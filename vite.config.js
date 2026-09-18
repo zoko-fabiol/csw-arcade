@@ -168,43 +168,54 @@ function nativeLauncherPlugin() {
   };
 }
 
+// Détection de l'environnement : Web pur (Netlify / PWA) vs Desktop Electron
+// Les plugins Electron ne sont activés QUE pour le build desktop dédié, jamais sur le web ou Netlify
+const isElectron = Boolean(
+  !process.env.NETLIFY && 
+  process.env.BUILD_TARGET !== 'web' && 
+  fs.existsSync(path.resolve(__dirname, 'electron/main.js')) &&
+  (process.env.ELECTRON === 'true' || process.env.npm_lifecycle_event === 'build:electron')
+);
+
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [
     react(),
     romStreamPlugin(),
     nativeLauncherPlugin(),
-    electron([
-      {
-        // Main process entry file of the Electron App.
-        entry: 'electron/main.js',
-        vite: {
-          build: {
-            outDir: 'dist-electron',
-            rollupOptions: {
-              external: ['electron']
+    ...(isElectron ? [
+      electron([
+        {
+          // Main process entry file of the Electron App.
+          entry: 'electron/main.js',
+          vite: {
+            build: {
+              outDir: 'dist-electron',
+              rollupOptions: {
+                external: ['electron']
+              }
             }
           }
-        }
-      },
-      {
-        // Preload scripts
-        entry: 'electron/preload.js',
-        onstart(options) {
-          // Notify the Renderer-Process to reload the page when the Preload-Scripts build is complete
-          options.reload();
         },
-        vite: {
-          build: {
-            outDir: 'dist-electron',
-            rollupOptions: {
-              external: ['electron']
+        {
+          // Preload scripts
+          entry: 'electron/preload.js',
+          onstart(options) {
+            // Notify the Renderer-Process to reload the page when the Preload-Scripts build is complete
+            options.reload();
+          },
+          vite: {
+            build: {
+              outDir: 'dist-electron',
+              rollupOptions: {
+                external: ['electron']
+              }
             }
           }
         }
-      }
-    ]),
-    renderer()
+      ]),
+      renderer()
+    ] : [])
   ],
   resolve: {
     alias: {
