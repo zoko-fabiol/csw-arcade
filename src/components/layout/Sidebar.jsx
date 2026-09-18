@@ -9,7 +9,8 @@ import {
   ShieldAlert, 
   CheckCircle2,
   RefreshCw,
-  Radio
+  Radio,
+  Download
 } from 'lucide-react';
 
 export function Sidebar({ 
@@ -36,14 +37,36 @@ export function Sidebar({
     'Platformer / Action'
   ];
 
+  const [deferredPrompt, setDeferredPrompt] = React.useState(null);
+
+  React.useEffect(() => {
+    const handleBeforeInstallPrompt = (e) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+    };
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+  }, []);
+
+  const handleInstallPwa = async () => {
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    if (outcome === 'accepted') {
+      setDeferredPrompt(null);
+    }
+  };
+
   return (
     <aside className="w-64 bg-neutral-900/90 border-r border-neutral-800 flex flex-col justify-between select-none h-screen backdrop-blur-md">
       {/* Brand Header */}
       <div>
         <div className="p-5 border-b border-neutral-800/80 flex items-center gap-3">
-          <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center shadow-lg shadow-cyan-500/20">
-            <Gamepad2 className="w-6 h-6 text-black stroke-[2.5]" />
-          </div>
+          <img 
+            src="/icons/icon-192.png" 
+            alt="CSW-Arcade" 
+            className="w-10 h-10 rounded-xl shadow-lg shadow-cyan-500/30 object-cover border border-cyan-500/40"
+          />
           <div>
             <h1 className="text-lg font-black tracking-wider text-white font-arcade uppercase">
               CSW<span className="text-cyan-400">.</span>ARCADE
@@ -155,6 +178,15 @@ export function Sidebar({
 
       {/* Footer Settings & Engine Info */}
       <div className="p-3 border-t border-neutral-800/80">
+        {deferredPrompt && (
+          <button
+            onClick={handleInstallPwa}
+            className="mb-2 w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-cyan-500/20 border border-cyan-400 text-cyan-300 hover:bg-cyan-500/30 text-xs font-bold font-mono transition-all animate-pulse"
+          >
+            <Download className="w-3.5 h-3.5 text-cyan-400" />
+            INSTALLER L'APP (PWA)
+          </button>
+        )}
         <button
           onClick={onOpenSettings}
           className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-xs font-medium text-neutral-400 hover:bg-neutral-800/60 hover:text-white transition-all"

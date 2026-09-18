@@ -8,18 +8,31 @@
       http-equiv="Content-Security-Policy"
       content="default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline' blob: https://cdn.emulatorjs.org; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.emulatorjs.org; font-src 'self' https://fonts.gstatic.com data:; connect-src 'self' ws: wss: https: http: data: blob:; img-src 'self' data: blob: https:; worker-src 'self' blob: https://cdn.emulatorjs.org; frame-src 'self' blob: data: https://cdn.emulatorjs.org;"
     />
+    <title>CSW-ARCADE</title>
+    <!-- PWA & Mobile Meta Tags -->
+    <meta name="theme-color" content="#00f0ff" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="CSW-Arcade" />
+    <meta name="application-name" content="CSW-Arcade" />
+    <meta name="description" content="Expérience NeoRAGEx Modernisée avec Émulateur FBNeo WebAssembly & WebRTC Netplay" />
+
+    <!-- Icons & Manifest -->
+    <link rel="icon" type="image/png" sizes="64x64" href="/favicon.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png" />
+    <link rel="manifest" href="/manifest.json" />
+
     <script>
-      // Nettoyage immédiat de tout ancien Service Worker fantôme présent sur ce port localhost
-      if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.getRegistrations().then(function(registrations) {
-          for (var r of registrations) {
-            r.unregister();
-            console.log('[CSW-Arcade] Ancien Service Worker orphelin purgé avec succès');
-          }
+      // Enregistrement du Service Worker PWA pour mode autonome et installation
+      if ('serviceWorker' in navigator && window.location.protocol.startsWith('http')) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js')
+            .then(reg => console.log('[PWA] Service Worker actif:', reg.scope))
+            .catch(err => console.warn('[PWA] Échec enregistrement SW:', err));
         });
       }
     </script>
-    <title>CSW-ARCADE</title>
   </head>
   <body class="bg-neutral-950 text-neutral-100 antialiased overflow-hidden select-none">
     <div id="root"></div>
