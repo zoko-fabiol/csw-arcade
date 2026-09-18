@@ -1,0 +1,808 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CSW-Arcade Neo Geo Player</title>
+  <style>
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      background-color: #050508;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, monospace;
+      color: #fff;
+    }
+
+    #game-wrapper {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    #game {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    #game canvas {
+      image-rendering: pixelated;
+    }
+
+    #loading-overlay {
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(circle at center, #0b0f19 0%, #030407 100%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      z-index: 10000;
+      transition: opacity 0.4s ease;
+    }
+
+    .neo-spinner {
+      width: 48px;
+      height: 48px;
+      border: 3px solid rgba(0, 240, 255, 0.15);
+      border-top-color: #00f0ff;
+      border-right-color: #ff0055;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .loading-title {
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 2px;
+      color: #00f0ff;
+      text-transform: uppercase;
+    }
+
+    .loading-sub {
+      font-size: 11px;
+      color: #94a3b8;
+    }
+
+    .loading-badge {
+      display: inline-block;
+      padding: 3px 8px;
+      background: rgba(0, 240, 255, 0.1);
+      border: 1px solid rgba(0, 240, 255, 0.3);
+      border-radius: 4px;
+      font-size: 10px;
+      color: #38bdf8;
+    }
+
+    #error-msg {
+      display: none;
+      color: #ef4444;
+      font-size: 11px;
+      max-width: 80%;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <div id="game-wrapper">
+    <div id="loading-overlay">
+      <div class="neo-spinner"></div>
+      <div class="loading-title">CSW-ARCADE NEO GEO ENGINE</div>
+      <div class="loading-sub" id="loading-desc">Chargement du ROMset FBNeo & BIOS...</div>
+      <div class="loading-badge" id="game-badge">MVS ARCADE</div>
+      <div id="error-msg"></div>
+    </div>
+    <div id="game"></div>
+  </div>
+
+  <script>
+    // Table officielle de mapping NeoRAGEx -> FBNeo MVS
+    const FBNEO_MVS_MAP = {
+  "2020superbaseball": "2020bb",
+  "3countbout": "3countb",
+  "aggressorsofdarkkombat": "aodk",
+  "alphamission2": "alpham2",
+  "androdunos": "androdun",
+  "artoffighting1": "aof",
+  "artoffighting2": "aof2",
+  "artoffighting3": "aof3",
+  "bakatonosmahjong": "bakatono",
+  "bangbead": "bangbead",
+  "baseballstars2": "bstars2",
+  "baseballstarsprofessional": "bstars",
+  "battleflipshot": "flipshot",
+  "blazingstar": "blazstar",
+  "bluesjourney": "bjourney",
+  "breakers": "breakers",
+  "breakersrevenge": "breakrev",
+  "burningfight": "burnfight",
+  "captaintomaday": "ctomada",
+  "columns": "columnsn",
+  "crossedswords": "crsword",
+  "crossedswords2": "crswd2bl",
+  "cyberlip": "cyberlip",
+  "doubledragon": "doubledr",
+  "eightman": "eightman",
+  "fatalfury1": "fatfury1",
+  "fatalfury2": "fatfury2",
+  "fatalfury3": "fatfury3",
+  "fatalfuryspecial": "fatfursp",
+  "fightfever": "fightfev",
+  "footballfrenzy": "fbfrenzy",
+  "galaxyfight": "galaxyfg",
+  "ganryu": "ganryu",
+  "garou": "garou",
+  "ghostlop": "ghostlop",
+  "ghostpilots": "gpilots",
+  "goalgoalgoal": "goalx3",
+  "gururin": "gururin",
+  "ironclad": "ironclad",
+  "kabukiklash": "kabukikl",
+  "karnovsrevenge": "karnovr",
+  "kingofthemonsters1": "kotm",
+  "kingofthemonsters2": "kotm2",
+  "kizunaencounter": "kizuna",
+  "kof94": "kof94",
+  "kof95": "kof95",
+  "kof96": "kof96",
+  "kof97": "kof97",
+  "kof97plus": "kof97pls",
+  "kof98": "kof98",
+  "kof99": "kof99",
+  "kof2000": "kof2000",
+  "kof2001": "kof2001",
+  "kof2002": "kof2002",
+  "kof2003": "kof2003",
+  "lastblade1": "lastblad",
+  "lastblade2": "lastbld2",
+  "thelastblade": "lastblad",
+  "thelastblade2": "lastbld2",
+  "legendofsuccessjoe": "legendos",
+  "magicaldrop2": "magdrop2",
+  "magicaldrop3": "magdrop3",
+  "maglord": "maglord",
+  "maglordh": "maglordh",
+  "matrimelee": "matrim",
+  "metalslug1": "mslug",
+  "metalslug": "mslug",
+  "metalslug2": "mslug2",
+  "metalslugx": "mslugx",
+  "metalslug3": "mslug3",
+  "metalslug4": "mslug4",
+  "metalslug5": "mslug5",
+  "moneyidleexchanger": "moneyex",
+  "mutationnation": "mutnat",
+  "nam1975": "nam1975",
+  "neobomberman": "neobombe",
+  "neodriftout": "neodrift",
+  "neomrdo": "neomrdo",
+  "ninjacommando": "ncommand",
+  "ninjamaster": "ninjamas",
+  "ninjamas": "ninjamas",
+  "overtop": "overtop",
+  "panicbomber": "panicbom",
+  "pleasuregoal": "pgoal",
+  "puzzled": "joyjoy",
+  "puzzledjoyjoykid": "joyjoy",
+  "puzzlebobble": "puzzledp",
+  "puzzlebobble2": "pbobbl2n",
+  "prehistoricisle2": "preisle2",
+  "pulstar": "pulstar",
+  "ragnagard": "ragnagrd",
+  "realboutfatalfury1": "rbff1",
+  "realboutfatalfury2": "rbff2",
+  "realboutfatalfuryspecial": "rbffspec",
+  "ridershero": "ridhero",
+  "robarmy": "robarma",
+  "rotd": "rotd",
+  "samuraishodown1": "samsho",
+  "samuraishodown2": "samsho2",
+  "samuraishodown3": "samsho3",
+  "samuraishodown4": "samsho4",
+  "samuraishodown5": "samsho5",
+  "samuraishodown5special": "samsh5sp",
+  "savagereign": "savagere",
+  "sengoku1": "sengoku",
+  "sengoku2": "sengoku2",
+  "sengoku3": "sengoku3",
+  "shocktroopers1": "shocktro",
+  "shocktroopers2": "shocktr2",
+  "snkvscapcom": "svc",
+  "svc": "svc",
+  "soccerbrawl": "socbrawl",
+  "spinmaster": "spinmast",
+  "stakewinners1": "stakwin",
+  "stakewinners2": "stakwin2",
+  "streethoop": "strhoop",
+  "superdodgeball": "sdodgeb",
+  "supersidekicks1": "ssideki",
+  "supersidekicks2": "ssideki2",
+  "supersidekicks3": "ssideki3",
+  "supersidekicks4": "ssideki4",
+  "tophunter": "tophuntr",
+  "topplayersgolf": "tpgolf",
+  "twinklestar": "twinspri",
+  "twinklestarsprites": "twinspri",
+  "viewpoint": "viewpoin",
+  "voltagefightergowcaizer": "gowcaizr",
+  "wakuwaku7": "wakuwak7",
+  "windjammers": "wjammers",
+  "worldheroes1": "wh1",
+  "worldheroes2": "wh2",
+  "worldheroes2jet": "wh2j",
+  "worldheroesperfect": "whp",
+  "zedblade": "zedblade",
+  "zupapa": "zupapa",
+  "cthd2003": "cthd2003",
+  "cthd2003s2": "cthd2003",
+  "cthd2003superplus": "cthd2003",
+  "jonasindiana": "legendos",
+  "jyanshindensetsu": "janshin",
+  "kingofgladiator": "kog",
+  "kof10th": "kof10th",
+  "kof10thextraplus": "kof10th",
+  "kof10thunique": "kof10th",
+  "kof2001plus": "kof2001",
+  "kof2001pluss2": "kof2001",
+  "kof2002magicplus": "kof2002",
+  "kof2002magicplus2": "kof2002",
+  "kof2002plus": "kof2002",
+  "kof2002pluss2": "kof2002",
+  "kof2002pluss3": "kof2002",
+  "kof2004hero": "kof2002",
+  "kof2004ultraplus": "kof2002",
+  "kof96bootleg": "kof96",
+  "kof97pluss2": "kof97pls",
+  "kofspecial2004": "kof2002",
+  "kofspecial2004plus": "kof2002",
+  "lansquenet2004": "shocktr2",
+  "lastresort": "lresort",
+  "leaguebowling": "lbowling",
+  "magicianlord": "maglord",
+  "mahjongkyoretsuden": "mahretsu",
+  "marukosdeluxequiz": "maruko",
+  "metalslug4plus": "mslug4",
+  "metalslug5plus": "mslug5",
+  "minnasanookagesa": "minnasno",
+  "moneyidolexchanger": "moneyex",
+  "neogeocup98": "neocup98",
+  "neomr.do": "neomrdo",
+  "neonopanepon": "joyjoy",
+  "neopong": "popbounc",
+  "neoturfmasters": "turfmast",
+  "nightmareinthedark": "nitd",
+  "ninjacombat": "ncombat",
+  "ninjamasters": "ninjamas",
+  "pochi&nyaa": "pnyaa",
+  "pokernight": "janshin",
+  "popnbounce": "popbounc",
+  "powerinstinctmatrimelee": "matrim",
+  "powerspikes2": "pspikes2",
+  "puzzlebobble1": "pbobblen",
+  "puzzledepon": "puzzledp",
+  "puzzledeponr": "puzzldpr",
+  "quizdaisousasen1": "quizdais",
+  "quizdaisousasen2": "quizdai2",
+  "quizkingoffighters": "quizkof",
+  "rageofthedragons": "rotd",
+  "ridinghero": "ridhero",
+  "roboarmy": "robarma",
+  "snkvscapcomplus": "svc",
+  "snkvscapcompluss2": "svc",
+  "snkvscapcomsuperplus": "svc",
+  "sonicwings2": "sonicwi2",
+  "sonicwings3": "sonicwi3",
+  "stakeswinner1": "stakwin",
+  "stakeswinner2": "stakwin2",
+  "strikers1945plus": "s1945p",
+  "syouginotatsujin": "shogism",
+  "tecmoworldsoccer96": "tws96",
+  "thelastblade1": "lastblad",
+  "thesuperspy": "superspy",
+  "theultimate2": "ssideki4",
+  "thrashrally": "trally",
+  "zintrick": "zintrckn"
+};
+
+    // Parsing des paramètres passés par CSW-Arcade
+    const params = new URLSearchParams(window.location.search);
+    const rawGame = params.get('game') || 'androdunos.zip';
+
+    let activeSettings = {};
+    try {
+      const sParam = params.get('settings');
+      if (sParam) {
+        activeSettings = JSON.parse(decodeURIComponent(sParam));
+      } else {
+        const stored = localStorage.getItem('csw_arcade_settings_v1');
+        if (stored) activeSettings = JSON.parse(stored);
+      }
+    } catch(e) {
+      console.warn('[Player] Échec parsing settings:', e);
+    }
+
+    // Dictionnaire exhaustif de conversion KeyboardEvent.code -> numeric keyCode
+    const CODE_TO_KEYCODE = {
+      KeyA: 65, KeyB: 66, KeyC: 67, KeyD: 68, KeyE: 69, KeyF: 70, KeyG: 71, KeyH: 72,
+      KeyI: 73, KeyJ: 74, KeyK: 75, KeyL: 76, KeyM: 77, KeyN: 78, KeyO: 79, KeyP: 80,
+      KeyQ: 81, KeyR: 82, KeyS: 83, KeyT: 84, KeyU: 85, KeyV: 86, KeyW: 87, KeyX: 88,
+      KeyY: 89, KeyZ: 90,
+      Digit0: 48, Digit1: 49, Digit2: 50, Digit3: 51, Digit4: 52, Digit5: 53,
+      Digit6: 54, Digit7: 55, Digit8: 56, Digit9: 57,
+      Numpad0: 96, Numpad1: 97, Numpad2: 98, Numpad3: 99, Numpad4: 100,
+      Numpad5: 101, Numpad6: 102, Numpad7: 103, Numpad8: 104, Numpad9: 105,
+      ArrowLeft: 37, ArrowUp: 38, ArrowRight: 39, ArrowDown: 40,
+      Space: 32, Enter: 13, Tab: 9, Escape: 27, Backspace: 8,
+      ShiftLeft: 16, ShiftRight: 16, ControlLeft: 17, ControlRight: 17, AltLeft: 18, AltRight: 18
+    };
+
+    function getKeyCode(code, fallback) {
+      if (typeof code === 'number') return code;
+      if (!code) return fallback;
+      return CODE_TO_KEYCODE[code] || fallback;
+    }
+
+    // Construction de la configuration de contrôles RetroArch / EmulatorJS
+    // Pour Neo Geo FBNeo:
+    // 0 = RetroPad B -> Neo Geo Bouton A
+    // 8 = RetroPad A -> Neo Geo Bouton B
+    // 1 = RetroPad Y -> Neo Geo Bouton C
+    // 9 = RetroPad X -> Neo Geo Bouton D
+    // 4 = HAUT, 5 = BAS, 6 = GAUCHE, 7 = DROITE
+    // 2 = SELECT (Coin/Crédit), 3 = START
+    function buildControllersConfig(controls) {
+      const p1 = controls?.p1 || {};
+      const p2 = controls?.p2 || {};
+
+      return {
+        0: {
+          4: { value: getKeyCode(p1.up, 87), value2: "DPAD_UP" },      // W
+          5: { value: getKeyCode(p1.down, 83), value2: "DPAD_DOWN" },    // S
+          6: { value: getKeyCode(p1.left, 65), value2: "DPAD_LEFT" },    // A
+          7: { value: getKeyCode(p1.right, 68), value2: "DPAD_RIGHT" },  // D
+          0: { value: getKeyCode(p1.a, 74), value2: "BUTTON_2" },        // J -> Neo Geo Bouton A
+          8: { value: getKeyCode(p1.b, 75), value2: "BUTTON_1" },        // K -> Neo Geo Bouton B
+          1: { value: getKeyCode(p1.c, 85), value2: "BUTTON_4" },        // U -> Neo Geo Bouton C
+          9: { value: getKeyCode(p1.d, 73), value2: "BUTTON_3" },        // I -> Neo Geo Bouton D
+          2: { value: getKeyCode(p1.coin, 53), value2: "SELECT" },       // 5 -> Coin / Crédit
+          3: { value: getKeyCode(p1.start, 49), value2: "START" }        // 1 -> Start
+        },
+        1: {
+          4: { value: getKeyCode(p2.up, 38), value2: "DPAD_UP" },        // Flèche Haut
+          5: { value: getKeyCode(p2.down, 40), value2: "DPAD_DOWN" },    // Flèche Bas
+          6: { value: getKeyCode(p2.left, 37), value2: "DPAD_LEFT" },    // Flèche Gauche
+          7: { value: getKeyCode(p2.right, 39), value2: "DPAD_RIGHT" },  // Flèche Droite
+          0: { value: getKeyCode(p2.a, 100), value2: "BUTTON_2" },       // Numpad 4 -> Bouton A
+          8: { value: getKeyCode(p2.b, 101), value2: "BUTTON_1" },       // Numpad 5 -> Bouton B
+          1: { value: getKeyCode(p2.c, 103), value2: "BUTTON_4" },       // Numpad 7 -> Bouton C
+          9: { value: getKeyCode(p2.d, 104), value2: "BUTTON_3" },       // Numpad 8 -> Bouton D
+          2: { value: getKeyCode(p2.coin, 54), value2: "SELECT" },       // 6 -> Coin
+          3: { value: getKeyCode(p2.start, 50), value2: "START" }        // 2 -> Start
+        },
+        2: {},
+        3: {}
+      };
+    }
+
+    // Construction des options système RetroArch FBNeo (MVS vs AES et Région)
+    function buildCoreOptions(system) {
+      const isAes = system?.biosMode === 'aes';
+      const region = system?.region || 'europe';
+
+      let modeVal = isAes ? 'AES Europe/Asia' : 'MVS Europe';
+      if (region === 'japan') {
+        modeVal = isAes ? 'AES Japan' : 'MVS Japan';
+      } else if (region === 'usa') {
+        modeVal = isAes ? 'AES USA' : 'MVS USA';
+      }
+
+      return {
+        'fbneo-neogeo-mode': modeVal,
+        'fbneo-cpu-speed-adjust': '100',
+        'fbneo-diagnostic-input': 'Hold Start'
+      };
+    }
+
+    // --- PILOTE D'INPUTS DIRECT & UNIVERSEL CSW-ARCADE ---
+    // RetroPad IDs pour le core FBNeo Neo Geo:
+    // 0: Neo Geo Bouton A (Poing Faible)
+    // 8: Neo Geo Bouton B (Pied Faible)
+    // 1: Neo Geo Bouton C (Poing Fort)
+    // 9: Neo Geo Bouton D (Pied Fort)
+    // 2: Coin / Crédit (Select)
+    // 3: Start
+    // 4: Haut, 5: Bas, 6: Gauche, 7: Droite
+
+    const ACTION_TO_RETROPAD = {
+      a: 0,
+      b: 8,
+      c: 1,
+      d: 9,
+      coin: 2,
+      start: 3,
+      up: 4,
+      down: 5,
+      left: 6,
+      right: 7
+    };
+
+    let keyToInputMap = {};
+
+    function rebuildKeyMap(controls) {
+      keyToInputMap = {};
+      const p1 = controls?.p1 || {};
+      const p2 = controls?.p2 || {};
+
+      for (const [action, btnId] of Object.entries(ACTION_TO_RETROPAD)) {
+        if (p1[action]) {
+          keyToInputMap[p1[action]] = { player: 0, buttonId: btnId };
+        }
+        if (p2[action]) {
+          keyToInputMap[p2[action]] = { player: 1, buttonId: btnId };
+        }
+      }
+    }
+
+    rebuildKeyMap(activeSettings.controls);
+
+    function dispatchDirectInput(player, buttonId, isPressed) {
+      if (window.EJS_emulator?.gameManager?.simulateInput) {
+        window.EJS_emulator.gameManager.simulateInput(player, buttonId, isPressed ? 1 : 0);
+      }
+    }
+
+    function handleDirectKey(code, keyCode, isDown) {
+      const binding = keyToInputMap[code];
+      if (binding) {
+        dispatchDirectInput(binding.player, binding.buttonId, isDown);
+        return true;
+      }
+      return false;
+    }
+
+    window.addEventListener('keydown', (e) => {
+      if (handleDirectKey(e.code, e.keyCode, true)) {
+        e.preventDefault();
+      }
+    });
+
+    window.addEventListener('keyup', (e) => {
+      if (handleDirectKey(e.code, e.keyCode, false)) {
+        e.preventDefault();
+      }
+    });
+
+    // Boucle de polling Gamepad 60 FPS
+    const lastGamepadState = { 0: {}, 1: {} };
+
+    function pollGamepadsLoop() {
+      if (window.EJS_emulator?.gameManager?.simulateInput && navigator.getGamepads) {
+        const gamepads = navigator.getGamepads();
+        const p1Idx = activeSettings.gamepad?.p1Index ?? 0;
+        const p2Idx = activeSettings.gamepad?.p2Index ?? 1;
+        const p1Gp = gamepads[p1Idx] || null;
+        const p2Gp = gamepads[p2Idx] || null;
+
+        const processPad = (gp, playerIdx) => {
+          if (!gp || !gp.connected) return;
+          const buttons = gp.buttons;
+          const axes = gp.axes;
+
+          const checkBtn = (btnId, isPressed) => {
+            const prev = !!lastGamepadState[playerIdx][btnId];
+            if (prev !== isPressed) {
+              lastGamepadState[playerIdx][btnId] = isPressed;
+              dispatchDirectInput(playerIdx, btnId, isPressed);
+            }
+          };
+
+          // D-Pad + Analog Stick selon le mode (both / dpad / analog)
+          const dpadMode = activeSettings.gamepad?.dpadMode || 'both';
+          const useDpad = dpadMode === 'both' || dpadMode === 'dpad';
+          const useAnalog = dpadMode === 'both' || dpadMode === 'analog';
+
+          const up = (useDpad && !!buttons[12]?.pressed) || (useAnalog && axes[1] < -0.4);
+          const down = (useDpad && !!buttons[13]?.pressed) || (useAnalog && axes[1] > 0.4);
+          const left = (useDpad && !!buttons[14]?.pressed) || (useAnalog && axes[0] < -0.4);
+          const right = (useDpad && !!buttons[15]?.pressed) || (useAnalog && axes[0] > 0.4);
+
+          checkBtn(4, up);
+          checkBtn(5, down);
+          checkBtn(6, left);
+          checkBtn(7, right);
+
+          // Boutons Neo Geo configurés ou standards
+          const custom = activeSettings.gamepad?.buttons || {};
+          const btnAIdx = custom.a ?? 0;
+          const btnBIdx = custom.b ?? 1;
+          const btnCIdx = custom.c ?? 2;
+          const btnDIdx = custom.d ?? 3;
+          const coinIdx = custom.coin ?? 8;
+          const startIdx = custom.start ?? 9;
+
+          checkBtn(0, !!buttons[btnAIdx]?.pressed); // Bouton A (RetroPad B: 0)
+          checkBtn(8, !!buttons[btnBIdx]?.pressed); // Bouton B (RetroPad A: 8)
+          checkBtn(1, !!buttons[btnCIdx]?.pressed); // Bouton C (RetroPad Y: 1)
+          checkBtn(9, !!buttons[btnDIdx]?.pressed); // Bouton D (RetroPad X: 9)
+          checkBtn(2, !!buttons[coinIdx]?.pressed || !!buttons[8]?.pressed); // Coin (Select)
+          checkBtn(3, !!buttons[startIdx]?.pressed || !!buttons[9]?.pressed); // Start
+        };
+
+        if (p1Gp) processPad(p1Gp, 0);
+        if (p2Gp && p2Idx !== p1Idx) processPad(p2Gp, 1);
+      }
+
+      requestAnimationFrame(pollGamepadsLoop);
+    }
+    requestAnimationFrame(pollGamepadsLoop);
+
+    // Contrôle direct de l'affichage vidéo (Résolution, Format & Filtres)
+    function applyDirectVideoStyles(video) {
+      if (!video) return;
+      const canvas = document.querySelector('#game canvas');
+      if (!canvas) return;
+
+      canvas.style.imageRendering = video.filter === 'smooth' ? 'auto' : 'pixelated';
+
+      const ratio = video.aspectRatio || '4:3';
+      if (ratio === '16:9') {
+        canvas.style.setProperty('width', '100%', 'important');
+        canvas.style.setProperty('height', '100%', 'important');
+        canvas.style.setProperty('max-width', '100%', 'important');
+        canvas.style.setProperty('max-height', '100%', 'important');
+        canvas.style.setProperty('object-fit', 'fill', 'important');
+      } else if (ratio === 'pixel-perfect') {
+        canvas.style.setProperty('width', '640px', 'important');
+        canvas.style.setProperty('height', '448px', 'important');
+        canvas.style.setProperty('max-width', 'none', 'important');
+        canvas.style.setProperty('max-height', 'none', 'important');
+        canvas.style.setProperty('object-fit', 'contain', 'important');
+      } else {
+        canvas.style.setProperty('width', 'auto', 'important');
+        canvas.style.setProperty('height', '100%', 'important');
+        canvas.style.setProperty('max-width', '100%', 'important');
+        canvas.style.setProperty('max-height', '100%', 'important');
+        canvas.style.setProperty('aspect-ratio', '4/3', 'important');
+        canvas.style.setProperty('object-fit', 'contain', 'important');
+      }
+    }
+
+    // Application des paramètres en direct
+    function applyLiveSettings(settings) {
+      if (!settings) return;
+      activeSettings = settings;
+
+      // 1. Audio
+      if (settings.audio && window.EJS_emulator) {
+        const isMuted = !!settings.audio.muted;
+        const targetVol = isMuted ? 0 : ((settings.audio.volume ?? 85) / 100);
+        window.EJS_emulator.muted = isMuted;
+        if (typeof window.EJS_emulator.setVolume === 'function') {
+          window.EJS_emulator.setVolume(targetVol);
+        }
+      }
+
+      // 2. Filtre vidéo & Résolution
+      applyDirectVideoStyles(settings.video);
+
+      // 3. Contrôles clavier
+      if (settings.controls) {
+        rebuildKeyMap(settings.controls);
+        const newControls = buildControllersConfig(settings.controls);
+        if (window.EJS_emulator) {
+          window.EJS_emulator.controls = newControls;
+          window.EJS_emulator.defaultControllers = newControls;
+          if (typeof window.EJS_emulator.setupKeys === 'function') {
+            window.EJS_emulator.setupKeys();
+          }
+        }
+      }
+
+      // 4. Système & BIOS (MVS vs AES / Région)
+      if (settings.system && window.EJS_emulator?.gameManager?.setVariable) {
+        const coreOptions = buildCoreOptions(settings.system);
+        for (const [key, val] of Object.entries(coreOptions)) {
+          try {
+            window.EJS_emulator.gameManager.setVariable(key, val);
+          } catch(e) {}
+        }
+      }
+    }
+
+    // Résolution du nom standard FBNeo
+    const cleanInput = rawGame.replace(/\.(zip|bin|dat|rom)$/i, '').toLowerCase();
+    const fbneoShortName = FBNEO_MVS_MAP[cleanInput] || cleanInput;
+    const targetZipName = fbneoShortName + '.zip';
+
+    const overlay = document.getElementById('loading-overlay');
+    const loadingDesc = document.getElementById('loading-desc');
+    const errorMsg = document.getElementById('error-msg');
+    const gameBadge = document.getElementById('game-badge');
+    gameBadge.innerText = fbneoShortName.toUpperCase() + (activeSettings.system?.biosMode === 'aes' ? ' (AES CONSOLE)' : ' (MVS ARCADE)');
+
+    let neogeoBytes = null;
+    let romBytes = null;
+
+    // Pré-chargement asynchrone bloquant AVANT initialisation du runtime WASM
+    async function preloadAssetsAndBoot() {
+      try {
+        loadingDesc.innerText = `Vérification et synchronisation de ${targetZipName}...`;
+
+        const [biosBuffer, romBuffer] = await Promise.all([
+          fetch('/api/rom-data/neogeo').then(r => {
+            if (!r.ok) throw new Error('Échec HTTP BIOS: ' + r.status);
+            return r.arrayBuffer();
+          }),
+          fetch('/api/rom-data/' + encodeURIComponent(fbneoShortName)).then(r => {
+            if (!r.ok) throw new Error('Échec HTTP ROM: ' + r.status);
+            return r.arrayBuffer();
+          })
+        ]);
+
+        neogeoBytes = new Uint8Array(biosBuffer);
+        romBytes = new Uint8Array(romBuffer);
+
+        if (window.parent) {
+          window.parent.postMessage({ type: 'ROM_DOWNLOADED', game: rawGame, shortName: fbneoShortName }, '*');
+        }
+
+        console.log(`[VFS Preload] BIOS: ${neogeoBytes.length} octets | ROM: ${romBytes.length} octets`);
+        loadingDesc.innerText = 'Démarrage du Core WebAssembly FBNeo...';
+
+        startEmulatorJS();
+      } catch (err) {
+        console.error('[CSW-Arcade] Erreur préchargement VFS:', err);
+        errorMsg.style.display = 'block';
+        errorMsg.innerText = 'Erreur: ' + err.message;
+      }
+    }
+
+    function startEmulatorJS() {
+      const initialVol = activeSettings.audio?.muted ? 0 : ((activeSettings.audio?.volume ?? 85) / 100);
+
+      window.EJS_player = '#game';
+      window.EJS_core = 'arcade';
+      window.EJS_gameName = fbneoShortName.toUpperCase();
+      window.EJS_gameUrl = '/api/rom-data/' + encodeURIComponent(targetZipName);
+      window.EJS_pathtodata = 'https://cdn.emulatorjs.org/stable/data/';
+      window.EJS_startOnLoaded = true;
+      window.EJS_volume = initialVol;
+      window.EJS_color = '#00f0ff';
+      window.EJS_alignStartButton = 'center';
+
+      // Application des contrôles personnalisés CSW-Arcade
+      window.EJS_defaultControls = buildControllersConfig(activeSettings.controls);
+      window.EJS_defaultOptions = buildCoreOptions(activeSettings.system);
+
+      window.EJS_ready = () => {
+        console.log('[VFS Injection] EJS_ready reçu, interception synchrone startGame...');
+        const emu = window.EJS_emulator;
+        if (!emu) return;
+
+        // Assurer l'application des contrôles configurés dans l'instance
+        emu.controls = buildControllersConfig(activeSettings.controls);
+        if (typeof emu.setupKeys === 'function') emu.setupKeys();
+
+        const origStartGame = emu.startGame.bind(emu);
+
+        // Fonction d'interception 100% SYNCHRONE (pas de async/await ici)
+        emu.startGame = function() {
+          console.log('[VFS Injection] Écriture synchrone des archives dans Emscripten VFS...');
+          try {
+            const fs = emu.gameManager?.FS;
+            if (fs) {
+              const writeToVFS = (virtualPath, data) => {
+                try {
+                  const parts = virtualPath.split('/');
+                  let current = '';
+                  for (let i = 0; i < parts.length - 1; i++) {
+                    if (parts[i]) {
+                      current += '/' + parts[i];
+                      try { fs.mkdir(current); } catch(e) {}
+                    }
+                  }
+                  fs.writeFile(virtualPath, data);
+                } catch(e) {}
+              };
+
+              // A. Injection du BIOS Neo Geo dans tous les chemins scrutés
+              writeToVFS('/neogeo.zip', neogeoBytes);
+              writeToVFS('neogeo.zip', neogeoBytes);
+              writeToVFS('/home/web_user/retroarch/userdata/system/neogeo.zip', neogeoBytes);
+              writeToVFS('/home/web_user/retroarch/userdata/neogeo.zip', neogeoBytes);
+              writeToVFS('/home/web_user/retroarch/userdata/content/neogeo.zip', neogeoBytes);
+
+              // B. Injection de la ROM du jeu
+              writeToVFS('/' + targetZipName, romBytes);
+              writeToVFS(targetZipName, romBytes);
+              writeToVFS('/home/web_user/retroarch/userdata/' + targetZipName, romBytes);
+              writeToVFS('/home/web_user/retroarch/userdata/content/' + targetZipName, romBytes);
+
+              if (emu.fileName && emu.fileName !== targetZipName) {
+                writeToVFS('/' + emu.fileName, romBytes);
+                writeToVFS(emu.fileName, romBytes);
+              }
+
+              console.log('[VFS Injection] Injection terminée avec succès dans le VFS !');
+            }
+          } catch(err) {
+            console.error('[VFS Injection] Erreur VFS:', err);
+          }
+
+          return origStartGame();
+        };
+      };
+
+      window.EJS_onGameStart = () => {
+        console.log('[CSW-Arcade] Jeu Neo Geo démarré à 60 FPS !');
+        overlay.style.opacity = '0';
+        setTimeout(() => { overlay.style.display = 'none'; }, 400);
+
+        // Application immédiate de la résolution, de l'aspect ratio et des filtres
+        applyDirectVideoStyles(activeSettings.video);
+
+        // Application du volume initial
+        if (activeSettings.audio && window.EJS_emulator) {
+          const isMuted = !!activeSettings.audio.muted;
+          const targetVol = isMuted ? 0 : ((activeSettings.audio.volume ?? 85) / 100);
+          window.EJS_emulator.muted = isMuted;
+          if (typeof window.EJS_emulator.setVolume === 'function') {
+            window.EJS_emulator.setVolume(targetVol);
+          }
+        }
+
+        if (window.parent) {
+          window.parent.postMessage({ type: 'EJS_GAME_STARTED', game: rawGame }, '*');
+          window.parent.postMessage({ type: 'ROM_DOWNLOADED', game: rawGame }, '*');
+        }
+      };
+
+      window.EJS_disableLocalStorage = true;
+
+      // Écoute des mises à jour dynamiques depuis CSW-Arcade (SettingsModal) et transferts de touches
+      window.addEventListener('message', (event) => {
+        if (!event.data) return;
+        if (event.data.type === 'UPDATE_SETTINGS' && event.data.settings) {
+          applyLiveSettings(event.data.settings);
+        }
+        if (event.data.type === 'KEY_EVENT') {
+          handleDirectKey(event.data.code, event.data.keyCode, event.data.eventType === 'keydown');
+        }
+        if (event.data.type === 'TOUCH_INPUT') {
+          dispatchDirectInput(0, event.data.buttonId, event.data.isPressed);
+        }
+      });
+
+      const s = document.createElement('script');
+      s.src = 'https://cdn.emulatorjs.org/stable/data/loader.js';
+      s.async = true;
+      s.onerror = (e) => {
+        console.error('[Player] Erreur chargement loader.js', e);
+        errorMsg.style.display = 'block';
+        errorMsg.innerText = 'Erreur: Impossible de charger le moteur WebAssembly.';
+      };
+      document.body.appendChild(s);
+    }
+
+    // Déclencher le préchargement
+    preloadAssetsAndBoot();
+  </script>
+</body>
+</html>

@@ -1,0 +1,183 @@
+import React, { useState } from 'react';
+import gamesData from './data/games.json';
+import { useRomAudit } from './hooks/useRomAudit';
+import { useSettings } from './hooks/useSettings';
+import { Sidebar } from './components/layout/Sidebar';
+import { GameLibrary } from './components/games/GameLibrary';
+import { EmulatorCore } from './components/emulator/EmulatorCore';
+import { NetplayLobbyModal } from './components/netplay/NetplayLobbyModal';
+import { WebRTCNetplayDemo } from './components/netplay/WebRTCNetplayDemo';
+import { SettingsModal } from './components/settings/SettingsModal';
+
+import { launchNativeNeoRAGEx } from './services/nativeLauncher';
+
+export default function App() {
+  const [selectedGenre, setSelectedGenre] = useState('Tous les Jeux');
+  const [activeGame, setActiveGame] = useState(null);
+  const [gameMode, setGameMode] = useState(null); // 'solo' | 'netplay'
+  const [nativeStatus, setNativeStatus] = useState(null);
+
+  // État Modales
+  const [isLobbyOpen, setIsLobbyOpen] = useState(false);
+  const [isWebRtcTestOpen, setIsWebRtcTestOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+
+  // État Session Netplay
+  const [netplaySession, setNetplaySession] = useState({
+    service: null,
+    isHost: true
+  });
+
+  // Audit des ROMs locales
+  const {
+    availableRoms,
+    isBiosReady,
+    refreshAudit,
+    isRomAvailable
+  } = useRomAudit();
+
+  // Gestionnaire de paramètres matériels NeoRAGEx
+  const {
+    settings,
+    updateKeyBinding,
+    updateVideoSetting,
+    updateAudioSetting,
+    updateSystemSetting,
+    updateGamepadSetting,
+    updateTouchSetting,
+    resetToDefaults
+  } = useSettings();
+
+  // Lancement Solo In-App WebAssembly (FBNeo 60 FPS)
+  const handleLaunchSolo = (game) => {
+    setActiveGame(game);
+    setGameMode('solo');
+  };
+
+  // Lancement direct du moteur NeoRAGEx
+  const handleLaunchNativeGeneral = async () => {
+    setNativeStatus('Démarrage du moteur natif NeoRAGEx 5.0...');
+    const res = await launchNativeNeoRAGEx({ settings });
+    if (res.success) {
+      setNativeStatus(`NeoRAGEx 5.0 démarré (PID: ${res.pid})`);
+      setTimeout(() => setNativeStatus(null), 4000);
+    } else {
+      setNativeStatus(`Erreur: ${res.error}`);
+      setTimeout(() => setNativeStatus(null), 5000);
+    }
+  };
+
+  // Clic 1v1 Netplay
+  const handleLaunchNetplay = (game) => {
+    setIsLobbyOpen(true);
+  };
+
+  // Démarrage effectif du match Netplay
+  const handleStartNetplayGame = ({ game, isHost, netplayService }) => {
+    setIsLobbyOpen(false);
+    setNetplaySession({
+      service: netplayService,
+      isHost
+    });
+    setActiveGame(game);
+    setGameMode('netplay');
+  };
+
+  // Quitter le jeu et libérer les ressources
+  const handleExitGame = () => {
+    if (netplaySession.service) {
+      netplaySession.service.disconnect();
+      setNetplaySession({ service: null, isHost: true });
+    }
+    setActiveGame(null);
+    setGameMode(null);
+  };
+
+  const installedCount = gamesData.filter(g => isRomAvailable(g.filename)).length;
+
+  return (
+    <div className="flex h-screen w-screen overflow-hidden bg-neutral-950 font-sans">
+      {/* Sidebar de navigation */}
+      <Sidebar
+        selectedGenre={selectedGenre}
+        onSelectGenre={setSelectedGenre}
+        isBiosReady={isBiosReady}
+        availableCount={installedCount}
+        totalCount={gamesData.length}
+        onRefreshAudit={refreshAudit}
+        onOpenNetplayLobby={() => setIsLobbyOpen(true)}
+        onOpenWebRtcTest={() => setIsWebRtcTestOpen(true)}
+        onOpenSettings={() => setIsSettingsOpen(true)}
+        onLaunchNative={handleLaunchNativeGeneral}
+      />
+
+      {/* Toast Notification Lancement Natif */}
+      {nativeStatus && (
+        <div className="fixed top-6 right-6 z-50 flex items-center gap-3 px-5 py-3 rounded-xl bg-cyan-950 border border-cyan-500/60 text-cyan-300 font-mono text-xs shadow-2xl backdrop-blur-md animate-in fade-in slide-in-from-top-4">
+          <span className="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-ping" />
+          <span className="font-bold">{nativeStatus}</span>
+        </div>
+      )}
+
+      {/* Catalogue des 181 jeux */}
+      <GameLibrary
+        games={gamesData}
+        selectedGenre={selectedGenre}
+        isBiosReady={isBiosReady}
+        isRomAvailable={isRomAvailable}
+        onLaunchSolo={handleLaunchSolo}
+        onLaunchNetplay={handleLaunchNetplay}
+      />
+
+      {/* Modal Matchmaking Netplay Firestore / WebRTC */}
+      <NetplayLobbyModal
+        isOpen={isLobbyOpen}
+        onClose={() => setIsLobbyOpen(false)}
+        games={gamesData}
+        onStartNetplayGame={handleStartNetplayGame}
+      />
+
+      {/* Modal Démonstrateur WebRTC 60 FPS (UDP-like) */}
+      {isWebRtcTestOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4">
+          <div className="relative w-full max-w-2xl">
+            <button
+              onClick={() => setIsWebRtcTestOpen(false)}
+              className="absolute -top-10 right-0 text-neutral-400 hover:text-white font-mono text-xs bg-neutral-900 border border-neutral-800 px-3 py-1 rounded-lg"
+            >
+              FERMER [ESC]
+            </button>
+            <WebRTCNetplayDemo />
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Configuration Matérielle NeoRAGEx */}
+      <SettingsModal
+        isOpen={isSettingsOpen}
+        onClose={() => setIsSettingsOpen(false)}
+        settings={settings}
+        updateKeyBinding={updateKeyBinding}
+        updateVideoSetting={updateVideoSetting}
+        updateAudioSetting={updateAudioSetting}
+        updateSystemSetting={updateSystemSetting}
+        updateGamepadSetting={updateGamepadSetting}
+        updateTouchSetting={updateTouchSetting}
+        resetToDefaults={resetToDefaults}
+      />
+
+      {/* Vue Plein Écran de l'Émulateur */}
+      {activeGame && (
+        <EmulatorCore
+          game={activeGame}
+          mode={gameMode}
+          settings={settings}
+          onExit={handleExitGame}
+          onOpenSettings={() => setIsSettingsOpen(true)}
+          netplayService={netplaySession.service}
+          isHost={netplaySession.isHost}
+        />
+      )}
+    </div>
+  );
+}

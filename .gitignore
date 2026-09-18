@@ -1,0 +1,33 @@
+# Dépendances
+node_modules/
+
+# Builds et exécutables Electron
+dist/
+dist-electron/
+release/
+build/
+*.exe
+*.dmg
+*.AppImage
+
+# Dossier Electron
+electron/
+
+# ROMs téléchargées et archives volumineuses
+*.zip
+*.7z
+*.rar
+*.bin
+*.iso
+public/roms/*.zip
+!public/roms/.gitkeep
+temp_nonmerged/
+neogeo.zip
+-C
+
+# Fichiers temporaires et éditeurs
+scratch/
+.vscode/
+*.log
+.DS_Store
+Thumbs.db

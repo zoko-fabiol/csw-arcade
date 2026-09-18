@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>Test Neo Geo WASM</title>
+  <style>
+    body, html { margin: 0; padding: 0; width: 100%; height: 100%; background: #0a0a0c; color: #fff; font-family: monospace; }
+    #game-container { width: 100%; height: 90vh; }
+    #log { height: 10vh; padding: 10px; background: #111; overflow: auto; font-size: 11px; }
+  </style>
+</head>
+<body>
+  <div id="log">Initialisation du test...</div>
+  <div id="game-container"></div>
+
+  <script>
+    const log = (msg) => {
+      const el = document.getElementById('log');
+      el.innerHTML += '<br>' + msg;
+      console.log(msg);
+    };
+
+    let neogeoBytes = null;
+    let romBytes = null;
+
+    // Pré-téléchargement instantané en parallèle via endpoint binaire sans extension
+    log('Pré-chargement du BIOS et de la ROM en mémoire...');
+    Promise.all([
+      fetch('/api/rom-data/neogeo').then(r => {
+        log('neogeo fetch status: ' + r.status + ', len header: ' + r.headers.get('content-length'));
+        return r.arrayBuffer();
+      }).then(b => {
+        neogeoBytes = new Uint8Array(b);
+        log('BIOS en mémoire: ' + neogeoBytes.length + ' octets');
+      }),
+      fetch('/api/rom-data/androdun').then(r => {
+        log('androdun fetch status: ' + r.status + ', len header: ' + r.headers.get('content-length'));
+        return r.arrayBuffer();
+      }).then(b => {
+        romBytes = new Uint8Array(b);
+        log('ROM en mémoire: ' + romBytes.length + ' octets');
+      })
+    ]).catch(err => log('Erreur préchargement: ' + err.message));
+
+    window.EJS_player = '#game-container';
+    window.EJS_core = 'arcade';
+    window.EJS_gameUrl = '/api/rom/androdun.zip';
+    window.EJS_pathtodata = 'https://cdn.emulatorjs.org/stable/data/';
+    window.EJS_startOnLoaded = true;
+
+    window.EJS_ready = () => {
+      log('>>> EJS_ready reçu !');
+      const emu = window.EJS_emulator;
+      if (!emu) return;
+
+      const origStartGame = emu.startGame.bind(emu);
+      emu.startGame = function() {
+        log('>>> Interception SYNCHRONE de startGame !');
+        try {
+          const fs = emu.gameManager?.FS;
+          if (fs) {
+            const writeTo = (p, data) => {
+              try {
+                const parts = p.split('/');
+                let cur = '';
+                for (let i = 0; i < parts.length - 1; i++) {
+                  if (parts[i]) {
+                    cur += '/' + parts[i];
+                    try { fs.mkdir(cur); } catch(e) {}
+                  }
+                }
+                fs.writeFile(p, data);
+                log('Injecté dans FS: ' + p + ' (' + data.length + ' octets)');
+              } catch(e) {
+                log('Erreur injection ' + p + ': ' + e.message);
+              }
+            };
+
+            if (neogeoBytes && neogeoBytes.length > 0) {
+              writeTo('/neogeo.zip', neogeoBytes);
+              writeTo('neogeo.zip', neogeoBytes);
+              writeTo('/home/web_user/retroarch/userdata/system/neogeo.zip', neogeoBytes);
+              writeTo('/home/web_user/retroarch/userdata/neogeo.zip', neogeoBytes);
+              writeTo('/home/web_user/retroarch/userdata/content/neogeo.zip', neogeoBytes);
+            } else {
+              log('ATTENTION: neogeoBytes est vide !');
+            }
+
+            if (romBytes && romBytes.length > 0) {
+              writeTo('/androdun.zip', romBytes);
+              writeTo('androdun.zip', romBytes);
+              writeTo('/home/web_user/retroarch/userdata/androdun.zip', romBytes);
+              writeTo('/home/web_user/retroarch/userdata/content/androdun.zip', romBytes);
+            } else {
+              log('ATTENTION: romBytes est vide !');
+            }
+
+            log('Vérification FS racine: ' + JSON.stringify(fs.readdir('/')));
+            try {
+              log('Vérification FS system: ' + JSON.stringify(fs.readdir('/home/web_user/retroarch/userdata/system')));
+            } catch(e) {}
+          }
+        } catch(err) {
+          log('Erreur injection: ' + err.message);
+        }
+
+        log('Démarrage de origStartGame()...');
+        return origStartGame();
+      };
+    };
+
+    window.EJS_onGameStart = () => log('>>> JEU DÉMARRÉ AVEC SUCCÈS ! <<<');
+    window.EJS_onLoadState = () => log('Core chargé');
+
+    log('Chargement de loader.js...');
+    const s = document.createElement('script');
+    s.src = 'https://cdn.emulatorjs.org/stable/data/loader.js';
+    s.onload = () => log('loader.js chargé !');
+    s.onerror = (e) => log('ERREUR chargement loader.js: ' + e);
+    document.body.appendChild(s);
+  </script>
+</body>
+</html>
