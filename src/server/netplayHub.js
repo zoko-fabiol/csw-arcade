@@ -170,7 +170,8 @@ export function setupNetplayHub(server) {
               maxPlayers: cleanMaxPlayers,
               role: 'p1',
               gameId,
-              gameTitle
+              gameTitle,
+              hostName
             }));
 
             broadcastRoomUpdate(room);
@@ -252,6 +253,32 @@ export function setupNetplayHub(server) {
                 buttonId,
                 isPressed: !!isPressed
               }));
+            }
+            break;
+          }
+
+          case 'START_GAME': {
+            const info = clientRooms.get(ws);
+            if (!info || info.playerIndex !== 0) return;
+            const room = rooms.get(info.roomCode);
+            if (!room) return;
+
+            const payload = JSON.stringify({
+              type: 'GAME_STARTED_BY_HOST',
+              roomCode: room.code,
+              gameId: room.gameId,
+              gameTitle: room.gameTitle
+            });
+
+            for (const p of room.players) {
+              if (p && p.ws.readyState === WebSocket.OPEN) {
+                p.ws.send(payload);
+              }
+            }
+            for (const s of room.spectators) {
+              if (s.ws && s.ws.readyState === WebSocket.OPEN) {
+                s.ws.send(payload);
+              }
             }
             break;
           }

@@ -28,11 +28,26 @@ export function NetplayModal({
   const selectedGame = games.find(g => g.id === selectedGameId) || currentGame || games[0] || {};
   const maxPlayersForGame = selectedGame.players || 2;
 
+  const [lanInfo, setLanInfo] = useState(null);
+
   // Sauvegarder le nom du joueur
   const handleNameChange = (val) => {
     setPlayerName(val);
     try { localStorage.setItem('csw_player_name', val); } catch(e) {}
   };
+
+  // Récupération de l'adresse LAN Wi-Fi du serveur Vite local
+  useEffect(() => {
+    if (!isOpen) return;
+    fetch('/api/network-info')
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
+        if (data && data.lanUrl) {
+          setLanInfo(data);
+        }
+      })
+      .catch(() => {});
+  }, [isOpen]);
 
   // Écouter les événements du netplayService
   useEffect(() => {
@@ -50,9 +65,17 @@ export function NetplayModal({
         if (asControllerOnly && onOpenMobileController) {
           onOpenMobileController(data);
           onClose();
-        } else if (onLaunchGame) {
+        }
+      }),
+      netplayService.on('game_started_by_host', (data) => {
+        if (onLaunchGame) {
           const gameToLaunch = games.find(g => g.id === data.gameId) || { id: data.gameId, title: data.gameTitle };
-          onLaunchGame(gameToLaunch, { isNetplay: true, role: data.role, playerIndex: data.playerIndex });
+          onLaunchGame(gameToLaunch, { 
+            isNetplay: true, 
+            isHost: false,
+            role: netplayService.myRole, 
+            playerIndex: netplayService.myPlayerIndex 
+          });
           onClose();
         }
       }),
@@ -64,13 +87,13 @@ export function NetplayModal({
       })
     ];
 
-    // Rafraîchir les salons locaux
+    // Rafraîchir les salons locaux & cloud
     loadRooms();
 
     return () => {
       unsubs.forEach(u => u());
     };
-  }, [isOpen, asControllerOnly]);
+  }, [isOpen, asControllerOnly, games, onLaunchGame, onOpenMobileController, onClose]);
 
   const loadRooms = async () => {
     setIsLoadingRooms(true);
@@ -121,6 +144,7 @@ export function NetplayModal({
   };
 
   const handleStartHostedGame = () => {
+    netplayService.startGame();
     if (onLaunchGame && selectedGame) {
       onLaunchGame(selectedGame, { isNetplay: true, isHost: true, playerIndex: 0, role: 'p1' });
       onClose();
@@ -215,6 +239,26 @@ export function NetplayModal({
                   </span>
                 </div>
               </div>
+
+              {/* Info Réseau Wi-Fi / Cloud */}
+              {lanInfo?.lanUrl && (
+                <div className="p-2.5 rounded-xl bg-neutral-900 border border-cyan-500/20 flex items-center justify-between text-xs">
+                  <div className="flex items-center gap-2">
+                    <Smartphone className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+                    <div>
+                      <span className="text-[10px] text-cyan-300 font-bold uppercase block">Accès Mobile (Même Wi-Fi) :</span>
+                      <span className="text-xs font-mono text-white select-all">{lanInfo.lanUrl}</span>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => handleCopyCode(lanInfo.lanUrl)}
+                    className="p-1 rounded bg-neutral-800 hover:bg-neutral-700 text-cyan-300 transition-colors"
+                    title="Copier l'adresse"
+                  >
+                    <Copy className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              )}
 
               {/* Grille des Slots Joueurs (2 à 4 Joueurs) */}
               <div className="pt-2 border-t border-neutral-800">
@@ -356,6 +400,25 @@ export function NetplayModal({
                       {maxPlayersForGame === 4 ? '🎮 4 Joueurs Simultanés' : '👥 2 Joueurs Max'}
                     </span>
                   </div>
+
+                  {lanInfo?.lanUrl && (
+                    <div className="p-3 rounded-xl bg-cyan-950/30 border border-cyan-500/30 flex items-center justify-between text-xs">
+                      <div className="flex items-center gap-2">
+                        <Smartphone className="w-4 h-4 text-cyan-400 shrink-0" />
+                        <div>
+                          <span className="text-[10px] text-cyan-300 font-bold uppercase block">Accès mobile sur le même Wi-Fi :</span>
+                          <span className="text-xs font-mono text-white select-all">{lanInfo.lanUrl}</span>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => handleCopyCode(lanInfo.lanUrl)}
+                        className="p-1.5 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-cyan-300 transition-colors"
+                        title="Copier l'adresse"
+                      >
+                        <Copy className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  )}
 
                   <p className="text-[11px] text-neutral-400 leading-relaxed">
                     Une fois le salon créé, vos amis sur le même réseau Wi-Fi / LAN pourront se joindre à vous en entrant votre code ou depuis la liste des salons locaux.

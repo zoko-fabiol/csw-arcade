@@ -1,18 +1,31 @@
-// Service client pour le multijoueur local (LAN / Wi-Fi) CSW-Arcade
+// Service universel pour le multijoueur CSW-Arcade (Hybride WebSocket LAN & Firebase Cloud)
+import { db } from '../config/firebase';
+import { 
+  collection, 
+  doc, 
+  setDoc, 
+  getDoc, 
+  updateDoc, 
+  onSnapshot, 
+  getDocs, 
+  deleteDoc 
+} from 'firebase/firestore';
+
 class NetplayService {
   constructor() {
     this.ws = null;
+    this.mode = 'auto'; // 'ws' | 'firebase'
     this.currentRoom = null;
-    this.myPlayerIndex = -1; // 0: J1 (Hôte), 1: J2, 2: J3, 3: J4, -1: Spectateur / Déconnecté
+    this.myPlayerIndex = -1; // 0: J1 (Hôte), 1: J2, 2: J3, 3: J4
     this.myRole = null; // 'p1' | 'p2' | 'p3' | 'p4' | 'spectator'
     this.listeners = new Map();
     this.ping = 0;
     this.pingInterval = null;
-    this.reconnectTimeout = null;
+    this.firestoreUnsub = null;
     this.isConnecting = false;
   }
 
-  // Système d'événements simple
+  // Système d'événements
   on(event, callback) {
     if (!this.listeners.has(event)) {
       this.listeners.set(event, new Set());
@@ -35,13 +48,38 @@ class NetplayService {
     }
   }
 
-  // Connexion WebSocket
-  connect() {
+  // Connexion intelligente : Tente le WebSocket local d'abord, puis bascule en Firebase Cloud
+  async connect() {
+    if (this.mode === 'firebase') return Promise.resolve();
     if (this.ws && (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING)) {
       return Promise.resolve();
     }
 
-    return new Promise((resolve, reject) => {
+    // Détection immédiate Netlify : Netlify ne gère pas les WebSockets persistants, bascule directe Firebase
+    const isNetlify = typeof window !== 'undefined' && (
+      window.location.hostname.includes('netlify.app') || 
+      window.location.protocol === 'https:' && !window.location.hostname.match(/^(localhost|127\.0\.0\.1|192\.168\.|10\.)/)
+    );
+
+    if (isNetlify) {
+      console.log('[Netplay] Environnement Cloud / Netlify détecté : activation du mode Firebase Cloud');
+      this.mode = 'firebase';
+      this.emit('connected');
+      return Promise.resolve();
+    }
+
+    return new Promise((resolve) => {
+      let resolved = false;
+      const timeout = setTimeout(() => {
+        if (!resolved) {
+          resolved = true;
+          console.log('[Netplay] Timeout WebSocket LAN, basculement vers Firebase Cloud...');
+          this.mode = 'firebase';
+          this.emit('connected');
+          resolve();
+        }
+      }, 1500);
+
       try {
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
         const host = window.location.host;
@@ -50,10 +88,15 @@ class NetplayService {
         this.ws = new WebSocket(wsUrl);
 
         this.ws.onopen = () => {
-          console.log('[Netplay] Connecté au serveur LAN:', wsUrl);
-          this.startPingLoop();
-          this.emit('connected');
-          resolve();
+          if (!resolved) {
+            resolved = true;
+            clearTimeout(timeout);
+            this.mode = 'ws';
+            console.log('[Netplay] Connecté au serveur WebSocket LAN:', wsUrl);
+            this.startPingLoop();
+            this.emit('connected');
+            resolve();
+          }
         };
 
         this.ws.onmessage = (event) => {
@@ -72,12 +115,22 @@ class NetplayService {
         };
 
         this.ws.onerror = (err) => {
-          console.warn('[Netplay] Erreur WebSocket:', err);
-          this.emit('error', 'Impossible de joindre le serveur réseau.');
-          reject(err);
+          if (!resolved) {
+            resolved = true;
+            clearTimeout(timeout);
+            console.log('[Netplay] Erreur WebSocket LAN, basculement vers Firebase Cloud');
+            this.mode = 'firebase';
+            this.emit('connected');
+            resolve();
+          }
         };
       } catch(err) {
-        reject(err);
+        if (!resolved) {
+          resolved = true;
+          clearTimeout(timeout);
+          this.mode = 'firebase';
+          resolve();
+        }
       }
     });
   }
@@ -89,7 +142,8 @@ class NetplayService {
           code: data.roomCode,
           maxPlayers: data.maxPlayers,
           gameId: data.gameId,
-          gameTitle: data.gameTitle
+          gameTitle: data.gameTitle,
+          players: [{ name: data.hostName || 'Hôte', slot: 1, isHost: true, playerIndex: 0, role: 'p1' }]
         };
         this.myPlayerIndex = 0;
         this.myRole = 'p1';
@@ -117,7 +171,6 @@ class NetplayService {
       }
 
       case 'REMOTE_INPUT': {
-        // Reçu par l'hôte : une touche envoyée par un joueur distant (J2, J3, J4)
         this.emit('remote_input', data);
         break;
       }
@@ -127,6 +180,11 @@ class NetplayService {
         this.myPlayerIndex = -1;
         this.myRole = null;
         this.emit('host_disconnected', data.message);
+        break;
+      }
+
+      case 'GAME_STARTED_BY_HOST': {
+        this.emit('game_started_by_host', data);
         break;
       }
 
@@ -145,7 +203,6 @@ class NetplayService {
     }
   }
 
-  // Démarrer la boucle de ping toutes les 3s pour surveiller la latence LAN
   startPingLoop() {
     this.stopPingLoop();
     this.pingInterval = setInterval(() => {
@@ -162,71 +219,302 @@ class NetplayService {
     }
   }
 
+  generateRoomCode() {
+    const chars = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
+    let code = '';
+    for (let i = 0; i < 4; i++) {
+      code += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return `ARC-${code}`;
+  }
+
   // Créer un salon (l'utilisateur devient J1 / Hôte)
   async createRoom({ gameId, gameTitle, maxPlayers = 2, hostName = 'Hôte' }) {
     await this.connect();
-    return new Promise((resolve, reject) => {
-      const onCreated = (data) => {
-        this.off('room_created', onCreated);
-        resolve(data);
-      };
-      this.on('room_created', onCreated);
 
-      this.ws.send(JSON.stringify({
-        type: 'CREATE_ROOM',
+    // 1. Tenter le mode WebSocket LAN si disponible
+    if (this.mode === 'ws' && this.ws && this.ws.readyState === WebSocket.OPEN) {
+      try {
+        const wsRes = await new Promise((resolve, reject) => {
+          const onCreated = (data) => {
+            this.off('room_created', onCreated);
+            resolve(data);
+          };
+          this.on('room_created', onCreated);
+
+          this.ws.send(JSON.stringify({
+            type: 'CREATE_ROOM',
+            gameId,
+            gameTitle,
+            maxPlayers,
+            hostName
+          }));
+
+          setTimeout(() => {
+            this.off('room_created', onCreated);
+            reject(new Error('Délai d\'attente création de salle LAN dépassé.'));
+          }, 3000);
+        });
+
+        // Mirrorer immédiatement dans Firebase pour que les amis sur 4G / Netlify puissent aussi rejoindre
+        try {
+          const roomRef = doc(db, 'rooms', wsRes.roomCode);
+          await setDoc(roomRef, {
+            code: wsRes.roomCode,
+            gameId,
+            gameTitle,
+            maxPlayers: wsRes.maxPlayers || maxPlayers,
+            hostName,
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
+            players: [
+              { name: hostName, slot: 1, isHost: true, playerIndex: 0, role: 'p1', ping: 5 }
+            ],
+            gameState: 'waiting',
+            isLanBridged: true
+          });
+
+          // Écouter les joueurs distants qui rejoignent via le Cloud
+          if (this.firestoreUnsub) this.firestoreUnsub();
+          this.firestoreUnsub = onSnapshot(roomRef, (snapshot) => {
+            if (!snapshot.exists()) return;
+            const data = snapshot.data();
+            // Si des inputs arrivent depuis le cloud
+            if (this.myPlayerIndex === 0 && data.lastInput && data.lastInput.playerIndex > 0) {
+              this.emit('remote_input', data.lastInput);
+            }
+          });
+        } catch(e) {
+          console.warn('[Netplay] Mirroring cloud non-bloquant:', e.message);
+        }
+
+        return wsRes;
+      } catch(err) {
+        console.warn('[Netplay] Erreur/timeout LAN, basculement automatique sur Firebase Cloud:', err.message);
+      }
+    }
+
+    // 2. Mode Firebase Cloud (Netlify / Internet / Secours universel)
+    return this.createFirebaseRoom({ gameId, gameTitle, maxPlayers, hostName });
+  }
+
+  async createFirebaseRoom({ gameId, gameTitle, maxPlayers = 2, hostName = 'Hôte' }) {
+    try {
+      const roomCode = this.generateRoomCode();
+      const initialRoom = {
+        code: roomCode,
         gameId,
         gameTitle,
         maxPlayers,
-        hostName
-      }));
+        hostName,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        players: [
+          { name: hostName, slot: 1, isHost: true, playerIndex: 0, role: 'p1', ping: 12 }
+        ],
+        gameState: 'waiting',
+        inputs: {}
+      };
 
-      setTimeout(() => {
-        this.off('room_created', onCreated);
-        reject(new Error('Délai d\'attente création de salle dépassé.'));
-      }, 5000);
-    });
+      const roomRef = doc(db, 'rooms', roomCode);
+      await setDoc(roomRef, initialRoom);
+
+      this.currentRoom = initialRoom;
+      this.myPlayerIndex = 0;
+      this.myRole = 'p1';
+
+      // Écoute en temps réel des changements de joueurs et des inputs
+      if (this.firestoreUnsub) this.firestoreUnsub();
+      this.firestoreUnsub = onSnapshot(roomRef, (snapshot) => {
+        if (!snapshot.exists()) {
+          this.emit('host_disconnected', 'Le salon a été fermé.');
+          return;
+        }
+        const data = snapshot.data();
+        this.currentRoom = data;
+        this.emit('room_update', data);
+
+        // Détection des inputs distants pour l'hôte
+        if (this.myPlayerIndex === 0 && data.lastInput && data.lastInput.playerIndex > 0) {
+          this.emit('remote_input', data.lastInput);
+        }
+      });
+
+      const resData = {
+        roomCode,
+        gameId,
+        gameTitle,
+        maxPlayers,
+        hostName,
+        role: 'p1',
+        playerIndex: 0
+      };
+
+      this.emit('room_created', resData);
+      console.log(`[Netplay Cloud] Salon ${roomCode} créé avec succès sur Firebase !`);
+      return resData;
+    } catch(err) {
+      console.error('[Netplay Cloud] Erreur création salon Firebase:', err);
+      throw new Error('Échec de la création du salon : ' + err.message);
+    }
   }
 
   // Rejoindre un salon avec un code (ex: ARC-74)
   async joinRoom(roomCode, playerName = 'Invité') {
     await this.connect();
-    return new Promise((resolve, reject) => {
-      const onSuccess = (data) => {
-        this.off('joined_success', onSuccess);
-        this.off('error', onError);
-        resolve(data);
+    const cleanCode = roomCode.trim().toUpperCase();
+
+    // 1. Mode WebSocket LAN
+    if (this.mode === 'ws' && this.ws && this.ws.readyState === WebSocket.OPEN) {
+      try {
+        const wsRes = await new Promise((resolve, reject) => {
+          const onSuccess = (data) => {
+            this.off('joined_success', onSuccess);
+            this.off('error', onError);
+            resolve(data);
+          };
+          const onError = (msg) => {
+            this.off('joined_success', onSuccess);
+            this.off('error', onError);
+            reject(new Error(msg));
+          };
+
+          this.on('joined_success', onSuccess);
+          this.on('error', onError);
+
+          this.ws.send(JSON.stringify({
+            type: 'JOIN_ROOM',
+            roomCode: cleanCode,
+            playerName
+          }));
+
+          setTimeout(() => {
+            this.off('joined_success', onSuccess);
+            this.off('error', onError);
+            reject(new Error('Délai d\'attente connexion LAN dépassé.'));
+          }, 3500);
+        });
+
+        return wsRes;
+      } catch(err) {
+        console.log('[Netplay] Salon non trouvé sur LAN ou timeout, essai immédiat sur Firebase Cloud...');
+      }
+    }
+
+    // 2. Mode Firebase Cloud (Netlify / Internet)
+    return this.joinFirebaseRoom(cleanCode, playerName);
+  }
+
+  async joinFirebaseRoom(cleanCode, playerName = 'Invité') {
+    try {
+      const roomRef = doc(db, 'rooms', cleanCode);
+      const snap = await getDoc(roomRef);
+
+      if (!snap.exists()) {
+        throw new Error(`Salon "${cleanCode}" introuvable.`);
+      }
+
+      const roomData = snap.data();
+      const currentPlayers = roomData.players || [];
+
+      if (currentPlayers.length >= roomData.maxPlayers) {
+        throw new Error(`Le salon ${cleanCode} est complet (${roomData.maxPlayers}/${roomData.maxPlayers}).`);
+      }
+
+      const playerIndex = currentPlayers.length;
+      const role = `p${playerIndex + 1}`;
+      const newPlayer = {
+        name: playerName,
+        slot: playerIndex + 1,
+        isHost: false,
+        playerIndex,
+        role,
+        ping: 25
       };
-      const onError = (msg) => {
-        this.off('joined_success', onSuccess);
-        this.off('error', onError);
-        reject(new Error(msg));
+
+      const updatedPlayers = [...currentPlayers, newPlayer];
+      await updateDoc(roomRef, {
+        players: updatedPlayers,
+        updatedAt: Date.now()
+      });
+
+      this.currentRoom = { ...roomData, players: updatedPlayers };
+      this.myPlayerIndex = playerIndex;
+      this.myRole = role;
+
+      if (this.firestoreUnsub) this.firestoreUnsub();
+      this.firestoreUnsub = onSnapshot(roomRef, (snapshot) => {
+        if (!snapshot.exists()) {
+          this.emit('host_disconnected', 'Le salon a été fermé.');
+          return;
+        }
+        const data = snapshot.data();
+        this.currentRoom = data;
+        this.emit('room_update', data);
+
+        // Détection de l'événement de lancement par l'hôte
+        if (data.gameState === 'started') {
+          this.emit('game_started_by_host', data);
+        }
+      });
+
+      const resData = {
+        roomCode: cleanCode,
+        gameId: roomData.gameId,
+        gameTitle: roomData.gameTitle,
+        maxPlayers: roomData.maxPlayers,
+        playerIndex,
+        role
       };
 
-      this.on('joined_success', onSuccess);
-      this.on('error', onError);
-
-      this.ws.send(JSON.stringify({
-        type: 'JOIN_ROOM',
-        roomCode: roomCode.trim().toUpperCase(),
-        playerName
-      }));
-
-      setTimeout(() => {
-        this.off('joined_success', onSuccess);
-        this.off('error', onError);
-        reject(new Error('Délai d\'attente connexion au salon dépassé.'));
-      }, 6000);
-    });
+      this.emit('joined_success', resData);
+      console.log(`[Netplay Cloud] Salon ${cleanCode} rejoint avec succès (Slot J${playerIndex + 1}) !`);
+      return resData;
+    } catch(err) {
+      console.error('[Netplay Cloud] Erreur connexion salon:', err);
+      throw new Error(err.message || 'Impossible de rejoindre le salon.');
+    }
   }
 
   // Envoyer un input (D-pad ou bouton) vers l'hôte
   sendInput(buttonId, isPressed) {
-    if (this.ws && this.ws.readyState === WebSocket.OPEN && this.currentRoom) {
+    // Mode WebSocket
+    if (this.mode === 'ws' && this.ws && this.ws.readyState === WebSocket.OPEN && this.currentRoom) {
       this.ws.send(JSON.stringify({
         type: 'SEND_INPUT',
         buttonId,
         isPressed: !!isPressed
       }));
+      return;
+    }
+
+    // Mode Firebase Cloud : Envoi rapide
+    if (this.currentRoom?.code) {
+      try {
+        const roomRef = doc(db, 'rooms', this.currentRoom.code);
+        updateDoc(roomRef, {
+          lastInput: {
+            playerIndex: this.myPlayerIndex,
+            role: this.myRole,
+            buttonId,
+            isPressed: !!isPressed,
+            time: Date.now()
+          }
+        }).catch(() => {});
+      } catch(e) {}
+    }
+  }
+
+  // Lancer la partie en tant qu'hôte
+  startGame() {
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      this.ws.send(JSON.stringify({ type: 'START_GAME' }));
+    }
+    if (this.currentRoom?.code && this.myPlayerIndex === 0) {
+      try {
+        const roomRef = doc(db, 'rooms', this.currentRoom.code);
+        updateDoc(roomRef, { gameState: 'started', updatedAt: Date.now() }).catch(() => {});
+      } catch(e) {}
     }
   }
 
@@ -235,23 +523,71 @@ class NetplayService {
     if (this.ws && this.ws.readyState === WebSocket.OPEN && this.currentRoom) {
       this.ws.send(JSON.stringify({ type: 'LEAVE_ROOM' }));
     }
+    
+    if (this.currentRoom?.code) {
+      try {
+        const roomRef = doc(db, 'rooms', this.currentRoom.code);
+        if (this.myPlayerIndex === 0) {
+          deleteDoc(roomRef).catch(() => {});
+        } else {
+          const remaining = (this.currentRoom.players || []).filter(p => p.playerIndex !== this.myPlayerIndex);
+          updateDoc(roomRef, { players: remaining }).catch(() => {});
+        }
+      } catch(e) {}
+    }
+
+    if (this.firestoreUnsub) {
+      this.firestoreUnsub();
+      this.firestoreUnsub = null;
+    }
+
     this.currentRoom = null;
     this.myPlayerIndex = -1;
     this.myRole = null;
     this.emit('left_room');
   }
 
-  // Récupérer la liste des salons LAN actifs via l'API REST
+  // Récupérer la liste des salons actifs (LAN ou Cloud)
   async fetchRooms() {
+    const combined = new Map();
+
+    // 1. Tenter l'API locale LAN
     try {
       const res = await fetch('/api/netplay/rooms');
-      if (!res.ok) return [];
-      const data = await res.json();
-      return data.rooms || [];
-    } catch(e) {
-      console.warn('[Netplay] Échec récupération salons:', e);
-      return [];
+      if (res.ok) {
+        const data = await res.json();
+        if (data.rooms && Array.isArray(data.rooms)) {
+          data.rooms.forEach(r => combined.set(r.code, r));
+        }
+      }
+    } catch(e) {}
+
+    // 2. Récupération Cloud Firebase
+    try {
+      const snap = await getDocs(collection(db, 'rooms'));
+      const now = Date.now();
+      snap.forEach(docSnap => {
+        const d = docSnap.data();
+        // Conserver les salons récents (< 2 heures)
+        if (d && (!d.updatedAt || (now - d.updatedAt) < 7200000)) {
+          if (!combined.has(d.code)) {
+            combined.set(d.code, {
+              code: d.code,
+              gameId: d.gameId,
+              gameTitle: d.gameTitle,
+              maxPlayers: d.maxPlayers || 2,
+              currentPlayers: (d.players || []).length,
+              players: d.players || [],
+              createdAt: d.createdAt
+            });
+          }
+        }
+      });
+    } catch(err) {
+      console.warn('[Netplay] Erreur lecture salons cloud:', err);
     }
+
+    return Array.from(combined.values());
   }
 }
 

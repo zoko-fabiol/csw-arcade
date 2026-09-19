@@ -4,6 +4,7 @@ import electron from 'vite-plugin-electron';
 import renderer from 'vite-plugin-electron-renderer';
 import path from 'node:path';
 import fs from 'node:fs';
+import os from 'node:os';
 import { execSync, spawn } from 'node:child_process';
 import { setupNetplayHub } from './src/server/netplayHub.js';
 
@@ -217,6 +218,35 @@ function netplayPlugin() {
     configureServer(server) {
       try {
         setupNetplayHub(server);
+
+        // Fournit l'IP locale Wi-Fi/LAN du PC hôte pour connecter facilement les mobiles
+        server.middlewares.use('/api/network-info', (req, res) => {
+          try {
+            const interfaces = os.networkInterfaces();
+            let localIp = '127.0.0.1';
+            for (const name of Object.keys(interfaces)) {
+              for (const iface of interfaces[name]) {
+                if (iface.family === 'IPv4' && !iface.internal) {
+                  localIp = iface.address;
+                  break;
+                }
+              }
+            }
+            res.writeHead(200, {
+              'Content-Type': 'application/json',
+              'Access-Control-Allow-Origin': '*'
+            });
+            res.end(JSON.stringify({
+              success: true,
+              localIp,
+              port: 3003,
+              lanUrl: `http://${localIp}:3003`
+            }));
+          } catch(e) {
+            res.statusCode = 500;
+            res.end(JSON.stringify({ success: false, error: e.message }));
+          }
+        });
       } catch(e) {
         console.warn('[Vite] Erreur init netplayHub:', e.message);
       }
