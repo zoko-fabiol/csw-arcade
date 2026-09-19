@@ -5,13 +5,58 @@
   "type": "module",
   "private": true,
   "description": "NeoRAGEx Modernized Arcade Experience with WebRTC Netplay & WebAssembly FBNeo",
-  "main": "electron/main.js",
+  "main": "dist-electron/main.js",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
     "build:web": "vite build",
-    "build:electron": "vite build && electron-builder",
+    "build:electron": "vite build && electron-builder --win",
     "preview": "vite preview"
+  },
+  "build": {
+    "appId": "com.cswarcade.app",
+    "productName": "CSW-Arcade",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "dist-electron/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "public/roms",
+        "to": "roms",
+        "filter": [
+          "**/*"
+        ]
+      }
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "public/icons/icon-512.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "CSW-Arcade"
+    }
   },
   "dependencies": {
     "firebase": "^10.12.0",

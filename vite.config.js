@@ -213,6 +213,7 @@ const isElectron = Boolean(
 
 // https://vitejs.dev/config/
 export default defineConfig({
+  base: './',
   plugins: [
     react(),
     romStreamPlugin(),
@@ -271,7 +272,7 @@ export default defineConfig({
     port: 3003,
     strictPort: true,
     watch: {
-      ignored: ['**/public/**']
+      ignored: ['**/public/**', '**/release/**', '**/dist/**', '**/dist-electron/**']
     },
     proxy: {
       '/api/archive-rom': {

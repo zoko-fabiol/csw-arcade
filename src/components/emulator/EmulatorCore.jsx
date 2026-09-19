@@ -233,7 +233,7 @@ export function EmulatorCore({
   const isScanlinesActive = settings?.video?.scanlines ?? true;
   const aspectRatio = settings?.video?.aspectRatio ?? '4:3';
   const settingsParam = encodeURIComponent(JSON.stringify(settings || {}));
-  const playerUrl = `/player.html?game=${encodeURIComponent(game.filename)}&settings=${settingsParam}`;
+  const playerUrl = `./player.html?game=${encodeURIComponent(game.filename)}&settings=${settingsParam}`;
 
   const isPortraitPadMode = isMobile && !isLandscape && (settings?.touch?.portraitMode ?? 'pad-bottom') === 'pad-bottom' && isTouchVisible;
 
