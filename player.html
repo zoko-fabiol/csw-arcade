@@ -1097,6 +1097,7 @@
       window.EJS_gameName = fbneoShortName.toUpperCase();
       window.EJS_gameUrl = targetZipName;
       window.EJS_biosUrl = 'neogeo.zip';
+      window.EJS_gameParentUrl = 'neogeo.zip';
       window.EJS_dontExtractBIOS = true;
       window.EJS_pathtodata = 'https://cdn.emulatorjs.org/stable/data/';
       window.EJS_startOnLoaded = true;
@@ -1144,6 +1145,21 @@
           }
         } catch (e) {}
         purgeBuiltInGamepad();
+
+        // 1. Empêcher la décompression des archives Arcade (FBNeo requiert impérativement les ZIPs intacts)
+        const origCheckCompression = emu.checkCompression ? emu.checkCompression.bind(emu) : null;
+        if (emu.checkCompression) {
+          emu.checkCompression = async function(data, label, onProgress) {
+            if (label && (label.toLowerCase().includes('game data') || label.toLowerCase().includes('jeu') || label.toLowerCase().includes('data'))) {
+              console.log('[CSW-Arcade] Maintien strict du conteneur ZIP pour FBNeo (' + targetZipName + ')');
+              if (typeof onProgress === 'function') {
+                onProgress('!!notCompressedData', data);
+              }
+              return { '!!notCompressedData': data };
+            }
+            return origCheckCompression ? origCheckCompression(data, label, onProgress) : { '!!notCompressedData': data };
+          };
+        }
 
         // Assurer l'application des contrôles configurés dans l'instance
         emu.controls = buildControllersConfig(activeSettings.controls);
@@ -1197,7 +1213,33 @@
         const origStartGame = emu.startGame.bind(emu);
         emu.startGame = function() {
           console.log('[VFS Injection] Écriture synchrone des archives dans Emscripten VFS...');
+          emu.fileName = targetZipName;
           injectVFS();
+
+          // Hook sur Module.callMain pour garantir que RetroArch charge targetZipName
+          const hookModuleCallMain = (mod) => {
+            if (!mod || !mod.callMain || mod._cswHooked) return;
+            mod._cswHooked = true;
+            const origCallMain = mod.callMain.bind(mod);
+            mod.callMain = function(args) {
+              console.log('[CSW-Arcade] Module.callMain intercepté avec:', args);
+              const fixedArgs = (args || []).map(arg => {
+                if (typeof arg === 'string' && (arg.endsWith('.lo') || arg.endsWith('.p1') || arg.endsWith('.c1') || arg.endsWith('.bin') || !arg.endsWith('.zip'))) {
+                  return '/' + targetZipName;
+                }
+                return arg;
+              });
+              if (!fixedArgs.some(a => typeof a === 'string' && a.includes(targetZipName))) {
+                fixedArgs.push('/' + targetZipName);
+              }
+              console.log('[CSW-Arcade] Lancement FBNeo avec:', fixedArgs);
+              injectVFS();
+              return origCallMain(fixedArgs);
+            };
+          };
+
+          if (emu.Module) hookModuleCallMain(emu.Module);
+
           // Sécurité anti-écran noir : masquage de l'overlay garanti
           setTimeout(hideOverlay, 2000);
           return origStartGame();
