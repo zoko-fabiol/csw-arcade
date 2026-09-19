@@ -1019,7 +1019,6 @@
         if (typeof emu.setupKeys === 'function') emu.setupKeys();
 
         emu.fileName = targetZipName;
-        const origStartGame = emu.startGame.bind(emu);
 
         const injectVFS = () => {
           try {
