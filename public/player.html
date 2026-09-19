@@ -912,10 +912,10 @@
           });
         }
 
-        return _origFetch.apply(this, [input, init]);
+        return _origFetch.apply(window, arguments);
       };
 
-      // 2. Interception transparente de XHR comme secours
+      // 2. Interception transparente de XHR comme secours avec support complet des en-têtes
       const _origXHROpen = XMLHttpRequest.prototype.open;
       const _origXHRSend = XMLHttpRequest.prototype.send;
 
@@ -934,6 +934,12 @@
           Object.defineProperty(this, 'statusText', { get: () => 'OK' });
           Object.defineProperty(this, 'response', { get: () => buf });
           Object.defineProperty(this, 'readyState', { get: () => 4 });
+          this.getResponseHeader = (header) => {
+            if (header && header.toLowerCase() === 'content-length') return String(buf.byteLength);
+            if (header && header.toLowerCase() === 'content-type') return 'application/zip';
+            return null;
+          };
+          this.getAllResponseHeaders = () => 'content-type: application/zip\r\ncontent-length: ' + buf.byteLength + '\r\n';
           setTimeout(() => {
             if (typeof this.onload === 'function') this.onload();
             this.dispatchEvent(new Event('load'));
@@ -949,6 +955,12 @@
           Object.defineProperty(this, 'statusText', { get: () => 'OK' });
           Object.defineProperty(this, 'response', { get: () => buf });
           Object.defineProperty(this, 'readyState', { get: () => 4 });
+          this.getResponseHeader = (header) => {
+            if (header && header.toLowerCase() === 'content-length') return String(buf.byteLength);
+            if (header && header.toLowerCase() === 'content-type') return 'application/zip';
+            return null;
+          };
+          this.getAllResponseHeaders = () => 'content-type: application/zip\r\ncontent-length: ' + buf.byteLength + '\r\n';
           setTimeout(() => {
             if (typeof this.onload === 'function') this.onload();
             this.dispatchEvent(new Event('load'));
@@ -964,8 +976,8 @@
       window.EJS_player = '#game';
       window.EJS_core = 'arcade';
       window.EJS_gameName = fbneoShortName.toUpperCase();
-      window.EJS_gameUrl = '/roms/' + encodeURIComponent(targetZipName);
-      window.EJS_biosUrl = '/roms/neogeo.zip';
+      window.EJS_gameUrl = targetZipName;
+      window.EJS_biosUrl = 'neogeo.zip';
       window.EJS_dontExtractBIOS = true;
       window.EJS_pathtodata = 'https://cdn.emulatorjs.org/stable/data/';
       window.EJS_startOnLoaded = true;
