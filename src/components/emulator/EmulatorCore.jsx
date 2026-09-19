@@ -268,6 +268,7 @@ export function EmulatorCore({
   const isScanlinesActive = settings?.video?.scanlines ?? true;
   const aspectRatio = settings?.video?.aspectRatio ?? '4:3';
   const myPlayerSlot = netplayService.myPlayerIndex >= 0 ? netplayService.myPlayerIndex : (isHost ? 0 : 1);
+  const settingsParam = encodeURIComponent(JSON.stringify(settings || {}));
   const playerUrl = `./player.html?game=${encodeURIComponent(game.filename)}&settings=${settingsParam}&playerIndex=${myPlayerSlot}&netplay=${mode === 'netplay' ? 1 : 0}`;
 
   const isPortraitPadMode = isMobile && !isLandscape && (settings?.touch?.portraitMode ?? 'pad-bottom') === 'pad-bottom' && isTouchVisible;
