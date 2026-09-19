@@ -47,23 +47,25 @@ export function EmulatorCore({
   });
 
   const handleTouchInput = (buttonId, isPressed) => {
-    if (mode === 'netplay' && !isHost) {
-      netplayService.sendInput(buttonId, isPressed);
+    const myIdx = netplayService.myPlayerIndex >= 0 ? netplayService.myPlayerIndex : (isHost ? 0 : 1);
+    if (mode === 'netplay') {
+      netplayService.sendInput(buttonId, isPressed, myIdx);
     }
     if (iframeRef.current?.contentWindow) {
       iframeRef.current.contentWindow.postMessage({
         type: 'TOUCH_INPUT',
-        playerIndex: isHost ? 0 : (netplayService.myPlayerIndex >= 0 ? netplayService.myPlayerIndex : 1),
+        playerIndex: myIdx,
         buttonId,
         isPressed
       }, '*');
     }
   };
 
-  // Écoute des entrées des joueurs distants (J2, J3, J4) en mode Netplay
+  // Écoute des entrées des joueurs distants et synchronisation d'état en mode Netplay
   useEffect(() => {
     if (mode !== 'netplay') return;
 
+    // Réception des inputs des autres joueurs (J1 pour l'invité, J2 pour l'hôte)
     const unsubInput = netplayService.on('remote_input', ({ playerIndex, buttonId, isPressed }) => {
       if (iframeRef.current?.contentWindow) {
         iframeRef.current.contentWindow.postMessage({
@@ -75,15 +77,33 @@ export function EmulatorCore({
       }
     });
 
+    // L'hôte reçoit une demande de synchronisation d'état (d'un joueur arrivant en cours de partie)
+    const unsubReqState = netplayService.on('request_state', ({ fromPlayerIndex }) => {
+      if (isHost && iframeRef.current?.contentWindow) {
+        console.log('[EmulatorCore] Demande de savestate reçue pour le joueur', fromPlayerIndex);
+        iframeRef.current.contentWindow.postMessage({ type: 'GET_STATE', toPlayerIndex: fromPlayerIndex }, '*');
+      }
+    });
+
+    // L'invité reçoit le savestate officiel de l'hôte pour se caler sur sa frame exacte
+    const unsubSyncState = netplayService.on('sync_state', ({ stateData }) => {
+      if (!isHost && iframeRef.current?.contentWindow) {
+        console.log('[EmulatorCore] Savestate reçu de l\'hôte, synchronisation...');
+        iframeRef.current.contentWindow.postMessage({ type: 'LOAD_STATE', state: stateData }, '*');
+      }
+    });
+
     const unsubPing = netplayService.on('ping', (p) => setPing(p));
     const unsubRoom = netplayService.on('room_update', (r) => setNetplayRoom(r));
 
     return () => {
       unsubInput();
+      unsubReqState();
+      unsubSyncState();
       unsubPing();
       unsubRoom();
     };
-  }, [mode]);
+  }, [mode, isHost]);
 
   // 1. Initialisation des contrôles matériels avec les paramètres utilisateur
   useEffect(() => {
@@ -92,36 +112,36 @@ export function EmulatorCore({
     }
   }, [settings]);
 
-  // 2. Initialisation des boucles de synchronisation et d'inputs
-  useEffect(() => {
-    let syncEngine = null;
-
-    if (mode === 'netplay' && netplayService) {
-      syncEngine = new NetplaySyncEngine(netplayService, isHost);
-      syncEngine.onSyncStats = ({ rtt }) => setPing(rtt);
-      syncEngine.start();
-
-      inputManager.start(({ p1 }) => {
-        syncEngine.processLocalInput(p1);
-      });
-    }
-
-    return () => {
-      inputManager.stop();
-      if (syncEngine) syncEngine.stop();
-    };
-  }, [mode, netplayService, isHost]);
-
-  // 3. Écoute des événements provenant de l'iframe player
+  // 2. Écoute des événements provenant de l'iframe player (Inputs locaux & État de démarrage)
   useEffect(() => {
     const handleMessage = (event) => {
-      if (event.data?.type === 'EJS_GAME_STARTED') {
+      if (!event.data) return;
+
+      if (event.data.type === 'EJS_GAME_STARTED') {
         setIsReady(true);
+        // Si invité en Netplay, demander immédiatement le savestate actuel à l'hôte
+        if (mode === 'netplay' && !isHost) {
+          console.log('[EmulatorCore] Invité prêt, demande de synchronisation du savestate à l\'hôte...');
+          netplayService.requestStateSync();
+        }
+      }
+
+      // Quand un joueur local joue au clavier ou à la manette dans l'iframe, diffuser l'input à l'autre joueur
+      if (event.data.type === 'LOCAL_INPUT' && mode === 'netplay') {
+        const myIdx = netplayService.myPlayerIndex >= 0 ? netplayService.myPlayerIndex : (isHost ? 0 : 1);
+        netplayService.sendInput(event.data.buttonId, event.data.isPressed, myIdx);
+      }
+
+      // L'iframe de l'hôte a extrait le savestate, l'envoyer au joueur distant
+      if (event.data.type === 'STATE_DATA' && mode === 'netplay' && isHost) {
+        console.log('[EmulatorCore] Savestate extrait par l\'iframe, transmission au joueur distant...');
+        netplayService.sendStateSync(event.data.state);
       }
     };
+
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
-  }, []);
+  }, [mode, isHost]);
 
   // Gestion plein écran universel (iOS Safari WebKit, Android Chrome, Desktop)
   const toggleFullscreen = () => {

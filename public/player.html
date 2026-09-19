@@ -508,6 +508,14 @@
       const binding = keyToInputMap[code];
       if (binding) {
         dispatchDirectInput(binding.player, binding.buttonId, isDown);
+        if (window.parent && window.parent !== window) {
+          window.parent.postMessage({
+            type: 'LOCAL_INPUT',
+            playerIndex: binding.player,
+            buttonId: binding.buttonId,
+            isPressed: isDown
+          }, '*');
+        }
         return true;
       }
       return false;
@@ -546,6 +554,14 @@
             if (prev !== isPressed) {
               lastGamepadState[playerIdx][btnId] = isPressed;
               dispatchDirectInput(playerIdx, btnId, isPressed);
+              if (window.parent && window.parent !== window) {
+                window.parent.postMessage({
+                  type: 'LOCAL_INPUT',
+                  playerIndex: playerIdx,
+                  buttonId: btnId,
+                  isPressed: isPressed
+                }, '*');
+              }
             }
           };
 
@@ -1296,6 +1312,35 @@
         }
         if (event.data.type === 'NETPLAY_INPUT') {
           dispatchDirectInput(event.data.playerIndex ?? 1, event.data.buttonId, event.data.isPressed);
+        }
+        if (event.data.type === 'GET_STATE') {
+          try {
+            if (window.EJS_emulator?.gameManager?.getState) {
+              const res = window.EJS_emulator.gameManager.getState();
+              Promise.resolve(res).then(stateBytes => {
+                if (window.parent && stateBytes) {
+                  window.parent.postMessage({
+                    type: 'STATE_DATA',
+                    state: stateBytes,
+                    requestId: event.data.requestId
+                  }, '*');
+                }
+              }).catch(e => console.warn('[Player] Erreur async getState:', e));
+            }
+          } catch(err) {
+            console.warn('[Player] Erreur capture state:', err);
+          }
+        }
+        if (event.data.type === 'LOAD_STATE' && event.data.state) {
+          try {
+            if (window.EJS_emulator?.gameManager?.loadState) {
+              console.log('[Player] Injection et synchronisation du savestate distant...');
+              window.EJS_emulator.gameManager.loadState(event.data.state);
+              console.log('[Player] Savestate chargé avec succès !');
+            }
+          } catch(err) {
+            console.warn('[Player] Erreur restauration savestate:', err);
+          }
         }
       });
 

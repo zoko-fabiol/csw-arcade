@@ -35,7 +35,9 @@ export function MobileControllerView({ sessionData, onExit }) {
     { name: 'J3 (Jaune)', accent: 'text-amber-400', border: 'border-amber-500', bg: 'bg-amber-950/40', badge: 'bg-amber-400 text-black' },
     { name: 'J4 (Vert)', accent: 'text-emerald-400', border: 'border-emerald-500', bg: 'bg-emerald-950/40', badge: 'bg-emerald-400 text-black' }
   ];
-  const theme = colorThemes[playerIndex] || colorThemes[1];
+  const [targetSlot, setTargetSlot] = useState(() => (sessionData?.asControllerOnly ? 0 : playerIndex));
+  const effectivePlayerNum = targetSlot + 1;
+  const theme = colorThemes[targetSlot] || colorThemes[1];
 
   // Écouter le ping et les déconnexions
   useEffect(() => {
@@ -57,12 +59,12 @@ export function MobileControllerView({ sessionData, onExit }) {
   }, []);
 
   const handleInput = useCallback((btnId, isPressed) => {
-    netplayService.sendInput(btnId, isPressed);
+    netplayService.sendInput(btnId, isPressed, targetSlot);
     setActiveButtons(prev => ({ ...prev, [btnId]: isPressed }));
     if (isPressed) {
       triggerHaptic();
     }
-  }, [triggerHaptic]);
+  }, [triggerHaptic, targetSlot]);
 
   // D-Pad tactile fluide
   const dpadRef = useRef(null);
@@ -102,12 +104,29 @@ export function MobileControllerView({ sessionData, onExit }) {
       {/* Barre d'état en haut */}
       <div className="flex items-center justify-between px-3 py-2 rounded-xl bg-neutral-900/90 border border-neutral-800 shrink-0">
         <div className="flex items-center gap-2">
-          <span className={`px-2.5 py-1 rounded-lg text-xs font-black uppercase ${theme.badge}`}>
-            JOUEUR {playerNum}
-          </span>
+          {/* Sélecteur J1 / J2 pour contrôler le joueur 1 ou le joueur 2 */}
+          <div className="flex items-center bg-black/60 p-0.5 rounded-lg border border-neutral-700">
+            <button
+              onClick={() => setTargetSlot(0)}
+              className={`px-2 py-0.5 rounded text-[10px] font-black uppercase transition-all ${
+                targetSlot === 0 ? 'bg-cyan-500 text-black shadow-md' : 'text-neutral-400 hover:text-white'
+              }`}
+            >
+              J1
+            </button>
+            <button
+              onClick={() => setTargetSlot(1)}
+              className={`px-2 py-0.5 rounded text-[10px] font-black uppercase transition-all ${
+                targetSlot === 1 ? 'bg-rose-500 text-white shadow-md' : 'text-neutral-400 hover:text-white'
+              }`}
+            >
+              J2
+            </button>
+          </div>
+
           <div>
             <p className="text-xs font-bold text-white line-clamp-1">{gameTitle}</p>
-            <span className="text-[10px] text-neutral-400">Salon : <strong className="text-white">{roomCode}</strong></span>
+            <span className="text-[10px] text-neutral-400">Contrôle : <strong className={targetSlot === 0 ? 'text-cyan-400' : 'text-rose-400'}>Joueur {effectivePlayerNum}</strong></span>
           </div>
         </div>
 

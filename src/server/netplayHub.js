@@ -237,22 +237,78 @@ export function setupNetplayHub(server) {
           }
 
           case 'SEND_INPUT': {
-            // Un joueur distant envoie une action (D-pad ou bouton) vers l'hôte
+            // Relayer l'action vers tous les autres joueurs (J1 -> J2, J2 -> J1)
             const info = clientRooms.get(ws);
-            if (!info || info.playerIndex <= 0) return;
+            if (!info) return;
+            const room = rooms.get(info.roomCode);
+            if (!room) return;
+
+            const { buttonId, isPressed, frame, playerIndex } = data;
+            const effectiveIndex = (typeof playerIndex === 'number') ? playerIndex : info.playerIndex;
+
+            const payload = JSON.stringify({
+              type: 'REMOTE_INPUT',
+              playerIndex: effectiveIndex,
+              buttonId,
+              isPressed: !!isPressed,
+              frame: frame || 0
+            });
+
+            // Diffuser à TOUS les autres clients du salon (l'hôte et les invités)
+            for (const p of room.players) {
+              if (p && p.ws !== ws && p.ws.readyState === WebSocket.OPEN) {
+                p.ws.send(payload);
+              }
+            }
+            for (const s of room.spectators) {
+              if (s && s.ws !== ws && s.ws.readyState === WebSocket.OPEN) {
+                s.ws.send(payload);
+              }
+            }
+            break;
+          }
+
+          case 'REQUEST_STATE': {
+            // Un joueur arrivant en cours de partie demande le savestate actuel à l'hôte
+            const info = clientRooms.get(ws);
+            if (!info) return;
             const room = rooms.get(info.roomCode);
             if (!room || !room.hostWs) return;
 
-            const { buttonId, isPressed } = data;
-
-            // Relayer immédiatement vers l'hôte
             if (room.hostWs.readyState === WebSocket.OPEN) {
               room.hostWs.send(JSON.stringify({
-                type: 'REMOTE_INPUT',
-                playerIndex: info.playerIndex,
-                buttonId,
-                isPressed: !!isPressed
+                type: 'REQUEST_STATE',
+                fromPlayerIndex: info.playerIndex
               }));
+            }
+            break;
+          }
+
+          case 'SEND_STATE': {
+            // L'hôte envoie son savestate de synchronisation
+            const info = clientRooms.get(ws);
+            if (!info || info.playerIndex !== 0) return;
+            const room = rooms.get(info.roomCode);
+            if (!room) return;
+
+            const { toPlayerIndex, stateData, frame } = data;
+            const payload = JSON.stringify({
+              type: 'SYNC_STATE',
+              stateData,
+              frame: frame || 0
+            });
+
+            if (toPlayerIndex !== undefined && room.players[toPlayerIndex]) {
+              const targetWs = room.players[toPlayerIndex].ws;
+              if (targetWs && targetWs.readyState === WebSocket.OPEN) {
+                targetWs.send(payload);
+              }
+            } else {
+              for (const p of room.players) {
+                if (p && p.playerIndex > 0 && p.ws.readyState === WebSocket.OPEN) {
+                  p.ws.send(payload);
+                }
+              }
             }
             break;
           }

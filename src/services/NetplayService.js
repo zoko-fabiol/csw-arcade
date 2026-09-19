@@ -175,6 +175,16 @@ class NetplayService {
         break;
       }
 
+      case 'REQUEST_STATE': {
+        this.emit('request_state', data);
+        break;
+      }
+
+      case 'SYNC_STATE': {
+        this.emit('sync_state', data);
+        break;
+      }
+
       case 'HOST_DISCONNECTED': {
         this.currentRoom = null;
         this.myPlayerIndex = -1;
@@ -476,12 +486,15 @@ class NetplayService {
     }
   }
 
-  // Envoyer un input (D-pad ou bouton) vers l'hôte
-  sendInput(buttonId, isPressed) {
-    // Mode WebSocket
-    if (this.mode === 'ws' && this.ws && this.ws.readyState === WebSocket.OPEN && this.currentRoom) {
+  // Envoyer un input (D-pad ou bouton) vers l'hôte ou les autres joueurs
+  sendInput(buttonId, isPressed, playerIndex = null) {
+    const pIdx = (typeof playerIndex === 'number') ? playerIndex : (this.myPlayerIndex >= 0 ? this.myPlayerIndex : 0);
+
+    // Mode WebSocket LAN
+    if (this.ws && this.ws.readyState === WebSocket.OPEN && this.currentRoom) {
       this.ws.send(JSON.stringify({
         type: 'SEND_INPUT',
+        playerIndex: pIdx,
         buttonId,
         isPressed: !!isPressed
       }));
@@ -494,14 +507,34 @@ class NetplayService {
         const roomRef = doc(db, 'rooms', this.currentRoom.code);
         updateDoc(roomRef, {
           lastInput: {
-            playerIndex: this.myPlayerIndex,
-            role: this.myRole,
+            playerIndex: pIdx,
+            role: this.myRole || (pIdx === 0 ? 'p1' : 'p2'),
             buttonId,
             isPressed: !!isPressed,
             time: Date.now()
           }
         }).catch(() => {});
       } catch(e) {}
+    }
+  }
+
+  // Demander la synchronisation de l'état (Guest -> Host)
+  requestStateSync() {
+    if (this.ws && this.ws.readyState === WebSocket.OPEN && this.currentRoom) {
+      this.ws.send(JSON.stringify({
+        type: 'REQUEST_STATE'
+      }));
+    }
+  }
+
+  // Envoyer l'état sérialisé (Host -> Guest)
+  sendStateSync(stateData, toPlayerIndex = undefined) {
+    if (this.ws && this.ws.readyState === WebSocket.OPEN && this.currentRoom) {
+      this.ws.send(JSON.stringify({
+        type: 'SEND_STATE',
+        toPlayerIndex,
+        stateData
+      }));
     }
   }
 
