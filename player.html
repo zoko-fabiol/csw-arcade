@@ -792,8 +792,13 @@
           try {
             const res = await electronApi.readRom('neogeo.zip');
             if (res && res.success && res.data) {
-              biosBuffer = res.data;
-              console.log('[CSW-Arcade] BIOS Neo Geo chargé directement via Electron IPC');
+              const u8 = new Uint8Array(res.data);
+              if (u8.length > 5000 && u8[0] === 0x50 && u8[1] === 0x4B) {
+                biosBuffer = res.data;
+                console.log('[CSW-Arcade] BIOS Neo Geo chargé directement via Electron IPC');
+              } else {
+                console.warn('[CSW-Arcade] IPC a renvoyé des données non-ZIP pour le BIOS, passage aux sources Web');
+              }
             }
           } catch (e) {
             console.warn('[CSW-Arcade] Échec lecture BIOS via IPC:', e.message);
@@ -827,8 +832,13 @@
               res = await electronApi.readRom(cleanInput + '.zip');
             }
             if (res && res.success && res.data) {
-              romBuffer = res.data;
-              console.log(`[CSW-Arcade] ROM ${targetZipName} chargée directement via Electron IPC`);
+              const u8 = new Uint8Array(res.data);
+              if (u8.length > 5000 && u8[0] === 0x50 && u8[1] === 0x4B) {
+                romBuffer = res.data;
+                console.log(`[CSW-Arcade] ROM ${targetZipName} chargée directement via Electron IPC`);
+              } else {
+                console.warn(`[CSW-Arcade] IPC a renvoyé des données non-ZIP pour ${targetZipName}, passage aux sources Web`);
+              }
             }
           } catch (e) {
             console.warn('[CSW-Arcade] Échec lecture ROM via IPC:', e.message);

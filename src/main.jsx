@@ -5,15 +5,19 @@ import './index.css';
 
 import gamesData from './data/games.json';
 
-// Polyfill de compatibilité si l'application est ouverte directement dans un navigateur Web (Chrome/Edge/Firefox)
-if (!window.electronAPI) {
-  console.log('[CSW-Arcade] Navigateur Web détecté : activation du polyfill client Web');
+// Polyfill de compatibilité uniquement en environnement de développement local (Vite dev)
+if (!window.electronAPI && import.meta.env.DEV) {
+  console.log('[CSW-Arcade] Environnement DEV détecté : activation du polyfill client local');
   window.electronAPI = {
     readRom: async (filename) => {
       try {
         const res = await fetch(`/api/rom?file=${encodeURIComponent(filename)}`);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const contentType = res.headers.get('content-type') || '';
+        if (contentType.includes('text/html')) throw new Error('SPA redirect HTML');
         const data = await res.arrayBuffer();
+        const u8 = new Uint8Array(data);
+        if (u8.length < 5000 || u8[0] !== 0x50 || u8[1] !== 0x4B) throw new Error('Fichier non-ZIP');
         return { success: true, data };
       } catch (err) {
         return { success: false, error: err.message };
