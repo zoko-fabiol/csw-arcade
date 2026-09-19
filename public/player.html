@@ -685,11 +685,22 @@
             const getReq = store.get(filename.toLowerCase());
             getReq.onsuccess = () => {
               if (getReq.result && getReq.result.data) {
-                console.log(`[Player IDB] ROM ${filename} trouvée en cache local IndexedDB (${getReq.result.size} octets)`);
-                resolve(getReq.result.data);
-              } else {
-                resolve(null);
+                const data = getReq.result.data;
+                const u8 = new Uint8Array(data);
+                // Validation stricte du header ZIP (PK) et de la taille
+                if (u8.length > 5000 && u8[0] === 0x50 && u8[1] === 0x4B) {
+                  console.log(`[Player IDB] ROM ${filename} trouvée et valide en cache local IndexedDB (${getReq.result.size} octets)`);
+                  resolve(data);
+                  return;
+                } else {
+                  console.warn(`[Player IDB] Données corrompues ou redirection HTML détectée pour ${filename}, purge du cache.`);
+                  try {
+                    const delTx = db.transaction(IDB_STORE, 'readwrite');
+                    delTx.objectStore(IDB_STORE).delete(filename.toLowerCase());
+                  } catch(e) {}
+                }
               }
+              resolve(null);
             };
             getReq.onerror = () => resolve(null);
           };
@@ -702,6 +713,13 @@
 
     function saveRomToIDB(filename, buffer) {
       try {
+        const u8 = new Uint8Array(buffer.buffer || buffer);
+        // Ne jamais sauvegarder du HTML ou des fichiers invalides
+        if (u8.length < 5000 || u8[0] !== 0x50 || u8[1] !== 0x4B) {
+          console.warn(`[Player IDB] Refus de sauvegarder ${filename}: buffer non-ZIP invalide`);
+          return;
+        }
+
         const req = indexedDB.open(IDB_NAME, 1);
         req.onupgradeneeded = (e) => {
           const db = e.target.result;
@@ -731,11 +749,24 @@
       let lastErr = null;
       for (const url of candidates) {
         try {
-          if (onProgressText) loadingDesc.innerText = onProgressText + ` (${url.startsWith('http') ? 'Cloud' : 'Serveur'})...`;
+          if (onProgressText) loadingDesc.innerText = onProgressText + ` (${url.startsWith('http') ? 'Cloud' : (url.includes('archive') ? 'Archive.org' : 'Serveur')})...`;
           const res = await fetch(url);
           if (res.ok) {
+            const contentType = res.headers.get('content-type') || '';
+            // Rejet catégorique des redirections SPA Netlify qui renvoient du HTML au lieu d'un binaire
+            if (contentType.includes('text/html')) {
+              console.warn(`[CSW-Arcade] ${url} a retourné du HTML (redirection SPA Netlify 404 ignorée)`);
+              continue;
+            }
+
             const buf = await res.arrayBuffer();
-            if (buf && buf.byteLength > 1000) {
+            if (buf && buf.byteLength > 5000) {
+              const u8 = new Uint8Array(buf);
+              // Vérification du Header magique ZIP 'PK' (0x50, 0x4B)
+              if (u8[0] !== 0x50 || u8[1] !== 0x4B) {
+                console.warn(`[CSW-Arcade] ${url} n'est pas une archive ZIP valide (en-tête invalide)`);
+                continue;
+              }
               console.log(`[CSW-Arcade] ${name} chargé avec succès depuis: ${url} (${buf.byteLength} octets)`);
               return buf;
             }
@@ -850,7 +881,41 @@
     function startEmulatorJS() {
       const initialVol = activeSettings.audio?.muted ? 0 : ((activeSettings.audio?.volume ?? 85) / 100);
 
-      // Interception transparente de XHR & Fetch pour servir romBytes et neogeoBytes directement en mémoire
+      // 1. Interception transparente de fetch pour servir romBytes et neogeoBytes directement en mémoire
+      const _origFetch = window.fetch;
+      window.fetch = async function(input, init) {
+        const url = (typeof input === 'string' ? input : (input?.url || '')).toLowerCase();
+
+        if (romBytes && (url.includes(targetZipName.toLowerCase()) || url.includes(fbneoShortName.toLowerCase()))) {
+          console.log('[Fetch Interceptor] Service direct en mémoire pour la ROM:', targetZipName);
+          const buf = romBytes.buffer.slice(romBytes.byteOffset, romBytes.byteOffset + romBytes.byteLength);
+          return new Response(buf, {
+            status: 200,
+            statusText: 'OK',
+            headers: {
+              'Content-Type': 'application/zip',
+              'Content-Length': String(romBytes.byteLength)
+            }
+          });
+        }
+
+        if (neogeoBytes && url.includes('neogeo.zip')) {
+          console.log('[Fetch Interceptor] Service direct en mémoire pour le BIOS: neogeo.zip');
+          const buf = neogeoBytes.buffer.slice(neogeoBytes.byteOffset, neogeoBytes.byteOffset + neogeoBytes.byteLength);
+          return new Response(buf, {
+            status: 200,
+            statusText: 'OK',
+            headers: {
+              'Content-Type': 'application/zip',
+              'Content-Length': String(neogeoBytes.byteLength)
+            }
+          });
+        }
+
+        return _origFetch.apply(this, [input, init]);
+      };
+
+      // 2. Interception transparente de XHR comme secours
       const _origXHROpen = XMLHttpRequest.prototype.open;
       const _origXHRSend = XMLHttpRequest.prototype.send;
 
@@ -862,7 +927,7 @@
       XMLHttpRequest.prototype.send = function(...args) {
         const url = (this._reqUrl || '').toLowerCase();
 
-        if (romBytes && url.includes(targetZipName.toLowerCase())) {
+        if (romBytes && (url.includes(targetZipName.toLowerCase()) || url.includes(fbneoShortName.toLowerCase()))) {
           console.log('[XHR Interceptor] Service direct en mémoire pour la ROM:', targetZipName);
           const buf = romBytes.buffer.slice(romBytes.byteOffset, romBytes.byteOffset + romBytes.byteLength);
           Object.defineProperty(this, 'status', { get: () => 200 });
@@ -895,11 +960,13 @@
         return _origXHRSend.apply(this, args);
       };
 
-      // Configuration officielle EmulatorJS avec nom de fichier strict
+      // Configuration officielle EmulatorJS avec nom de fichier strict et BIOS Arcade
       window.EJS_player = '#game';
       window.EJS_core = 'arcade';
       window.EJS_gameName = fbneoShortName.toUpperCase();
       window.EJS_gameUrl = '/roms/' + encodeURIComponent(targetZipName);
+      window.EJS_biosUrl = '/roms/neogeo.zip';
+      window.EJS_dontExtractBIOS = true;
       window.EJS_pathtodata = 'https://cdn.emulatorjs.org/stable/data/';
       window.EJS_startOnLoaded = true;
       window.EJS_volume = initialVol;
@@ -954,9 +1021,7 @@
         emu.fileName = targetZipName;
         const origStartGame = emu.startGame.bind(emu);
 
-        // Fonction d'interception 100% SYNCHRONE (pas de async/await ici)
-        emu.startGame = function() {
-          console.log('[VFS Injection] Écriture synchrone des archives dans Emscripten VFS...');
+        const injectVFS = () => {
           try {
             const fs = emu.gameManager?.FS;
             if (fs) {
@@ -997,9 +1062,23 @@
           } catch(err) {
             console.error('[VFS Injection] Erreur VFS:', err);
           }
+        };
 
+        const origStartGame = emu.startGame.bind(emu);
+        emu.startGame = function() {
+          console.log('[VFS Injection] Écriture synchrone des archives dans Emscripten VFS...');
+          injectVFS();
           return origStartGame();
         };
+
+        if (emu.gameManager && typeof emu.gameManager.initModule === 'function') {
+          const origInitModule = emu.gameManager.initModule.bind(emu.gameManager);
+          emu.gameManager.initModule = function(t, e) {
+            const res = origInitModule(t, e);
+            injectVFS();
+            return res;
+          };
+        }
       };
 
       window.EJS_onGameStart = () => {
