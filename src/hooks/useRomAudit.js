@@ -17,26 +17,66 @@ export function useRomAudit() {
 
     try {
       let files = [];
+      let biosFound = false;
+
       if (window.electronAPI && typeof window.electronAPI.listAvailableRoms === 'function') {
         const res = await window.electronAPI.listAvailableRoms();
         if (res.success && Array.isArray(res.files)) {
           files = res.files;
         }
       } else {
-        const res = await fetch('/api/roms-list').then(r => r.json());
-        if (res.success && Array.isArray(res.files)) {
-          files = res.files;
+        // 1. Essayer le manifeste statique (Netlify / Web CDN)
+        try {
+          const manifestRes = await fetch('/roms-manifest.json');
+          if (manifestRes.ok) {
+            const mData = await manifestRes.json();
+            if (mData.success && Array.isArray(mData.files)) {
+              files = mData.files;
+            }
+          }
+        } catch (mErr) {}
+
+        // 2. Si non trouvé ou vide, essayer l'API dev Vite
+        if (files.length === 0) {
+          try {
+            const res = await fetch('/api/roms-list');
+            if (res.ok) {
+              const data = await res.json();
+              if (data.success && Array.isArray(data.files)) {
+                files = data.files;
+              }
+            }
+          } catch (apiErr) {}
         }
       }
 
       const fileSet = new Set(files.map(f => f.toLowerCase()));
-      setAvailableRoms(fileSet);
 
-      // Le BIOS est prêt s'il est présent dans public/roms/neogeo.zip
-      setIsBiosReady(fileSet.has('neogeo.zip'));
+      // 3. Vérification directe du BIOS /roms/neogeo.zip (présent dans public/roms sur Netlify)
+      if (fileSet.has('neogeo.zip')) {
+        biosFound = true;
+      } else {
+        try {
+          const headRes = await fetch('/roms/neogeo.zip', { method: 'HEAD' });
+          if (headRes.ok) {
+            biosFound = true;
+            fileSet.add('neogeo.zip');
+          }
+        } catch (hErr) {}
+      }
+
+      setAvailableRoms(fileSet);
+      setIsBiosReady(biosFound || fileSet.has('neogeo.zip'));
     } catch (err) {
       console.error('[useRomAudit] Exception:', err);
       setError(err.message);
+      // En cas d'erreur de parsing d'API sur le web, vérifier le BIOS en secours
+      try {
+        const headFallback = await fetch('/roms/neogeo.zip', { method: 'HEAD' });
+        if (headFallback.ok) {
+          setIsBiosReady(true);
+        }
+      } catch (e) {}
     } finally {
       setIsLoading(false);
     }

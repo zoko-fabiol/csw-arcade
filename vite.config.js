@@ -5,6 +5,7 @@ import renderer from 'vite-plugin-electron-renderer';
 import path from 'node:path';
 import fs from 'node:fs';
 import { execSync, spawn } from 'node:child_process';
+import { setupNetplayHub } from './src/server/netplayHub.js';
 
 // Plugin pour streamer les ROMs en flux mémoire sans déclencher les gestionnaires de téléchargement externes (IDM)
 function romStreamPlugin() {
@@ -168,6 +169,39 @@ function nativeLauncherPlugin() {
   };
 }
 
+function netplayPlugin() {
+  return {
+    name: 'netplay-middleware',
+    configureServer(server) {
+      try {
+        setupNetplayHub(server);
+      } catch(e) {
+        console.warn('[Vite] Erreur init netplayHub:', e.message);
+      }
+    }
+  };
+}
+
+function romManifestPlugin() {
+  return {
+    name: 'rom-manifest-generator',
+    buildStart() {
+      try {
+        const romsDir = path.resolve(__dirname, 'public/roms');
+        const manifestPath = path.resolve(__dirname, 'public/roms-manifest.json');
+        const files = fs.existsSync(romsDir)
+          ? fs.readdirSync(romsDir).filter(f => f.toLowerCase().endsWith('.zip'))
+          : [];
+        if (!files.some(f => f.toLowerCase() === 'neogeo.zip') && fs.existsSync(path.join(romsDir, 'neogeo.zip'))) {
+          files.push('neogeo.zip');
+        }
+        fs.writeFileSync(manifestPath, JSON.stringify({ success: true, files }, null, 2), 'utf8');
+        console.log(`[CSW-Arcade] Manifeste public/roms-manifest.json généré (${files.length} fichiers).`);
+      } catch(e) {}
+    }
+  };
+}
+
 // Détection de l'environnement : Web pur (Netlify / PWA) vs Desktop Electron
 // Les plugins Electron ne sont activés QUE pour le build desktop dédié, jamais sur le web ou Netlify
 const isElectron = Boolean(
@@ -183,6 +217,8 @@ export default defineConfig({
     react(),
     romStreamPlugin(),
     nativeLauncherPlugin(),
+    netplayPlugin(),
+    romManifestPlugin(),
     ...(isElectron ? [
       electron([
         {
@@ -231,6 +267,7 @@ export default defineConfig({
     }
   },
   server: {
+    host: true,
     port: 3003,
     strictPort: true,
     watch: {

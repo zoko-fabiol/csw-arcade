@@ -19,6 +19,7 @@ import { NetplaySyncEngine } from '../../services/NetplaySyncEngine';
 import { emulatorLoader } from '../../services/emulatorLoader';
 import { TouchOverlay } from './TouchOverlay';
 import { useDeviceType } from '../../utils/deviceDetector';
+import { netplayService } from '../../services/netplayService';
 
 export function EmulatorCore({ 
   game, 
@@ -26,7 +27,6 @@ export function EmulatorCore({
   settings, 
   onExit, 
   onOpenSettings, 
-  netplayService = null, 
   isHost = true 
 }) {
   const containerRef = useRef(null);
@@ -39,6 +39,7 @@ export function EmulatorCore({
   const [fps, setFps] = useState(60);
   const [ping, setPing] = useState(null);
   const [errorMessage, setErrorMessage] = useState(null);
+  const [netplayRoom, setNetplayRoom] = useState(() => netplayService.currentRoom);
 
   // Détection automatique du mode tactile (mobile / tablette / tactile)
   const [isTouchVisible, setIsTouchVisible] = useState(() => {
@@ -46,14 +47,43 @@ export function EmulatorCore({
   });
 
   const handleTouchInput = (buttonId, isPressed) => {
+    if (mode === 'netplay' && !isHost) {
+      netplayService.sendInput(buttonId, isPressed);
+    }
     if (iframeRef.current?.contentWindow) {
       iframeRef.current.contentWindow.postMessage({
         type: 'TOUCH_INPUT',
+        playerIndex: isHost ? 0 : (netplayService.myPlayerIndex >= 0 ? netplayService.myPlayerIndex : 1),
         buttonId,
         isPressed
       }, '*');
     }
   };
+
+  // Écoute des entrées des joueurs distants (J2, J3, J4) en mode Netplay
+  useEffect(() => {
+    if (mode !== 'netplay') return;
+
+    const unsubInput = netplayService.on('remote_input', ({ playerIndex, buttonId, isPressed }) => {
+      if (iframeRef.current?.contentWindow) {
+        iframeRef.current.contentWindow.postMessage({
+          type: 'NETPLAY_INPUT',
+          playerIndex,
+          buttonId,
+          isPressed
+        }, '*');
+      }
+    });
+
+    const unsubPing = netplayService.on('ping', (p) => setPing(p));
+    const unsubRoom = netplayService.on('room_update', (r) => setNetplayRoom(r));
+
+    return () => {
+      unsubInput();
+      unsubPing();
+      unsubRoom();
+    };
+  }, [mode]);
 
   // 1. Initialisation des contrôles matériels avec les paramètres utilisateur
   useEffect(() => {
@@ -236,10 +266,15 @@ export function EmulatorCore({
         {/* Télémétrie & Mode */}
         <div className="flex items-center gap-2 sm:gap-4 shrink-0">
           {mode === 'netplay' ? (
-            <div className="flex items-center gap-1.5 px-2 sm:px-3 py-0.5 sm:py-1 rounded-full bg-red-950/80 border border-red-500/40 text-red-400 text-[10px] sm:text-[11px]">
-              <Radio className="w-3 h-3 animate-pulse text-red-500" />
-              <span className="hidden sm:inline">NETPLAY {isHost ? '[HÔTE P1]' : '[INVITÉ P2]'}</span>
-              <span className="sm:hidden">1V1</span>
+            <div className="flex items-center gap-1.5 px-2 sm:px-3 py-0.5 sm:py-1 rounded-full bg-cyan-950/90 border border-cyan-500/50 text-cyan-300 text-[10px] sm:text-[11px]">
+              <Radio className="w-3 h-3 animate-pulse text-cyan-400" />
+              <span className="hidden sm:inline">
+                LAN {netplayRoom?.code ? `[${netplayRoom.code}]` : ''} {isHost ? '• HÔTE (J1)' : `• JOUEUR ${netplayService.myPlayerIndex >= 0 ? netplayService.myPlayerIndex + 1 : 2}`}
+                {netplayRoom ? ` (${netplayRoom.players ? netplayRoom.players.filter(Boolean).length : 2}/${netplayRoom.maxPlayers || 2}P)` : ''}
+              </span>
+              <span className="sm:hidden">
+                {netplayRoom?.code || 'LAN'} {isHost ? 'J1' : `J${netplayService.myPlayerIndex >= 0 ? netplayService.myPlayerIndex + 1 : 2}`}
+              </span>
             </div>
           ) : (
             <div className="flex items-center gap-1.5 px-2 sm:px-3 py-0.5 sm:py-1 rounded-full bg-cyan-950/80 border border-cyan-500/40 text-cyan-400 text-[10px] sm:text-[11px]">

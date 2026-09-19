@@ -664,20 +664,49 @@
     let neogeoBytes = null;
     let romBytes = null;
 
+    // Fonction de téléchargement résiliente multi-sources (Local Vite, Netlify Static, Miroir Archive.org)
+    async function fetchBinaryWithFallbacks(name, candidates, onProgressText) {
+      let lastErr = null;
+      for (const url of candidates) {
+        try {
+          if (onProgressText) loadingDesc.innerText = onProgressText + ` (${url.startsWith('http') ? 'Miroir Cloud' : 'Serveur'})...`;
+          const res = await fetch(url);
+          if (res.ok) {
+            const buf = await res.arrayBuffer();
+            if (buf && buf.byteLength > 1000) {
+              console.log(`[CSW-Arcade] ${name} chargé avec succès depuis: ${url} (${buf.byteLength} octets)`);
+              return buf;
+            }
+          }
+        } catch (e) {
+          lastErr = e;
+          console.warn(`[CSW-Arcade] Échec source ${url} pour ${name}:`, e.message);
+        }
+      }
+      throw new Error(`Impossible de charger ${name}. Vérifiez la connexion réseau.`);
+    }
+
     // Pré-chargement asynchrone bloquant AVANT initialisation du runtime WASM
     async function preloadAssetsAndBoot() {
       try {
-        loadingDesc.innerText = `Vérification et synchronisation de ${targetZipName}...`;
+        loadingDesc.innerText = `Recherche du BIOS Neo Geo et de la ROM ${targetZipName}...`;
+
+        const biosCandidates = [
+          '/roms/neogeo.zip',
+          '/api/rom-data/neogeo',
+          'https://archive.org/download/NeoGeoRomCollectionByGhostware/neogeo.zip'
+        ];
+
+        const romCandidates = [
+          '/roms/' + encodeURIComponent(targetZipName),
+          '/api/rom-data/' + encodeURIComponent(fbneoShortName),
+          'https://archive.org/download/neo-geo-mvs-romset/' + encodeURIComponent(targetZipName),
+          'https://archive.org/download/NeoGeoRomCollectionByGhostware/' + encodeURIComponent(targetZipName)
+        ];
 
         const [biosBuffer, romBuffer] = await Promise.all([
-          fetch('/api/rom-data/neogeo').then(r => {
-            if (!r.ok) throw new Error('Échec HTTP BIOS: ' + r.status);
-            return r.arrayBuffer();
-          }),
-          fetch('/api/rom-data/' + encodeURIComponent(fbneoShortName)).then(r => {
-            if (!r.ok) throw new Error('Échec HTTP ROM: ' + r.status);
-            return r.arrayBuffer();
-          })
+          fetchBinaryWithFallbacks('BIOS Neo Geo (neogeo.zip)', biosCandidates, 'Synchronisation du BIOS Neo Geo'),
+          fetchBinaryWithFallbacks(`ROM ${targetZipName}`, romCandidates, `Chargement de ${fbneoShortName.toUpperCase()}`)
         ]);
 
         neogeoBytes = new Uint8Array(biosBuffer);
@@ -701,10 +730,19 @@
     function startEmulatorJS() {
       const initialVol = activeSettings.audio?.muted ? 0 : ((activeSettings.audio?.volume ?? 85) / 100);
 
+      // Créer un Blob URL pour le buffer ROM en mémoire
+      let romBlobUrl = '';
+      try {
+        if (romBytes && romBytes.length > 0) {
+          const blob = new Blob([romBytes], { type: 'application/zip' });
+          romBlobUrl = URL.createObjectURL(blob);
+        }
+      } catch (e) {}
+
       window.EJS_player = '#game';
       window.EJS_core = 'arcade';
       window.EJS_gameName = fbneoShortName.toUpperCase();
-      window.EJS_gameUrl = '/api/rom-data/' + encodeURIComponent(targetZipName);
+      window.EJS_gameUrl = romBlobUrl || ('/roms/' + encodeURIComponent(targetZipName));
       window.EJS_pathtodata = 'https://cdn.emulatorjs.org/stable/data/';
       window.EJS_startOnLoaded = true;
       window.EJS_volume = initialVol;
@@ -842,7 +880,10 @@
           handleDirectKey(event.data.code, event.data.keyCode, event.data.eventType === 'keydown');
         }
         if (event.data.type === 'TOUCH_INPUT') {
-          dispatchDirectInput(0, event.data.buttonId, event.data.isPressed);
+          dispatchDirectInput(event.data.playerIndex ?? 0, event.data.buttonId, event.data.isPressed);
+        }
+        if (event.data.type === 'NETPLAY_INPUT') {
+          dispatchDirectInput(event.data.playerIndex ?? 1, event.data.buttonId, event.data.isPressed);
         }
       });
 

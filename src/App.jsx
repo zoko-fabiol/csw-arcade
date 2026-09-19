@@ -5,9 +5,11 @@ import { useSettings } from './hooks/useSettings';
 import { Sidebar } from './components/layout/Sidebar';
 import { GameLibrary } from './components/games/GameLibrary';
 import { EmulatorCore } from './components/emulator/EmulatorCore';
-import { NetplayLobbyModal } from './components/netplay/NetplayLobbyModal';
+import { NetplayModal } from './components/netplay/NetplayModal';
+import { MobileControllerView } from './components/netplay/MobileControllerView';
 import { WebRTCNetplayDemo } from './components/netplay/WebRTCNetplayDemo';
 import { SettingsModal } from './components/settings/SettingsModal';
+import { netplayService } from './services/netplayService';
 
 import { launchNativeNeoRAGEx } from './services/nativeLauncher';
 
@@ -19,14 +21,17 @@ export default function App() {
 
   // État Modales & Responsive
   const [isLobbyOpen, setIsLobbyOpen] = useState(false);
+  const [netplayPreselectedGame, setNetplayPreselectedGame] = useState(null);
+  const [mobileControllerSession, setMobileControllerSession] = useState(null);
   const [isWebRtcTestOpen, setIsWebRtcTestOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
   // État Session Netplay
   const [netplaySession, setNetplaySession] = useState({
-    service: null,
-    isHost: true
+    isHost: true,
+    playerIndex: 0,
+    role: 'p1'
   });
 
   // Audit des ROMs locales
@@ -68,17 +73,19 @@ export default function App() {
     }
   };
 
-  // Clic 1v1 Netplay
-  const handleLaunchNetplay = (game) => {
+  // Clic Partie en Réseau LAN
+  const handleLaunchNetplay = (game = null) => {
+    setNetplayPreselectedGame(game);
     setIsLobbyOpen(true);
   };
 
-  // Démarrage effectif du match Netplay
-  const handleStartNetplayGame = ({ game, isHost, netplayService }) => {
+  // Démarrage effectif du match Netplay LAN
+  const handleStartNetplayGame = (game, options = {}) => {
     setIsLobbyOpen(false);
     setNetplaySession({
-      service: netplayService,
-      isHost
+      isHost: options.isHost ?? true,
+      playerIndex: options.playerIndex ?? 0,
+      role: options.role ?? 'p1'
     });
     setActiveGame(game);
     setGameMode('netplay');
@@ -86,9 +93,9 @@ export default function App() {
 
   // Quitter le jeu et libérer les ressources
   const handleExitGame = () => {
-    if (netplaySession.service) {
-      netplaySession.service.disconnect();
-      setNetplaySession({ service: null, isHost: true });
+    if (gameMode === 'netplay') {
+      netplayService.leaveRoom();
+      setNetplaySession({ isHost: true, playerIndex: 0, role: 'p1' });
     }
     setActiveGame(null);
     setGameMode(null);
@@ -133,13 +140,26 @@ export default function App() {
         onToggleMobileSidebar={() => setIsMobileSidebarOpen(prev => !prev)}
       />
 
-      {/* Modal Matchmaking Netplay Firestore / WebRTC */}
-      <NetplayLobbyModal
+      {/* Modal Matchmaking Multijoueur LAN (2 à 4 Joueurs) */}
+      <NetplayModal
         isOpen={isLobbyOpen}
-        onClose={() => setIsLobbyOpen(false)}
+        onClose={() => {
+          setIsLobbyOpen(false);
+          setNetplayPreselectedGame(null);
+        }}
         games={gamesData}
-        onStartNetplayGame={handleStartNetplayGame}
+        currentGame={netplayPreselectedGame || activeGame}
+        onLaunchGame={handleStartNetplayGame}
+        onOpenMobileController={(sessionData) => setMobileControllerSession(sessionData)}
       />
+
+      {/* Vue Manette Sans Fil Smartphone Dédiée */}
+      {mobileControllerSession && (
+        <MobileControllerView
+          sessionData={mobileControllerSession}
+          onExit={() => setMobileControllerSession(null)}
+        />
+      )}
 
       {/* Modal Démonstrateur WebRTC 60 FPS (UDP-like) */}
       {isWebRtcTestOpen && (
@@ -178,7 +198,6 @@ export default function App() {
           settings={settings}
           onExit={handleExitGame}
           onOpenSettings={() => setIsSettingsOpen(true)}
-          netplayService={netplaySession.service}
           isHost={netplaySession.isHost}
         />
       )}
