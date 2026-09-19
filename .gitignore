@@ -21,8 +21,8 @@ electron/
 *.iso
 public/roms/*.zip
 !public/roms/.gitkeep
+!public/roms/neogeo.zip
 temp_nonmerged/
-neogeo.zip
 -C
 
 # Fichiers temporaires et éditeurs
