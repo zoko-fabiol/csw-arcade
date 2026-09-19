@@ -812,19 +812,56 @@
     function startEmulatorJS() {
       const initialVol = activeSettings.audio?.muted ? 0 : ((activeSettings.audio?.volume ?? 85) / 100);
 
-      // Créer un Blob URL pour le buffer ROM en mémoire
-      let romBlobUrl = '';
-      try {
-        if (romBytes && romBytes.length > 0) {
-          const blob = new Blob([romBytes], { type: 'application/zip' });
-          romBlobUrl = URL.createObjectURL(blob);
-        }
-      } catch (e) {}
+      // Interception transparente de XHR & Fetch pour servir romBytes et neogeoBytes directement en mémoire
+      const _origXHROpen = XMLHttpRequest.prototype.open;
+      const _origXHRSend = XMLHttpRequest.prototype.send;
 
+      XMLHttpRequest.prototype.open = function(method, url, ...rest) {
+        this._reqUrl = url ? String(url) : '';
+        return _origXHROpen.apply(this, [method, url, ...rest]);
+      };
+
+      XMLHttpRequest.prototype.send = function(...args) {
+        const url = (this._reqUrl || '').toLowerCase();
+
+        if (romBytes && url.includes(targetZipName.toLowerCase())) {
+          console.log('[XHR Interceptor] Service direct en mémoire pour la ROM:', targetZipName);
+          const buf = romBytes.buffer.slice(romBytes.byteOffset, romBytes.byteOffset + romBytes.byteLength);
+          Object.defineProperty(this, 'status', { get: () => 200 });
+          Object.defineProperty(this, 'statusText', { get: () => 'OK' });
+          Object.defineProperty(this, 'response', { get: () => buf });
+          Object.defineProperty(this, 'readyState', { get: () => 4 });
+          setTimeout(() => {
+            if (typeof this.onload === 'function') this.onload();
+            this.dispatchEvent(new Event('load'));
+            this.dispatchEvent(new Event('loadend'));
+          }, 5);
+          return;
+        }
+
+        if (neogeoBytes && url.includes('neogeo.zip')) {
+          console.log('[XHR Interceptor] Service direct en mémoire pour le BIOS: neogeo.zip');
+          const buf = neogeoBytes.buffer.slice(neogeoBytes.byteOffset, neogeoBytes.byteOffset + neogeoBytes.byteLength);
+          Object.defineProperty(this, 'status', { get: () => 200 });
+          Object.defineProperty(this, 'statusText', { get: () => 'OK' });
+          Object.defineProperty(this, 'response', { get: () => buf });
+          Object.defineProperty(this, 'readyState', { get: () => 4 });
+          setTimeout(() => {
+            if (typeof this.onload === 'function') this.onload();
+            this.dispatchEvent(new Event('load'));
+            this.dispatchEvent(new Event('loadend'));
+          }, 5);
+          return;
+        }
+
+        return _origXHRSend.apply(this, args);
+      };
+
+      // Configuration officielle EmulatorJS avec nom de fichier strict
       window.EJS_player = '#game';
       window.EJS_core = 'arcade';
       window.EJS_gameName = fbneoShortName.toUpperCase();
-      window.EJS_gameUrl = romBlobUrl || ('/roms/' + encodeURIComponent(targetZipName));
+      window.EJS_gameUrl = '/roms/' + encodeURIComponent(targetZipName);
       window.EJS_pathtodata = 'https://cdn.emulatorjs.org/stable/data/';
       window.EJS_startOnLoaded = true;
       window.EJS_volume = initialVol;
@@ -876,6 +913,7 @@
         emu.controls = buildControllersConfig(activeSettings.controls);
         if (typeof emu.setupKeys === 'function') emu.setupKeys();
 
+        emu.fileName = targetZipName;
         const origStartGame = emu.startGame.bind(emu);
 
         // Fonction d'interception 100% SYNCHRONE (pas de async/await ici)
