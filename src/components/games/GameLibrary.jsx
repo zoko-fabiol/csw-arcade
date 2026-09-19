@@ -187,8 +187,8 @@ export function GameLibrary({
       {/* Zone de Contenu Principale */}
       <main className="flex-1 overflow-y-auto p-2.5 sm:p-6 space-y-3.5 sm:space-y-6">
         
-        {/* Alerte Critique BIOS Neo Geo */}
-        {!isBiosReady && (
+        {/* Alerte Critique BIOS Neo Geo (uniquement en mode Desktop Electron si le dossier local est incomplet) */}
+        {typeof window !== 'undefined' && window.electronAPI && !isBiosReady && (
           <div className="p-3 sm:p-4 rounded-xl bg-gradient-to-r from-rose-950/60 to-red-950/40 border border-rose-500/40 flex items-start gap-3 sm:gap-4 text-xs font-mono">
             <AlertOctagon className="w-4 h-4 sm:w-5 sm:h-5 text-rose-400 shrink-0 mt-0.5 animate-bounce" />
             <div className="min-w-0">

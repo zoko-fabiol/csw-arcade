@@ -67,7 +67,7 @@ export function useRomAudit() {
         biosFound = true;
       } else {
         try {
-          const headRes = await fetch('/roms/neogeo.zip', { method: 'HEAD' });
+          const headRes = await fetch('./roms/neogeo.zip');
           if (headRes.ok) {
             biosFound = true;
             fileSet.add('neogeo.zip');
@@ -75,18 +75,15 @@ export function useRomAudit() {
         } catch (hErr) {}
       }
 
+      const isWeb = typeof window !== 'undefined' && !window.electronAPI;
       setAvailableRoms(fileSet);
-      setIsBiosReady(biosFound || fileSet.has('neogeo.zip'));
+      // Sur le web (Netlify / PWA), le BIOS est toujours géré et injecté automatiquement par player.html
+      setIsBiosReady(isWeb || biosFound || fileSet.has('neogeo.zip'));
     } catch (err) {
       console.error('[useRomAudit] Exception:', err);
       setError(err.message);
-      // En cas d'erreur de parsing d'API sur le web, vérifier le BIOS en secours
-      try {
-        const headFallback = await fetch('/roms/neogeo.zip', { method: 'HEAD' });
-        if (headFallback.ok) {
-          setIsBiosReady(true);
-        }
-      } catch (e) {}
+      const isWeb = typeof window !== 'undefined' && !window.electronAPI;
+      setIsBiosReady(isWeb);
     } finally {
       setIsLoading(false);
     }
