@@ -89,11 +89,15 @@ export function EmulatorCore({
     });
 
     // L'invité reçoit le savestate officiel de l'hôte pour se caler sur sa frame exacte (une seule fois à froid)
-    const unsubSyncState = netplayService.on('sync_state', ({ stateData }) => {
+    const unsubSyncState = netplayService.on('sync_state', ({ stateBase64, stateData }) => {
       if (!isHost && iframeRef.current?.contentWindow) {
         console.log('[EmulatorCore] Savestate à froid reçu de l\'hôte, synchronisation initiale...');
         hasSyncedInitialState.current = true;
-        iframeRef.current.contentWindow.postMessage({ type: 'LOAD_STATE', state: stateData }, '*');
+        iframeRef.current.contentWindow.postMessage({
+          type: 'LOAD_STATE',
+          stateBase64: stateBase64 || null,
+          state: stateData || null
+        }, '*');
       }
     });
 
@@ -139,7 +143,10 @@ export function EmulatorCore({
       // L'iframe de l'hôte a extrait le savestate, l'envoyer au joueur distant
       if (event.data.type === 'STATE_DATA' && mode === 'netplay' && isHost) {
         console.log('[EmulatorCore] Savestate extrait par l\'iframe, transmission au joueur distant...');
-        netplayService.sendStateSync(event.data.state);
+        netplayService.sendStateSync({
+          stateBase64: event.data.stateBase64 || null,
+          stateSize: event.data.stateSize || 0
+        });
       }
     };
 

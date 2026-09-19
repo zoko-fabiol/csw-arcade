@@ -45,8 +45,8 @@ export function setupNetplayHub(server) {
     }
   });
 
-  // Attach WebSocket server to httpServer
-  const wss = new WebSocketServer({ noServer: true });
+  // Attach WebSocket server to httpServer avec support de payload de 64 Mo pour les savestates à froid
+  const wss = new WebSocketServer({ noServer: true, maxPayload: 64 * 1024 * 1024 });
 
   if (server.httpServer) {
     server.httpServer.on('upgrade', (request, socket, head) => {
@@ -288,16 +288,18 @@ export function setupNetplayHub(server) {
           }
 
           case 'SEND_STATE': {
-            // L'hôte envoie son savestate de synchronisation
+            // L'hôte envoie son savestate de synchronisation à froid
             const info = clientRooms.get(ws);
             if (!info || info.playerIndex !== 0) return;
             const room = rooms.get(info.roomCode);
             if (!room) return;
 
-            const { toPlayerIndex, stateData, frame } = data;
+            const { toPlayerIndex, stateBase64, stateSize, stateData, frame } = data;
             const payload = JSON.stringify({
               type: 'SYNC_STATE',
-              stateData,
+              stateBase64: stateBase64 || null,
+              stateSize: stateSize || 0,
+              stateData: stateData || null,
               frame: frame || 0
             });
 

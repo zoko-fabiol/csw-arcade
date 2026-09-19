@@ -582,12 +582,15 @@ class NetplayService {
   }
 
   // Envoyer l'état sérialisé (Host -> Guest)
-  sendStateSync(stateData, toPlayerIndex = undefined) {
+  sendStateSync(payload, toPlayerIndex = undefined) {
     if (this.ws && this.ws.readyState === WebSocket.OPEN && this.currentRoom) {
+      const isObj = payload && typeof payload === 'object' && ('stateBase64' in payload);
       this.ws.send(JSON.stringify({
         type: 'SEND_STATE',
         toPlayerIndex,
-        stateData
+        stateBase64: isObj ? payload.stateBase64 : (typeof payload === 'string' ? payload : null),
+        stateSize: isObj ? payload.stateSize : 0,
+        stateData: !isObj ? payload : null
       }));
     }
   }
