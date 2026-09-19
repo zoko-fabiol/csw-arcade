@@ -5,15 +5,19 @@
  * Moteur de synchronisation déterministe prédictif avec retour en arrière
  * (Rollback & Fast-Forward Resimulation) pour FinalBurn Neo (FBNeo) WebAssembly.
  *
- * Principes architecturaux :
- * 1. Emulateur FBNeo traité comme une boîte noire déterministe.
- * 2. Ring Buffers circulaires pour inputs locaux, inputs distants et savestates.
- * 3. Boucle à pas de temps fixe (Fixed Timestep 60Hz) avec accumulateur.
- * 4. Prédiction des inputs distants en cas de gigue/latence réseau.
- * 5. Réconciliation immédiate (Rollback + Fast-forward sans rendu visuel/audio)
- *    lors de la réception d'un input distant divergent.
- * 6. Gestion zéro-allocation dans la boucle critique via pointeurs persistants
- *    sur le tas linéaire Emscripten (HEAPU8).
+ * Principes architecturaux (Standards GGPO de l'industrie) :
+ * 1. ZERO savestate sur le réseau en cours de jeu. Le savestate réseau ne sert
+ *    qu'UNE SEULE FOIS à la synchronisation à froid (initial join).
+ * 2. Chaque machine capture et conserve ses savestates localement en mémoire
+ *    dans un Ring Buffer circulaire (128 frames).
+ * 3. En cas de retard ou d'input divergent : restauration du savestate local passé,
+ *    correction de l'input et ré-exécution ultra-rapide (Fast-Forward) SANS rendu
+ *    graphique/audio jusqu'à l'image actuelle.
+ * 4. Pacing dynamique par "Skip Render" : en cas de retard de K frames, calcul de K frames
+ *    d'un coup dans le même tick avec skip-render sur les K-1 premières frames,
+ *    sans jamais modifier la fréquence requestAnimationFrame ni détruire le buffer audio.
+ * 5. Redondance d'Inputs N-3 : chaque paquet d'input transporte la frame F et l'historique
+ *    des 3 frames précédentes (F-1, F-2, F-3) pour immuniser contre la perte de paquets UDP/Wi-Fi.
  * ============================================================================
  */
 
@@ -21,6 +25,7 @@ export const BUFFER_SIZE = 128; // Puissance de 2 pour modulo binaire (& BUFFER_
 export const BUFFER_MASK = BUFFER_SIZE - 1;
 export const MAX_ROLLBACK_FRAMES = 120; // Seuil maximal de réconciliation en frames
 export const FRAME_TIME_MS = 1000 / 60; // 16.6667 ms (60 FPS standard NTSC Arcade)
+export const MAX_CATCHUP_FRAMES = 5;    // Maximum de frames rattrapables par tick (Skip Render)
 
 export class RollbackManager {
   /**
@@ -47,9 +52,10 @@ export class RollbackManager {
     this.onRollback = onRollback;
     this.onStatsUpdate = onStatsUpdate;
 
-    // --- ETAT TEMPOREL ---
+    // --- ETAT TEMPOREL ET CADENCE ---
     this.currentFrame = 0;
     this.remoteFrameAdvancement = 0;
+    this.remoteAckFrame = 0;
     this.isRunning = false;
     this.isRollingBack = false;
     this.animationFrameId = null;
@@ -60,17 +66,20 @@ export class RollbackManager {
     this.stateSize = 0;
     this.wasmStatePtr = null;
 
-    // --- RING BUFFERS (Mémoires Tampons Circulaires) ---
-    // Inputs sous forme d'entiers 32-bit (masques de boutons RetroPad Neo Geo)
+    // --- RING BUFFERS CIRCULAIRES ---
+    // Inputs sous forme d'entiers 32-bit (masques RetroPad Neo Geo)
     this.localInputs = new Int32Array(BUFFER_SIZE);
     this.remoteInputs = new Int32Array(BUFFER_SIZE);
     this.remoteInputPredicted = new Uint8Array(BUFFER_SIZE); // 1 = prédit, 0 = confirmé réel
     this.frameNumbers = new Int32Array(BUFFER_SIZE).fill(-1);
 
-    // Tableau de Uint8Array contenant les instantanés mémoire de FBNeo
+    // Tableau de TypedArray pour stocker les instantanés de la RAM FBNeo
     this.savestates = new Array(BUFFER_SIZE);
 
-    // File d'attente des paquets reçus par WebRTC avant intégration
+    // Historique des 3 dernières frames pour la redondance N-3
+    this.localInputHistory = [0, 0, 0];
+
+    // File d'attente des paquets reçus
     this.incomingPacketQueue = [];
 
     // --- STATISTIQUES & TELEMETRIE GGPO ---
@@ -81,11 +90,13 @@ export class RollbackManager {
       lastRollbackDistance: 0,
       mispredictions: 0,
       predictedFramesCount: 0,
-      rttMs: 0
+      recoveredByRedundancy: 0,
+      catchupFramesExecuted: 0,
+      frameAdvantage: 0
     };
     this.statsInterval = null;
 
-    // Liaison des méthodes de rappel
+    // Liaison des méthodes
     this.gameLoop = this.gameLoop.bind(this);
     this.handleDataChannelMessage = this.handleDataChannelMessage.bind(this);
 
@@ -104,12 +115,11 @@ export class RollbackManager {
     const requiredFunctions = ['_serialize_size', '_serialize', '_unserialize', '_step'];
     for (const fn of requiredFunctions) {
       if (typeof this.module[fn] !== 'function') {
-        // Recherche dans ccall/cwrap si non exporté directement avec underscore
         const cleanName = fn.replace(/^_/, '');
         if (typeof this.module[cleanName] === 'function') {
           this.module[fn] = this.module[cleanName];
         } else {
-          console.warn(`[RollbackManager] Avertissement: Symbole WASM ${fn} non trouvé directement sur Module.`);
+          console.warn(`[RollbackManager] Symbole WASM ${fn} non trouvé directement sur Module.`);
         }
       }
     }
@@ -118,27 +128,24 @@ export class RollbackManager {
     try {
       this.stateSize = this.module._serialize_size ? this.module._serialize_size() : 0;
     } catch(e) {
-      console.warn('[RollbackManager] Erreur appel _serialize_size:', e.message);
       this.stateSize = 0;
     }
 
     if (this.stateSize <= 0) {
-      // Taille standard de repli pour la RAM Neo Geo (68000 + Z80 + VRAM + YM2610) ~ 512 Ko
-      this.stateSize = 512 * 1024;
-      console.info(`[RollbackManager] Utilisation d'une taille de savestate par défaut : ${this.stateSize} octets.`);
+      this.stateSize = 512 * 1024; // 512 Ko par défaut pour Neo Geo MVS
+      console.info(`[RollbackManager] Taille de savestate par défaut : ${this.stateSize} octets.`);
     } else {
       console.info(`[RollbackManager] Taille de savestate FBNeo détectée : ${this.stateSize} octets.`);
     }
 
-    // Allocation d'un bloc de mémoire persistant dans le tas WebAssembly (HEAPU8)
-    // Réutilisé à chaque frame pour éviter la fragmentation et le ramasse-miettes (GC)
+    // Allocation persistante dans le tas WebAssembly (HEAPU8) - Zéro allocation per-frame
     if (typeof this.module._malloc === 'function') {
       this.wasmStatePtr = this.module._malloc(this.stateSize);
     } else {
       throw new Error('[RollbackManager] Module._malloc introuvable. Emscripten doit exporter _malloc.');
     }
 
-    // Pré-allocation des TypedArrays du Ring Buffer de savestates
+    // Pré-allocation des TypedArrays du Ring Buffer
     for (let i = 0; i < BUFFER_SIZE; i++) {
       this.savestates[i] = new Uint8Array(this.stateSize);
     }
@@ -146,6 +153,30 @@ export class RollbackManager {
     // Capture de la frame initiale 0
     this.saveStateToRingBuffer(0);
     console.log('[RollbackManager] Initialisé avec succès. Ring buffer alloué.');
+  }
+
+  /**
+   * Capture une savestate complète à froid (utilisée UNIQUEMENT lors du cold start / connexion initiale)
+   * @returns {Uint8Array}
+   */
+  serializeColdState() {
+    if (!this.wasmStatePtr || !this.module._serialize) return null;
+    this.module._serialize(this.wasmStatePtr);
+    const snapshot = new Uint8Array(this.stateSize);
+    snapshot.set(this.module.HEAPU8.subarray(this.wasmStatePtr, this.wasmStatePtr + this.stateSize));
+    return snapshot;
+  }
+
+  /**
+   * Restaure une savestate complète à froid (utilisée UNIQUEMENT lors du cold start / connexion initiale)
+   * @param {Uint8Array} stateBytes 
+   */
+  unserializeColdState(stateBytes) {
+    if (!this.wasmStatePtr || !this.module._unserialize || !stateBytes) return;
+    this.module.HEAPU8.set(stateBytes, this.wasmStatePtr);
+    this.module._unserialize(this.wasmStatePtr);
+    this.saveStateToRingBuffer(this.currentFrame);
+    console.log('[RollbackManager] Savestate à froid injecté avec succès.');
   }
 
   /**
@@ -172,9 +203,9 @@ export class RollbackManager {
     this.timeAccumulator = 0;
     this.animationFrameId = requestAnimationFrame(this.gameLoop);
 
-    // Télémétrie toutes les 500 ms
     this.statsInterval = setInterval(() => {
       if (this.onStatsUpdate) {
+        this.stats.frameAdvantage = this.currentFrame - this.remoteFrameAdvancement;
         this.onStatsUpdate({ ...this.stats });
       }
     }, 500);
@@ -213,45 +244,96 @@ export class RollbackManager {
   }
 
   // ==========================================================================
-  // GESTION DU RESEAU WEBRTC & PAQUETS BINAIRES COMPACTS
+  // PROTOCOLE RESEAU D'INPUTS AVEC REDONDANCE N-3 (IMMUNITE AUX PERTES UDP)
   // ==========================================================================
 
   /**
-   * Émet l'input local sur le DataChannel WebRTC
-   * Format compact : [Type: 0x01 (1o), Frame (4o uint32), Input (4o int32)] = 9 octets
+   * Émet l'input local avec redondance N-3 sur le DataChannel WebRTC
+   * Format binaire compact (22 octets) :
+   * [Header: 0x03 (1o) | PlayerIndex: 1o | Frame: 4o | CurrentInput: 4o | InputF-1: 4o | InputF-2: 4o | InputF-3: 4o]
    */
-  sendLocalInput(frame, input) {
-    if (!this.dataChannel || this.dataChannel.readyState !== 'open') return;
+  sendLocalInput(frame, currentInput) {
+    // Mise à jour de l'historique circulaire N-3
+    const h1 = this.localInputHistory[0] || 0;
+    const h2 = this.localInputHistory[1] || 0;
+    const h3 = this.localInputHistory[2] || 0;
 
-    try {
-      const buffer = new ArrayBuffer(9);
-      const view = new DataView(buffer);
-      view.setUint8(0, 0x01); // Header identifiant paquet input
-      view.setUint32(1, frame, false); // Big endian
-      view.setInt32(5, input, false);
-      this.dataChannel.send(buffer);
-    } catch(err) {
-      console.warn('[RollbackManager] Erreur envoi WebRTC:', err.message);
+    if (this.dataChannel && this.dataChannel.readyState === 'open') {
+      try {
+        const buffer = new ArrayBuffer(22);
+        const view = new DataView(buffer);
+        view.setUint8(0, 0x03); // Protocole redondant N-3
+        view.setUint8(1, this.playerIndex);
+        view.setUint32(2, frame, false);
+        view.setInt32(6, currentInput, false);
+        view.setInt32(10, h1, false);
+        view.setInt32(14, h2, false);
+        view.setInt32(18, h3, false);
+        this.dataChannel.send(buffer);
+      } catch(err) {
+        console.warn('[RollbackManager] Erreur envoi WebRTC:', err.message);
+      }
     }
+
+    // Décalage de l'historique
+    this.localInputHistory[2] = h2;
+    this.localInputHistory[1] = h1;
+    this.localInputHistory[0] = currentInput;
   }
 
   /**
-   * Réception asynchrone des messages réseau via le DataChannel
+   * Réception asynchrone des paquets d'inputs redondants
    */
   handleDataChannelMessage(event) {
     try {
       if (event.data instanceof ArrayBuffer) {
         const view = new DataView(event.data);
         const type = view.getUint8(0);
-        if (type === 0x01) {
+
+        if (type === 0x03) {
+          // Paquet Redondant N-3
+          const pIdx = view.getUint8(1);
+          const frame = view.getUint32(2, false);
+          const currentInput = view.getInt32(6, false);
+          const h1 = view.getInt32(10, false);
+          const h2 = view.getInt32(14, false);
+          const h3 = view.getInt32(18, false);
+
+          this.incomingPacketQueue.push({
+            frame,
+            inputs: [
+              { f: frame, input: currentInput },
+              { f: frame - 1, input: h1 },
+              { f: frame - 2, input: h2 },
+              { f: frame - 3, input: h3 }
+            ]
+          });
+        } else if (type === 0x01) {
+          // Paquet simple de compatibilité
           const frame = view.getUint32(1, false);
           const input = view.getInt32(5, false);
-          this.incomingPacketQueue.push({ frame, input });
+          this.incomingPacketQueue.push({
+            frame,
+            inputs: [{ f: frame, input }]
+          });
         }
       } else if (typeof event.data === 'string') {
         const json = JSON.parse(event.data);
-        if (json.type === 'INPUT' && typeof json.frame === 'number') {
-          this.incomingPacketQueue.push({ frame: json.frame, input: json.input || 0 });
+        if (json.type === 'INPUT_N3') {
+          this.incomingPacketQueue.push({
+            frame: json.frame,
+            inputs: [
+              { f: json.frame, input: json.input },
+              { f: json.frame - 1, input: json.history?.[0] ?? json.input },
+              { f: json.frame - 2, input: json.history?.[1] ?? json.input },
+              { f: json.frame - 3, input: json.history?.[2] ?? json.input }
+            ]
+          });
+        } else if (json.type === 'INPUT') {
+          this.incomingPacketQueue.push({
+            frame: json.frame,
+            inputs: [{ f: json.frame, input: json.input || 0 }]
+          });
         }
       }
     } catch(e) {
@@ -260,7 +342,7 @@ export class RollbackManager {
   }
 
   /**
-   * Traite la file des paquets distants reçus et déclenche la réconciliation si nécessaire
+   * Traite la file des paquets distants reçus et déclenche la réconciliation locale si divergence
    */
   processIncomingRemotePackets() {
     if (this.incomingPacketQueue.length === 0) return;
@@ -269,96 +351,79 @@ export class RollbackManager {
 
     while (this.incomingPacketQueue.length > 0) {
       const packet = this.incomingPacketQueue.shift();
-      const { frame, input } = packet;
-
-      if (frame > this.remoteFrameAdvancement) {
-        this.remoteFrameAdvancement = frame;
+      if (packet.frame > this.remoteFrameAdvancement) {
+        this.remoteFrameAdvancement = packet.frame;
       }
 
-      // Si le paquet correspond à une frame déjà simulée dans le passé
-      if (frame < this.currentFrame) {
-        const delta = this.currentFrame - frame;
-        if (delta <= MAX_ROLLBACK_FRAMES) {
-          const ringIndex = frame & BUFFER_MASK;
-          const predictedInput = this.remoteInputs[ringIndex];
-          const wasPredicted = this.remoteInputPredicted[ringIndex] === 1;
+      // Parcourir chaque entrée du paquet (frame courante + redondance N-3)
+      for (const item of packet.inputs) {
+        const { f, input } = item;
+        if (f < 0) continue;
 
-          // Enregistrement du vrai input reçu
-          this.remoteInputs[ringIndex] = input;
-          this.remoteInputPredicted[ringIndex] = 0; // Confirmé
+        const ringIndex = f & BUFFER_MASK;
 
-          // Vérification de divergence entre la prédiction et la réalité
-          if (wasPredicted && predictedInput !== input) {
-            this.stats.mispredictions++;
-            if (earliestMispredictedFrame === -1 || frame < earliestMispredictedFrame) {
-              earliestMispredictedFrame = frame;
+        // Si la frame est dans le passé de notre simulation locale
+        if (f < this.currentFrame) {
+          const delta = this.currentFrame - f;
+          if (delta <= MAX_ROLLBACK_FRAMES) {
+            const predictedInput = this.remoteInputs[ringIndex];
+            const wasPredicted = this.remoteInputPredicted[ringIndex] === 1;
+
+            if (wasPredicted) {
+              // Confirmer le vrai input
+              this.remoteInputs[ringIndex] = input;
+              this.remoteInputPredicted[ringIndex] = 0;
+
+              // Divergence constatée : Rollback nécessaire
+              if (predictedInput !== input) {
+                this.stats.mispredictions++;
+                if (earliestMispredictedFrame === -1 || f < earliestMispredictedFrame) {
+                  earliestMispredictedFrame = f;
+                }
+              } else {
+                // Prédiction correcte réparée par la redondance
+                this.stats.recoveredByRedundancy++;
+              }
             }
           }
         } else {
-          console.warn(`[RollbackManager] Paquet trop ancien ignoré (Delta: ${delta} frames).`);
+          // Input reçu à temps pour la frame courante ou future
+          this.remoteInputs[ringIndex] = input;
+          this.remoteInputPredicted[ringIndex] = 0; // Confirmé réel
+          this.frameNumbers[ringIndex] = f;
         }
-      } else {
-        // Paquet reçu à temps pour la frame courante ou future
-        const ringIndex = frame & BUFFER_MASK;
-        this.remoteInputs[ringIndex] = input;
-        this.remoteInputPredicted[ringIndex] = 0; // Confirmé réel
-        this.frameNumbers[ringIndex] = frame;
       }
     }
 
-    // Si une divergence a été constatée, déclencher le Rollback depuis la frame la plus ancienne erronée
+    // Déclencher le Rollback local depuis la frame divergente la plus ancienne
     if (earliestMispredictedFrame !== -1) {
       this.executeRollback(earliestMispredictedFrame);
     }
   }
 
   // ==========================================================================
-  // GESTION DES SAVESTATES DANS LA MEMOIRE LINEAIRE WASM (HEAPU8)
+  // GESTION DES SAVESTATES DANS LA MEMOIRE WASM (Zéro-Réseau en cours de jeu)
   // ==========================================================================
 
-  /**
-   * Sauvegarde l'état du core FBNeo dans le ring buffer pour une frame donnée
-   * @param {number} frame
-   */
   saveStateToRingBuffer(frame) {
     if (!this.wasmStatePtr || !this.module._serialize) return;
-
-    // 1. Demande au module C++ d'écrire la RAM dans notre pointeur WASM
     this.module._serialize(this.wasmStatePtr);
-
-    // 2. Copie immédiate depuis Module.HEAPU8 vers le TypedArray du Ring Buffer
     const ringIndex = frame & BUFFER_MASK;
-    const destBuffer = this.savestates[ringIndex];
-    destBuffer.set(this.module.HEAPU8.subarray(this.wasmStatePtr, this.wasmStatePtr + this.stateSize));
-
+    this.savestates[ringIndex].set(this.module.HEAPU8.subarray(this.wasmStatePtr, this.wasmStatePtr + this.stateSize));
     this.frameNumbers[ringIndex] = frame;
   }
 
-  /**
-   * Restaure l'état du core FBNeo depuis le ring buffer pour une frame donnée
-   * @param {number} frame
-   */
   loadStateFromRingBuffer(frame) {
     if (!this.wasmStatePtr || !this.module._unserialize) return;
-
     const ringIndex = frame & BUFFER_MASK;
-    const srcBuffer = this.savestates[ringIndex];
-
-    // 1. Copie depuis notre buffer JS vers la mémoire WASM
-    this.module.HEAPU8.set(srcBuffer, this.wasmStatePtr);
-
-    // 2. Restauration de l'état dans l'émulateur FBNeo
+    this.module.HEAPU8.set(this.savestates[ringIndex], this.wasmStatePtr);
     this.module._unserialize(this.wasmStatePtr);
   }
 
   // ==========================================================================
-  // ALGORITHME DE ROLLBACK & RESIMULATION (FAST-FORWARD)
+  // RECONCILIATION LOCALE : ROLLBACK & FAST-FORWARD RESIMULATION
   // ==========================================================================
 
-  /**
-   * Exécute le Rollback depuis une frame passée jusqu'à la frame courante
-   * @param {number} rollbackFrame Numéro de frame à restaurer
-   */
   executeRollback(rollbackFrame) {
     const rollbackDistance = this.currentFrame - rollbackFrame;
     if (rollbackDistance <= 0) return;
@@ -371,17 +436,14 @@ export class RollbackManager {
       this.onRollback(rollbackDistance, this.currentFrame);
     }
 
-    // 1. Charger la savestate saine de la frame erronée
+    // 1. Recharger notre propre savestate saine locale de la frame erronée
     this.loadStateFromRingBuffer(rollbackFrame);
 
-    // 2. Boucle de resimulation en avance rapide (Fast-Forward)
-    // Note: renderVideo = false pour désactiver le rendu vidéo et audio,
-    // garantissant une ré-exécution ultra-rapide en moins d'une milliseconde.
+    // 2. Resimulation en Fast-Forward SANS rendu graphique/audio
     for (let f = rollbackFrame; f < this.currentFrame; f++) {
       const ringIndex = f & BUFFER_MASK;
 
-      // Si l'input distant pour les frames intermédiaires était une prédiction,
-      // la mettre à jour avec la dernière valeur réelle confirmée
+      // Si l'input distant pour une frame suivante n'a pas encore été reçu, propager le dernier input réel
       if (this.remoteInputPredicted[ringIndex] === 1) {
         const prevIndex = (f - 1) & BUFFER_MASK;
         this.remoteInputs[ringIndex] = this.remoteInputs[prevIndex];
@@ -390,7 +452,7 @@ export class RollbackManager {
       const p1Input = this.playerIndex === 0 ? this.localInputs[ringIndex] : this.remoteInputs[ringIndex];
       const p2Input = this.playerIndex === 0 ? this.remoteInputs[ringIndex] : this.localInputs[ringIndex];
 
-      // Exécution de la frame SANS rendu graphique/audio
+      // Exécution de l'émulateur avec renderVideo = false (Skip Render)
       this.module._step(p1Input, p2Input, false);
 
       // Ré-enregistrement de la savestate corrigée
@@ -401,55 +463,55 @@ export class RollbackManager {
   }
 
   // ==========================================================================
-  // BOUCLE PRINCIPALE (FRAME LOOP A 60 HZ)
+  // BOUCLE PRINCIPALE (FRAME LOOP 60 HZ) AVEC PACING SKIP-RENDER SANS PERTE AUDIO
   // ==========================================================================
 
   /**
-   * Avance l'émulateur d'une frame (Tick déterministe)
+   * Exécute un tick déterministe
+   * @param {boolean} renderVideo Si false, exécute en Skip Render (Fast-Forward sans rendu canvas/audio)
    */
-  tick() {
+  tick(renderVideo = true) {
     const frame = this.currentFrame;
     const ringIndex = frame & BUFFER_MASK;
 
-    // 1. Récupération de l'input physique local
+    // 1. Lecture de l'input physique local
     const localInput = this.getLocalInput() | 0;
     this.localInputs[ringIndex] = localInput;
 
-    // 2. Envoi immédiat de l'input sur le réseau via WebRTC DataChannel
+    // 2. Émission WebRTC avec redondance N-3
     this.sendLocalInput(frame, localInput);
 
-    // 3. Vérification de l'input distant pour cette frame
+    // 3. Vérification de l'input distant
     let remoteInput = 0;
     if (this.remoteInputPredicted[ringIndex] === 0 && this.frameNumbers[ringIndex] === frame) {
-      // L'input réel distant est déjà arrivé à temps !
       remoteInput = this.remoteInputs[ringIndex];
     } else {
-      // PREDICTION GGPO : L'input n'est pas encore arrivé à cause de la latence réseau.
-      // On prédit qu'il est identique à l'input de la frame précédente.
+      // Prédiction GGPO
       const prevRingIndex = (frame - 1) & BUFFER_MASK;
       remoteInput = frame > 0 ? this.remoteInputs[prevRingIndex] : 0;
 
       this.remoteInputs[ringIndex] = remoteInput;
-      this.remoteInputPredicted[ringIndex] = 1; // Marqué comme prédit
+      this.remoteInputPredicted[ringIndex] = 1;
       this.stats.predictedFramesCount++;
     }
 
-    // 4. Sauvegarder l'état complet du core avant de faire le step
+    // 4. Capture de l'état local dans le Ring Buffer
     this.saveStateToRingBuffer(frame);
 
-    // 5. Mapper les inputs selon notre rôle (P1 ou P2)
+    // 5. Application des inputs (P1 / P2)
     const p1Input = this.playerIndex === 0 ? localInput : remoteInput;
     const p2Input = this.playerIndex === 0 ? remoteInput : localInput;
 
-    // 6. Avancer l'émulateur d'une frame AVEC rendu vidéo et audio normal
-    this.module._step(p1Input, p2Input, true);
+    // 6. Exécution de l'image (renderVideo contrôle le rendu visuel et audio)
+    this.module._step(p1Input, p2Input, renderVideo);
 
     this.currentFrame++;
     this.stats.totalFrames++;
   }
 
   /**
-   * Boucle requestAnimationFrame avec régulateur de cadence fixe
+   * Boucle requestAnimationFrame avec régulation de cadence (Pacing) par Skip Render
+   * L'horloge audio et le timer du navigateur restent purs à 60Hz.
    */
   gameLoop(now) {
     if (!this.isRunning) return;
@@ -457,15 +519,29 @@ export class RollbackManager {
     const delta = now - this.lastTimestamp;
     this.lastTimestamp = now;
 
-    // Protection contre les pauses d'onglets (delta cap à 100ms)
+    // Plafond de protection contre les onglets masqués
     this.timeAccumulator += Math.min(delta, 100);
 
-    // Traiter d'abord les paquets réseau arrivés
+    // Dépouillement des paquets réseau
     this.processIncomingRemotePackets();
 
-    // Consommer le temps accumulé à cadence fixe de 60Hz
+    // Consommation du temps accumulé
     while (this.timeAccumulator >= FRAME_TIME_MS) {
-      this.tick();
+      // PACING DYNAMIQUE GGPO (Étage A optimisé) :
+      // Si nous avons du retard par rapport à la progression confirmée du joueur distant
+      const frameLag = this.remoteFrameAdvancement - this.currentFrame;
+
+      if (frameLag > 1 && frameLag <= MAX_CATCHUP_FRAMES) {
+        // Exécuter frameLag - 1 frames en Skip Render (Fast-Forward invisible)
+        const catchupCount = frameLag - 1;
+        for (let k = 0; k < catchupCount; k++) {
+          this.tick(false); // renderVideo = false
+          this.stats.catchupFramesExecuted++;
+        }
+      }
+
+      // Exécuter la frame courante avec rendu visuel et audio normal
+      this.tick(true);
       this.timeAccumulator -= FRAME_TIME_MS;
     }
 

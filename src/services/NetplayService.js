@@ -23,6 +23,12 @@ class NetplayService {
     this.pingInterval = null;
     this.firestoreUnsub = null;
     this.isConnecting = false;
+
+    // --- REDONDANCE N-3 & FLUX GGPO ---
+    this.localSeq = 0;
+    this.currentFrame = 0;
+    this.inputHistory = []; // [ { seq, frame, buttonId, isPressed, playerIndex } ]
+    this.lastRemoteSeq = new Map(); // playerIndex -> last received seq
   }
 
   // Système d'événements
@@ -171,6 +177,33 @@ class NetplayService {
       }
 
       case 'REMOTE_INPUT': {
+        const pIdx = data.playerIndex ?? 1;
+        const incomingSeq = data.seq || 0;
+        const lastSeq = this.lastRemoteSeq.get(pIdx) || 0;
+
+        // Auto-réparation N-3 en cas de perte de paquets (gap de séquence > 1)
+        if (incomingSeq > lastSeq + 1 && Array.isArray(data.history) && data.history.length > 0) {
+          const missedCount = incomingSeq - (lastSeq + 1);
+          console.log(`[Netplay N-3] ${missedCount} paquet(s) manquant(s) détecté(s). Restauration via redondance N-3...`);
+          // Réinjecter les inputs manquants dans l'ordre chronologique
+          for (const item of data.history) {
+            if (item && item.seq > lastSeq && item.seq < incomingSeq) {
+              this.emit('remote_input', {
+                playerIndex: pIdx,
+                buttonId: item.buttonId,
+                isPressed: item.isPressed,
+                frame: item.frame || 0,
+                seq: item.seq,
+                recovered: true
+              });
+              this.lastRemoteSeq.set(pIdx, item.seq);
+            }
+          }
+        }
+
+        if (incomingSeq > 0) {
+          this.lastRemoteSeq.set(pIdx, Math.max(lastSeq, incomingSeq));
+        }
         this.emit('remote_input', data);
         break;
       }
@@ -486,9 +519,25 @@ class NetplayService {
     }
   }
 
-  // Envoyer un input (D-pad ou bouton) vers l'hôte ou les autres joueurs
+  // Envoyer un input (D-pad ou bouton) vers l'hôte ou les autres joueurs avec redondance N-3
   sendInput(buttonId, isPressed, playerIndex = null) {
     const pIdx = (typeof playerIndex === 'number') ? playerIndex : (this.myPlayerIndex >= 0 ? this.myPlayerIndex : 0);
+    this.localSeq = (this.localSeq + 1) & 0x7FFFFFFF;
+
+    const currentItem = {
+      seq: this.localSeq,
+      frame: this.currentFrame,
+      buttonId,
+      isPressed: !!isPressed,
+      playerIndex: pIdx
+    };
+
+    // Historique des 3 frames précédentes (N-3)
+    const historyPayload = this.inputHistory.slice(-3);
+    this.inputHistory.push(currentItem);
+    if (this.inputHistory.length > 16) {
+      this.inputHistory.shift();
+    }
 
     // Mode WebSocket LAN
     if (this.ws && this.ws.readyState === WebSocket.OPEN && this.currentRoom) {
@@ -496,12 +545,15 @@ class NetplayService {
         type: 'SEND_INPUT',
         playerIndex: pIdx,
         buttonId,
-        isPressed: !!isPressed
+        isPressed: !!isPressed,
+        frame: this.currentFrame,
+        seq: this.localSeq,
+        history: historyPayload
       }));
       return;
     }
 
-    // Mode Firebase Cloud : Envoi rapide
+    // Mode Firebase Cloud : Envoi rapide avec redondance N-3
     if (this.currentRoom?.code) {
       try {
         const roomRef = doc(db, 'rooms', this.currentRoom.code);
@@ -511,6 +563,8 @@ class NetplayService {
             role: this.myRole || (pIdx === 0 ? 'p1' : 'p2'),
             buttonId,
             isPressed: !!isPressed,
+            seq: this.localSeq,
+            history: historyPayload,
             time: Date.now()
           }
         }).catch(() => {});

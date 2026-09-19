@@ -40,6 +40,7 @@ export function EmulatorCore({
   const [ping, setPing] = useState(null);
   const [errorMessage, setErrorMessage] = useState(null);
   const [netplayRoom, setNetplayRoom] = useState(() => netplayService.currentRoom);
+  const hasSyncedInitialState = useRef(false);
 
   // Détection automatique du mode tactile (mobile / tablette / tactile)
   const [isTouchVisible, setIsTouchVisible] = useState(() => {
@@ -66,13 +67,15 @@ export function EmulatorCore({
     if (mode !== 'netplay') return;
 
     // Réception des inputs des autres joueurs (J1 pour l'invité, J2 pour l'hôte)
-    const unsubInput = netplayService.on('remote_input', ({ playerIndex, buttonId, isPressed }) => {
+    const unsubInput = netplayService.on('remote_input', ({ playerIndex, buttonId, isPressed, frame, recovered }) => {
       if (iframeRef.current?.contentWindow) {
         iframeRef.current.contentWindow.postMessage({
           type: 'NETPLAY_INPUT',
           playerIndex,
           buttonId,
-          isPressed
+          isPressed,
+          frame,
+          recovered
         }, '*');
       }
     });
@@ -85,10 +88,11 @@ export function EmulatorCore({
       }
     });
 
-    // L'invité reçoit le savestate officiel de l'hôte pour se caler sur sa frame exacte
+    // L'invité reçoit le savestate officiel de l'hôte pour se caler sur sa frame exacte (une seule fois à froid)
     const unsubSyncState = netplayService.on('sync_state', ({ stateData }) => {
       if (!isHost && iframeRef.current?.contentWindow) {
-        console.log('[EmulatorCore] Savestate reçu de l\'hôte, synchronisation...');
+        console.log('[EmulatorCore] Savestate à froid reçu de l\'hôte, synchronisation initiale...');
+        hasSyncedInitialState.current = true;
         iframeRef.current.contentWindow.postMessage({ type: 'LOAD_STATE', state: stateData }, '*');
       }
     });
@@ -119,9 +123,9 @@ export function EmulatorCore({
 
       if (event.data.type === 'EJS_GAME_STARTED') {
         setIsReady(true);
-        // Si invité en Netplay, demander immédiatement le savestate actuel à l'hôte
-        if (mode === 'netplay' && !isHost) {
-          console.log('[EmulatorCore] Invité prêt, demande de synchronisation du savestate à l\'hôte...');
+        // Si invité en Netplay, demander immédiatement et UNE SEULE FOIS le savestate actuel à l'hôte
+        if (mode === 'netplay' && !isHost && !hasSyncedInitialState.current) {
+          console.log('[EmulatorCore] Invité prêt, demande unique de synchronisation à froid à l\'hôte...');
           netplayService.requestStateSync();
         }
       }
@@ -211,6 +215,17 @@ export function EmulatorCore({
     }
   }, [settings]);
 
+  // Synchronisation de l'index du joueur avec l'iframe
+  useEffect(() => {
+    if (iframeRef.current?.contentWindow && mode === 'netplay') {
+      const pIdx = netplayService.myPlayerIndex >= 0 ? netplayService.myPlayerIndex : (isHost ? 0 : 1);
+      iframeRef.current.contentWindow.postMessage({
+        type: 'SET_PLAYER_INDEX',
+        playerIndex: pIdx
+      }, '*');
+    }
+  }, [mode, isHost, netplayRoom]);
+
   // 5. Transfert transparent des touches du clavier vers le player de l'iframe
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -252,8 +267,8 @@ export function EmulatorCore({
 
   const isScanlinesActive = settings?.video?.scanlines ?? true;
   const aspectRatio = settings?.video?.aspectRatio ?? '4:3';
-  const settingsParam = encodeURIComponent(JSON.stringify(settings || {}));
-  const playerUrl = `./player.html?game=${encodeURIComponent(game.filename)}&settings=${settingsParam}`;
+  const myPlayerSlot = netplayService.myPlayerIndex >= 0 ? netplayService.myPlayerIndex : (isHost ? 0 : 1);
+  const playerUrl = `./player.html?game=${encodeURIComponent(game.filename)}&settings=${settingsParam}&playerIndex=${myPlayerSlot}&netplay=${mode === 'netplay' ? 1 : 0}`;
 
   const isPortraitPadMode = isMobile && !isLandscape && (settings?.touch?.portraitMode ?? 'pad-bottom') === 'pad-bottom' && isTouchVisible;
 

@@ -360,6 +360,7 @@
     // Parsing des paramètres passés par CSW-Arcade
     const params = new URLSearchParams(window.location.search);
     const rawGame = params.get('game') || 'androdunos.zip';
+    let assignedPlayerIndex = parseInt(params.get('playerIndex') ?? '0', 10);
 
     let activeSettings = {};
     try {
@@ -486,12 +487,15 @@
       const p1 = controls?.p1 || {};
       const p2 = controls?.p2 || {};
 
+      const localSlot = assignedPlayerIndex > 0 ? assignedPlayerIndex : 0;
+      const otherSlot = localSlot === 0 ? 1 : 0;
+
       for (const [action, btnId] of Object.entries(ACTION_TO_RETROPAD)) {
         if (p1[action]) {
-          keyToInputMap[p1[action]] = { player: 0, buttonId: btnId };
+          keyToInputMap[p1[action]] = { player: localSlot, buttonId: btnId };
         }
         if (p2[action]) {
-          keyToInputMap[p2[action]] = { player: 1, buttonId: btnId };
+          keyToInputMap[p2[action]] = { player: otherSlot, buttonId: btnId };
         }
       }
     }
@@ -597,8 +601,11 @@
           checkBtn(3, !!buttons[startIdx]?.pressed || !!buttons[9]?.pressed); // Start
         };
 
-        if (p1Gp) processPad(p1Gp, 0);
-        if (p2Gp && p2Idx !== p1Idx) processPad(p2Gp, 1);
+        const targetLocalSlot = assignedPlayerIndex > 0 ? assignedPlayerIndex : 0;
+        const targetOtherSlot = targetLocalSlot === 0 ? 1 : 0;
+
+        if (p1Gp) processPad(p1Gp, targetLocalSlot);
+        if (p2Gp && p2Idx !== p1Idx) processPad(p2Gp, targetOtherSlot);
       }
 
       requestAnimationFrame(pollGamepadsLoop);
@@ -1341,6 +1348,11 @@
           } catch(err) {
             console.warn('[Player] Erreur restauration savestate:', err);
           }
+        }
+        if (event.data.type === 'SET_PLAYER_INDEX') {
+          assignedPlayerIndex = event.data.playerIndex ?? 0;
+          rebuildKeyMap(activeSettings.controls);
+          console.log(`[Player] Index joueur assigné mis à jour: J${assignedPlayerIndex + 1}`);
         }
       });
 

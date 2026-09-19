@@ -243,7 +243,7 @@ export function setupNetplayHub(server) {
             const room = rooms.get(info.roomCode);
             if (!room) return;
 
-            const { buttonId, isPressed, frame, playerIndex } = data;
+            const { buttonId, isPressed, frame, playerIndex, history, ackFrame, seq } = data;
             const effectiveIndex = (typeof playerIndex === 'number') ? playerIndex : info.playerIndex;
 
             const payload = JSON.stringify({
@@ -251,7 +251,10 @@ export function setupNetplayHub(server) {
               playerIndex: effectiveIndex,
               buttonId,
               isPressed: !!isPressed,
-              frame: frame || 0
+              frame: frame || 0,
+              history: Array.isArray(history) ? history : [],
+              ackFrame: ackFrame || 0,
+              seq: seq || 0
             });
 
             // Diffuser à TOUS les autres clients du salon (l'hôte et les invités)
