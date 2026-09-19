@@ -21,7 +21,7 @@ export function GameCard({ game, isAvailable, isBiosReady, onLaunchSolo, onLaunc
       {/* Visual Cover Container */}
       <div className="relative aspect-[16/10] overflow-hidden bg-neutral-950">
         <img
-          src={game.coverUrl}
+          src={game.coverUrl?.startsWith('/') ? '.' + game.coverUrl : game.coverUrl}
           alt={game.title}
           className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-500 opacity-90 group-hover:opacity-100"
           loading="lazy"

@@ -753,33 +753,71 @@
       try {
         loadingDesc.innerText = `Recherche de ${targetZipName} dans le stockage local...`;
 
-        // 1. Vérification du BIOS (IndexedDB ou Réseau)
-        let biosBuffer = await getRomFromIDB('neogeo.zip');
+        const electronApi = window.electronAPI || (window.parent && window.parent.electronAPI);
+
+        // 1. Vérification du BIOS (Electron IPC, IndexedDB ou Réseau)
+        let biosBuffer = null;
+        if (electronApi && typeof electronApi.readRom === 'function') {
+          try {
+            const res = await electronApi.readRom('neogeo.zip');
+            if (res && res.success && res.data) {
+              biosBuffer = res.data;
+              console.log('[CSW-Arcade] BIOS Neo Geo chargé directement via Electron IPC');
+            }
+          } catch (e) {
+            console.warn('[CSW-Arcade] Échec lecture BIOS via IPC:', e.message);
+          }
+        }
+
+        if (!biosBuffer) {
+          biosBuffer = await getRomFromIDB('neogeo.zip');
+        }
+
         if (!biosBuffer) {
           const biosCandidates = [
+            './roms/neogeo.zip',
             '/roms/neogeo.zip',
-            '/api/archive-rom/NeoGeoRomCollectionByGhostware/neogeo.zip',
             '/api/rom-data/neogeo',
+            '/api/archive-rom/NeoGeoRomCollectionByGhostware/neogeo.zip',
             'https://archive.org/download/NeoGeoRomCollectionByGhostware/neogeo.zip'
           ];
           biosBuffer = await fetchBinaryWithFallbacks('BIOS Neo Geo (neogeo.zip)', biosCandidates, 'Synchronisation du BIOS Neo Geo');
           saveRomToIDB('neogeo.zip', biosBuffer);
         } else {
-          console.log('[CSW-Arcade] BIOS Neo Geo chargé depuis le stockage IndexedDB');
+          console.log('[CSW-Arcade] BIOS Neo Geo prêt');
         }
 
-        // 2. Vérification de la ROM (IndexedDB ou Réseau)
-        let romBuffer = await getRomFromIDB(targetZipName);
-        if (!romBuffer && fbneoShortName !== cleanInput) {
-          romBuffer = await getRomFromIDB(cleanInput + '.zip');
+        // 2. Vérification de la ROM (Electron IPC, IndexedDB ou Réseau)
+        let romBuffer = null;
+        if (electronApi && typeof electronApi.readRom === 'function') {
+          try {
+            let res = await electronApi.readRom(targetZipName);
+            if (!res?.success && cleanInput !== fbneoShortName) {
+              res = await electronApi.readRom(cleanInput + '.zip');
+            }
+            if (res && res.success && res.data) {
+              romBuffer = res.data;
+              console.log(`[CSW-Arcade] ROM ${targetZipName} chargée directement via Electron IPC`);
+            }
+          } catch (e) {
+            console.warn('[CSW-Arcade] Échec lecture ROM via IPC:', e.message);
+          }
+        }
+
+        if (!romBuffer) {
+          romBuffer = await getRomFromIDB(targetZipName);
+          if (!romBuffer && fbneoShortName !== cleanInput) {
+            romBuffer = await getRomFromIDB(cleanInput + '.zip');
+          }
         }
 
         if (!romBuffer) {
           const romCandidates = [
+            './roms/' + encodeURIComponent(targetZipName),
             '/roms/' + encodeURIComponent(targetZipName),
+            '/api/rom-data/' + encodeURIComponent(fbneoShortName),
             '/api/archive-rom/neo-geo-mvs-romset/' + encodeURIComponent(targetZipName),
             '/api/archive-rom/NeoGeoRomCollectionByGhostware/' + encodeURIComponent(targetZipName),
-            '/api/rom-data/' + encodeURIComponent(fbneoShortName),
             'https://archive.org/download/neo-geo-mvs-romset/' + encodeURIComponent(targetZipName)
           ];
           romBuffer = await fetchBinaryWithFallbacks(`ROM ${targetZipName}`, romCandidates, `Téléchargement de ${fbneoShortName.toUpperCase()}`);
@@ -788,7 +826,7 @@
           saveRomToIDB(targetZipName, romBuffer);
           saveRomToIDB(cleanInput + '.zip', romBuffer);
         } else {
-          console.log(`[CSW-Arcade] ROM ${targetZipName} chargée directement depuis le stockage IndexedDB`);
+          console.log(`[CSW-Arcade] ROM ${targetZipName} prête`);
         }
 
         neogeoBytes = new Uint8Array(biosBuffer);

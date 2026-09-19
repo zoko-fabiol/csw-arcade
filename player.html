@@ -98,6 +98,30 @@
       max-width: 80%;
       text-align: center;
     }
+
+    /* Masquage absolu et suppression des doublons de gamepad virtuel EmulatorJS */
+    .ejs_virtualGamepad_parent,
+    .ejs_virtualGamepad,
+    [class*="ejs_virtualGamepad"],
+    [class*="virtualGamepad"],
+    [id*="ejs_virtualGamepad"],
+    [id*="virtualGamepad"],
+    .nipple,
+    [class*="nipple"],
+    [id*="nipple"],
+    .ejs_touch,
+    [class*="ejs_touch"] {
+      display: none !important;
+      visibility: hidden !important;
+      opacity: 0 !important;
+      pointer-events: none !important;
+      width: 0 !important;
+      height: 0 !important;
+      position: absolute !important;
+      left: -9999px !important;
+      top: -9999px !important;
+      transform: scale(0) !important;
+    }
   </style>
 </head>
 <body>
@@ -640,27 +664,176 @@
     let neogeoBytes = null;
     let romBytes = null;
 
+    // --- GESTION DU STOCKAGE PERSISTANT LOCAL (IndexedDB) ---
+    const IDB_NAME = 'csw_arcade_roms_db';
+    const IDB_STORE = 'rom_archives';
+
+    function getRomFromIDB(filename) {
+      return new Promise((resolve) => {
+        try {
+          const req = indexedDB.open(IDB_NAME, 1);
+          req.onupgradeneeded = (e) => {
+            const db = e.target.result;
+            if (!db.objectStoreNames.contains(IDB_STORE)) {
+              db.createObjectStore(IDB_STORE, { keyPath: 'id' });
+            }
+          };
+          req.onsuccess = () => {
+            const db = req.result;
+            const tx = db.transaction(IDB_STORE, 'readonly');
+            const store = tx.objectStore(IDB_STORE);
+            const getReq = store.get(filename.toLowerCase());
+            getReq.onsuccess = () => {
+              if (getReq.result && getReq.result.data) {
+                console.log(`[Player IDB] ROM ${filename} trouvée en cache local IndexedDB (${getReq.result.size} octets)`);
+                resolve(getReq.result.data);
+              } else {
+                resolve(null);
+              }
+            };
+            getReq.onerror = () => resolve(null);
+          };
+          req.onerror = () => resolve(null);
+        } catch(e) {
+          resolve(null);
+        }
+      });
+    }
+
+    function saveRomToIDB(filename, buffer) {
+      try {
+        const req = indexedDB.open(IDB_NAME, 1);
+        req.onupgradeneeded = (e) => {
+          const db = e.target.result;
+          if (!db.objectStoreNames.contains(IDB_STORE)) {
+            db.createObjectStore(IDB_STORE, { keyPath: 'id' });
+          }
+        };
+        req.onsuccess = () => {
+          const db = req.result;
+          const tx = db.transaction(IDB_STORE, 'readwrite');
+          const store = tx.objectStore(IDB_STORE);
+          const arrayBuffer = buffer.buffer ? buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength) : buffer;
+          store.put({
+            id: filename.toLowerCase(),
+            filename: filename.toLowerCase(),
+            data: arrayBuffer,
+            size: arrayBuffer.byteLength,
+            savedAt: Date.now()
+          });
+          console.log(`[Player IDB] ROM ${filename} enregistrée dans le stockage local IndexedDB !`);
+        };
+      } catch(e) {}
+    }
+
+    // Fonction de téléchargement résiliente multi-sources (Proxy Netlify, Local Vite, Miroir Archive.org)
+    async function fetchBinaryWithFallbacks(name, candidates, onProgressText) {
+      let lastErr = null;
+      for (const url of candidates) {
+        try {
+          if (onProgressText) loadingDesc.innerText = onProgressText + ` (${url.startsWith('http') ? 'Cloud' : 'Serveur'})...`;
+          const res = await fetch(url);
+          if (res.ok) {
+            const buf = await res.arrayBuffer();
+            if (buf && buf.byteLength > 1000) {
+              console.log(`[CSW-Arcade] ${name} chargé avec succès depuis: ${url} (${buf.byteLength} octets)`);
+              return buf;
+            }
+          }
+        } catch (e) {
+          lastErr = e;
+          console.warn(`[CSW-Arcade] Échec source ${url} pour ${name}:`, e.message);
+        }
+      }
+      throw new Error(`Impossible de charger ${name}.`);
+    }
+
     // Pré-chargement asynchrone bloquant AVANT initialisation du runtime WASM
     async function preloadAssetsAndBoot() {
       try {
-        loadingDesc.innerText = `Vérification et synchronisation de ${targetZipName}...`;
+        loadingDesc.innerText = `Recherche de ${targetZipName} dans le stockage local...`;
 
-        const [biosBuffer, romBuffer] = await Promise.all([
-          fetch('/api/rom-data/neogeo').then(r => {
-            if (!r.ok) throw new Error('Échec HTTP BIOS: ' + r.status);
-            return r.arrayBuffer();
-          }),
-          fetch('/api/rom-data/' + encodeURIComponent(fbneoShortName)).then(r => {
-            if (!r.ok) throw new Error('Échec HTTP ROM: ' + r.status);
-            return r.arrayBuffer();
-          })
-        ]);
+        const electronApi = window.electronAPI || (window.parent && window.parent.electronAPI);
+
+        // 1. Vérification du BIOS (Electron IPC, IndexedDB ou Réseau)
+        let biosBuffer = null;
+        if (electronApi && typeof electronApi.readRom === 'function') {
+          try {
+            const res = await electronApi.readRom('neogeo.zip');
+            if (res && res.success && res.data) {
+              biosBuffer = res.data;
+              console.log('[CSW-Arcade] BIOS Neo Geo chargé directement via Electron IPC');
+            }
+          } catch (e) {
+            console.warn('[CSW-Arcade] Échec lecture BIOS via IPC:', e.message);
+          }
+        }
+
+        if (!biosBuffer) {
+          biosBuffer = await getRomFromIDB('neogeo.zip');
+        }
+
+        if (!biosBuffer) {
+          const biosCandidates = [
+            './roms/neogeo.zip',
+            '/roms/neogeo.zip',
+            '/api/rom-data/neogeo',
+            '/api/archive-rom/NeoGeoRomCollectionByGhostware/neogeo.zip',
+            'https://archive.org/download/NeoGeoRomCollectionByGhostware/neogeo.zip'
+          ];
+          biosBuffer = await fetchBinaryWithFallbacks('BIOS Neo Geo (neogeo.zip)', biosCandidates, 'Synchronisation du BIOS Neo Geo');
+          saveRomToIDB('neogeo.zip', biosBuffer);
+        } else {
+          console.log('[CSW-Arcade] BIOS Neo Geo prêt');
+        }
+
+        // 2. Vérification de la ROM (Electron IPC, IndexedDB ou Réseau)
+        let romBuffer = null;
+        if (electronApi && typeof electronApi.readRom === 'function') {
+          try {
+            let res = await electronApi.readRom(targetZipName);
+            if (!res?.success && cleanInput !== fbneoShortName) {
+              res = await electronApi.readRom(cleanInput + '.zip');
+            }
+            if (res && res.success && res.data) {
+              romBuffer = res.data;
+              console.log(`[CSW-Arcade] ROM ${targetZipName} chargée directement via Electron IPC`);
+            }
+          } catch (e) {
+            console.warn('[CSW-Arcade] Échec lecture ROM via IPC:', e.message);
+          }
+        }
+
+        if (!romBuffer) {
+          romBuffer = await getRomFromIDB(targetZipName);
+          if (!romBuffer && fbneoShortName !== cleanInput) {
+            romBuffer = await getRomFromIDB(cleanInput + '.zip');
+          }
+        }
+
+        if (!romBuffer) {
+          const romCandidates = [
+            './roms/' + encodeURIComponent(targetZipName),
+            '/roms/' + encodeURIComponent(targetZipName),
+            '/api/rom-data/' + encodeURIComponent(fbneoShortName),
+            '/api/archive-rom/neo-geo-mvs-romset/' + encodeURIComponent(targetZipName),
+            '/api/archive-rom/NeoGeoRomCollectionByGhostware/' + encodeURIComponent(targetZipName),
+            'https://archive.org/download/neo-geo-mvs-romset/' + encodeURIComponent(targetZipName)
+          ];
+          romBuffer = await fetchBinaryWithFallbacks(`ROM ${targetZipName}`, romCandidates, `Téléchargement de ${fbneoShortName.toUpperCase()}`);
+          
+          // Sauvegarde automatique et persistante dans IndexedDB
+          saveRomToIDB(targetZipName, romBuffer);
+          saveRomToIDB(cleanInput + '.zip', romBuffer);
+        } else {
+          console.log(`[CSW-Arcade] ROM ${targetZipName} prête`);
+        }
 
         neogeoBytes = new Uint8Array(biosBuffer);
         romBytes = new Uint8Array(romBuffer);
 
         if (window.parent) {
-          window.parent.postMessage({ type: 'ROM_DOWNLOADED', game: rawGame, shortName: fbneoShortName }, '*');
+          window.parent.postMessage({ type: 'ROM_DOWNLOADED', filename: targetZipName, game: rawGame, shortName: fbneoShortName }, '*');
         }
 
         console.log(`[VFS Preload] BIOS: ${neogeoBytes.length} octets | ROM: ${romBytes.length} octets`);
@@ -677,10 +850,56 @@
     function startEmulatorJS() {
       const initialVol = activeSettings.audio?.muted ? 0 : ((activeSettings.audio?.volume ?? 85) / 100);
 
+      // Interception transparente de XHR & Fetch pour servir romBytes et neogeoBytes directement en mémoire
+      const _origXHROpen = XMLHttpRequest.prototype.open;
+      const _origXHRSend = XMLHttpRequest.prototype.send;
+
+      XMLHttpRequest.prototype.open = function(method, url, ...rest) {
+        this._reqUrl = url ? String(url) : '';
+        return _origXHROpen.apply(this, [method, url, ...rest]);
+      };
+
+      XMLHttpRequest.prototype.send = function(...args) {
+        const url = (this._reqUrl || '').toLowerCase();
+
+        if (romBytes && url.includes(targetZipName.toLowerCase())) {
+          console.log('[XHR Interceptor] Service direct en mémoire pour la ROM:', targetZipName);
+          const buf = romBytes.buffer.slice(romBytes.byteOffset, romBytes.byteOffset + romBytes.byteLength);
+          Object.defineProperty(this, 'status', { get: () => 200 });
+          Object.defineProperty(this, 'statusText', { get: () => 'OK' });
+          Object.defineProperty(this, 'response', { get: () => buf });
+          Object.defineProperty(this, 'readyState', { get: () => 4 });
+          setTimeout(() => {
+            if (typeof this.onload === 'function') this.onload();
+            this.dispatchEvent(new Event('load'));
+            this.dispatchEvent(new Event('loadend'));
+          }, 5);
+          return;
+        }
+
+        if (neogeoBytes && url.includes('neogeo.zip')) {
+          console.log('[XHR Interceptor] Service direct en mémoire pour le BIOS: neogeo.zip');
+          const buf = neogeoBytes.buffer.slice(neogeoBytes.byteOffset, neogeoBytes.byteOffset + neogeoBytes.byteLength);
+          Object.defineProperty(this, 'status', { get: () => 200 });
+          Object.defineProperty(this, 'statusText', { get: () => 'OK' });
+          Object.defineProperty(this, 'response', { get: () => buf });
+          Object.defineProperty(this, 'readyState', { get: () => 4 });
+          setTimeout(() => {
+            if (typeof this.onload === 'function') this.onload();
+            this.dispatchEvent(new Event('load'));
+            this.dispatchEvent(new Event('loadend'));
+          }, 5);
+          return;
+        }
+
+        return _origXHRSend.apply(this, args);
+      };
+
+      // Configuration officielle EmulatorJS avec nom de fichier strict
       window.EJS_player = '#game';
       window.EJS_core = 'arcade';
       window.EJS_gameName = fbneoShortName.toUpperCase();
-      window.EJS_gameUrl = '/api/rom-data/' + encodeURIComponent(targetZipName);
+      window.EJS_gameUrl = '/roms/' + encodeURIComponent(targetZipName);
       window.EJS_pathtodata = 'https://cdn.emulatorjs.org/stable/data/';
       window.EJS_startOnLoaded = true;
       window.EJS_volume = initialVol;
@@ -691,15 +910,48 @@
       window.EJS_defaultControls = buildControllersConfig(activeSettings.controls);
       window.EJS_defaultOptions = buildCoreOptions(activeSettings.system);
 
+      // Désactiver le gamepad virtuel EmulatorJS pour éviter tout doublon avec le TouchOverlay CSW
+      window.EJS_VirtualGamepadSettings = [
+        { type: 'button', text: '', id: 'csw_hidden', location: 'left', left: -9999, top: -9999, input_value: 999 }
+      ];
+
+      // Nettoyeur actif anti-doublon d'éléments tactiles EmulatorJS
+      const purgeBuiltInGamepad = () => {
+        try {
+          const badElements = document.querySelectorAll(
+            '.ejs_virtualGamepad_parent, .nipple, [class*="ejs_virtualGamepad"], [class*="virtualGamepad"], [id*="nipple"]'
+          );
+          badElements.forEach(el => {
+            el.style.display = 'none';
+            el.remove();
+          });
+        } catch(e) {}
+      };
+      purgeBuiltInGamepad();
+      const purgeObserver = new MutationObserver(purgeBuiltInGamepad);
+      purgeObserver.observe(document.body, { childList: true, subtree: true });
+
       window.EJS_ready = () => {
         console.log('[VFS Injection] EJS_ready reçu, interception synchrone startGame...');
         const emu = window.EJS_emulator;
         if (!emu) return;
 
+        // Désactivation forcée du gamepad interne
+        try {
+          if (typeof emu.toggleVirtualGamepad === 'function') {
+            emu.toggleVirtualGamepad(false);
+          }
+          if (emu.virtualGamepad) {
+            emu.virtualGamepad.style.display = 'none';
+          }
+        } catch (e) {}
+        purgeBuiltInGamepad();
+
         // Assurer l'application des contrôles configurés dans l'instance
         emu.controls = buildControllersConfig(activeSettings.controls);
         if (typeof emu.setupKeys === 'function') emu.setupKeys();
 
+        emu.fileName = targetZipName;
         const origStartGame = emu.startGame.bind(emu);
 
         // Fonction d'interception 100% SYNCHRONE (pas de async/await ici)
@@ -786,7 +1038,10 @@
           handleDirectKey(event.data.code, event.data.keyCode, event.data.eventType === 'keydown');
         }
         if (event.data.type === 'TOUCH_INPUT') {
-          dispatchDirectInput(0, event.data.buttonId, event.data.isPressed);
+          dispatchDirectInput(event.data.playerIndex ?? 0, event.data.buttonId, event.data.isPressed);
+        }
+        if (event.data.type === 'NETPLAY_INPUT') {
+          dispatchDirectInput(event.data.playerIndex ?? 1, event.data.buttonId, event.data.isPressed);
         }
       });
 

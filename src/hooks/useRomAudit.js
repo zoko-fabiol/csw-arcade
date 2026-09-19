@@ -62,9 +62,17 @@ export function useRomAudit() {
 
       const fileSet = new Set(files.map(f => f.toLowerCase()));
 
-      // 3. Vérification directe du BIOS /roms/neogeo.zip (présent dans public/roms sur Netlify)
+      // 3. Vérification directe du BIOS /roms/neogeo.zip
       if (fileSet.has('neogeo.zip')) {
         biosFound = true;
+      } else if (window.electronAPI && typeof window.electronAPI.checkRomExists === 'function') {
+        try {
+          const bCheck = await window.electronAPI.checkRomExists('neogeo.zip');
+          if (bCheck?.exists) {
+            biosFound = true;
+            fileSet.add('neogeo.zip');
+          }
+        } catch(e) {}
       } else {
         try {
           const headRes = await fetch('./roms/neogeo.zip');

@@ -31,6 +31,13 @@
         "filter": [
           "**/*"
         ]
+      },
+      {
+        "from": "public/previews",
+        "to": "previews",
+        "filter": [
+          "**/*"
+        ]
       }
     ],
     "win": {
