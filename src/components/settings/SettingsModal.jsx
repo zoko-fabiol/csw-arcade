@@ -10,9 +10,12 @@ import {
   Check, 
   Sliders, 
   Keyboard,
-  Smartphone 
+  Smartphone,
+  Vibrate,
+  Eye
 } from 'lucide-react';
 import { GamepadVisualizer } from './GamepadVisualizer';
+import { useDeviceType } from '../../utils/deviceDetector';
 
 export function SettingsModal({ 
   isOpen, 
@@ -26,8 +29,9 @@ export function SettingsModal({
   updateTouchSetting,
   resetToDefaults 
 }) {
+  const { isMobile } = useDeviceType();
   const [activeTab, setActiveTab] = useState('controls'); // 'controls' | 'video' | 'audio' | 'system'
-  const [controlSubTab, setControlSubTab] = useState('gamepad'); // 'keyboard' | 'gamepad' | 'touch'
+  const [controlSubTab, setControlSubTab] = useState(() => isMobile ? 'touch' : 'gamepad'); // 'keyboard' | 'gamepad' | 'touch'
   const [activePlayer, setActivePlayer] = useState('p1'); // 'p1' | 'p2'
   const [listeningAction, setListeningAction] = useState(null); // action en cours de remapping
   const [connectedGamepad, setConnectedGamepad] = useState(null);
@@ -96,21 +100,22 @@ export function SettingsModal({
   ];
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-md p-4 font-mono select-none">
-      <div className="relative w-full max-w-3xl bg-neutral-900 border border-neutral-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-md p-2 sm:p-4 font-mono select-none">
+      <div className="relative w-full max-w-3xl bg-neutral-900 border border-neutral-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh]">
         
         {/* Header Modale */}
-        <div className="p-5 border-b border-neutral-800 flex items-center justify-between bg-neutral-950/60">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-cyan-500/20 border border-cyan-500/40 flex items-center justify-center text-cyan-400">
-              <Sliders className="w-4 h-4" />
+        <div className="p-3.5 sm:p-5 border-b border-neutral-800 flex items-center justify-between bg-neutral-950/60">
+          <div className="flex items-center gap-2.5 sm:gap-3">
+            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-cyan-500/20 border border-cyan-500/40 flex items-center justify-center text-cyan-400 shrink-0">
+              <Sliders className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
             </div>
             <div>
-              <h3 className="text-sm font-bold text-white uppercase tracking-wider">
-                Configuration Matérielle NeoRAGEx
+              <h3 className="text-xs sm:text-sm font-bold text-white uppercase tracking-wider">
+                <span className="hidden sm:inline">Configuration Matérielle NeoRAGEx</span>
+                <span className="sm:hidden">PARAMÈTRES NEORAGEX</span>
               </h3>
-              <p className="text-[10px] text-neutral-400">
-                Paramètres d'inputs, filtres d'affichage et architecture MVS / AES
+              <p className="text-[9px] sm:text-[10px] text-neutral-400">
+                Inputs, CRT & MVS/AES
               </p>
             </div>
           </div>
@@ -123,13 +128,13 @@ export function SettingsModal({
           </button>
         </div>
 
-        {/* Onglets Principaux */}
-        <div className="grid grid-cols-4 border-b border-neutral-800 bg-neutral-950 text-xs font-bold text-center">
+        {/* Onglets Principaux Responsive */}
+        <div className="grid grid-cols-4 border-b border-neutral-800 bg-neutral-950 text-[10px] sm:text-xs font-bold text-center">
           {[
-            { id: 'controls', label: 'CONTRÔLES', icon: Gamepad2 },
-            { id: 'video', label: 'AFFICHAGE & CRT', icon: Tv },
-            { id: 'audio', label: 'AUDIO', icon: Volume2 },
-            { id: 'system', label: 'SYSTÈME & BIOS', icon: Cpu }
+            { id: 'controls', full: 'CONTRÔLES', short: 'CONTRÔLE', icon: Gamepad2 },
+            { id: 'video', full: 'AFFICHAGE & CRT', short: 'VIDÉO', icon: Tv },
+            { id: 'audio', full: 'AUDIO', short: 'AUDIO', icon: Volume2 },
+            { id: 'system', full: 'SYSTÈME & BIOS', short: 'BIOS', icon: Cpu }
           ].map((tab) => {
             const Icon = tab.icon;
             const active = activeTab === tab.id;
@@ -137,62 +142,68 @@ export function SettingsModal({
               <button
                 key={tab.id}
                 onClick={() => { setActiveTab(tab.id); setListeningAction(null); }}
-                className={`py-3 flex items-center justify-center gap-2 border-b-2 transition-all ${
+                className={`py-2.5 sm:py-3 flex items-center justify-center gap-1.5 sm:gap-2 border-b-2 transition-all ${
                   active 
                     ? 'border-cyan-400 text-cyan-400 bg-cyan-950/20' 
                     : 'border-transparent text-neutral-400 hover:text-white'
                 }`}
               >
-                <Icon className="w-3.5 h-3.5" />
-                {tab.label}
+                <Icon className="w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0" />
+                <span className="hidden sm:inline">{tab.full}</span>
+                <span className="sm:hidden">{tab.short}</span>
               </button>
             );
           })}
         </div>
 
         {/* Corps de la Modale */}
-        <div className="p-6 flex-1 overflow-y-auto space-y-6 text-xs">
+        <div className="p-3.5 sm:p-6 flex-1 overflow-y-auto space-y-4 sm:space-y-6 text-xs">
           
           {/* ================= ONGLET 1 : CONTRÔLES ================= */}
           {activeTab === 'controls' && (
-            <div className="space-y-5">
-              {/* Sous-navigation Contrôles : Clavier / Manette Interactive / Mobile Tactile */}
-              <div className="grid grid-cols-3 gap-2 p-1 bg-neutral-950 rounded-xl border border-neutral-800 text-xs font-bold">
-                <button
-                  onClick={() => setControlSubTab('gamepad')}
-                  className={`py-2 px-3 rounded-lg flex items-center justify-center gap-2 transition-all ${
-                    controlSubTab === 'gamepad'
-                      ? 'bg-cyan-500 text-black shadow-md'
-                      : 'text-neutral-400 hover:text-white hover:bg-neutral-900'
-                  }`}
-                >
-                  <Gamepad2 className="w-3.5 h-3.5" />
-                  MANETTE INTERACTIVE
-                </button>
-
-                <button
-                  onClick={() => setControlSubTab('keyboard')}
-                  className={`py-2 px-3 rounded-lg flex items-center justify-center gap-2 transition-all ${
-                    controlSubTab === 'keyboard'
-                      ? 'bg-cyan-500 text-black shadow-md'
-                      : 'text-neutral-400 hover:text-white hover:bg-neutral-900'
-                  }`}
-                >
-                  <Keyboard className="w-3.5 h-3.5" />
-                  CLAVIER (P1 / P2)
-                </button>
-
+            <div className="space-y-4 sm:space-y-5">
+              {/* Sous-navigation Contrôles : Tactile (priorité mobile) / Manette / Clavier (desktop uniquement) */}
+              <div className={`grid ${isMobile ? 'grid-cols-2' : 'grid-cols-3'} gap-1.5 sm:gap-2 p-1 bg-neutral-950 rounded-xl border border-neutral-800 text-[11px] sm:text-xs font-bold`}>
                 <button
                   onClick={() => setControlSubTab('touch')}
-                  className={`py-2 px-3 rounded-lg flex items-center justify-center gap-2 transition-all ${
+                  className={`py-1.5 sm:py-2 px-2 sm:px-3 rounded-lg flex items-center justify-center gap-1.5 sm:gap-2 transition-all ${
                     controlSubTab === 'touch'
                       ? 'bg-cyan-500 text-black shadow-md'
                       : 'text-neutral-400 hover:text-white hover:bg-neutral-900'
                   }`}
                 >
-                  <Smartphone className="w-3.5 h-3.5" />
-                  TACTILE MOBILE
+                  <Smartphone className="w-3.5 h-3.5 shrink-0" />
+                  <span className="hidden sm:inline">TACTILE MOBILE</span>
+                  <span className="sm:hidden">TACTILE</span>
                 </button>
+
+                <button
+                  onClick={() => setControlSubTab('gamepad')}
+                  className={`py-1.5 sm:py-2 px-2 sm:px-3 rounded-lg flex items-center justify-center gap-1.5 sm:gap-2 transition-all ${
+                    controlSubTab === 'gamepad'
+                      ? 'bg-cyan-500 text-black shadow-md'
+                      : 'text-neutral-400 hover:text-white hover:bg-neutral-900'
+                  }`}
+                >
+                  <Gamepad2 className="w-3.5 h-3.5 shrink-0" />
+                  <span className="hidden sm:inline">MANETTE (BLUETOOTH)</span>
+                  <span className="sm:hidden">MANETTE</span>
+                </button>
+
+                {!isMobile && (
+                  <button
+                    onClick={() => setControlSubTab('keyboard')}
+                    className={`py-1.5 sm:py-2 px-2 sm:px-3 rounded-lg flex items-center justify-center gap-1.5 sm:gap-2 transition-all ${
+                      controlSubTab === 'keyboard'
+                        ? 'bg-cyan-500 text-black shadow-md'
+                        : 'text-neutral-400 hover:text-white hover:bg-neutral-900'
+                    }`}
+                  >
+                    <Keyboard className="w-3.5 h-3.5 shrink-0" />
+                    <span className="hidden sm:inline">CLAVIER (P1 / P2)</span>
+                    <span className="sm:hidden">CLAVIER</span>
+                  </button>
+                )}
               </div>
 
               {/* Sous-onglet 1 : MANETTE INTERACTIVE */}
@@ -284,32 +295,144 @@ export function SettingsModal({
                 <div className="space-y-4 p-4 rounded-xl bg-neutral-950 border border-neutral-800">
                   <div className="flex items-center justify-between">
                     <div>
-                      <h4 className="text-xs font-bold text-white uppercase">Touches Tactiles Mobiles</h4>
+                      <h4 className="text-xs font-bold text-white uppercase flex items-center gap-2">
+                        <Smartphone className="w-4 h-4 text-cyan-400" />
+                        Options Tactiles & Ergonomie Mobile
+                      </h4>
                       <p className="text-[11px] text-neutral-400 mt-0.5">
-                        Boutons virtuels A, B, X, Y, D-Pad 8 directions et touches utilitaires
+                        Personnalisez le contrôleur virtuel pour une expérience arcade optimale
                       </p>
                     </div>
                     <span className="px-2.5 py-1 rounded-full text-[10px] bg-cyan-950 border border-cyan-500/40 text-cyan-300 font-bold">
-                      LAYOUT : A, B, X, Y (DIAMANT)
+                      A, B, X, Y
                     </span>
                   </div>
 
-                  <div className="p-3 rounded-lg bg-neutral-900 border border-neutral-800 text-[11px] text-neutral-300 space-y-2">
-                    <p>💡 <strong className="text-white">Déplacement libre en jeu :</strong> Cliquez sur le bouton <span className="text-amber-400 font-bold">DÉPLACER TOUCHES</span> directement sur l'écran de jeu pour faire glisser le D-Pad ou les boutons A, B, X, Y où vous le souhaitez sous vos pouces.</p>
-                    <p>🎮 <strong className="text-white">Correspondance Neo Geo :</strong> A = Poing Faible, B = Pied Faible, X = Poing Fort, Y = Pied Fort.</p>
+                  {/* 1. Retour Haptique (Vibration) */}
+                  <div className="p-3 bg-neutral-900/90 border border-neutral-800 rounded-xl flex items-center justify-between">
+                    <div className="flex items-center gap-2.5">
+                      <Vibrate className="w-4 h-4 text-cyan-400 shrink-0" />
+                      <div>
+                        <span className="font-bold text-neutral-200 block text-xs">Vibration Haptique</span>
+                        <span className="text-[10px] text-neutral-400">Micro-vibration à chaque appui pour simuler de vrais boutons</span>
+                      </div>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={settings.touch?.vibration ?? true}
+                      onChange={(e) => updateTouchSetting('vibration', e.target.checked)}
+                      className="w-5 h-5 accent-cyan-500 cursor-pointer rounded"
+                    />
+                  </div>
+
+                  {/* 2. Opacité des Touches */}
+                  <div className="p-3 bg-neutral-900/90 border border-neutral-800 rounded-xl space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2.5">
+                        <Eye className="w-4 h-4 text-cyan-400 shrink-0" />
+                        <div>
+                          <span className="font-bold text-neutral-200 block text-xs">Opacité des Touches</span>
+                          <span className="text-[10px] text-neutral-400">Transparence des contrôles sur l'écran</span>
+                        </div>
+                      </div>
+                      <span className="text-xs font-mono font-bold text-cyan-400">
+                        {settings.touch?.opacity ?? 75}%
+                      </span>
+                    </div>
+                    <input
+                      type="range"
+                      min="20"
+                      max="100"
+                      step="5"
+                      value={settings.touch?.opacity ?? 75}
+                      onChange={(e) => updateTouchSetting('opacity', Number(e.target.value))}
+                      className="w-full accent-cyan-500 cursor-pointer h-1.5 bg-neutral-800 rounded-lg"
+                    />
+                  </div>
+
+                  {/* 3. Taille des Touches */}
+                  <div className="p-3 bg-neutral-900/90 border border-neutral-800 rounded-xl space-y-2">
+                    <span className="font-bold text-neutral-200 block text-xs">Taille des Boutons & D-Pad</span>
+                    <div className="grid grid-cols-3 gap-2">
+                      {[
+                        { val: 80, label: 'Compact (80%)' },
+                        { val: 100, label: 'Normal (100%)' },
+                        { val: 120, label: 'Grand (120%)' }
+                      ].map((item) => (
+                        <button
+                          key={item.val}
+                          onClick={() => updateTouchSetting('scale', item.val)}
+                          className={`py-1.5 px-2 rounded-lg text-[11px] font-bold border transition-all ${
+                            (settings.touch?.scale ?? 100) === item.val
+                              ? 'bg-cyan-500/20 border-cyan-500 text-cyan-300'
+                              : 'bg-neutral-950 border-neutral-800 text-neutral-400 hover:text-white'
+                          }`}
+                        >
+                          {item.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* 4. Mode Portrait Smartphone */}
+                  <div className="p-3 bg-neutral-900/90 border border-neutral-800 rounded-xl space-y-2">
+                    <span className="font-bold text-neutral-200 block text-xs">Disposition en Mode Portrait (Smartphone)</span>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        onClick={() => updateTouchSetting('portraitMode', 'pad-bottom')}
+                        className={`py-2 px-2.5 rounded-lg text-[11px] font-bold border text-left transition-all ${
+                          (settings.touch?.portraitMode ?? 'pad-bottom') === 'pad-bottom'
+                            ? 'bg-cyan-500/20 border-cyan-500 text-cyan-300'
+                            : 'bg-neutral-950 border-neutral-800 text-neutral-400 hover:text-white'
+                        }`}
+                      >
+                        <span className="block font-bold">🕹️ Arcade Pad Bas</span>
+                        <span className="text-[9px] text-neutral-400 font-normal">Écran 4:3 en haut, manette en bas sans masquer le jeu</span>
+                      </button>
+
+                      <button
+                        onClick={() => updateTouchSetting('portraitMode', 'overlay')}
+                        className={`py-2 px-2.5 rounded-lg text-[11px] font-bold border text-left transition-all ${
+                          (settings.touch?.portraitMode ?? 'pad-bottom') === 'overlay'
+                            ? 'bg-cyan-500/20 border-cyan-500 text-cyan-300'
+                            : 'bg-neutral-950 border-neutral-800 text-neutral-400 hover:text-white'
+                        }`}
+                      >
+                        <span className="block font-bold">📱 Superposé</span>
+                        <span className="text-[9px] text-neutral-400 font-normal">Contrôles transparents sur toute la hauteur</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* 5. Auto-masquer si Manette Détectée */}
+                  <div className="p-3 bg-neutral-900/90 border border-neutral-800 rounded-xl flex items-center justify-between">
+                    <div>
+                      <span className="font-bold text-neutral-200 block text-xs">Masquer si Manette Connectée</span>
+                      <span className="text-[10px] text-neutral-400">Cache le tactile dès qu'une manette Bluetooth / USB est active</span>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={settings.touch?.autoHideOnGamepad ?? true}
+                      onChange={(e) => updateTouchSetting('autoHideOnGamepad', e.target.checked)}
+                      className="w-5 h-5 accent-cyan-500 cursor-pointer rounded"
+                    />
                   </div>
 
                   <button
                     onClick={() => {
                       try {
-                        localStorage.removeItem('csw_touch_layout_v2');
-                        alert('Disposition tactile réinitialisée aux positions par défaut !');
+                        localStorage.removeItem('csw_touch_layout_v3');
+                        updateTouchSetting('opacity', 75);
+                        updateTouchSetting('scale', 100);
+                        updateTouchSetting('vibration', true);
+                        updateTouchSetting('portraitMode', 'pad-bottom');
+                        alert('Paramètres et positions tactiles réinitialisés aux valeurs optimales !');
                       } catch(e) {}
                     }}
-                    className="flex items-center gap-2 px-3 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-xs font-bold transition-all"
+                    className="flex items-center gap-2 px-3 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-xs font-bold transition-all w-full justify-center"
                   >
                     <RotateCcw className="w-3.5 h-3.5" />
-                    Réinitialiser position et taille par défaut
+                    Réinitialiser les réglages tactiles par défaut
                   </button>
                 </div>
               )}

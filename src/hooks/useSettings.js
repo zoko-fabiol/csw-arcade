@@ -56,6 +56,13 @@ export const DEFAULT_SETTINGS = {
   system: {
     biosMode: 'mvs', // 'mvs' (Arcade) | 'aes' (Console Free Play)
     region: 'europe'  // 'europe' | 'usa' | 'japan'
+  },
+  touch: {
+    vibration: true,
+    opacity: 75,
+    scale: 100, // 80, 100, 120
+    portraitMode: 'pad-bottom', // 'pad-bottom' | 'overlay'
+    autoHideOnGamepad: true
   }
 };
 
@@ -78,7 +85,8 @@ export function useSettings() {
           gamepad: { ...DEFAULT_SETTINGS.gamepad, ...(parsed.gamepad || {}) },
           video: { ...DEFAULT_SETTINGS.video, ...(parsed.video || {}) },
           audio: { ...DEFAULT_SETTINGS.audio, ...(parsed.audio || {}) },
-          system: { ...DEFAULT_SETTINGS.system, ...(parsed.system || {}) }
+          system: { ...DEFAULT_SETTINGS.system, ...(parsed.system || {}) },
+          touch: { ...DEFAULT_SETTINGS.touch, ...(parsed.touch || {}) }
         };
       }
     } catch (e) {

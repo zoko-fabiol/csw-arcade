@@ -98,6 +98,30 @@
       max-width: 80%;
       text-align: center;
     }
+
+    /* Masquage absolu et suppression des doublons de gamepad virtuel EmulatorJS */
+    .ejs_virtualGamepad_parent,
+    .ejs_virtualGamepad,
+    [class*="ejs_virtualGamepad"],
+    [class*="virtualGamepad"],
+    [id*="ejs_virtualGamepad"],
+    [id*="virtualGamepad"],
+    .nipple,
+    [class*="nipple"],
+    [id*="nipple"],
+    .ejs_touch,
+    [class*="ejs_touch"] {
+      display: none !important;
+      visibility: hidden !important;
+      opacity: 0 !important;
+      pointer-events: none !important;
+      width: 0 !important;
+      height: 0 !important;
+      position: absolute !important;
+      left: -9999px !important;
+      top: -9999px !important;
+      transform: scale(0) !important;
+    }
   </style>
 </head>
 <body>
@@ -691,10 +715,42 @@
       window.EJS_defaultControls = buildControllersConfig(activeSettings.controls);
       window.EJS_defaultOptions = buildCoreOptions(activeSettings.system);
 
+      // Désactiver le gamepad virtuel EmulatorJS pour éviter tout doublon avec le TouchOverlay CSW
+      window.EJS_VirtualGamepadSettings = [
+        { type: 'button', text: '', id: 'csw_hidden', location: 'left', left: -9999, top: -9999, input_value: 999 }
+      ];
+
+      // Nettoyeur actif anti-doublon d'éléments tactiles EmulatorJS
+      const purgeBuiltInGamepad = () => {
+        try {
+          const badElements = document.querySelectorAll(
+            '.ejs_virtualGamepad_parent, .nipple, [class*="ejs_virtualGamepad"], [class*="virtualGamepad"], [id*="nipple"]'
+          );
+          badElements.forEach(el => {
+            el.style.display = 'none';
+            el.remove();
+          });
+        } catch(e) {}
+      };
+      purgeBuiltInGamepad();
+      const purgeObserver = new MutationObserver(purgeBuiltInGamepad);
+      purgeObserver.observe(document.body, { childList: true, subtree: true });
+
       window.EJS_ready = () => {
         console.log('[VFS Injection] EJS_ready reçu, interception synchrone startGame...');
         const emu = window.EJS_emulator;
         if (!emu) return;
+
+        // Désactivation forcée du gamepad interne
+        try {
+          if (typeof emu.toggleVirtualGamepad === 'function') {
+            emu.toggleVirtualGamepad(false);
+          }
+          if (emu.virtualGamepad) {
+            emu.virtualGamepad.style.display = 'none';
+          }
+        } catch (e) {}
+        purgeBuiltInGamepad();
 
         // Assurer l'application des contrôles configurés dans l'instance
         emu.controls = buildControllersConfig(activeSettings.controls);

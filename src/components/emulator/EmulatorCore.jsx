@@ -18,6 +18,7 @@ import { inputManager } from '../../services/InputManager';
 import { NetplaySyncEngine } from '../../services/NetplaySyncEngine';
 import { emulatorLoader } from '../../services/emulatorLoader';
 import { TouchOverlay } from './TouchOverlay';
+import { useDeviceType } from '../../utils/deviceDetector';
 
 export function EmulatorCore({ 
   game, 
@@ -30,6 +31,8 @@ export function EmulatorCore({
 }) {
   const containerRef = useRef(null);
   const iframeRef = useRef(null);
+
+  const { isMobile, isLandscape } = useDeviceType();
 
   const [isReady, setIsReady] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -90,16 +93,63 @@ export function EmulatorCore({
     return () => window.removeEventListener('message', handleMessage);
   }, []);
 
+  // Gestion plein écran universel (iOS Safari WebKit, Android Chrome, Desktop)
   const toggleFullscreen = () => {
     if (!containerRef.current) return;
-    if (!document.fullscreenElement) {
-      containerRef.current.requestFullscreen().catch(() => {});
-      setIsFullscreen(true);
+    const elem = containerRef.current;
+    const isCurrentlyFs = !!(
+      document.fullscreenElement ||
+      document.webkitFullscreenElement ||
+      document.mozFullScreenElement ||
+      document.msFullscreenElement
+    );
+
+    if (!isCurrentlyFs) {
+      const req = elem.requestFullscreen || elem.webkitRequestFullscreen || elem.mozRequestFullScreen || elem.msRequestFullscreen;
+      if (req) {
+        req.call(elem).then(() => {
+          setIsFullscreen(true);
+          // Tenter de verrouiller en paysage si sur mobile
+          if (typeof screen !== 'undefined' && screen.orientation && typeof screen.orientation.lock === 'function') {
+            screen.orientation.lock('landscape').catch(() => {});
+          }
+        }).catch(() => {
+          setIsFullscreen(true);
+        });
+      }
     } else {
-      document.exitFullscreen().catch(() => {});
-      setIsFullscreen(false);
+      const exit = document.exitFullscreen || document.webkitExitFullscreen || document.mozCancelFullScreen || document.msExitFullscreen;
+      if (exit) {
+        exit.call(document).then(() => {
+          setIsFullscreen(false);
+          if (typeof screen !== 'undefined' && screen.orientation && typeof screen.orientation.unlock === 'function') {
+            try { screen.orientation.unlock(); } catch(e) {}
+          }
+        }).catch(() => {
+          setIsFullscreen(false);
+        });
+      }
     }
   };
+
+  useEffect(() => {
+    const handleFsChange = () => {
+      const isCurrentlyFs = !!(
+        document.fullscreenElement ||
+        document.webkitFullscreenElement ||
+        document.mozFullScreenElement ||
+        document.msFullscreenElement
+      );
+      setIsFullscreen(isCurrentlyFs);
+    };
+
+    document.addEventListener('fullscreenchange', handleFsChange);
+    document.addEventListener('webkitfullscreenchange', handleFsChange);
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFsChange);
+      document.removeEventListener('webkitfullscreenchange', handleFsChange);
+    };
+  }, []);
 
   // 4. Synchronisation en temps réel des paramètres avec le player dans l'iframe
   useEffect(() => {
@@ -155,122 +205,165 @@ export function EmulatorCore({
   const settingsParam = encodeURIComponent(JSON.stringify(settings || {}));
   const playerUrl = `/player.html?game=${encodeURIComponent(game.filename)}&settings=${settingsParam}`;
 
+  const isPortraitPadMode = isMobile && !isLandscape && (settings?.touch?.portraitMode ?? 'pad-bottom') === 'pad-bottom' && isTouchVisible;
+
   return (
     <div 
       ref={containerRef}
       className="fixed inset-0 z-50 bg-black flex flex-col select-none overflow-hidden font-mono"
     >
-      {/* Barre de Contrôle Supérieure */}
-      <div className="h-14 bg-neutral-950/90 border-b border-neutral-800 px-6 flex items-center justify-between text-xs text-neutral-300 backdrop-blur-md shrink-0">
-        <div className="flex items-center gap-4">
+      {/* Barre de Contrôle Supérieure Responsive */}
+      <div className="h-11 sm:h-14 bg-neutral-950/95 border-b border-neutral-800 px-2.5 sm:px-6 flex items-center justify-between text-xs text-neutral-300 backdrop-blur-md shrink-0">
+        <div className="flex items-center gap-2 sm:gap-4 min-w-0">
           <button
             onClick={onExit}
-            className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-neutral-900 border border-neutral-800 hover:border-neutral-700 hover:text-white transition-all active:scale-95"
+            className="flex items-center gap-1.5 px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-lg bg-neutral-900 border border-neutral-800 hover:border-neutral-700 hover:text-white transition-all active:scale-95 text-[11px] sm:text-xs font-bold shrink-0"
           >
-            <ArrowLeft className="w-4 h-4" />
-            QUITTER
+            <ArrowLeft className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+            <span className="hidden xs:inline">QUITTER</span>
           </button>
 
-          <div className="flex items-center gap-2">
-            <span className="font-bold text-white tracking-wide">{game.title}</span>
-            <span className="px-2 py-0.5 rounded bg-neutral-800 text-[10px] text-cyan-400">
+          <div className="flex items-center gap-1.5 truncate">
+            <span className="font-bold text-white tracking-wide truncate text-[11px] sm:text-sm">
+              {game.title}
+            </span>
+            <span className="hidden md:inline px-2 py-0.5 rounded bg-neutral-800 text-[10px] text-cyan-400">
               {game.filename}
             </span>
           </div>
         </div>
 
         {/* Télémétrie & Mode */}
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2 sm:gap-4 shrink-0">
           {mode === 'netplay' ? (
-            <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-red-950/80 border border-red-500/40 text-red-400 text-[11px]">
-              <Radio className="w-3.5 h-3.5 animate-pulse text-red-500" />
-              <span>NETPLAY {isHost ? '[HÔTE P1]' : '[INVITÉ P2]'}</span>
+            <div className="flex items-center gap-1.5 px-2 sm:px-3 py-0.5 sm:py-1 rounded-full bg-red-950/80 border border-red-500/40 text-red-400 text-[10px] sm:text-[11px]">
+              <Radio className="w-3 h-3 animate-pulse text-red-500" />
+              <span className="hidden sm:inline">NETPLAY {isHost ? '[HÔTE P1]' : '[INVITÉ P2]'}</span>
+              <span className="sm:hidden">1V1</span>
             </div>
           ) : (
-            <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-950/80 border border-cyan-500/40 text-cyan-400 text-[11px]">
-              <Gamepad2 className="w-3.5 h-3.5" />
-              <span>ARCADE 60 FPS</span>
+            <div className="flex items-center gap-1.5 px-2 sm:px-3 py-0.5 sm:py-1 rounded-full bg-cyan-950/80 border border-cyan-500/40 text-cyan-400 text-[10px] sm:text-[11px]">
+              <Gamepad2 className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+              <span className="hidden sm:inline">ARCADE 60 FPS</span>
+              <span className="sm:hidden">60 FPS</span>
             </div>
           )}
 
           {ping !== null && (
-            <span className={`text-[11px] font-bold ${ping < 60 ? 'text-emerald-400' : 'text-amber-400'}`}>
-              {ping} ms
+            <span className={`text-[10px] sm:text-[11px] font-bold ${ping < 60 ? 'text-emerald-400' : 'text-amber-400'}`}>
+              {ping}ms
             </span>
           )}
 
-          <span className="text-emerald-400 font-bold">{fps} FPS</span>
+          <span className="text-emerald-400 font-bold text-[10px] sm:text-xs">{fps} FPS</span>
         </div>
 
         {/* Commandes Utilitaires */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
           <button
             onClick={() => setIsTouchVisible(!isTouchVisible)}
-            className={`p-2 rounded-lg border transition-all ${
+            className={`p-1.5 sm:p-2 rounded-lg border transition-all ${
               isTouchVisible
                 ? 'bg-cyan-500 text-black border-cyan-400 shadow-md'
                 : 'bg-neutral-900 border-neutral-800 text-neutral-400 hover:text-white'
             }`}
             title={isTouchVisible ? "Masquer commandes tactiles" : "Afficher commandes tactiles"}
           >
-            <Smartphone className="w-4 h-4" />
+            <Smartphone className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
           </button>
 
           <button
             onClick={onOpenSettings}
-            className="p-2 rounded-lg bg-neutral-900 border border-neutral-800 hover:text-cyan-400 transition-all"
-            title="Options & Remapping Touches"
+            className="p-1.5 sm:p-2 rounded-lg bg-neutral-900 border border-neutral-800 hover:text-cyan-400 transition-all"
+            title="Options & Paramètres"
           >
-            <Sliders className="w-4 h-4" />
+            <Sliders className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
           </button>
 
           <button
             onClick={toggleFullscreen}
-            className="p-2 rounded-lg bg-neutral-900 border border-neutral-800 hover:text-white transition-all"
+            className={`p-1.5 sm:p-2 rounded-lg border transition-all ${
+              isFullscreen 
+                ? 'bg-amber-500 text-black border-amber-400 font-bold' 
+                : 'bg-neutral-900 border-neutral-800 hover:text-white'
+            }`}
             title="Plein Écran"
           >
-            {isFullscreen ? <Minimize className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}
+            {isFullscreen ? <Minimize className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> : <Maximize className="w-3.5 h-3.5 sm:w-4 sm:h-4" />}
           </button>
         </div>
       </div>
 
-      {/* Zone de Rendu */}
-      <div className="flex-1 relative flex items-center justify-center bg-black overflow-hidden">
-        {/* Conteneur d'Écran avec Ratio Configuré */}
-        <div 
-          className={`relative max-h-full w-full h-full transition-all duration-200 flex items-center justify-center ${
-            aspectRatio === '4:3' 
-              ? 'aspect-[4/3] w-auto h-full max-w-[calc(100vh*(4/3))]' 
-              : aspectRatio === 'pixel-perfect'
-              ? 'w-[640px] h-[448px]'
-              : 'w-full h-full'
-          }`}
-        >
-          {/* Iframe Runner Isolé pour le Core Arcade WebAssembly */}
-          <iframe
-            ref={iframeRef}
-            src={playerUrl}
-            className="w-full h-full border-0 bg-black block"
-            allow="autoplay"
-            title={game.title}
-          />
-
-          {/* Calque Shaders Scanlines CRT */}
-          {isScanlinesActive && (
-            <div 
-              className="absolute inset-0 crt-scanlines pointer-events-none z-10" 
-              style={{ opacity: Math.max(0.1, (settings?.video?.intensity ?? 40) / 100) }}
+      {/* Zone de Rendu : Deux modes intelligents */}
+      {isPortraitPadMode ? (
+        /* MODE A : PORTRAIT MOBILE SMARTPHONE AVEC ARCADE PAD EN BAS */
+        <div className="flex-1 flex flex-col w-full h-full overflow-hidden bg-black">
+          {/* Écran de Jeu 4:3 en haut */}
+          <div className="w-full aspect-[4/3] max-h-[46vh] relative flex items-center justify-center bg-black border-b border-neutral-800/80 shrink-0">
+            <iframe
+              ref={iframeRef}
+              src={playerUrl}
+              className="w-full h-full border-0 bg-black block"
+              allow="autoplay"
+              title={game.title}
             />
-          )}
+            {isScanlinesActive && (
+              <div 
+                className="absolute inset-0 crt-scanlines pointer-events-none z-10" 
+                style={{ opacity: Math.max(0.1, (settings?.video?.intensity ?? 40) / 100) }}
+              />
+            )}
+          </div>
 
-          {/* Overlay Tactile Virtuel Mobile / Tablette */}
+          {/* Manette tactile dédiée en bas sans recouvrir le jeu */}
+          <div className="flex-1 relative w-full bg-gradient-to-b from-neutral-950 via-neutral-900 to-black overflow-hidden flex flex-col justify-center">
+            <TouchOverlay
+              isVisible={isTouchVisible}
+              onInput={handleTouchInput}
+              onToggleVisibility={() => setIsTouchVisible(!isTouchVisible)}
+              settings={settings}
+              isPortraitPad={true}
+            />
+          </div>
+        </div>
+      ) : (
+        /* MODE B : MODE STANDARD / PAYSAGE / OVERLAY LIBRE */
+        <div className="flex-1 relative flex items-center justify-center bg-black overflow-hidden">
+          <div 
+            className={`relative max-h-full w-full h-full transition-all duration-200 flex items-center justify-center ${
+              aspectRatio === '4:3' 
+                ? 'aspect-[4/3] w-auto h-full max-w-[calc(100vh*(4/3))]' 
+                : aspectRatio === 'pixel-perfect'
+                ? 'w-[640px] h-[448px]'
+                : 'w-full h-full'
+            }`}
+          >
+            <iframe
+              ref={iframeRef}
+              src={playerUrl}
+              className="w-full h-full border-0 bg-black block"
+              allow="autoplay"
+              title={game.title}
+            />
+
+            {isScanlinesActive && (
+              <div 
+                className="absolute inset-0 crt-scanlines pointer-events-none z-10" 
+                style={{ opacity: Math.max(0.1, (settings?.video?.intensity ?? 40) / 100) }}
+              />
+            )}
+          </div>
+
+          {/* Overlay tactile transparent flottant sur toute la fenêtre */}
           <TouchOverlay
             isVisible={isTouchVisible}
             onInput={handleTouchInput}
             onToggleVisibility={() => setIsTouchVisible(!isTouchVisible)}
+            settings={settings}
+            isPortraitPad={false}
           />
         </div>
-      </div>
+      )}
     </div>
   );
 }

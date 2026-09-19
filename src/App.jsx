@@ -17,10 +17,11 @@ export default function App() {
   const [gameMode, setGameMode] = useState(null); // 'solo' | 'netplay'
   const [nativeStatus, setNativeStatus] = useState(null);
 
-  // État Modales
+  // État Modales & Responsive
   const [isLobbyOpen, setIsLobbyOpen] = useState(false);
   const [isWebRtcTestOpen, setIsWebRtcTestOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
   // État Session Netplay
   const [netplaySession, setNetplaySession] = useState({
@@ -97,7 +98,7 @@ export default function App() {
 
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-neutral-950 font-sans">
-      {/* Sidebar de navigation */}
+      {/* Sidebar de navigation (Desktop ancré & Mobile Drawer) */}
       <Sidebar
         selectedGenre={selectedGenre}
         onSelectGenre={setSelectedGenre}
@@ -109,6 +110,8 @@ export default function App() {
         onOpenWebRtcTest={() => setIsWebRtcTestOpen(true)}
         onOpenSettings={() => setIsSettingsOpen(true)}
         onLaunchNative={handleLaunchNativeGeneral}
+        isOpenMobile={isMobileSidebarOpen}
+        onCloseMobile={() => setIsMobileSidebarOpen(false)}
       />
 
       {/* Toast Notification Lancement Natif */}
@@ -119,7 +122,7 @@ export default function App() {
         </div>
       )}
 
-      {/* Catalogue des 181 jeux */}
+      {/* Catalogue des jeux avec bascule Grille / Liste et hamburger */}
       <GameLibrary
         games={gamesData}
         selectedGenre={selectedGenre}
@@ -127,6 +130,7 @@ export default function App() {
         isRomAvailable={isRomAvailable}
         onLaunchSolo={handleLaunchSolo}
         onLaunchNetplay={handleLaunchNetplay}
+        onToggleMobileSidebar={() => setIsMobileSidebarOpen(prev => !prev)}
       />
 
       {/* Modal Matchmaking Netplay Firestore / WebRTC */}
