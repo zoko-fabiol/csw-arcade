@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import gamesData from './data/games.json';
 import { useRomAudit } from './hooks/useRomAudit';
 import { useSettings } from './hooks/useSettings';
@@ -101,6 +101,16 @@ export default function App() {
     setActiveGame(null);
     setGameMode(null);
   };
+
+  // Détection du paramètre ?join= dans l'URL pour ouvrir directement le salon multijoueur
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('join')) {
+        setIsLobbyOpen(true);
+      }
+    }
+  }, []);
 
   const isOnline = useOnlineStatus();
   const { exitToastVisible } = useMobileNavigation({

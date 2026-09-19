@@ -1,5 +1,5 @@
 const SHELL_CACHE_NAME = 'csw-arcade-shell-v2';
-const ENGINE_CACHE_NAME = 'csw-arcade-engine-v1';
+const ENGINE_CACHE_NAME = 'csw-arcade-engine-v2';
 
 const PRECACHE_ASSETS = [
   '/',
@@ -10,7 +10,15 @@ const PRECACHE_ASSETS = [
   '/roms-manifest.json',
   '/icons/icon-192.png',
   '/icons/icon-512.png',
-  '/icons/apple-touch-icon.png'
+  '/icons/apple-touch-icon.png',
+  '/emulatorjs/loader.js',
+  '/emulatorjs/emulator.min.js',
+  '/emulatorjs/emulator.min.css',
+  '/emulatorjs/version.json',
+  '/emulatorjs/localization/en-US.json',
+  '/emulatorjs/cores/reports/fbneo.json',
+  '/emulatorjs/cores/fbneo-wasm.data',
+  '/emulatorjs/compression/extract7z.js'
 ];
 
 // Installation : pré-mise en cache immédiate du shell applicatif
@@ -49,9 +57,9 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // 1. STRATÉGIE CACHE-FIRST POUR LE MOTEUR EMULATORJS (CDN WASM FBNEO)
-  // Permet de jouer 100% hors-ligne en mode avion dès que le moteur a été chargé une fois
-  if (url.hostname.includes('cdn.emulatorjs.org')) {
+  // 1. STRATÉGIE CACHE-FIRST POUR LE MOTEUR EMULATORJS EMBARQUÉ ET CDN
+  // Permet un démarrage instantané 100% hors-ligne sans dépendance réseau
+  if (url.pathname.startsWith('/emulatorjs/') || url.hostname.includes('cdn.emulatorjs.org')) {
     event.respondWith(
       caches.open(ENGINE_CACHE_NAME).then((cache) => {
         return cache.match(event.request).then((cachedResponse) => {
@@ -64,7 +72,7 @@ self.addEventListener('fetch', (event) => {
             }
             return networkResponse;
           }).catch((err) => {
-            console.warn('[CSW-Arcade SW] Échec réseau CDN hors-ligne:', url.pathname);
+            console.warn('[CSW-Arcade SW] Échec réseau moteur hors-ligne:', url.pathname);
             throw err;
           });
         });

@@ -10,6 +10,7 @@ import {
   Gamepad2, 
   Loader2, 
   Radio,
+  WifiOff,
   Sliders,
   Smartphone
 } from 'lucide-react';
@@ -40,6 +41,7 @@ export function EmulatorCore({
   const [ping, setPing] = useState(null);
   const [errorMessage, setErrorMessage] = useState(null);
   const [netplayRoom, setNetplayRoom] = useState(() => netplayService.currentRoom);
+  const [interrupted, setInterrupted] = useState({ isInterrupted: false, message: '' });
   const hasSyncedInitialState = useRef(false);
 
   // Détection automatique du mode tactile (mobile / tablette / tactile)
@@ -60,6 +62,15 @@ export function EmulatorCore({
         isPressed
       }, '*');
     }
+  };
+
+  const handleExitGame = () => {
+    if (mode === 'netplay') {
+      try {
+        netplayService.leaveRoom();
+      } catch(e) {}
+    }
+    onExit();
   };
 
   // Écoute des entrées des joueurs distants et synchronisation d'état en mode Netplay
@@ -88,28 +99,57 @@ export function EmulatorCore({
       }
     });
 
-    // L'invité reçoit le savestate officiel de l'hôte pour se caler sur sa frame exacte (une seule fois à froid)
-    const unsubSyncState = netplayService.on('sync_state', ({ stateBase64, stateData }) => {
+    // L'invité reçoit le savestate officiel de l'hôte (initial ou heartbeat autoritaire)
+    const unsubSyncState = netplayService.on('sync_state', ({ stateBase64, stateData, isHeartbeat }) => {
       if (!isHost && iframeRef.current?.contentWindow) {
-        console.log('[EmulatorCore] Savestate à froid reçu de l\'hôte, synchronisation initiale...');
-        hasSyncedInitialState.current = true;
+        if (!isHeartbeat) {
+          console.log('[EmulatorCore] Savestate initial reçu de l\'hôte, synchronisation...');
+          hasSyncedInitialState.current = true;
+        }
         iframeRef.current.contentWindow.postMessage({
           type: 'LOAD_STATE',
           stateBase64: stateBase64 || null,
-          state: stateData || null
+          state: stateData || null,
+          isHeartbeat: !!isHeartbeat
         }, '*');
       }
     });
 
+    // Gestion de la déconnexion de l'autre joueur / arrêt automatique de partie
+    const handleDisconnection = (data) => {
+      const msg = (data && data.message) ? data.message : "L'autre joueur a quitté la partie.";
+      console.log('[EmulatorCore] Interruption de partie détectée :', msg);
+      setInterrupted({ isInterrupted: true, message: msg });
+      if (iframeRef.current?.contentWindow) {
+        iframeRef.current.contentWindow.postMessage({ type: 'APP_VISIBILITY', visible: false }, '*');
+      }
+    };
+
+    const unsubPeerLeft = netplayService.on('peer_left', handleDisconnection);
+    const unsubHostDisc = netplayService.on('host_disconnected', (msg) => handleDisconnection({ message: msg }));
+
     const unsubPing = netplayService.on('ping', (p) => setPing(p));
     const unsubRoom = netplayService.on('room_update', (r) => setNetplayRoom(r));
+
+    // Heartbeat autoritaire périodique de l'hôte (toutes les 3.5s pour forcer la synchronisation absolue et la mort identique des personnages)
+    let heartbeatInterval = null;
+    if (isHost) {
+      heartbeatInterval = setInterval(() => {
+        if (iframeRef.current?.contentWindow) {
+          iframeRef.current.contentWindow.postMessage({ type: 'GET_STATE', isHeartbeat: true }, '*');
+        }
+      }, 3500);
+    }
 
     return () => {
       unsubInput();
       unsubReqState();
       unsubSyncState();
+      unsubPeerLeft();
+      unsubHostDisc();
       unsubPing();
       unsubRoom();
+      if (heartbeatInterval) clearInterval(heartbeatInterval);
     };
   }, [mode, isHost]);
 
@@ -142,10 +182,13 @@ export function EmulatorCore({
 
       // L'iframe de l'hôte a extrait le savestate, l'envoyer au joueur distant
       if (event.data.type === 'STATE_DATA' && mode === 'netplay' && isHost) {
-        console.log('[EmulatorCore] Savestate extrait par l\'iframe, transmission au joueur distant...');
+        if (!event.data.isHeartbeat) {
+          console.log('[EmulatorCore] Savestate extrait par l\'iframe, transmission au joueur distant...');
+        }
         netplayService.sendStateSync({
           stateBase64: event.data.stateBase64 || null,
-          stateSize: event.data.stateSize || 0
+          stateSize: event.data.stateSize || 0,
+          isHeartbeat: !!event.data.isHeartbeat
         });
       }
     };
@@ -331,7 +374,7 @@ export function EmulatorCore({
       <div className="h-11 sm:h-14 bg-neutral-950/95 border-b border-neutral-800 px-2.5 sm:px-6 flex items-center justify-between text-xs text-neutral-300 backdrop-blur-md shrink-0 pt-safe pl-safe pr-safe">
         <div className="flex items-center gap-2 sm:gap-4 min-w-0">
           <button
-            onClick={onExit}
+            onClick={handleExitGame}
             className="flex items-center gap-1.5 px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-lg bg-neutral-900 border border-neutral-800 hover:border-neutral-700 hover:text-white transition-all active:scale-95 text-[11px] sm:text-xs font-bold shrink-0"
           >
             <ArrowLeft className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
@@ -482,6 +525,30 @@ export function EmulatorCore({
             settings={settings}
             isPortraitPad={false}
           />
+        </div>
+      )}
+
+      {/* Modal d'Interruption / Déconnexion Arcade */}
+      {interrupted.isInterrupted && (
+        <div className="absolute inset-0 z-[100] bg-black/90 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-neutral-900 border-2 border-red-500/70 rounded-2xl max-w-md w-full p-6 text-center shadow-[0_0_60px_rgba(239,68,68,0.4)] animate-in fade-in zoom-in-95">
+            <div className="w-16 h-16 rounded-full bg-red-500/10 border border-red-500/30 flex items-center justify-center mx-auto mb-4 text-red-400">
+              <WifiOff className="w-8 h-8" />
+            </div>
+            <h3 className="text-xl font-black tracking-wider text-white mb-2 uppercase font-sans">
+              Partie Interrompue
+            </h3>
+            <p className="text-xs sm:text-sm text-neutral-300 mb-6 leading-relaxed font-sans">
+              {interrupted.message || "L'autre joueur a quitté la partie ou a été déconnecté. La session est terminée."}
+            </p>
+            <button
+              onClick={handleExitGame}
+              className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white font-bold tracking-wide shadow-lg shadow-red-600/30 active:scale-95 transition-all text-xs sm:text-sm uppercase flex items-center justify-center gap-2 font-sans"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              Retourner au Menu
+            </button>
+          </div>
         </div>
       )}
     </div>

@@ -24,17 +24,35 @@ export function NetplayModal({
   const [errorMsg, setErrorMsg] = useState(null);
   const [activeRoom, setActiveRoom] = useState(null);
   const [ping, setPing] = useState(0);
+  const [isP2P, setIsP2P] = useState(false);
+  const [showQrModal, setShowQrModal] = useState(false);
 
   const selectedGame = games.find(g => g.id === selectedGameId) || currentGame || games[0] || {};
   const maxPlayersForGame = selectedGame.players || 2;
 
   const [lanInfo, setLanInfo] = useState(null);
 
+  // Détermination de l'URL de partage LAN / Même Wi-Fi / Netlify
+  const shareBaseUrl = lanInfo?.lanUrl || (typeof window !== 'undefined' ? window.location.origin : '');
+  const shareRoomUrl = activeRoom?.code ? `${shareBaseUrl}/?join=${activeRoom.code}` : shareBaseUrl;
+
   // Sauvegarder le nom du joueur
   const handleNameChange = (val) => {
     setPlayerName(val);
     try { localStorage.setItem('csw_player_name', val); } catch(e) {}
   };
+
+  // Pré-remplissage si un code est fourni dans l'URL (?join=ARC-XXXX)
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const j = params.get('join');
+      if (j) {
+        setJoinCode(j.toUpperCase());
+        setActiveTab('join');
+      }
+    }
+  }, [isOpen]);
 
   // Récupération de l'adresse LAN Wi-Fi du serveur Vite local
   useEffect(() => {
@@ -84,6 +102,9 @@ export function NetplayModal({
       }),
       netplayService.on('ping', (p) => {
         setPing(p);
+      }),
+      netplayService.on('p2p_connected', () => {
+        setIsP2P(true);
       })
     ];
 
@@ -170,12 +191,12 @@ export function NetplayModal({
             </div>
             <div>
               <h2 className="text-sm font-black text-white uppercase tracking-wider flex items-center gap-2">
-                Multijoueur Réseau Local
+                Multijoueur Même Réseau & En Ligne
                 <span className="px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 text-[10px] font-normal border border-cyan-500/40">
-                  LAN 2 - 4 Joueurs
+                  {isP2P ? '⚡ P2P Direct' : (netplayService.mode === 'ws' ? 'LAN Local' : 'P2P WebRTC')}
                 </span>
               </h2>
-              <p className="text-[11px] text-neutral-400">Jouez ensemble sur le même réseau Wi-Fi</p>
+              <p className="text-[11px] text-neutral-400">Jouez ensemble sur le même réseau Wi-Fi ou à distance en ligne</p>
             </div>
           </div>
           
@@ -241,24 +262,34 @@ export function NetplayModal({
               </div>
 
               {/* Info Réseau Wi-Fi / Cloud */}
-              {lanInfo?.lanUrl && (
-                <div className="p-2.5 rounded-xl bg-neutral-900 border border-cyan-500/20 flex items-center justify-between text-xs">
-                  <div className="flex items-center gap-2">
-                    <Smartphone className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
-                    <div>
-                      <span className="text-[10px] text-cyan-300 font-bold uppercase block">Accès Mobile (Même Wi-Fi) :</span>
-                      <span className="text-xs font-mono text-white select-all">{lanInfo.lanUrl}</span>
-                    </div>
+              <div className="p-2.5 rounded-xl bg-neutral-900 border border-cyan-500/30 flex items-center justify-between text-xs">
+                <div className="flex items-center gap-2 min-w-0">
+                  <Smartphone className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+                  <div className="min-w-0">
+                    <span className="text-[10px] text-cyan-300 font-bold uppercase block truncate">
+                      {lanInfo?.lanUrl ? 'Accès Mobile (Même Wi-Fi LAN) :' : 'Lien de partage (Même Wi-Fi & Web) :'}
+                    </span>
+                    <span className="text-xs font-mono text-white select-all truncate block">{shareRoomUrl}</span>
                   </div>
+                </div>
+                <div className="flex items-center gap-1.5 shrink-0">
                   <button
-                    onClick={() => handleCopyCode(lanInfo.lanUrl)}
-                    className="p-1 rounded bg-neutral-800 hover:bg-neutral-700 text-cyan-300 transition-colors"
-                    title="Copier l'adresse"
+                    onClick={() => handleCopyCode(shareRoomUrl)}
+                    className="p-1 rounded bg-neutral-800 hover:bg-neutral-700 text-cyan-300 transition-colors flex items-center gap-1 text-[10px]"
+                    title="Copier le lien"
                   >
-                    <Copy className="w-3.5 h-3.5" />
+                    {copiedCode ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                    <span className="hidden xs:inline">Copier</span>
+                  </button>
+                  <button
+                    onClick={() => setShowQrModal(true)}
+                    className="p-1 rounded bg-neutral-800 hover:bg-neutral-700 text-cyan-300 transition-colors"
+                    title="Afficher le QR Code"
+                  >
+                    <QrCode className="w-3.5 h-3.5" />
                   </button>
                 </div>
-              )}
+              </div>
 
               {/* Grille des Slots Joueurs (2 à 4 Joueurs) */}
               <div className="pt-2 border-t border-neutral-800">
@@ -401,27 +432,37 @@ export function NetplayModal({
                     </span>
                   </div>
 
-                  {lanInfo?.lanUrl && (
-                    <div className="p-3 rounded-xl bg-cyan-950/30 border border-cyan-500/30 flex items-center justify-between text-xs">
-                      <div className="flex items-center gap-2">
-                        <Smartphone className="w-4 h-4 text-cyan-400 shrink-0" />
-                        <div>
-                          <span className="text-[10px] text-cyan-300 font-bold uppercase block">Accès mobile sur le même Wi-Fi :</span>
-                          <span className="text-xs font-mono text-white select-all">{lanInfo.lanUrl}</span>
-                        </div>
+                  <div className="p-3 rounded-xl bg-cyan-950/30 border border-cyan-500/30 flex items-center justify-between text-xs">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <Smartphone className="w-4 h-4 text-cyan-400 shrink-0" />
+                      <div className="min-w-0">
+                        <span className="text-[10px] text-cyan-300 font-bold uppercase block truncate">
+                          {lanInfo?.lanUrl ? 'Accès mobile sur le même Wi-Fi :' : 'Adresse du salon (Même Wi-Fi & Web) :'}
+                        </span>
+                        <span className="text-xs font-mono text-white select-all truncate block">{shareBaseUrl}</span>
                       </div>
+                    </div>
+                    <div className="flex items-center gap-1.5 shrink-0">
                       <button
-                        onClick={() => handleCopyCode(lanInfo.lanUrl)}
-                        className="p-1.5 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-cyan-300 transition-colors"
+                        onClick={() => handleCopyCode(shareBaseUrl)}
+                        className="p-1.5 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-cyan-300 transition-colors flex items-center gap-1 text-[11px]"
                         title="Copier l'adresse"
                       >
                         <Copy className="w-3.5 h-3.5" />
+                        <span className="hidden xs:inline">Copier</span>
+                      </button>
+                      <button
+                        onClick={() => setShowQrModal(true)}
+                        className="p-1.5 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-cyan-300 transition-colors"
+                        title="Afficher le QR Code"
+                      >
+                        <QrCode className="w-3.5 h-3.5" />
                       </button>
                     </div>
-                  )}
+                  </div>
 
                   <p className="text-[11px] text-neutral-400 leading-relaxed">
-                    Une fois le salon créé, vos amis sur le même réseau Wi-Fi / LAN pourront se joindre à vous en entrant votre code ou depuis la liste des salons locaux.
+                    Une fois le salon créé, vos amis sur le même réseau Wi-Fi ou à distance pourront se joindre à vous en entrant votre code ou en scannant le QR code.
                   </p>
 
                   <button
@@ -527,6 +568,52 @@ export function NetplayModal({
                   </div>
                 </div>
               )}
+            </div>
+          </div>
+        )}
+
+        {/* Modal QR Code Popup pour rejoindre sur mobile ou même Wi-Fi */}
+        {showQrModal && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-in fade-in">
+            <div className="relative p-6 bg-neutral-900 border border-cyan-500/50 rounded-2xl flex flex-col items-center gap-4 shadow-2xl max-w-xs text-center w-full">
+              <div className="flex items-center justify-between w-full">
+                <span className="text-xs font-black uppercase text-cyan-300 tracking-wider flex items-center gap-1.5">
+                  <QrCode className="w-4 h-4 text-cyan-400" />
+                  Scanner pour rejoindre
+                </span>
+                <button
+                  onClick={() => setShowQrModal(false)}
+                  className="p-1 rounded text-neutral-400 hover:text-white hover:bg-neutral-800 transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <p className="text-[11px] text-neutral-300 leading-snug">
+                Pointez la caméra de votre smartphone sur le même Wi-Fi pour vous connecter directement.
+              </p>
+
+              <div className="p-3 bg-white rounded-xl shadow-lg border border-neutral-200">
+                <img
+                  src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(shareRoomUrl)}`}
+                  alt="QR Code Netplay"
+                  className="w-44 h-44 object-contain"
+                />
+              </div>
+
+              <div className="w-full bg-neutral-950 p-2.5 rounded-xl border border-neutral-800 text-[11px] font-mono text-neutral-300 break-all select-all">
+                {shareRoomUrl}
+              </div>
+
+              <button
+                onClick={() => {
+                  handleCopyCode(shareRoomUrl);
+                  setShowQrModal(false);
+                }}
+                className="w-full py-2.5 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-black font-bold rounded-xl text-xs uppercase tracking-wider transition-all shadow-md shadow-cyan-500/20"
+              >
+                Copier le lien & Fermer
+              </button>
             </div>
           </div>
         )}

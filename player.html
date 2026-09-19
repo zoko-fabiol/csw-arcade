@@ -360,6 +360,8 @@
     // Parsing des paramètres passés par CSW-Arcade
     const params = new URLSearchParams(window.location.search);
     const rawGame = params.get('game') || 'androdunos.zip';
+    let assignedPlayerIndex = parseInt(params.get('playerIndex') ?? '0', 10);
+    const isNetplay = params.get('netplay') === '1';
 
     let activeSettings = {};
     try {
@@ -407,31 +409,55 @@
       const p1 = controls?.p1 || {};
       const p2 = controls?.p2 || {};
 
+      const p1Config = {
+        4: { value: getKeyCode(p1.up, 87), value2: "DPAD_UP" },      // W
+        5: { value: getKeyCode(p1.down, 83), value2: "DPAD_DOWN" },    // S
+        6: { value: getKeyCode(p1.left, 65), value2: "DPAD_LEFT" },    // A
+        7: { value: getKeyCode(p1.right, 68), value2: "DPAD_RIGHT" },  // D
+        0: { value: getKeyCode(p1.a, 74), value2: "BUTTON_2" },        // J -> Neo Geo Bouton A
+        8: { value: getKeyCode(p1.b, 75), value2: "BUTTON_1" },        // K -> Neo Geo Bouton B
+        1: { value: getKeyCode(p1.c, 85), value2: "BUTTON_4" },        // U -> Neo Geo Bouton C
+        9: { value: getKeyCode(p1.d, 73), value2: "BUTTON_3" },        // I -> Neo Geo Bouton D
+        2: { value: getKeyCode(p1.coin, 53), value2: "SELECT" },       // 5 -> Coin / Crédit
+        3: { value: getKeyCode(p1.start, 49), value2: "START" }        // 1 -> Start
+      };
+
+      const p2Config = {
+        4: { value: getKeyCode(p2.up, 38), value2: "DPAD_UP" },        // Flèche Haut
+        5: { value: getKeyCode(p2.down, 40), value2: "DPAD_DOWN" },    // Flèche Bas
+        6: { value: getKeyCode(p2.left, 37), value2: "DPAD_LEFT" },    // Flèche Gauche
+        7: { value: getKeyCode(p2.right, 39), value2: "DPAD_RIGHT" },  // Flèche Droite
+        0: { value: getKeyCode(p2.a, 100), value2: "BUTTON_2" },       // Numpad 4 -> Bouton A
+        8: { value: getKeyCode(p2.b, 101), value2: "BUTTON_1" },       // Numpad 5 -> Bouton B
+        1: { value: getKeyCode(p2.c, 103), value2: "BUTTON_4" },       // Numpad 7 -> Bouton C
+        9: { value: getKeyCode(p2.d, 104), value2: "BUTTON_3" },       // Numpad 8 -> Bouton D
+        2: { value: getKeyCode(p2.coin, 54), value2: "SELECT" },       // 6 -> Coin
+        3: { value: getKeyCode(p2.start, 50), value2: "START" }        // 2 -> Start
+      };
+
+      if (isNetplay) {
+        if (assignedPlayerIndex === 1) {
+          // Invité : touches configurées sur Port 1 uniquement, Port 0 réservé aux inputs réseau
+          return {
+            0: {},
+            1: p1Config,
+            2: {},
+            3: {}
+          };
+        } else {
+          // Hôte : touches configurées sur Port 0 uniquement, Port 1 réservé aux inputs réseau
+          return {
+            0: p1Config,
+            1: {},
+            2: {},
+            3: {}
+          };
+        }
+      }
+
       return {
-        0: {
-          4: { value: getKeyCode(p1.up, 87), value2: "DPAD_UP" },      // W
-          5: { value: getKeyCode(p1.down, 83), value2: "DPAD_DOWN" },    // S
-          6: { value: getKeyCode(p1.left, 65), value2: "DPAD_LEFT" },    // A
-          7: { value: getKeyCode(p1.right, 68), value2: "DPAD_RIGHT" },  // D
-          0: { value: getKeyCode(p1.a, 74), value2: "BUTTON_2" },        // J -> Neo Geo Bouton A
-          8: { value: getKeyCode(p1.b, 75), value2: "BUTTON_1" },        // K -> Neo Geo Bouton B
-          1: { value: getKeyCode(p1.c, 85), value2: "BUTTON_4" },        // U -> Neo Geo Bouton C
-          9: { value: getKeyCode(p1.d, 73), value2: "BUTTON_3" },        // I -> Neo Geo Bouton D
-          2: { value: getKeyCode(p1.coin, 53), value2: "SELECT" },       // 5 -> Coin / Crédit
-          3: { value: getKeyCode(p1.start, 49), value2: "START" }        // 1 -> Start
-        },
-        1: {
-          4: { value: getKeyCode(p2.up, 38), value2: "DPAD_UP" },        // Flèche Haut
-          5: { value: getKeyCode(p2.down, 40), value2: "DPAD_DOWN" },    // Flèche Bas
-          6: { value: getKeyCode(p2.left, 37), value2: "DPAD_LEFT" },    // Flèche Gauche
-          7: { value: getKeyCode(p2.right, 39), value2: "DPAD_RIGHT" },  // Flèche Droite
-          0: { value: getKeyCode(p2.a, 100), value2: "BUTTON_2" },       // Numpad 4 -> Bouton A
-          8: { value: getKeyCode(p2.b, 101), value2: "BUTTON_1" },       // Numpad 5 -> Bouton B
-          1: { value: getKeyCode(p2.c, 103), value2: "BUTTON_4" },       // Numpad 7 -> Bouton C
-          9: { value: getKeyCode(p2.d, 104), value2: "BUTTON_3" },       // Numpad 8 -> Bouton D
-          2: { value: getKeyCode(p2.coin, 54), value2: "SELECT" },       // 6 -> Coin
-          3: { value: getKeyCode(p2.start, 50), value2: "START" }        // 2 -> Start
-        },
+        0: p1Config,
+        1: p2Config,
         2: {},
         3: {}
       };
@@ -486,12 +512,26 @@
       const p1 = controls?.p1 || {};
       const p2 = controls?.p2 || {};
 
+      if (isNetplay) {
+        // En mode Netplay : mapper les touches uniquement vers le port assigné (J1 = 0, J2 = 1)
+        const mySlot = assignedPlayerIndex > 0 ? assignedPlayerIndex : 0;
+        for (const [action, btnId] of Object.entries(ACTION_TO_RETROPAD)) {
+          if (p1[action]) {
+            keyToInputMap[p1[action]] = { player: mySlot, buttonId: btnId };
+          }
+        }
+        return;
+      }
+
+      const localSlot = assignedPlayerIndex > 0 ? assignedPlayerIndex : 0;
+      const otherSlot = localSlot === 0 ? 1 : 0;
+
       for (const [action, btnId] of Object.entries(ACTION_TO_RETROPAD)) {
         if (p1[action]) {
-          keyToInputMap[p1[action]] = { player: 0, buttonId: btnId };
+          keyToInputMap[p1[action]] = { player: localSlot, buttonId: btnId };
         }
         if (p2[action]) {
-          keyToInputMap[p2[action]] = { player: 1, buttonId: btnId };
+          keyToInputMap[p2[action]] = { player: otherSlot, buttonId: btnId };
         }
       }
     }
@@ -508,6 +548,14 @@
       const binding = keyToInputMap[code];
       if (binding) {
         dispatchDirectInput(binding.player, binding.buttonId, isDown);
+        if (window.parent && window.parent !== window) {
+          window.parent.postMessage({
+            type: 'LOCAL_INPUT',
+            playerIndex: binding.player,
+            buttonId: binding.buttonId,
+            isPressed: isDown
+          }, '*');
+        }
         return true;
       }
       return false;
@@ -546,6 +594,14 @@
             if (prev !== isPressed) {
               lastGamepadState[playerIdx][btnId] = isPressed;
               dispatchDirectInput(playerIdx, btnId, isPressed);
+              if (window.parent && window.parent !== window) {
+                window.parent.postMessage({
+                  type: 'LOCAL_INPUT',
+                  playerIndex: playerIdx,
+                  buttonId: btnId,
+                  isPressed: isPressed
+                }, '*');
+              }
             }
           };
 
@@ -581,8 +637,15 @@
           checkBtn(3, !!buttons[startIdx]?.pressed || !!buttons[9]?.pressed); // Start
         };
 
-        if (p1Gp) processPad(p1Gp, 0);
-        if (p2Gp && p2Idx !== p1Idx) processPad(p2Gp, 1);
+        if (isNetplay) {
+          const mySlot = assignedPlayerIndex > 0 ? assignedPlayerIndex : 0;
+          if (p1Gp) processPad(p1Gp, mySlot);
+        } else {
+          const targetLocalSlot = assignedPlayerIndex > 0 ? assignedPlayerIndex : 0;
+          const targetOtherSlot = targetLocalSlot === 0 ? 1 : 0;
+          if (p1Gp) processPad(p1Gp, targetLocalSlot);
+          if (p2Gp && p2Idx !== p1Idx) processPad(p2Gp, targetOtherSlot);
+        }
       }
 
       requestAnimationFrame(pollGamepadsLoop);
@@ -990,6 +1053,21 @@
     function startEmulatorJS() {
       const initialVol = activeSettings.audio?.muted ? 0 : ((activeSettings.audio?.volume ?? 85) / 100);
 
+      // Optimisation basse consommation & faible latence pour Canvas GPU mobile
+      const _origGetContext = HTMLCanvasElement.prototype.getContext;
+      HTMLCanvasElement.prototype.getContext = function(type, attributes) {
+        if (type === 'webgl' || type === 'webgl2' || type === 'experimental-webgl') {
+          attributes = Object.assign({}, attributes, {
+            powerPreference: 'low-power',
+            desynchronized: true,
+            alpha: false,
+            antialias: false,
+            preserveDrawingBuffer: false
+          });
+        }
+        return _origGetContext.call(this, type, attributes);
+      };
+
       // 1. Interception transparente de fetch pour servir romBytes et neogeoBytes directement en mémoire
       const _origFetch = window.fetch;
       window.fetch = async function(input, init) {
@@ -1099,7 +1177,7 @@
       window.EJS_biosUrl = 'neogeo.zip';
       window.EJS_gameParentUrl = 'neogeo.zip';
       window.EJS_dontExtractBIOS = true;
-      window.EJS_pathtodata = 'https://cdn.emulatorjs.org/stable/data/';
+      window.EJS_pathtodata = 'emulatorjs/';
       window.EJS_startOnLoaded = true;
       window.EJS_volume = initialVol;
       window.EJS_color = '#00f0ff';
@@ -1297,15 +1375,132 @@
         if (event.data.type === 'NETPLAY_INPUT') {
           dispatchDirectInput(event.data.playerIndex ?? 1, event.data.buttonId, event.data.isPressed);
         }
+        if (event.data.type === 'GET_STATE') {
+          try {
+            if (window.EJS_emulator?.gameManager?.getState) {
+              const res = window.EJS_emulator.gameManager.getState();
+              Promise.resolve(res).then(stateBytes => {
+                if (window.parent && stateBytes && (stateBytes instanceof Uint8Array || stateBytes.buffer)) {
+                  const u8 = stateBytes instanceof Uint8Array ? stateBytes : new Uint8Array(stateBytes);
+                  if (!event.data.isHeartbeat) {
+                    console.log('[Player] Savestate extrait par l\'hôte :', u8.byteLength, 'octets.');
+                  }
+                  let binary = '';
+                  const len = u8.byteLength;
+                  const chunkSize = 32768;
+                  for (let i = 0; i < len; i += chunkSize) {
+                    const chunk = u8.subarray(i, Math.min(i + chunkSize, len));
+                    binary += String.fromCharCode.apply(null, chunk);
+                  }
+                  const base64 = btoa(binary);
+                  window.parent.postMessage({
+                    type: 'STATE_DATA',
+                    stateBase64: base64,
+                    stateSize: u8.byteLength,
+                    isHeartbeat: !!event.data.isHeartbeat,
+                    requestId: event.data.requestId
+                  }, '*');
+                }
+              }).catch(e => console.warn('[Player] Erreur async getState:', e));
+            }
+          } catch(err) {
+            console.warn('[Player] Erreur capture state:', err);
+          }
+        }
+        if (event.data.type === 'LOAD_STATE') {
+          try {
+            let uint8 = null;
+            if (event.data.stateBase64) {
+              if (!event.data.isHeartbeat) {
+                console.log('[Player] Décodage du savestate Base64 reçu de l\'hôte...');
+              }
+              const binary = atob(event.data.stateBase64);
+              const len = binary.length;
+              uint8 = new Uint8Array(len);
+              for (let i = 0; i < len; i++) {
+                uint8[i] = binary.charCodeAt(i);
+              }
+            } else if (event.data.state instanceof Uint8Array) {
+              uint8 = event.data.state;
+            } else if (event.data.state && typeof event.data.state === 'object') {
+              uint8 = new Uint8Array(Object.values(event.data.state));
+            }
+
+            if (uint8 && window.EJS_emulator?.gameManager?.loadState) {
+              window.EJS_emulator.gameManager.loadState(uint8);
+              if (!event.data.isHeartbeat) {
+                console.log('[Player] ✓ Savestate initial chargé avec succès ! État 100% synchronisé avec l\'hôte.');
+                if (typeof window.EJS_emulator.play === 'function') window.EJS_emulator.play();
+              }
+            }
+          } catch(err) {
+            console.warn('[Player] Erreur restauration savestate:', err);
+          }
+        }
+        if (event.data.type === 'SET_PLAYER_INDEX') {
+          assignedPlayerIndex = event.data.playerIndex ?? 0;
+          rebuildKeyMap(activeSettings.controls);
+          console.log(`[Player] Index joueur assigné mis à jour: J${assignedPlayerIndex + 1}`);
+        }
+        if (event.data.type === 'APP_VISIBILITY') {
+          const isVis = !!event.data.visible;
+          if (window.EJS_emulator) {
+            try {
+              if (isVis) {
+                if (typeof window.EJS_emulator.play === 'function') window.EJS_emulator.play();
+                if (window.EJS_emulator.audioContext && typeof window.EJS_emulator.audioContext.resume === 'function') {
+                  window.EJS_emulator.audioContext.resume();
+                }
+              } else {
+                if (typeof window.EJS_emulator.pause === 'function') window.EJS_emulator.pause();
+                if (window.EJS_emulator.audioContext && typeof window.EJS_emulator.audioContext.suspend === 'function') {
+                  window.EJS_emulator.audioContext.suspend();
+                }
+              }
+            } catch(e) {}
+          }
+        }
+      });
+
+      // Déverrouillage automatique de l'audio mobile dès le premier toucher
+      const unlockAudio = () => {
+        try {
+          if (window.EJS_emulator?.audioContext && window.EJS_emulator.audioContext.state === 'suspended') {
+            window.EJS_emulator.audioContext.resume();
+          }
+        } catch(e) {}
+        window.removeEventListener('touchstart', unlockAudio);
+        window.removeEventListener('click', unlockAudio);
+      };
+      window.addEventListener('touchstart', unlockAudio, { passive: true });
+      window.addEventListener('click', unlockAudio, { passive: true });
+
+      // Mise en veille instantanée dès que l'écran du smartphone est verrouillé (0% batterie en veille)
+      document.addEventListener('visibilitychange', () => {
+        if (document.hidden) {
+          try {
+            if (typeof window.EJS_emulator?.pause === 'function') window.EJS_emulator.pause();
+            if (window.EJS_emulator?.audioContext && typeof window.EJS_emulator.audioContext.suspend === 'function') {
+              window.EJS_emulator.audioContext.suspend();
+            }
+          } catch(e) {}
+        } else {
+          try {
+            if (typeof window.EJS_emulator?.play === 'function') window.EJS_emulator.play();
+            if (window.EJS_emulator?.audioContext && typeof window.EJS_emulator.audioContext.resume === 'function') {
+              window.EJS_emulator.audioContext.resume();
+            }
+          } catch(e) {}
+        }
       });
 
       const s = document.createElement('script');
-      s.src = 'https://cdn.emulatorjs.org/stable/data/loader.js';
+      s.src = 'emulatorjs/loader.js';
       s.async = true;
       s.onerror = (e) => {
-        console.error('[Player] Erreur chargement loader.js', e);
+        console.error('[Player] Erreur chargement local loader.js', e);
         errorMsg.style.display = 'block';
-        errorMsg.innerText = 'Erreur: Impossible de charger le moteur WebAssembly.';
+        errorMsg.innerText = 'Erreur: Impossible de charger le moteur WebAssembly local (emulatorjs/loader.js).';
       };
       document.body.appendChild(s);
     }

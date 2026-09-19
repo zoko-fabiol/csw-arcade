@@ -17,7 +17,7 @@ class EmulatorLoaderService {
 
     return new Promise((resolve, reject) => {
       const script = document.createElement('script');
-      script.src = 'https://cdn.emulatorjs.org/stable/data/loader.js';
+      script.src = '/emulatorjs/loader.js';
       script.async = true;
       script.onload = () => {
         this.isScriptLoaded = true;

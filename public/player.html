@@ -1177,7 +1177,7 @@
       window.EJS_biosUrl = 'neogeo.zip';
       window.EJS_gameParentUrl = 'neogeo.zip';
       window.EJS_dontExtractBIOS = true;
-      window.EJS_pathtodata = 'https://cdn.emulatorjs.org/stable/data/';
+      window.EJS_pathtodata = 'emulatorjs/';
       window.EJS_startOnLoaded = true;
       window.EJS_volume = initialVol;
       window.EJS_color = '#00f0ff';
@@ -1382,7 +1382,9 @@
               Promise.resolve(res).then(stateBytes => {
                 if (window.parent && stateBytes && (stateBytes instanceof Uint8Array || stateBytes.buffer)) {
                   const u8 = stateBytes instanceof Uint8Array ? stateBytes : new Uint8Array(stateBytes);
-                  console.log('[Player] Savestate extrait par l\'hôte :', u8.byteLength, 'octets. Conversion Base64...');
+                  if (!event.data.isHeartbeat) {
+                    console.log('[Player] Savestate extrait par l\'hôte :', u8.byteLength, 'octets.');
+                  }
                   let binary = '';
                   const len = u8.byteLength;
                   const chunkSize = 32768;
@@ -1391,11 +1393,11 @@
                     binary += String.fromCharCode.apply(null, chunk);
                   }
                   const base64 = btoa(binary);
-                  console.log('[Player] Savestate Base64 généré (' + base64.length + ' chars). Transmission au parent...');
                   window.parent.postMessage({
                     type: 'STATE_DATA',
                     stateBase64: base64,
                     stateSize: u8.byteLength,
+                    isHeartbeat: !!event.data.isHeartbeat,
                     requestId: event.data.requestId
                   }, '*');
                 }
@@ -1409,7 +1411,9 @@
           try {
             let uint8 = null;
             if (event.data.stateBase64) {
-              console.log('[Player] Décodage du savestate Base64 reçu de l\'hôte...');
+              if (!event.data.isHeartbeat) {
+                console.log('[Player] Décodage du savestate Base64 reçu de l\'hôte...');
+              }
               const binary = atob(event.data.stateBase64);
               const len = binary.length;
               uint8 = new Uint8Array(len);
@@ -1423,9 +1427,11 @@
             }
 
             if (uint8 && window.EJS_emulator?.gameManager?.loadState) {
-              console.log('[Player] Injection et synchronisation du savestate distant (' + uint8.byteLength + ' octets)...');
               window.EJS_emulator.gameManager.loadState(uint8);
-              console.log('[Player] ✓ Savestate chargé avec succès ! État 100% synchronisé avec l\'hôte.');
+              if (!event.data.isHeartbeat) {
+                console.log('[Player] ✓ Savestate initial chargé avec succès ! État 100% synchronisé avec l\'hôte.');
+                if (typeof window.EJS_emulator.play === 'function') window.EJS_emulator.play();
+              }
             }
           } catch(err) {
             console.warn('[Player] Erreur restauration savestate:', err);
@@ -1489,14 +1495,12 @@
       });
 
       const s = document.createElement('script');
-      s.src = 'https://cdn.emulatorjs.org/stable/data/loader.js';
+      s.src = 'emulatorjs/loader.js';
       s.async = true;
       s.onerror = (e) => {
-        console.error('[Player] Erreur chargement loader.js', e);
+        console.error('[Player] Erreur chargement local loader.js', e);
         errorMsg.style.display = 'block';
-        errorMsg.innerText = navigator.onLine
-          ? 'Erreur: Impossible de charger le moteur WebAssembly.'
-          : 'Mode Hors-Ligne: Veuillez lancer ce jeu une première fois avec connexion pour activer le cache hors-ligne permanent.';
+        errorMsg.innerText = 'Erreur: Impossible de charger le moteur WebAssembly local (emulatorjs/loader.js).';
       };
       document.body.appendChild(s);
     }

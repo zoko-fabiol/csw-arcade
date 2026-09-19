@@ -1,4 +1,4 @@
-// Service universel pour le multijoueur CSW-Arcade (Hybride WebSocket LAN & Firebase Cloud)
+// Service universel pour le multijoueur CSW-Arcade (Hybride WebSocket LAN & WebRTC P2P / Firebase Cloud)
 import { db } from '../config/firebase';
 import { 
   collection, 
@@ -8,8 +8,18 @@ import {
   updateDoc, 
   onSnapshot, 
   getDocs, 
-  deleteDoc 
+  deleteDoc,
+  addDoc
 } from 'firebase/firestore';
+
+const RTC_CONFIG = {
+  iceServers: [
+    { urls: 'stun:stun.l.google.com:19302' },
+    { urls: 'stun:stun1.l.google.com:19302' },
+    { urls: 'stun:stun2.l.google.com:19302' }
+  ],
+  iceCandidatePoolSize: 10
+};
 
 class NetplayService {
   constructor() {
@@ -24,11 +34,19 @@ class NetplayService {
     this.firestoreUnsub = null;
     this.isConnecting = false;
 
+    // --- WebRTC P2P DataChannel ---
+    this.pc = null;
+    this.webrtcChannel = null;
+    this.webrtcUnsubs = [];
+    this.webrtcPingInterval = null;
+    this.isP2PConnected = false;
+
     // --- REDONDANCE N-3 & FLUX GGPO ---
     this.localSeq = 0;
     this.currentFrame = 0;
     this.inputHistory = []; // [ { seq, frame, buttonId, isPressed, playerIndex } ]
     this.lastRemoteSeq = new Map(); // playerIndex -> last received seq
+    this.incomingStateChunks = new Map(); // transferId -> { chunks, receivedCount, totalChunks, isHeartbeat }
   }
 
   // Système d'événements
@@ -64,11 +82,11 @@ class NetplayService {
     // Détection immédiate Netlify : Netlify ne gère pas les WebSockets persistants, bascule directe Firebase
     const isNetlify = typeof window !== 'undefined' && (
       window.location.hostname.includes('netlify.app') || 
-      window.location.protocol === 'https:' && !window.location.hostname.match(/^(localhost|127\.0\.0\.1|192\.168\.|10\.)/)
+      (window.location.protocol === 'https:' && !window.location.hostname.match(/^(localhost|127\.0\.0\.1|192\.168\.|10\.)/))
     );
 
     if (isNetlify) {
-      console.log('[Netplay] Environnement Cloud / Netlify détecté : activation du mode Firebase Cloud');
+      console.log('[Netplay] Environnement Cloud / Netlify détecté : activation du mode WebRTC + Firebase Cloud');
       this.mode = 'firebase';
       this.emit('connected');
       return Promise.resolve();
@@ -79,7 +97,7 @@ class NetplayService {
       const timeout = setTimeout(() => {
         if (!resolved) {
           resolved = true;
-          console.log('[Netplay] Timeout WebSocket LAN, basculement vers Firebase Cloud...');
+          console.log('[Netplay] Timeout WebSocket LAN, basculement vers WebRTC + Firebase Cloud...');
           this.mode = 'firebase';
           this.emit('connected');
           resolve();
@@ -120,11 +138,11 @@ class NetplayService {
           this.emit('disconnected');
         };
 
-        this.ws.onerror = (err) => {
+        this.ws.onerror = () => {
           if (!resolved) {
             resolved = true;
             clearTimeout(timeout);
-            console.log('[Netplay] Erreur WebSocket LAN, basculement vers Firebase Cloud');
+            console.log('[Netplay] Erreur WebSocket LAN, basculement vers WebRTC + Firebase Cloud');
             this.mode = 'firebase';
             this.emit('connected');
             resolve();
@@ -141,7 +159,10 @@ class NetplayService {
     });
   }
 
+  // Traitement centralisé des messages (reçus soit via WebSocket LAN, soit via WebRTC DataChannel)
   handleMessage(data) {
+    if (!data || !data.type) return;
+
     switch(data.type) {
       case 'ROOM_CREATED': {
         this.currentRoom = {
@@ -176,16 +197,19 @@ class NetplayService {
         break;
       }
 
+      case 'SEND_INPUT':
       case 'REMOTE_INPUT': {
         const pIdx = data.playerIndex ?? 1;
+        // Si c'est notre propre input, on ne le rejoue pas
+        if (pIdx === this.myPlayerIndex) return;
+
         const incomingSeq = data.seq || 0;
         const lastSeq = this.lastRemoteSeq.get(pIdx) || 0;
 
         // Auto-réparation N-3 en cas de perte de paquets (gap de séquence > 1)
         if (incomingSeq > lastSeq + 1 && Array.isArray(data.history) && data.history.length > 0) {
           const missedCount = incomingSeq - (lastSeq + 1);
-          console.log(`[Netplay N-3] ${missedCount} paquet(s) manquant(s) détecté(s). Restauration via redondance N-3...`);
-          // Réinjecter les inputs manquants dans l'ordre chronologique
+          console.log(`[Netplay N-3] ${missedCount} paquet(s) manquant(s) pour J${pIdx + 1}. Restauration via N-3...`);
           for (const item of data.history) {
             if (item && item.seq > lastSeq && item.seq < incomingSeq) {
               this.emit('remote_input', {
@@ -204,7 +228,14 @@ class NetplayService {
         if (incomingSeq > 0) {
           this.lastRemoteSeq.set(pIdx, Math.max(lastSeq, incomingSeq));
         }
-        this.emit('remote_input', data);
+
+        this.emit('remote_input', {
+          playerIndex: pIdx,
+          buttonId: data.buttonId,
+          isPressed: !!data.isPressed,
+          frame: data.frame || 0,
+          seq: incomingSeq
+        });
         break;
       }
 
@@ -213,8 +244,45 @@ class NetplayService {
         break;
       }
 
+      case 'SEND_STATE':
       case 'SYNC_STATE': {
         this.emit('sync_state', data);
+        break;
+      }
+
+      case 'STATE_CHUNK': {
+        const { transferId, chunkIndex, totalChunks, chunk, stateSize, isHeartbeat, time } = data;
+        if (!this.incomingStateChunks.has(transferId)) {
+          this.incomingStateChunks.set(transferId, {
+            chunks: new Array(totalChunks),
+            receivedCount: 0,
+            totalChunks,
+            stateSize,
+            isHeartbeat,
+            time
+          });
+        }
+        const transfer = this.incomingStateChunks.get(transferId);
+        if (transfer && !transfer.chunks[chunkIndex]) {
+          transfer.chunks[chunkIndex] = chunk;
+          transfer.receivedCount++;
+        }
+
+        if (transfer && transfer.receivedCount === transfer.totalChunks) {
+          const fullBase64 = transfer.chunks.join('');
+          this.incomingStateChunks.delete(transferId);
+          this.emit('sync_state', {
+            stateBase64: fullBase64,
+            stateSize: transfer.stateSize,
+            isHeartbeat: transfer.isHeartbeat,
+            time: transfer.time
+          });
+        }
+        break;
+      }
+
+      case 'PEER_LEFT': {
+        this.emit('peer_left', data);
         break;
       }
 
@@ -222,10 +290,11 @@ class NetplayService {
         this.currentRoom = null;
         this.myPlayerIndex = -1;
         this.myRole = null;
-        this.emit('host_disconnected', data.message);
+        this.emit('host_disconnected', data.message || "L'hôte a quitté la partie.");
         break;
       }
 
+      case 'START_GAME':
       case 'GAME_STARTED_BY_HOST': {
         this.emit('game_started_by_host', data);
         break;
@@ -243,6 +312,203 @@ class NetplayService {
         }
         break;
       }
+    }
+  }
+
+  // --- GESTION DU CANAL WEBRTC DATACHANNEL P2P ---
+  closeWebRTC() {
+    if (this.webrtcPingInterval) {
+      clearInterval(this.webrtcPingInterval);
+      this.webrtcPingInterval = null;
+    }
+    if (this.webrtcUnsubs && Array.isArray(this.webrtcUnsubs)) {
+      this.webrtcUnsubs.forEach(u => {
+        try { u(); } catch(e) {}
+      });
+      this.webrtcUnsubs = [];
+    }
+    if (this.webrtcChannel) {
+      try {
+        this.webrtcChannel.onopen = null;
+        this.webrtcChannel.onclose = null;
+        this.webrtcChannel.onerror = null;
+        this.webrtcChannel.onmessage = null;
+        if (this.webrtcChannel.readyState !== 'closed') {
+          this.webrtcChannel.close();
+        }
+      } catch(e) {}
+      this.webrtcChannel = null;
+    }
+    if (this.pc) {
+      try {
+        this.pc.onicecandidate = null;
+        this.pc.onconnectionstatechange = null;
+        this.pc.ondatachannel = null;
+        this.pc.close();
+      } catch(e) {}
+      this.pc = null;
+    }
+    this.isP2PConnected = false;
+  }
+
+  setupDataChannel(dc) {
+    dc.onopen = () => {
+      console.log(`[Netplay WebRTC] ✓ DataChannel '${dc.label}' OUVERT ! Connexion P2P directe active (0 ms latence interne).`);
+      this.isP2PConnected = true;
+      this.emit('p2p_connected');
+
+      // Mesure du RTT P2P
+      if (this.webrtcPingInterval) clearInterval(this.webrtcPingInterval);
+      this.webrtcPingInterval = setInterval(() => {
+        if (dc.readyState === 'open') {
+          try {
+            dc.send(JSON.stringify({ type: 'PING', clientTime: Date.now() }));
+          } catch(e) {}
+        }
+      }, 2000);
+    };
+
+    dc.onclose = () => {
+      console.log(`[Netplay WebRTC] DataChannel '${dc.label}' FERMÉ.`);
+      this.isP2PConnected = false;
+      if (this.webrtcPingInterval) clearInterval(this.webrtcPingInterval);
+      if (this.currentRoom) {
+        this.emit('peer_left', { message: "Connexion P2P fermée ou perdue avec l'autre joueur." });
+      }
+    };
+
+    dc.onerror = (err) => {
+      console.warn('[Netplay WebRTC] Erreur DataChannel:', err);
+    };
+
+    dc.onmessage = (event) => {
+      try {
+        const msg = JSON.parse(event.data);
+        if (msg.type === 'PING') {
+          if (dc.readyState === 'open') {
+            try { dc.send(JSON.stringify({ type: 'PONG', clientTime: msg.clientTime })); } catch(e) {}
+          }
+          return;
+        }
+        if (msg.type === 'PONG') {
+          if (msg.clientTime) {
+            this.ping = Math.max(1, Date.now() - msg.clientTime);
+            this.emit('ping', this.ping);
+          }
+          return;
+        }
+        this.handleMessage(msg);
+      } catch(e) {
+        console.warn('[Netplay WebRTC] Erreur parsing message entrant:', e);
+      }
+    };
+  }
+
+  async setupWebRTCHost(roomRef) {
+    try {
+      this.closeWebRTC();
+      const pc = new RTCPeerConnection(RTC_CONFIG);
+      this.pc = pc;
+
+      // Création du DataChannel bidirectionnel ordonné pour garantir l'ordre des touches et savestates
+      const dc = pc.createDataChannel('csw-arcade-netplay', {
+        ordered: true
+      });
+      this.webrtcChannel = dc;
+      this.setupDataChannel(dc);
+
+      const callerCandidatesCol = collection(roomRef, 'callerCandidates');
+      pc.onicecandidate = (event) => {
+        if (event.candidate) {
+          addDoc(callerCandidatesCol, event.candidate.toJSON()).catch(() => {});
+        }
+      };
+
+      pc.onconnectionstatechange = () => {
+        console.log('[Netplay WebRTC Hôte] ConnectionState:', pc.connectionState);
+      };
+
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+
+      await updateDoc(roomRef, {
+        offer: { type: offer.type, sdp: offer.sdp }
+      });
+
+      // Écoute de l'answer de l'invité
+      const unsubAnswer = onSnapshot(roomRef, (snapshot) => {
+        const d = snapshot.data();
+        if (d?.answer && !pc.currentRemoteDescription) {
+          console.log('[Netplay WebRTC Hôte] Réponse SDP reçue de l\'invité ! Établissement du tunnel...');
+          pc.setRemoteDescription(new RTCSessionDescription(d.answer)).catch(err => {
+            console.warn('[Netplay WebRTC] Erreur remote description hôte:', err);
+          });
+        }
+      });
+      this.webrtcUnsubs.push(unsubAnswer);
+
+      // Écoute des candidats ICE de l'invité
+      const calleeCandidatesCol = collection(roomRef, 'calleeCandidates');
+      const unsubCallee = onSnapshot(calleeCandidatesCol, (snapshot) => {
+        snapshot.docChanges().forEach(async (change) => {
+          if (change.type === 'added') {
+            try {
+              await pc.addIceCandidate(new RTCIceCandidate(change.doc.data()));
+            } catch (e) {}
+          }
+        });
+      });
+      this.webrtcUnsubs.push(unsubCallee);
+    } catch(err) {
+      console.warn('[Netplay WebRTC] Erreur initialisation Hôte:', err);
+    }
+  }
+
+  async setupWebRTCGuest(roomRef, offer) {
+    try {
+      this.closeWebRTC();
+      const pc = new RTCPeerConnection(RTC_CONFIG);
+      this.pc = pc;
+
+      pc.ondatachannel = (event) => {
+        console.log('[Netplay WebRTC Invité] DataChannel capté depuis l\'hôte !');
+        this.webrtcChannel = event.channel;
+        this.setupDataChannel(event.channel);
+      };
+
+      const calleeCandidatesCol = collection(roomRef, 'calleeCandidates');
+      pc.onicecandidate = (event) => {
+        if (event.candidate) {
+          addDoc(calleeCandidatesCol, event.candidate.toJSON()).catch(() => {});
+        }
+      };
+
+      pc.onconnectionstatechange = () => {
+        console.log('[Netplay WebRTC Invité] ConnectionState:', pc.connectionState);
+      };
+
+      await pc.setRemoteDescription(new RTCSessionDescription(offer));
+      const answer = await pc.createAnswer();
+      await pc.setLocalDescription(answer);
+
+      await updateDoc(roomRef, {
+        answer: { type: answer.type, sdp: answer.sdp }
+      });
+
+      // Écoute des candidats ICE de l'hôte
+      const callerCandidatesCol = collection(roomRef, 'callerCandidates');
+      const unsubCaller = onSnapshot(callerCandidatesCol, (snapshot) => {
+        snapshot.docChanges().forEach(async (change) => {
+          if (change.type === 'added') {
+            try {
+              await pc.addIceCandidate(new RTCIceCandidate(change.doc.data()));
+            } catch (e) {}
+          }
+        });
+      });
+      this.webrtcUnsubs.push(unsubCaller);
+    } catch(err) {
+      console.warn('[Netplay WebRTC] Erreur initialisation Invité:', err);
     }
   }
 
@@ -275,7 +541,7 @@ class NetplayService {
   async createRoom({ gameId, gameTitle, maxPlayers = 2, hostName = 'Hôte' }) {
     await this.connect();
 
-    // 1. Tenter le mode WebSocket LAN si disponible
+    // 1. Tenter le mode WebSocket LAN si disponible (serveur local)
     if (this.mode === 'ws' && this.ws && this.ws.readyState === WebSocket.OPEN) {
       try {
         const wsRes = await new Promise((resolve, reject) => {
@@ -299,7 +565,7 @@ class NetplayService {
           }, 3000);
         });
 
-        // Mirrorer immédiatement dans Firebase pour que les amis sur 4G / Netlify puissent aussi rejoindre
+        // Mirrorer immédiatement dans Firebase pour que les amis sur le même Wi-Fi ou à distance puissent se joindre
         try {
           const roomRef = doc(db, 'rooms', wsRes.roomCode);
           await setDoc(roomRef, {
@@ -317,14 +583,29 @@ class NetplayService {
             isLanBridged: true
           });
 
-          // Écouter les joueurs distants qui rejoignent via le Cloud
+          // Setup WebRTC Host pour les connexions directes
+          this.setupWebRTCHost(roomRef);
+
+          // Écouter les joueurs distants
           if (this.firestoreUnsub) this.firestoreUnsub();
+          let lastProcessedInputTime = 0;
+          let lastProcessedStateReq = 0;
+
           this.firestoreUnsub = onSnapshot(roomRef, (snapshot) => {
             if (!snapshot.exists()) return;
             const data = snapshot.data();
-            // Si des inputs arrivent depuis le cloud
-            if (this.myPlayerIndex === 0 && data.lastInput && data.lastInput.playerIndex > 0) {
-              this.emit('remote_input', data.lastInput);
+            // Détection symétrique des inputs
+            if (this.myPlayerIndex === 0 && data.lastInput && data.lastInput.playerIndex > 0 && data.lastInput.time !== lastProcessedInputTime) {
+              lastProcessedInputTime = data.lastInput.time;
+              this.handleMessage({
+                type: 'REMOTE_INPUT',
+                ...data.lastInput
+              });
+            }
+            // Détection demande de savestate
+            if (this.myPlayerIndex === 0 && data.stateRequest && data.stateRequest.time !== lastProcessedStateReq) {
+              lastProcessedStateReq = data.stateRequest.time;
+              this.emit('request_state', data.stateRequest);
             }
           });
         } catch(e) {
@@ -337,7 +618,7 @@ class NetplayService {
       }
     }
 
-    // 2. Mode Firebase Cloud (Netlify / Internet / Secours universel)
+    // 2. Mode Firebase Cloud + WebRTC (Netlify / Internet / Même Wi-Fi sans serveur dédié)
     return this.createFirebaseRoom({ gameId, gameTitle, maxPlayers, hostName });
   }
 
@@ -366,8 +647,14 @@ class NetplayService {
       this.myPlayerIndex = 0;
       this.myRole = 'p1';
 
+      // Initialiser l'hôte WebRTC P2P direct
+      this.setupWebRTCHost(roomRef);
+
       // Écoute en temps réel des changements de joueurs et des inputs
       if (this.firestoreUnsub) this.firestoreUnsub();
+      let lastProcessedInputTime = 0;
+      let lastProcessedStateReq = 0;
+
       this.firestoreUnsub = onSnapshot(roomRef, (snapshot) => {
         if (!snapshot.exists()) {
           this.emit('host_disconnected', 'Le salon a été fermé.');
@@ -377,9 +664,19 @@ class NetplayService {
         this.currentRoom = data;
         this.emit('room_update', data);
 
-        // Détection des inputs distants pour l'hôte
-        if (this.myPlayerIndex === 0 && data.lastInput && data.lastInput.playerIndex > 0) {
-          this.emit('remote_input', data.lastInput);
+        // SYMETRIQUE : Détection des inputs distants pour l'hôte (venant du joueur 2)
+        if (this.myPlayerIndex === 0 && data.lastInput && data.lastInput.playerIndex > 0 && data.lastInput.time !== lastProcessedInputTime) {
+          lastProcessedInputTime = data.lastInput.time;
+          this.handleMessage({
+            type: 'REMOTE_INPUT',
+            ...data.lastInput
+          });
+        }
+
+        // Détection demande de savestate
+        if (this.myPlayerIndex === 0 && data.stateRequest && data.stateRequest.time !== lastProcessedStateReq) {
+          lastProcessedStateReq = data.stateRequest.time;
+          this.emit('request_state', data.stateRequest);
         }
       });
 
@@ -394,7 +691,7 @@ class NetplayService {
       };
 
       this.emit('room_created', resData);
-      console.log(`[Netplay Cloud] Salon ${roomCode} créé avec succès sur Firebase !`);
+      console.log(`[Netplay Cloud] Salon ${roomCode} créé avec succès (WebRTC P2P prêt) !`);
       return resData;
     } catch(err) {
       console.error('[Netplay Cloud] Erreur création salon Firebase:', err);
@@ -407,7 +704,7 @@ class NetplayService {
     await this.connect();
     const cleanCode = roomCode.trim().toUpperCase();
 
-    // 1. Mode WebSocket LAN
+    // 1. Mode WebSocket LAN si serveur local actif
     if (this.mode === 'ws' && this.ws && this.ws.readyState === WebSocket.OPEN) {
       try {
         const wsRes = await new Promise((resolve, reject) => {
@@ -435,26 +732,34 @@ class NetplayService {
             this.off('joined_success', onSuccess);
             this.off('error', onError);
             reject(new Error('Délai d\'attente connexion LAN dépassé.'));
-          }, 3500);
+          }, 2500);
         });
+
+        // Mirroring / écoute Firebase en parallèle pour la synchronisation WebRTC
+        try {
+          const roomRef = doc(db, 'rooms', cleanCode);
+          const snap = await getDoc(roomRef);
+          if (snap.exists()) {
+            const data = snap.data();
+            if (data.offer) {
+              this.setupWebRTCGuest(roomRef, data.offer);
+            }
+          }
+        } catch(e) {}
 
         return wsRes;
       } catch(err) {
-        console.log('[Netplay] Salon non trouvé sur LAN ou timeout, essai immédiat sur Firebase Cloud...');
+        console.log('[Netplay] Salon non trouvé sur LAN ou timeout, essai immédiat sur Firebase Cloud / WebRTC...');
       }
     }
 
-    // 2. Mode Firebase Cloud (Netlify / Internet)
-    return this.joinFirebaseRoom(cleanCode, playerName);
-  }
-
-  async joinFirebaseRoom(cleanCode, playerName = 'Invité') {
+    // 2. Mode Firebase Cloud + WebRTC (Netlify / Internet / Même Wi-Fi)
     try {
       const roomRef = doc(db, 'rooms', cleanCode);
       const snap = await getDoc(roomRef);
 
       if (!snap.exists()) {
-        throw new Error(`Salon "${cleanCode}" introuvable.`);
+        throw new Error(`Le salon ${cleanCode} n'existe pas ou est fermé.`);
       }
 
       const roomData = snap.data();
@@ -486,6 +791,9 @@ class NetplayService {
       this.myRole = role;
 
       if (this.firestoreUnsub) this.firestoreUnsub();
+      let lastProcessedInputTime = 0;
+      let lastProcessedStateSync = 0;
+
       this.firestoreUnsub = onSnapshot(roomRef, (snapshot) => {
         if (!snapshot.exists()) {
           this.emit('host_disconnected', 'Le salon a été fermé.');
@@ -495,11 +803,40 @@ class NetplayService {
         this.currentRoom = data;
         this.emit('room_update', data);
 
-        // Détection de l'événement de lancement par l'hôte
+        // Détection du démarrage du match par l'hôte
         if (data.gameState === 'started') {
           this.emit('game_started_by_host', data);
         }
+
+        // SYMETRIQUE : Si un input arrive depuis le Cloud pour l'invité (venant de l'hôte J1)
+        if (data.lastInput && data.lastInput.playerIndex !== this.myPlayerIndex && data.lastInput.time !== lastProcessedInputTime) {
+          lastProcessedInputTime = data.lastInput.time;
+          this.handleMessage({
+            type: 'REMOTE_INPUT',
+            ...data.lastInput
+          });
+        }
+
+        // Réception du savestate initial envoyé par l'hôte via Firebase
+        if (data.stateSync && data.stateSync.time !== lastProcessedStateSync) {
+          lastProcessedStateSync = data.stateSync.time;
+          this.emit('sync_state', data.stateSync);
+        }
       });
+
+      // Lancement WebRTC Guest
+      if (roomData.offer) {
+        this.setupWebRTCGuest(roomRef, roomData.offer);
+      } else {
+        const unsubOffer = onSnapshot(roomRef, (snapshot) => {
+          const d = snapshot.data();
+          if (d?.offer && !this.pc) {
+            unsubOffer();
+            this.setupWebRTCGuest(roomRef, d.offer);
+          }
+        });
+        this.webrtcUnsubs.push(unsubOffer);
+      }
 
       const resData = {
         roomCode: cleanCode,
@@ -519,7 +856,7 @@ class NetplayService {
     }
   }
 
-  // Envoyer un input (D-pad ou bouton) vers l'hôte ou les autres joueurs avec redondance N-3
+  // Envoyer un input (D-pad ou bouton) vers l'autre joueur avec redondance N-3
   sendInput(buttonId, isPressed, playerIndex = null) {
     const pIdx = (typeof playerIndex === 'number') ? playerIndex : (this.myPlayerIndex >= 0 ? this.myPlayerIndex : 0);
     this.localSeq = (this.localSeq + 1) & 0x7FFFFFFF;
@@ -539,21 +876,31 @@ class NetplayService {
       this.inputHistory.shift();
     }
 
-    // Mode WebSocket LAN
-    if (this.ws && this.ws.readyState === WebSocket.OPEN && this.currentRoom) {
-      this.ws.send(JSON.stringify({
-        type: 'SEND_INPUT',
-        playerIndex: pIdx,
-        buttonId,
-        isPressed: !!isPressed,
-        frame: this.currentFrame,
-        seq: this.localSeq,
-        history: historyPayload
-      }));
+    const payloadObj = {
+      type: 'SEND_INPUT',
+      playerIndex: pIdx,
+      buttonId,
+      isPressed: !!isPressed,
+      frame: this.currentFrame,
+      seq: this.localSeq,
+      history: historyPayload
+    };
+
+    // 1. PRIORITÉ ABSOLUE : WebRTC DataChannel P2P direct (<20ms)
+    if (this.webrtcChannel && this.webrtcChannel.readyState === 'open') {
+      try {
+        this.webrtcChannel.send(JSON.stringify(payloadObj));
+      } catch(e) {}
       return;
     }
 
-    // Mode Firebase Cloud : Envoi rapide avec redondance N-3
+    // 2. Mode WebSocket LAN
+    if (this.ws && this.ws.readyState === WebSocket.OPEN && this.currentRoom) {
+      this.ws.send(JSON.stringify(payloadObj));
+      return;
+    }
+
+    // 3. Fallback Firebase Cloud (Bidirectionnel)
     if (this.currentRoom?.code) {
       try {
         const roomRef = doc(db, 'rooms', this.currentRoom.code);
@@ -574,32 +921,121 @@ class NetplayService {
 
   // Demander la synchronisation de l'état (Guest -> Host)
   requestStateSync() {
+    const payload = {
+      type: 'REQUEST_STATE',
+      fromPlayerIndex: this.myPlayerIndex
+    };
+
+    if (this.webrtcChannel && this.webrtcChannel.readyState === 'open') {
+      try {
+        this.webrtcChannel.send(JSON.stringify(payload));
+        return;
+      } catch(e) {}
+    }
+
     if (this.ws && this.ws.readyState === WebSocket.OPEN && this.currentRoom) {
-      this.ws.send(JSON.stringify({
-        type: 'REQUEST_STATE'
-      }));
+      this.ws.send(JSON.stringify(payload));
+      return;
+    }
+
+    if (this.currentRoom?.code) {
+      try {
+        const roomRef = doc(db, 'rooms', this.currentRoom.code);
+        updateDoc(roomRef, {
+          stateRequest: {
+            fromPlayerIndex: this.myPlayerIndex,
+            time: Date.now()
+          }
+        }).catch(() => {});
+      } catch(e) {}
     }
   }
 
   // Envoyer l'état sérialisé (Host -> Guest)
   sendStateSync(payload, toPlayerIndex = undefined) {
+    const isObj = payload && typeof payload === 'object' && ('stateBase64' in payload);
+    const stateBase64 = isObj ? payload.stateBase64 : (typeof payload === 'string' ? payload : null);
+    const stateSize = isObj ? payload.stateSize : 0;
+    const isHeartbeat = !!(isObj && payload.isHeartbeat);
+    const stateData = !isObj ? payload : null;
+
+    const syncMsg = {
+      type: 'SYNC_STATE',
+      toPlayerIndex,
+      stateBase64,
+      stateSize,
+      stateData,
+      isHeartbeat,
+      time: Date.now()
+    };
+
+    // 1. Envoi direct ultra-rapide via WebRTC DataChannel (avec chunking de sécurité à 32 Ko)
+    if (this.webrtcChannel && this.webrtcChannel.readyState === 'open') {
+      try {
+        if (stateBase64 && stateBase64.length > 32768) {
+          const CHUNK_SIZE = 32768;
+          const totalChunks = Math.ceil(stateBase64.length / CHUNK_SIZE);
+          const transferId = 'sync_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
+          for (let i = 0; i < totalChunks; i++) {
+            const chunk = stateBase64.substring(i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE);
+            this.webrtcChannel.send(JSON.stringify({
+              type: 'STATE_CHUNK',
+              transferId,
+              chunkIndex: i,
+              totalChunks,
+              chunk,
+              stateSize,
+              isHeartbeat,
+              time: syncMsg.time
+            }));
+          }
+        } else {
+          this.webrtcChannel.send(JSON.stringify(syncMsg));
+        }
+        return;
+      } catch(e) {
+        console.warn('[Netplay] Erreur envoi state WebRTC:', e);
+      }
+    }
+
+    // 2. Mode WebSocket LAN
     if (this.ws && this.ws.readyState === WebSocket.OPEN && this.currentRoom) {
-      const isObj = payload && typeof payload === 'object' && ('stateBase64' in payload);
       this.ws.send(JSON.stringify({
         type: 'SEND_STATE',
-        toPlayerIndex,
-        stateBase64: isObj ? payload.stateBase64 : (typeof payload === 'string' ? payload : null),
-        stateSize: isObj ? payload.stateSize : 0,
-        stateData: !isObj ? payload : null
+        ...syncMsg
       }));
+      return;
+    }
+
+    // 3. Fallback Firestore (Uniquement pour le savestate initial à froid, JAMAIS pour les heartbeats périodiques)
+    if (!isHeartbeat && this.currentRoom?.code) {
+      try {
+        const roomRef = doc(db, 'rooms', this.currentRoom.code);
+        updateDoc(roomRef, {
+          stateSync: syncMsg
+        }).catch(() => {});
+      } catch(e) {}
     }
   }
 
   // Lancer la partie en tant qu'hôte
   startGame() {
-    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-      this.ws.send(JSON.stringify({ type: 'START_GAME' }));
+    const startMsg = {
+      type: 'START_GAME',
+      gameId: this.currentRoom?.gameId,
+      gameTitle: this.currentRoom?.gameTitle
+    };
+
+    if (this.webrtcChannel && this.webrtcChannel.readyState === 'open') {
+      try {
+        this.webrtcChannel.send(JSON.stringify(startMsg));
+      } catch(e) {}
     }
+
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      this.ws.send(JSON.stringify(startMsg));
+    }
+
     if (this.currentRoom?.code && this.myPlayerIndex === 0) {
       try {
         const roomRef = doc(db, 'rooms', this.currentRoom.code);
@@ -610,21 +1046,41 @@ class NetplayService {
 
   // Quitter le salon actuel
   leaveRoom() {
-    if (this.ws && this.ws.readyState === WebSocket.OPEN && this.currentRoom) {
-      this.ws.send(JSON.stringify({ type: 'LEAVE_ROOM' }));
+    const isHost = this.myPlayerIndex === 0;
+    const leaveMsg = {
+      type: isHost ? 'HOST_DISCONNECTED' : 'PEER_LEFT',
+      playerIndex: this.myPlayerIndex,
+      message: isHost ? "L'hôte a quitté la partie." : "L'autre joueur a quitté la partie."
+    };
+
+    if (this.webrtcChannel && this.webrtcChannel.readyState === 'open') {
+      try {
+        this.webrtcChannel.send(JSON.stringify(leaveMsg));
+      } catch(e) {}
     }
-    
+
+    if (this.ws && this.ws.readyState === WebSocket.OPEN && this.currentRoom) {
+      try {
+        this.ws.send(JSON.stringify(leaveMsg));
+      } catch(e) {}
+    }
+
     if (this.currentRoom?.code) {
       try {
         const roomRef = doc(db, 'rooms', this.currentRoom.code);
-        if (this.myPlayerIndex === 0) {
+        if (isHost) {
           deleteDoc(roomRef).catch(() => {});
         } else {
           const remaining = (this.currentRoom.players || []).filter(p => p.playerIndex !== this.myPlayerIndex);
-          updateDoc(roomRef, { players: remaining }).catch(() => {});
+          updateDoc(roomRef, { 
+            players: remaining,
+            lastEvent: { type: 'PEER_LEFT', playerIndex: this.myPlayerIndex, time: Date.now() }
+          }).catch(() => {});
         }
       } catch(e) {}
     }
+
+    this.closeWebRTC();
 
     if (this.firestoreUnsub) {
       this.firestoreUnsub();
@@ -641,7 +1097,7 @@ class NetplayService {
   async fetchRooms() {
     const combined = new Map();
 
-    // 1. Tenter l'API locale LAN
+    // 1. Tenter l'API locale LAN si sur serveur dev
     try {
       const res = await fetch('/api/netplay/rooms');
       if (res.ok) {
@@ -652,7 +1108,7 @@ class NetplayService {
       }
     } catch(e) {}
 
-    // 2. Récupération Cloud Firebase
+    // 2. Récupération Cloud Firebase (Salons créés sur Netlify ou distants)
     try {
       const snap = await getDocs(collection(db, 'rooms'));
       const now = Date.now();
