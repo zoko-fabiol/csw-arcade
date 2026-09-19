@@ -3,7 +3,7 @@ import {
   Users, Wifi, Gamepad2, Radio, QrCode, Copy, Check, 
   X, Play, ShieldAlert, ArrowRight, RefreshCw, Smartphone
 } from 'lucide-react';
-import { netplayService } from '../../services/netplayService';
+import { netplayService } from '../../services/NetplayService';
 
 export function NetplayModal({ 
   isOpen, 

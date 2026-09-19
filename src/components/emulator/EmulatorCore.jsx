@@ -19,7 +19,7 @@ import { NetplaySyncEngine } from '../../services/NetplaySyncEngine';
 import { emulatorLoader } from '../../services/emulatorLoader';
 import { TouchOverlay } from './TouchOverlay';
 import { useDeviceType } from '../../utils/deviceDetector';
-import { netplayService } from '../../services/netplayService';
+import { netplayService } from '../../services/NetplayService';
 
 export function EmulatorCore({ 
   game, 

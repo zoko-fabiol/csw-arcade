@@ -9,7 +9,7 @@ import { NetplayModal } from './components/netplay/NetplayModal';
 import { MobileControllerView } from './components/netplay/MobileControllerView';
 import { WebRTCNetplayDemo } from './components/netplay/WebRTCNetplayDemo';
 import { SettingsModal } from './components/settings/SettingsModal';
-import { netplayService } from './services/netplayService';
+import { netplayService } from './services/NetplayService';
 
 import { launchNativeNeoRAGEx } from './services/nativeLauncher';
 

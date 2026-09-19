@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Gamepad2, Wifi, LogOut, Radio } from 'lucide-react';
-import { netplayService } from '../../services/netplayService';
+import { netplayService } from '../../services/NetplayService';
 
 // RetroPad IDs pour Neo Geo FBNeo
 const RETROPAD = {
