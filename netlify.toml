@@ -7,6 +7,10 @@
   BUILD_TARGET = "web"
   NETLIFY = "true"
 
+[[edge_functions]]
+  path = "/api/rom-proxy"
+  function = "rom-proxy"
+
 [[redirects]]
   from = "/api/archive-rom/*"
   to = "https://archive.org/download/:splat"
@@ -17,6 +21,13 @@
   from = "/*"
   to = "/index.html"
   status = 200
+
+[[headers]]
+  for = "/roms/*"
+  [headers.values]
+    Access-Control-Allow-Origin = "*"
+    Access-Control-Allow-Methods = "GET, HEAD, OPTIONS"
+    Access-Control-Expose-Headers = "Content-Length, Content-Type"
 
 [[headers]]
   for = "/*"

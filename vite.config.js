@@ -72,6 +72,7 @@ function romStreamPlugin() {
             'Content-Length': fileBuffer.length,
             'Access-Control-Allow-Origin': '*',
             'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS',
+            'Access-Control-Expose-Headers': 'Content-Length, Content-Type',
             'Cache-Control': 'no-store'
           });
 
@@ -84,6 +85,7 @@ function romStreamPlugin() {
 
       server.middlewares.use('/api/rom-data', handleRomRequest);
       server.middlewares.use('/api/rom', handleRomRequest);
+      server.middlewares.use('/api/rom-proxy', handleRomRequest);
 
       // Endpoint d'audit des ROMs pour le frontend (Web & Electron)
       server.middlewares.use('/api/roms-list', (req, res) => {
