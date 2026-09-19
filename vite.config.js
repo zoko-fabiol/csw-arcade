@@ -41,42 +41,82 @@ function romStreamPlugin() {
             }
           }
 
-          // 2. Si la ROM n'existe pas encore dans public/roms/, téléchargement interne automatique
-          if (!fs.existsSync(filePath)) {
-            console.log(`[CSW-Arcade] Téléchargement interne de la ROM: ${resolvedName}.zip vers public/roms/...`);
-            const targetPath = path.resolve(romsDir, resolvedName + '.zip');
+          if (req.method === 'OPTIONS') {
+            res.writeHead(204, {
+              'Access-Control-Allow-Origin': '*',
+              'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS',
+              'Access-Control-Allow-Headers': '*'
+            });
+            return res.end();
+          }
+
+          // Si la ROM est disponible localement, streaming direct
+          if (fs.existsSync(filePath)) {
+            const stat = fs.statSync(filePath);
+            res.writeHead(200, {
+              'Content-Type': 'application/zip',
+              'Content-Length': stat.size,
+              'Access-Control-Allow-Origin': '*',
+              'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS',
+              'Access-Control-Expose-Headers': 'Content-Length, Content-Type',
+              'Cache-Control': 'public, max-age=31536000'
+            });
+            if (req.method === 'HEAD') return res.end();
+            return fs.createReadStream(filePath).pipe(res);
+          }
+
+          // 2. Si la ROM n'existe pas encore, stream asynchrone depuis Archive.org sans bloquer le serveur
+          console.log(`[CSW-Arcade] Streaming asynchrone de la ROM: ${resolvedName}.zip...`);
+          const candidateUrls = [
+            `https://archive.org/download/neo-geo-mvs-romset/${resolvedName}.zip`,
+            `https://archive.org/download/NeoGeoRomCollectionByGhostware/${resolvedName}.zip`,
+            `https://archive.org/download/mame-merged/${resolvedName}.zip`
+          ];
+
+          for (const remoteUrl of candidateUrls) {
             try {
-              const remoteUrl = `https://archive.org/download/neo-geo-mvs-romset/${resolvedName}.zip`;
-              execSync(`curl.exe -L -s -o "${targetPath}" "${remoteUrl}"`, { timeout: 300000 });
-              if (fs.existsSync(targetPath) && fs.statSync(targetPath).size > 1000) {
-                filePath = targetPath;
-                console.log(`[CSW-Arcade] ROM ${resolvedName}.zip enregistrée avec succès dans public/roms/ (${fs.statSync(targetPath).size} octets)`);
-              } else {
-                if (fs.existsSync(targetPath)) fs.unlinkSync(targetPath);
-                console.warn(`[CSW-Arcade] Fichier téléchargé incomplet pour ${resolvedName}`);
+              const remoteRes = await fetch(remoteUrl, {
+                redirect: 'follow',
+                headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' }
+              });
+
+              if (remoteRes.ok) {
+                const cl = remoteRes.headers.get('content-length');
+                res.writeHead(200, {
+                  'Content-Type': 'application/zip',
+                  ...(cl ? { 'Content-Length': cl } : {}),
+                  'Access-Control-Allow-Origin': '*',
+                  'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS',
+                  'Access-Control-Expose-Headers': 'Content-Length, Content-Type',
+                  'Cache-Control': 'public, max-age=31536000'
+                });
+
+                if (req.method === 'HEAD') return res.end();
+
+                const targetPath = path.resolve(romsDir, resolvedName + '.zip');
+                const fileWriteStream = fs.createWriteStream(targetPath);
+                const reader = remoteRes.body.getReader();
+
+                while (true) {
+                  const { done, value } = await reader.read();
+                  if (done) break;
+                  const buf = Buffer.from(value);
+                  res.write(buf);
+                  fileWriteStream.write(buf);
+                }
+
+                fileWriteStream.end();
+                res.end();
+                console.log(`[CSW-Arcade] ROM ${resolvedName}.zip téléchargée et mise en cache (${targetPath}).`);
+                return;
               }
             } catch (dlErr) {
-              console.warn(`[CSW-Arcade] Erreur téléchargement ${resolvedName}:`, dlErr.message);
-              if (fs.existsSync(targetPath)) fs.unlinkSync(targetPath);
+              console.warn(`[CSW-Arcade] Erreur stream source ${remoteUrl}:`, dlErr.message);
             }
           }
 
-          if (!fs.existsSync(filePath)) {
-            res.statusCode = 404;
-            return res.end(`ROM ${resolvedName}.zip introuvable`);
-          }
-
-          const fileBuffer = fs.readFileSync(filePath);
-          res.writeHead(200, {
-            'Content-Type': 'application/octet-stream',
-            'Content-Length': fileBuffer.length,
-            'Access-Control-Allow-Origin': '*',
-            'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS',
-            'Access-Control-Expose-Headers': 'Content-Length, Content-Type',
-            'Cache-Control': 'no-store'
-          });
-
-          res.end(fileBuffer);
+          res.statusCode = 404;
+          return res.end(`ROM ${resolvedName}.zip introuvable sur les serveurs distants`);
         } catch (err) {
           res.statusCode = 500;
           res.end(err.message);

@@ -682,8 +682,25 @@
 
     function getRomFromIDB(filename) {
       return new Promise((resolve) => {
+        const timeout = setTimeout(() => {
+          console.warn(`[Player IDB] Timeout pour ${filename}, passage au réseau`);
+          resolve(null);
+        }, 1200);
+
         try {
+          if (!window.indexedDB) {
+            clearTimeout(timeout);
+            return resolve(null);
+          }
           const req = indexedDB.open(IDB_NAME, 1);
+          req.onblocked = () => {
+            clearTimeout(timeout);
+            resolve(null);
+          };
+          req.onerror = () => {
+            clearTimeout(timeout);
+            resolve(null);
+          };
           req.onupgradeneeded = (e) => {
             const db = e.target.result;
             if (!db.objectStoreNames.contains(IDB_STORE)) {
@@ -691,33 +708,33 @@
             }
           };
           req.onsuccess = () => {
-            const db = req.result;
-            const tx = db.transaction(IDB_STORE, 'readonly');
-            const store = tx.objectStore(IDB_STORE);
-            const getReq = store.get(filename.toLowerCase());
-            getReq.onsuccess = () => {
-              if (getReq.result && getReq.result.data) {
-                const data = getReq.result.data;
-                const u8 = new Uint8Array(data);
-                // Validation stricte du header ZIP (PK) et de la taille
-                if (u8.length > 5000 && u8[0] === 0x50 && u8[1] === 0x4B) {
-                  console.log(`[Player IDB] ROM ${filename} trouvée et valide en cache local IndexedDB (${getReq.result.size} octets)`);
-                  resolve(data);
-                  return;
-                } else {
-                  console.warn(`[Player IDB] Données corrompues ou redirection HTML détectée pour ${filename}, purge du cache.`);
-                  try {
-                    const delTx = db.transaction(IDB_STORE, 'readwrite');
-                    delTx.objectStore(IDB_STORE).delete(filename.toLowerCase());
-                  } catch(e) {}
+            try {
+              const db = req.result;
+              const tx = db.transaction(IDB_STORE, 'readonly');
+              tx.onerror = () => { clearTimeout(timeout); resolve(null); };
+              tx.onabort = () => { clearTimeout(timeout); resolve(null); };
+              const store = tx.objectStore(IDB_STORE);
+              const getReq = store.get(filename.toLowerCase());
+              getReq.onsuccess = () => {
+                clearTimeout(timeout);
+                if (getReq.result && getReq.result.data) {
+                  const data = getReq.result.data;
+                  const u8 = new Uint8Array(data);
+                  if (u8.length > 5000 && u8[0] === 0x50 && u8[1] === 0x4B) {
+                    console.log(`[Player IDB] ROM ${filename} trouvée en cache local (${getReq.result.size} octets)`);
+                    return resolve(data);
+                  }
                 }
-              }
+                resolve(null);
+              };
+              getReq.onerror = () => { clearTimeout(timeout); resolve(null); };
+            } catch (err) {
+              clearTimeout(timeout);
               resolve(null);
-            };
-            getReq.onerror = () => resolve(null);
+            }
           };
-          req.onerror = () => resolve(null);
-        } catch(e) {
+        } catch (e) {
+          clearTimeout(timeout);
           resolve(null);
         }
       });
@@ -764,6 +781,13 @@
       const dlPercent = document.getElementById('dl-progress-percent');
       const dlFill = document.getElementById('dl-progress-fill');
 
+      if (dlBox) {
+        dlBox.style.display = 'flex';
+        dlFill.style.width = '0%';
+        dlPercent.innerText = '0%';
+        dlSize.innerText = 'Connexion...';
+      }
+
       for (const url of candidates) {
         try {
           if (onProgressText) {
@@ -789,8 +813,6 @@
 
           if (dlBox) {
             dlBox.style.display = 'flex';
-            dlFill.style.width = '0%';
-            dlPercent.innerText = '0%';
             dlSize.innerText = totalMB ? `0.0 MB / ${totalMB} MB` : `0.0 MB`;
           }
 
@@ -837,7 +859,6 @@
           // Vérification du Header magique ZIP 'PK' (0x50, 0x4B)
           if (merged.length < 5000 || merged[0] !== 0x50 || merged[1] !== 0x4B) {
             console.warn(`[CSW-Arcade] ${url} n'est pas une archive ZIP valide (en-tête invalide)`);
-            if (dlBox) dlBox.style.display = 'none';
             continue;
           }
 
@@ -847,7 +868,6 @@
         } catch (e) {
           lastErr = e;
           console.warn(`[CSW-Arcade] Échec source ${url} pour ${name}:`, e.message);
-          if (dlBox) dlBox.style.display = 'none';
         }
       }
 
@@ -858,7 +878,7 @@
     // Pré-chargement asynchrone bloquant AVANT initialisation du runtime WASM
     async function preloadAssetsAndBoot() {
       try {
-        loadingDesc.innerText = `Recherche de ${targetZipName} dans le stockage local...`;
+        loadingDesc.innerText = `Initialisation de ${targetZipName}...`;
 
         const electronApi = window.electronAPI || (window.parent && window.parent.electronAPI);
 
@@ -887,8 +907,8 @@
 
         if (!biosBuffer) {
           const biosCandidates = [
-            './roms/neogeo.zip',
             '/roms/neogeo.zip',
+            './roms/neogeo.zip',
             '/api/rom-proxy?file=neogeo.zip',
             '/api/rom-data/neogeo',
             'https://archive.org/download/mame-merged/neogeo.zip',
@@ -931,10 +951,10 @@
 
         if (!romBuffer) {
           const romCandidates = [
-            './roms/' + encodeURIComponent(targetZipName),
-            '/roms/' + encodeURIComponent(targetZipName),
             '/api/rom-proxy?file=' + encodeURIComponent(targetZipName),
             ...(fbneoShortName !== cleanInput ? ['/api/rom-proxy?file=' + encodeURIComponent(cleanInput + '.zip')] : []),
+            '/roms/' + encodeURIComponent(targetZipName),
+            './roms/' + encodeURIComponent(targetZipName),
             '/api/rom-data/' + encodeURIComponent(fbneoShortName),
             'https://archive.org/download/neo-geo-mvs-romset/' + encodeURIComponent(targetZipName),
             'https://archive.org/download/NeoGeoRomCollectionByGhostware/' + encodeURIComponent(targetZipName),
@@ -1030,6 +1050,7 @@
           };
           this.getAllResponseHeaders = () => 'content-type: application/zip\r\ncontent-length: ' + buf.byteLength + '\r\n';
           setTimeout(() => {
+            if (typeof this.onreadystatechange === 'function') this.onreadystatechange();
             if (typeof this.onload === 'function') this.onload();
             this.dispatchEvent(new Event('load'));
             this.dispatchEvent(new Event('loadend'));
@@ -1051,6 +1072,7 @@
           };
           this.getAllResponseHeaders = () => 'content-type: application/zip\r\ncontent-length: ' + buf.byteLength + '\r\n';
           setTimeout(() => {
+            if (typeof this.onreadystatechange === 'function') this.onreadystatechange();
             if (typeof this.onload === 'function') this.onload();
             this.dispatchEvent(new Event('load'));
             this.dispatchEvent(new Event('loadend'));
@@ -1059,6 +1081,14 @@
         }
 
         return _origXHRSend.apply(this, args);
+      };
+
+      // Sécurité anti-écran noir : masquer l'overlay dès que le jeu commence
+      const hideOverlay = () => {
+        if (overlay && overlay.style.display !== 'none') {
+          overlay.style.opacity = '0';
+          setTimeout(() => { overlay.style.display = 'none'; }, 300);
+        }
       };
 
       // Configuration officielle EmulatorJS avec nom de fichier strict et BIOS Arcade
@@ -1168,6 +1198,8 @@
         emu.startGame = function() {
           console.log('[VFS Injection] Écriture synchrone des archives dans Emscripten VFS...');
           injectVFS();
+          // Sécurité anti-écran noir : masquage de l'overlay garanti
+          setTimeout(hideOverlay, 2000);
           return origStartGame();
         };
 
@@ -1183,6 +1215,7 @@
 
       window.EJS_onGameStart = () => {
         console.log('[CSW-Arcade] Jeu Neo Geo démarré à 60 FPS !');
+        hideOverlay();
         overlay.style.opacity = '0';
         setTimeout(() => { overlay.style.display = 'none'; }, 400);
 
