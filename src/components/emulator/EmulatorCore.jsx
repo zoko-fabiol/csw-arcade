@@ -154,7 +154,49 @@ export function EmulatorCore({
     return () => window.removeEventListener('message', handleMessage);
   }, [mode, isHost]);
 
-  // Gestion plein écran universel (iOS Safari WebKit, Android Chrome, Desktop)
+  // Screen Wake Lock API et veille zéro-consommation en arrière-plan
+  useEffect(() => {
+    let wakeLock = null;
+
+    const requestWakeLock = async () => {
+      try {
+        if ('wakeLock' in navigator && !document.hidden) {
+          wakeLock = await navigator.wakeLock.request('screen');
+        }
+      } catch (err) {}
+    };
+
+    requestWakeLock();
+
+    const handleVisibility = () => {
+      if (document.hidden) {
+        if (wakeLock) {
+          wakeLock.release().catch(() => {});
+          wakeLock = null;
+        }
+        // Couper le son et suspendre le CPU FBNeo en arrière-plan (0 mW de batterie)
+        if (iframeRef.current?.contentWindow) {
+          iframeRef.current.contentWindow.postMessage({ type: 'APP_VISIBILITY', visible: false }, '*');
+        }
+      } else {
+        requestWakeLock();
+        if (iframeRef.current?.contentWindow) {
+          iframeRef.current.contentWindow.postMessage({ type: 'APP_VISIBILITY', visible: true }, '*');
+        }
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibility);
+      if (wakeLock) {
+        wakeLock.release().catch(() => {});
+      }
+    };
+  }, []);
+
+  // Gestion plein écran universel sans forcer l'orientation si le téléphone est verrouillé en portrait
   const toggleFullscreen = () => {
     if (!containerRef.current) return;
     const elem = containerRef.current;
@@ -170,8 +212,8 @@ export function EmulatorCore({
       if (req) {
         req.call(elem).then(() => {
           setIsFullscreen(true);
-          // Tenter de verrouiller en paysage si sur mobile
-          if (typeof screen !== 'undefined' && screen.orientation && typeof screen.orientation.lock === 'function') {
+          // Tenter l'orientation paysage uniquement si l'appareil est déjà tenu horizontalement
+          if (isLandscape && typeof screen !== 'undefined' && screen.orientation && typeof screen.orientation.lock === 'function') {
             screen.orientation.lock('landscape').catch(() => {});
           }
         }).catch(() => {
@@ -283,10 +325,10 @@ export function EmulatorCore({
   return (
     <div 
       ref={containerRef}
-      className="fixed inset-0 z-50 bg-black flex flex-col select-none overflow-hidden font-mono"
+      className="fixed inset-0 z-50 bg-black flex flex-col select-none overflow-hidden font-mono touch-none"
     >
       {/* Barre de Contrôle Supérieure Responsive */}
-      <div className="h-11 sm:h-14 bg-neutral-950/95 border-b border-neutral-800 px-2.5 sm:px-6 flex items-center justify-between text-xs text-neutral-300 backdrop-blur-md shrink-0">
+      <div className="h-11 sm:h-14 bg-neutral-950/95 border-b border-neutral-800 px-2.5 sm:px-6 flex items-center justify-between text-xs text-neutral-300 backdrop-blur-md shrink-0 pt-safe pl-safe pr-safe">
         <div className="flex items-center gap-2 sm:gap-4 min-w-0">
           <button
             onClick={onExit}

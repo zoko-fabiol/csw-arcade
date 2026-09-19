@@ -1053,6 +1053,21 @@
     function startEmulatorJS() {
       const initialVol = activeSettings.audio?.muted ? 0 : ((activeSettings.audio?.volume ?? 85) / 100);
 
+      // Optimisation basse consommation & faible latence pour Canvas GPU mobile
+      const _origGetContext = HTMLCanvasElement.prototype.getContext;
+      HTMLCanvasElement.prototype.getContext = function(type, attributes) {
+        if (type === 'webgl' || type === 'webgl2' || type === 'experimental-webgl') {
+          attributes = Object.assign({}, attributes, {
+            powerPreference: 'low-power',
+            desynchronized: true,
+            alpha: false,
+            antialias: false,
+            preserveDrawingBuffer: false
+          });
+        }
+        return _origGetContext.call(this, type, attributes);
+      };
+
       // 1. Interception transparente de fetch pour servir romBytes et neogeoBytes directement en mémoire
       const _origFetch = window.fetch;
       window.fetch = async function(input, init) {
@@ -1421,6 +1436,56 @@
           rebuildKeyMap(activeSettings.controls);
           console.log(`[Player] Index joueur assigné mis à jour: J${assignedPlayerIndex + 1}`);
         }
+        if (event.data.type === 'APP_VISIBILITY') {
+          const isVis = !!event.data.visible;
+          if (window.EJS_emulator) {
+            try {
+              if (isVis) {
+                if (typeof window.EJS_emulator.play === 'function') window.EJS_emulator.play();
+                if (window.EJS_emulator.audioContext && typeof window.EJS_emulator.audioContext.resume === 'function') {
+                  window.EJS_emulator.audioContext.resume();
+                }
+              } else {
+                if (typeof window.EJS_emulator.pause === 'function') window.EJS_emulator.pause();
+                if (window.EJS_emulator.audioContext && typeof window.EJS_emulator.audioContext.suspend === 'function') {
+                  window.EJS_emulator.audioContext.suspend();
+                }
+              }
+            } catch(e) {}
+          }
+        }
+      });
+
+      // Déverrouillage automatique de l'audio mobile dès le premier toucher
+      const unlockAudio = () => {
+        try {
+          if (window.EJS_emulator?.audioContext && window.EJS_emulator.audioContext.state === 'suspended') {
+            window.EJS_emulator.audioContext.resume();
+          }
+        } catch(e) {}
+        window.removeEventListener('touchstart', unlockAudio);
+        window.removeEventListener('click', unlockAudio);
+      };
+      window.addEventListener('touchstart', unlockAudio, { passive: true });
+      window.addEventListener('click', unlockAudio, { passive: true });
+
+      // Mise en veille instantanée dès que l'écran du smartphone est verrouillé (0% batterie en veille)
+      document.addEventListener('visibilitychange', () => {
+        if (document.hidden) {
+          try {
+            if (typeof window.EJS_emulator?.pause === 'function') window.EJS_emulator.pause();
+            if (window.EJS_emulator?.audioContext && typeof window.EJS_emulator.audioContext.suspend === 'function') {
+              window.EJS_emulator.audioContext.suspend();
+            }
+          } catch(e) {}
+        } else {
+          try {
+            if (typeof window.EJS_emulator?.play === 'function') window.EJS_emulator.play();
+            if (window.EJS_emulator?.audioContext && typeof window.EJS_emulator.audioContext.resume === 'function') {
+              window.EJS_emulator.audioContext.resume();
+            }
+          } catch(e) {}
+        }
       });
 
       const s = document.createElement('script');
@@ -1429,7 +1494,9 @@
       s.onerror = (e) => {
         console.error('[Player] Erreur chargement loader.js', e);
         errorMsg.style.display = 'block';
-        errorMsg.innerText = 'Erreur: Impossible de charger le moteur WebAssembly.';
+        errorMsg.innerText = navigator.onLine
+          ? 'Erreur: Impossible de charger le moteur WebAssembly.'
+          : 'Mode Hors-Ligne: Veuillez lancer ce jeu une première fois avec connexion pour activer le cache hors-ligne permanent.';
       };
       document.body.appendChild(s);
     }

@@ -12,6 +12,7 @@ import { SettingsModal } from './components/settings/SettingsModal';
 import { netplayService } from './services/NetplayService';
 
 import { launchNativeNeoRAGEx } from './services/nativeLauncher';
+import { useMobileNavigation, useOnlineStatus } from './hooks/useMobileNavigation';
 
 export default function App() {
   const [selectedGenre, setSelectedGenre] = useState('Tous les Jeux');
@@ -101,10 +102,43 @@ export default function App() {
     setGameMode(null);
   };
 
+  const isOnline = useOnlineStatus();
+  const { exitToastVisible } = useMobileNavigation({
+    activeGame,
+    onExitGame: handleExitGame,
+    isSettingsOpen,
+    onCloseSettings: () => setIsSettingsOpen(false),
+    isLobbyOpen,
+    onCloseLobby: () => {
+      setIsLobbyOpen(false);
+      setNetplayPreselectedGame(null);
+    },
+    mobileControllerSession,
+    onCloseMobileController: () => setMobileControllerSession(null),
+    isWebRtcTestOpen,
+    onCloseWebRtcTest: () => setIsWebRtcTestOpen(false),
+    isMobileSidebarOpen,
+    onCloseMobileSidebar: () => setIsMobileSidebarOpen(false)
+  });
+
   const installedCount = gamesData.filter(g => isRomAvailable(g.filename)).length;
 
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-neutral-950 font-sans">
+      {/* Toast PWA Mobile : Double-tap pour quitter */}
+      {exitToastVisible && (
+        <div className="fixed bottom-10 left-1/2 -translate-x-1/2 z-[100] px-4 py-2 rounded-full bg-neutral-900/95 border border-neutral-700 text-neutral-200 text-xs font-mono shadow-2xl backdrop-blur-md animate-in fade-in slide-in-from-bottom-2">
+          Appuyez encore une fois pour quitter
+        </div>
+      )}
+
+      {/* Bannière discrète Mode Hors-Ligne (Mode Avion) */}
+      {!isOnline && (
+        <div className="fixed top-2 left-1/2 -translate-x-1/2 z-40 px-3 py-1 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-300 text-[10px] font-mono shadow-lg backdrop-blur-md flex items-center gap-1.5 pointer-events-none">
+          <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+          <span>Mode Hors-Ligne • Jeux téléchargés 100% jouables</span>
+        </div>
+      )}
       {/* Sidebar de navigation (Desktop ancré & Mobile Drawer) */}
       <Sidebar
         selectedGenre={selectedGenre}
