@@ -8,6 +8,12 @@
   NETLIFY = "true"
 
 [[redirects]]
+  from = "/api/archive-rom/*"
+  to = "https://archive.org/download/:splat"
+  status = 200
+  force = true
+
+[[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200

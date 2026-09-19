@@ -1,7 +1,8 @@
-import React, { useState, useMemo, useEffect } from 'react';
-import { Search, LayoutGrid, List, AlertOctagon, Terminal, Menu } from 'lucide-react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
+import { Search, LayoutGrid, List, AlertOctagon, Terminal, Menu, UploadCloud, Check, HardDrive } from 'lucide-react';
 import { GameCard } from './GameCard';
 import { GameListItem } from './GameListItem';
+import { romStorage } from '../../services/romStorage';
 
 const VIEW_MODE_STORAGE_KEY = 'csw_arcade_view_mode';
 
@@ -15,6 +16,8 @@ export function GameLibrary({
   onToggleMobileSidebar
 }) {
   const [searchQuery, setSearchQuery] = useState('');
+  const [importStatus, setImportStatus] = useState(null);
+  const fileInputRef = useRef(null);
   const [viewMode, setViewMode] = useState(() => {
     try {
       return localStorage.getItem(VIEW_MODE_STORAGE_KEY) || 'grid';
@@ -22,6 +25,31 @@ export function GameLibrary({
       return 'grid';
     }
   });
+
+  const handleImportFiles = async (e) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    setImportStatus('Stockage en cours...');
+    let imported = 0;
+
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      if (file.name.toLowerCase().endsWith('.zip')) {
+        try {
+          const buf = await file.arrayBuffer();
+          await romStorage.saveRom(file.name, buf);
+          imported++;
+        } catch(err) {
+          console.error('[Import]', err);
+        }
+      }
+    }
+
+    setImportStatus(`${imported} ROM(s) stockée(s) !`);
+    setTimeout(() => setImportStatus(null), 3500);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
 
   const handleToggleViewMode = (mode) => {
     setViewMode(mode);
@@ -98,6 +126,32 @@ export function GameLibrary({
               className="w-full pl-9 pr-3 py-1.5 sm:py-2 bg-neutral-900/90 border border-neutral-800 rounded-xl text-xs font-mono text-neutral-200 placeholder:text-neutral-500 focus:outline-none focus:border-cyan-500/80 focus:ring-1 focus:ring-cyan-500/50 transition-all"
             />
           </div>
+
+          {/* Importateur de ROMs vers stockage local */}
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleImportFiles}
+            multiple
+            accept=".zip"
+            className="hidden"
+          />
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            title="Importer une ou plusieurs ROMs (.zip) dans le stockage local du navigateur"
+            className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 sm:py-2 bg-neutral-900 hover:bg-neutral-800 border border-neutral-800 hover:border-cyan-500/50 rounded-xl text-xs font-mono text-cyan-300 transition-all shrink-0 active:scale-95"
+          >
+            <UploadCloud className="w-4 h-4 text-cyan-400 shrink-0" />
+            <span className="hidden md:inline font-semibold">Importer ROM</span>
+          </button>
+
+          {/* Toast / Notification Import */}
+          {importStatus && (
+            <div className="fixed bottom-5 right-5 z-50 px-4 py-2 rounded-xl bg-cyan-950/90 border border-cyan-500 text-cyan-200 text-xs font-mono shadow-2xl flex items-center gap-2 backdrop-blur-md animate-bounce">
+              <Check className="w-4 h-4 text-emerald-400" />
+              <span>{importStatus}</span>
+            </div>
+          )}
 
           {/* Bascule Grille / Liste */}
           <div className="flex items-center p-1 bg-neutral-900 rounded-xl border border-neutral-800 shrink-0">

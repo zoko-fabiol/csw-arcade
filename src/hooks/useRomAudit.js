@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
 import fbneoMapping from '../data/fbneoMapping.json';
+import { romStorage } from '../services/romStorage';
 
 /**
  * Hook d'audit local des ROMs et du BIOS NeoGeo
- * Compatible Electron & Navigateur Web standard via /api/roms-list
+ * Compatible Electron, Stockage Web Persistant (IndexedDB) & Serveur Netlify
  */
 export function useRomAudit() {
   const [availableRoms, setAvailableRoms] = useState(new Set());
@@ -19,10 +20,21 @@ export function useRomAudit() {
       let files = [];
       let biosFound = false;
 
+      // 0. Récupérer d'abord les ROMs et BIOS sauvegardés localement dans le navigateur (IndexedDB)
+      try {
+        const idbRoms = await romStorage.listSavedRoms();
+        if (Array.isArray(idbRoms)) {
+          files.push(...idbRoms);
+          if (idbRoms.includes('neogeo.zip')) {
+            biosFound = true;
+          }
+        }
+      } catch (idbErr) {}
+
       if (window.electronAPI && typeof window.electronAPI.listAvailableRoms === 'function') {
         const res = await window.electronAPI.listAvailableRoms();
         if (res.success && Array.isArray(res.files)) {
-          files = res.files;
+          files.push(...res.files);
         }
       } else {
         // 1. Essayer le manifeste statique (Netlify / Web CDN)
@@ -31,23 +43,21 @@ export function useRomAudit() {
           if (manifestRes.ok) {
             const mData = await manifestRes.json();
             if (mData.success && Array.isArray(mData.files)) {
-              files = mData.files;
+              files.push(...mData.files);
             }
           }
         } catch (mErr) {}
 
         // 2. Si non trouvé ou vide, essayer l'API dev Vite
-        if (files.length === 0) {
-          try {
-            const res = await fetch('/api/roms-list');
-            if (res.ok) {
-              const data = await res.json();
-              if (data.success && Array.isArray(data.files)) {
-                files = data.files;
-              }
+        try {
+          const res = await fetch('/api/roms-list');
+          if (res.ok) {
+            const data = await res.json();
+            if (data.success && Array.isArray(data.files)) {
+              files.push(...data.files);
             }
-          } catch (apiErr) {}
-        }
+          }
+        } catch (apiErr) {}
       }
 
       const fileSet = new Set(files.map(f => f.toLowerCase()));

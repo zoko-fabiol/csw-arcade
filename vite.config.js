@@ -272,6 +272,13 @@ export default defineConfig({
     strictPort: true,
     watch: {
       ignored: ['**/public/**']
+    },
+    proxy: {
+      '/api/archive-rom': {
+        target: 'https://archive.org/download',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/archive-rom/, '')
+      }
     }
   }
 });

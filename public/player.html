@@ -664,12 +664,74 @@
     let neogeoBytes = null;
     let romBytes = null;
 
-    // Fonction de téléchargement résiliente multi-sources (Local Vite, Netlify Static, Miroir Archive.org)
+    // --- GESTION DU STOCKAGE PERSISTANT LOCAL (IndexedDB) ---
+    const IDB_NAME = 'csw_arcade_roms_db';
+    const IDB_STORE = 'rom_archives';
+
+    function getRomFromIDB(filename) {
+      return new Promise((resolve) => {
+        try {
+          const req = indexedDB.open(IDB_NAME, 1);
+          req.onupgradeneeded = (e) => {
+            const db = e.target.result;
+            if (!db.objectStoreNames.contains(IDB_STORE)) {
+              db.createObjectStore(IDB_STORE, { keyPath: 'id' });
+            }
+          };
+          req.onsuccess = () => {
+            const db = req.result;
+            const tx = db.transaction(IDB_STORE, 'readonly');
+            const store = tx.objectStore(IDB_STORE);
+            const getReq = store.get(filename.toLowerCase());
+            getReq.onsuccess = () => {
+              if (getReq.result && getReq.result.data) {
+                console.log(`[Player IDB] ROM ${filename} trouvée en cache local IndexedDB (${getReq.result.size} octets)`);
+                resolve(getReq.result.data);
+              } else {
+                resolve(null);
+              }
+            };
+            getReq.onerror = () => resolve(null);
+          };
+          req.onerror = () => resolve(null);
+        } catch(e) {
+          resolve(null);
+        }
+      });
+    }
+
+    function saveRomToIDB(filename, buffer) {
+      try {
+        const req = indexedDB.open(IDB_NAME, 1);
+        req.onupgradeneeded = (e) => {
+          const db = e.target.result;
+          if (!db.objectStoreNames.contains(IDB_STORE)) {
+            db.createObjectStore(IDB_STORE, { keyPath: 'id' });
+          }
+        };
+        req.onsuccess = () => {
+          const db = req.result;
+          const tx = db.transaction(IDB_STORE, 'readwrite');
+          const store = tx.objectStore(IDB_STORE);
+          const arrayBuffer = buffer.buffer ? buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength) : buffer;
+          store.put({
+            id: filename.toLowerCase(),
+            filename: filename.toLowerCase(),
+            data: arrayBuffer,
+            size: arrayBuffer.byteLength,
+            savedAt: Date.now()
+          });
+          console.log(`[Player IDB] ROM ${filename} enregistrée dans le stockage local IndexedDB !`);
+        };
+      } catch(e) {}
+    }
+
+    // Fonction de téléchargement résiliente multi-sources (Proxy Netlify, Local Vite, Miroir Archive.org)
     async function fetchBinaryWithFallbacks(name, candidates, onProgressText) {
       let lastErr = null;
       for (const url of candidates) {
         try {
-          if (onProgressText) loadingDesc.innerText = onProgressText + ` (${url.startsWith('http') ? 'Miroir Cloud' : 'Serveur'})...`;
+          if (onProgressText) loadingDesc.innerText = onProgressText + ` (${url.startsWith('http') ? 'Cloud' : 'Serveur'})...`;
           const res = await fetch(url);
           if (res.ok) {
             const buf = await res.arrayBuffer();
@@ -683,37 +745,57 @@
           console.warn(`[CSW-Arcade] Échec source ${url} pour ${name}:`, e.message);
         }
       }
-      throw new Error(`Impossible de charger ${name}. Vérifiez la connexion réseau.`);
+      throw new Error(`Impossible de charger ${name}.`);
     }
 
     // Pré-chargement asynchrone bloquant AVANT initialisation du runtime WASM
     async function preloadAssetsAndBoot() {
       try {
-        loadingDesc.innerText = `Recherche du BIOS Neo Geo et de la ROM ${targetZipName}...`;
+        loadingDesc.innerText = `Recherche de ${targetZipName} dans le stockage local...`;
 
-        const biosCandidates = [
-          '/roms/neogeo.zip',
-          '/api/rom-data/neogeo',
-          'https://archive.org/download/NeoGeoRomCollectionByGhostware/neogeo.zip'
-        ];
+        // 1. Vérification du BIOS (IndexedDB ou Réseau)
+        let biosBuffer = await getRomFromIDB('neogeo.zip');
+        if (!biosBuffer) {
+          const biosCandidates = [
+            '/roms/neogeo.zip',
+            '/api/archive-rom/NeoGeoRomCollectionByGhostware/neogeo.zip',
+            '/api/rom-data/neogeo',
+            'https://archive.org/download/NeoGeoRomCollectionByGhostware/neogeo.zip'
+          ];
+          biosBuffer = await fetchBinaryWithFallbacks('BIOS Neo Geo (neogeo.zip)', biosCandidates, 'Synchronisation du BIOS Neo Geo');
+          saveRomToIDB('neogeo.zip', biosBuffer);
+        } else {
+          console.log('[CSW-Arcade] BIOS Neo Geo chargé depuis le stockage IndexedDB');
+        }
 
-        const romCandidates = [
-          '/roms/' + encodeURIComponent(targetZipName),
-          '/api/rom-data/' + encodeURIComponent(fbneoShortName),
-          'https://archive.org/download/neo-geo-mvs-romset/' + encodeURIComponent(targetZipName),
-          'https://archive.org/download/NeoGeoRomCollectionByGhostware/' + encodeURIComponent(targetZipName)
-        ];
+        // 2. Vérification de la ROM (IndexedDB ou Réseau)
+        let romBuffer = await getRomFromIDB(targetZipName);
+        if (!romBuffer && fbneoShortName !== cleanInput) {
+          romBuffer = await getRomFromIDB(cleanInput + '.zip');
+        }
 
-        const [biosBuffer, romBuffer] = await Promise.all([
-          fetchBinaryWithFallbacks('BIOS Neo Geo (neogeo.zip)', biosCandidates, 'Synchronisation du BIOS Neo Geo'),
-          fetchBinaryWithFallbacks(`ROM ${targetZipName}`, romCandidates, `Chargement de ${fbneoShortName.toUpperCase()}`)
-        ]);
+        if (!romBuffer) {
+          const romCandidates = [
+            '/roms/' + encodeURIComponent(targetZipName),
+            '/api/archive-rom/neo-geo-mvs-romset/' + encodeURIComponent(targetZipName),
+            '/api/archive-rom/NeoGeoRomCollectionByGhostware/' + encodeURIComponent(targetZipName),
+            '/api/rom-data/' + encodeURIComponent(fbneoShortName),
+            'https://archive.org/download/neo-geo-mvs-romset/' + encodeURIComponent(targetZipName)
+          ];
+          romBuffer = await fetchBinaryWithFallbacks(`ROM ${targetZipName}`, romCandidates, `Téléchargement de ${fbneoShortName.toUpperCase()}`);
+          
+          // Sauvegarde automatique et persistante dans IndexedDB
+          saveRomToIDB(targetZipName, romBuffer);
+          saveRomToIDB(cleanInput + '.zip', romBuffer);
+        } else {
+          console.log(`[CSW-Arcade] ROM ${targetZipName} chargée directement depuis le stockage IndexedDB`);
+        }
 
         neogeoBytes = new Uint8Array(biosBuffer);
         romBytes = new Uint8Array(romBuffer);
 
         if (window.parent) {
-          window.parent.postMessage({ type: 'ROM_DOWNLOADED', game: rawGame, shortName: fbneoShortName }, '*');
+          window.parent.postMessage({ type: 'ROM_DOWNLOADED', filename: targetZipName, game: rawGame, shortName: fbneoShortName }, '*');
         }
 
         console.log(`[VFS Preload] BIOS: ${neogeoBytes.length} octets | ROM: ${romBytes.length} octets`);
