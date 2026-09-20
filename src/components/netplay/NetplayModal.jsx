@@ -496,15 +496,24 @@ export function NetplayModal({
               {netplayService.myPlayerIndex === 0 ? (
                 <button
                   onClick={handleStartHostedGame}
-                  className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-black font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg shadow-cyan-500/25 active:scale-98 transition-transform"
+                  disabled={!activeRoom || (activeRoom.players || []).length < 2}
+                  className={`flex-1 py-2.5 rounded-xl font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg active:scale-98 transition-all ${
+                    (activeRoom?.players || []).length >= 2
+                      ? 'bg-gradient-to-r from-emerald-400 to-cyan-400 hover:from-emerald-300 hover:to-cyan-300 text-black shadow-emerald-500/25 animate-pulse cursor-pointer'
+                      : 'bg-neutral-800 text-neutral-500 cursor-not-allowed border border-neutral-700'
+                  }`}
                 >
                   <Play className="w-4 h-4 fill-current" />
-                  <span>Lancer la Partie (Hôte)</span>
+                  <span>
+                    {(activeRoom?.players || []).length >= 2
+                      ? 'Lancer la Partie (J1 + J2 prêts) 🚀'
+                      : 'En attente du Joueur 2 (1/2)...'}
+                  </span>
                 </button>
               ) : (
                 <div className="flex items-center gap-2 text-xs text-cyan-400 font-bold">
                   <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping" />
-                  <span>En attente que l'hôte lance la partie...</span>
+                  <span>Connecté ! En attente que l'hôte lance la partie...</span>
                 </div>
               )}
             </div>

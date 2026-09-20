@@ -20,19 +20,7 @@ const RTC_CONFIG = {
     { urls: 'stun:stun2.l.google.com:19302' },
     { urls: 'stun:stun3.l.google.com:19302' },
     { urls: 'stun:stun4.l.google.com:19302' },
-    { urls: 'stun:stun.cloudflare.com:3478' },
-    { urls: 'stun:global.stun.twilio.com:3478' },
-    { urls: 'stun:stun.metered.ca:80' },
-    // Serveurs TURN pour traverser les CGNAT mobiles (Orange, MTN, Camtel) & pare-feux
-    {
-      urls: [
-        'turn:openrelay.metered.ca:80',
-        'turn:openrelay.metered.ca:443',
-        'turn:openrelay.metered.ca:443?transport=tcp'
-      ],
-      username: 'openrelayproject',
-      credential: 'openrelayproject'
-    }
+    { urls: 'stun:stun.cloudflare.com:3478' }
   ],
   iceCandidatePoolSize: 10
 };
@@ -560,34 +548,46 @@ class NetplayService {
       if (isHost) {
         console.log(`[Netplay PeerJS] Initialisation du salon Hôte P2P : ${hostPeerId}`);
         const peer = new Peer(hostPeerId, {
-          config: RTC_CONFIG
+          config: RTC_CONFIG,
+          debug: 1
         });
         this.peer = peer;
 
         peer.on('open', (id) => {
           console.log(`[Netplay PeerJS] ✓ Salon Hôte prêt avec ID P2P : ${id}`);
+          this.emit('host_ready', { id, roomCode: cleanCode });
         });
 
         peer.on('connection', (conn) => {
-          console.log(`[Netplay PeerJS] ✓ Invité connecté via DataChannel : ${conn.peer}`);
+          console.log(`[Netplay PeerJS] ✓ Connexion entrante reçue de : ${conn.peer}`);
           this.peerConn = conn;
           this.setupPeerDataConnection(conn, true);
         });
 
         peer.on('error', (err) => {
           console.warn('[Netplay PeerJS] Statut Peer Hôte:', err.type || err.message);
+          if (err.type === 'unavailable-id') {
+            console.warn(`[Netplay PeerJS] ID ${hostPeerId} temporairement occupé sur le broker, nouvelle tentative dans 1s...`);
+            setTimeout(() => {
+              if (this.peer === peer && isHost) {
+                this.setupPeerConnection(roomCode, true, playerName);
+              }
+            }, 1000);
+          }
         });
       } else {
         console.log(`[Netplay PeerJS] Invité : tentative de connexion P2P vers ${hostPeerId}...`);
         const peer = new Peer({
-          config: RTC_CONFIG
+          config: RTC_CONFIG,
+          debug: 1
         });
         this.peer = peer;
 
         peer.on('open', (myId) => {
           console.log(`[Netplay PeerJS] Invité connecté au broker (ID: ${myId}), liaison vers l'Hôte : ${hostPeerId}`);
           const conn = peer.connect(hostPeerId, {
-            reliable: true
+            reliable: true,
+            serialization: 'json'
           });
           this.peerConn = conn;
           this.setupPeerDataConnection(conn, false);
@@ -595,6 +595,9 @@ class NetplayService {
 
         peer.on('error', (err) => {
           console.warn('[Netplay PeerJS] Statut Peer Invité:', err.type || err.message);
+          if (err.type === 'peer-unavailable') {
+            this.emit('error', `Impossible de joindre le salon ${cleanCode}. Vérifiez le code ou que l'hôte a bien créé ce salon.`);
+          }
         });
       }
     } catch(err) {
@@ -604,14 +607,26 @@ class NetplayService {
 
   setupPeerDataConnection(conn, isHost) {
     conn.on('open', () => {
-      console.log('[Netplay PeerJS] ✓✓ CANAL DIRECT P2P OUVERT ! Latence zéro active.');
+      console.log(`[Netplay PeerJS] ✓✓ CANAL DIRECT P2P OUVERT ! Latence zéro active (isHost=${isHost}).`);
       this.isP2PConnected = true;
       this.emit('p2p_connected', { label: 'peerjs-webrtc' });
 
+      // Ping périodique ultra-léger pour mesurer la latence directe
+      if (this.webrtcPingInterval) clearInterval(this.webrtcPingInterval);
+      this.webrtcPingInterval = setInterval(() => {
+        if (this.peerConn && this.peerConn.open) {
+          try {
+            this.peerConn.send({ type: 'PING', t: Date.now() });
+          } catch(e) {}
+        }
+      }, 2000);
+
       if (!isHost) {
+        console.log('[Netplay PeerJS] Invité : envoi du signal GUEST_JOINED à l\'hôte...');
         conn.send({
           type: 'GUEST_JOINED',
-          playerName: this.playerName || 'Invité'
+          playerName: this.playerName || 'Joueur 2',
+          sessionId: this.mySessionId
         });
       }
     });
@@ -622,44 +637,109 @@ class NetplayService {
         try { data = JSON.parse(data); } catch(e) {}
       }
 
+      // 1. Handshake : L'Hôte détecte l'invité et l'enregistre
       if (data.type === 'GUEST_JOINED' && isHost) {
-        console.log('[Netplay PeerJS] Invité détecté dans le salon :', data.playerName);
-        if (this.currentRoom) {
-          const newPlayer = {
-            name: data.playerName || 'Joueur 2',
-            slot: 2,
-            isHost: false,
-            playerIndex: 1,
-            role: 'p2',
-            ping: 15
-          };
-          this.currentRoom.players = [this.currentRoom.players[0], newPlayer];
+        console.log('[Netplay PeerJS] ✓ Hôte : Invité connecté avec succès :', data.playerName);
+        const guestName = data.playerName || 'Joueur 2';
+        const p1 = this.currentRoom?.players?.[0] || { 
+          name: this.currentRoom?.hostName || this.playerName || 'Hôte', 
+          slot: 1, 
+          isHost: true, 
+          playerIndex: 0, 
+          role: 'p1', 
+          ping: 10 
+        };
+        const p2 = { 
+          name: guestName, 
+          slot: 2, 
+          isHost: false, 
+          playerIndex: 1, 
+          role: 'p2', 
+          ping: 15 
+        };
+        
+        this.currentRoom = {
+          ...this.currentRoom,
+          players: [p1, p2],
+          updatedAt: Date.now()
+        };
+        this.emit('room_update', this.currentRoom);
+
+        // Envoyer la confirmation officielle et la synchronisation du salon à l'invité
+        conn.send({
+          type: 'HOST_WELCOME',
+          room: this.currentRoom,
+          playerIndex: 1,
+          role: 'p2'
+        });
+      }
+
+      // 2. Handshake : L'Invité reçoit l'acquittement de l'Hôte
+      if (data.type === 'HOST_WELCOME' && !isHost) {
+        console.log('[Netplay PeerJS] ✓ Invité : Confirmation reçue de l\'Hôte ! Salon validé.');
+        if (data.room) {
+          this.currentRoom = { ...this.currentRoom, ...data.room };
+          this.myPlayerIndex = data.playerIndex ?? 1;
+          this.myRole = data.role ?? 'p2';
           this.emit('room_update', this.currentRoom);
-          conn.send({
-            type: 'ROOM_SYNC',
-            room: this.currentRoom
+          this.emit('joined_success', {
+            roomCode: this.currentRoom.code,
+            gameId: this.currentRoom.gameId,
+            gameTitle: this.currentRoom.gameTitle,
+            playerIndex: this.myPlayerIndex,
+            role: this.myRole,
+            players: this.currentRoom.players
           });
         }
       }
 
-      if (data.type === 'ROOM_SYNC' && !isHost) {
-        if (data.room) {
-          this.currentRoom = { ...this.currentRoom, ...data.room };
-          this.emit('room_update', this.currentRoom);
-        }
-      }
-
+      // 3. Lancement du jeu
       if (data.type === 'GAME_STARTED_BY_HOST' && !isHost) {
+        console.log('[Netplay PeerJS] Invité : Ordre de démarrage reçu de l\'Hôte !');
         this.emit('game_started_by_host', data);
       }
 
-      this.handleMessage(data);
+      // 4. Inputs en temps réel
+      if (data.type === 'SEND_INPUT') {
+        this.handleMessage(data);
+      }
+
+      // 5. Synchronisation de Savestate
+      if (data.type === 'REQUEST_STATE') {
+        this.emit('request_state', { fromPlayerIndex: data.fromPlayerIndex });
+      }
+      if (data.type === 'SYNC_STATE') {
+        this.emit('sync_state', data);
+      }
+
+      // 6. Ping / Pong
+      if (data.type === 'PING') {
+        try { conn.send({ type: 'PONG', t: data.t }); } catch(e) {}
+      }
+      if (data.type === 'PONG') {
+        if (data.t) {
+          this.ping = Math.max(1, Math.round((Date.now() - data.t) / 2));
+          this.emit('ping', this.ping);
+        }
+      }
+
+      // 7. Déconnexion
+      if (data.type === 'PEER_LEFT') {
+        this.emit('peer_left', data);
+      }
+      if (data.type === 'HOST_DISCONNECTED') {
+        this.emit('host_disconnected', data.message || "L'hôte a fermé le salon.");
+      }
     });
 
     conn.on('close', () => {
       console.log('[Netplay PeerJS] Canal P2P fermé.');
       this.isP2PConnected = false;
       this.emit('p2p_disconnected');
+      if (this.webrtcPingInterval) {
+        clearInterval(this.webrtcPingInterval);
+        this.webrtcPingInterval = null;
+      }
     });
 
     conn.on('error', (err) => {
@@ -1409,7 +1489,7 @@ class NetplayService {
         createdAt: Date.now(),
         updatedAt: Date.now(),
         players: [
-          { name: hostName, slot: 1, isHost: true, playerIndex: 0, role: 'p1', ping: 12 }
+          { name: hostName, slot: 1, isHost: true, playerIndex: 0, role: 'p1', ping: 5 }
         ],
         gameState: 'waiting',
         inputs: {}
@@ -1418,27 +1498,10 @@ class NetplayService {
       this.currentRoom = initialRoom;
       this.myPlayerIndex = 0;
       this.myRole = 'p1';
+      this.playerName = hostName;
 
-      // 1. Initialiser IMMÉDIATEMENT le tunnel direct P2P sans quota (PeerJS Cloud 0.peerjs.com)
+      // 1. Initialiser le salon Hôte PeerJS (Zero Quota, Zero 429)
       this.setupPeerConnection(roomCode, true, hostName);
-
-      // 2. Initialiser également le relais Ntfy en secours
-      this.setupNtfySignaling(roomCode, true);
-
-      // 3. Lancer la diffusion de battement de cœur dans le lobby global
-      this.startLobbyAnnouncement();
-
-      // 4. Optionnel : Sauvegarde Firestore en tâche de fond STRICTEMENT non-bloquante si quota disponible
-      if (!this.isFirestoreQuotaExceeded) {
-        Promise.race([
-          setDoc(doc(db, 'rooms', roomCode), initialRoom),
-          new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 400))
-        ]).catch((e) => {
-          if (e?.code === 'resource-exhausted' || e?.message?.includes('Quota exceeded')) {
-            this.isFirestoreQuotaExceeded = true;
-          }
-        });
-      }
 
       const resData = {
         roomCode,
@@ -1447,11 +1510,12 @@ class NetplayService {
         maxPlayers,
         hostName,
         role: 'p1',
-        playerIndex: 0
+        playerIndex: 0,
+        players: initialRoom.players
       };
 
       this.emit('room_created', resData);
-      console.log(`[Netplay Cloud] Salon ${roomCode} créé INSTANTANÉMENT (WebRTC P2P sans quota prêt) !`);
+      console.log(`[Netplay Cloud] Salon ${roomCode} créé avec succès (Hôte en attente de connexions P2P directes) !`);
       return resData;
     } catch(err) {
       console.error('[Netplay Cloud] Erreur création salon:', err);
@@ -1462,12 +1526,13 @@ class NetplayService {
   // Rejoindre un salon avec un code (ex: ARC-74 ou 74)
   async joinRoom(roomCode, playerName = 'Invité') {
     await this.connect();
+    this.playerName = playerName;
     let cleanCode = (roomCode || '').trim().toUpperCase();
     if (!cleanCode.startsWith('ARC-') && cleanCode.length <= 4) {
       cleanCode = `ARC-${cleanCode}`;
     }
 
-    // 1. Mode WebSocket LAN si serveur local actif
+    // 1. Mode WebSocket LAN si serveur local actif (ex: même réseau Wi-Fi avec serveur Node)
     if (this.mode === 'ws' && this.ws && this.ws.readyState === WebSocket.OPEN) {
       try {
         const wsRes = await new Promise((resolve, reject) => {
@@ -1498,92 +1563,60 @@ class NetplayService {
           }, 2500);
         });
 
-        // Toujours initialiser la liaison PeerJS P2P et Ntfy
+        // Toujours initialiser la liaison PeerJS P2P en parallèle
         this.setupPeerConnection(cleanCode, false, playerName);
-        this.setupNtfySignaling(cleanCode, false, playerName);
         return wsRes;
       } catch(err) {
         console.log('[Netplay] Salon non trouvé sur LAN ou timeout, essai immédiat sur Cloud / WebRTC...');
       }
     }
 
-    // 2. Mode Cloud + WebRTC (Netlify / Internet / Même Wi-Fi)
-    let joinedRoomData = null;
-    let playerIndex = 1;
-    let role = 'p2';
+    // 2. Mode Cloud + WebRTC (Vercel / Netlify / Internet)
+    this.myPlayerIndex = 1;
+    this.myRole = 'p2';
 
-    // Récupérer les métadonnées depuis les salons découverts en temps réel dans le lobby
-    if (this.discoveredRooms.has(cleanCode)) {
-      joinedRoomData = this.discoveredRooms.get(cleanCode);
-    }
+    // Attente bloquante du véritable handshake HOST_WELCOME avec l'Hôte
+    return new Promise((resolve, reject) => {
+      let settled = false;
 
-    // Tenter Firestore si quota non épuisé (non-bloquant)
-    if (!this.isFirestoreQuotaExceeded) {
-      try {
-        const snap = await Promise.race([
-          getDoc(doc(db, 'rooms', cleanCode)),
-          new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 400))
-        ]);
-
-        if (snap && snap.exists()) {
-          const d = snap.data();
-          if (!joinedRoomData) {
-            joinedRoomData = d;
-          }
+      const timer = setTimeout(() => {
+        if (!settled) {
+          settled = true;
+          cleanup();
+          reject(new Error(`Délai dépassé (10s). Impossible de joindre l'hôte du salon ${cleanCode}. Vérifiez que le code est exact et que l'hôte a bien son salon ouvert.`));
         }
-      } catch(fbErr) {
-        if (fbErr?.code === 'resource-exhausted' || fbErr?.message?.includes('Quota exceeded')) {
-          this.isFirestoreQuotaExceeded = true;
-        }
-      }
-    }
+      }, 10000);
 
-    // Si pas encore de métadonnées, structure par défaut
-    if (!joinedRoomData) {
-      joinedRoomData = {
-        code: cleanCode,
-        gameId: 'arcade',
-        gameTitle: 'Partie Arcade Multijoueur',
-        maxPlayers: 2,
-        players: [
-          { name: 'Hôte', slot: 1, isHost: true, playerIndex: 0, role: 'p1' },
-          { name: playerName, slot: 2, isHost: false, playerIndex: 1, role: 'p2' }
-        ],
-        gameState: 'waiting'
+      const onSuccess = (data) => {
+        if (!settled) {
+          settled = true;
+          clearTimeout(timer);
+          cleanup();
+          resolve(data);
+        }
       };
-    } else {
-      // S'assurer que le tableau des joueurs contient l'hôte et l'invité
-      const existingPlayers = Array.isArray(joinedRoomData.players) ? [...joinedRoomData.players] : [];
-      if (existingPlayers.length === 0) {
-        existingPlayers[0] = { name: joinedRoomData.hostName || 'Hôte', slot: 1, isHost: true, playerIndex: 0, role: 'p1' };
-      }
-      existingPlayers[1] = { name: playerName, slot: 2, isHost: false, playerIndex: 1, role: 'p2' };
-      joinedRoomData.players = existingPlayers;
-    }
 
-    this.currentRoom = joinedRoomData;
-    this.myPlayerIndex = playerIndex;
-    this.myRole = role;
+      const onError = (err) => {
+        if (!settled) {
+          settled = true;
+          clearTimeout(timer);
+          cleanup();
+          const msg = typeof err === 'string' ? err : (err?.message || 'Échec de connexion au salon');
+          reject(new Error(msg));
+        }
+      };
 
-    // Relais direct P2P garanti sans quota (PeerJS Cloud 0.peerjs.com)
-    this.setupPeerConnection(cleanCode, false, playerName);
+      const cleanup = () => {
+        this.off('joined_success', onSuccess);
+        this.off('error', onError);
+      };
 
-    // Relais de signalisation P2P en secours (ntfy.sh WebSocket)
-    this.setupNtfySignaling(cleanCode, false, playerName);
+      this.on('joined_success', onSuccess);
+      this.on('error', onError);
 
-    const resData = {
-      roomCode: cleanCode,
-      gameId: joinedRoomData.gameId,
-      gameTitle: joinedRoomData.gameTitle,
-      maxPlayers: joinedRoomData.maxPlayers || 2,
-      playerIndex,
-      role,
-      players: joinedRoomData.players
-    };
-
-    this.emit('joined_success', resData);
-    console.log(`[Netplay Cloud] Salon ${cleanCode} rejoint instantanément (Slot J${playerIndex + 1}) !`);
-    return resData;
+      console.log(`[Netplay Cloud] Tentative de connexion directe P2P vers le salon ${cleanCode}...`);
+      this.setupPeerConnection(cleanCode, false, playerName);
+    });
   }
 
   // Envoyer un input (D-pad ou bouton) vers l'autre joueur avec redondance N-3
