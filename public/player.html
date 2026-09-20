@@ -1446,6 +1446,50 @@
           rebuildKeyMap(activeSettings.controls);
           console.log(`[Player] Index joueur assigné mis à jour: J${assignedPlayerIndex + 1}`);
         }
+        if (event.data.type === 'APPLY_WORLD_ENTITIES') {
+          // L'Invité reçoit les positions certifiées des monstres/objets de l'Hôte
+          const { frame, entities, drift } = event.data;
+          try {
+            const heap = window.EJS_emulator?.gameManager?.Module?.HEAPU8;
+            if (heap && Array.isArray(entities)) {
+              const baseOffset = (window._csw_entity_offset || 0x100000);
+              for (const e of entities) {
+                const entAddr = baseOffset + e.id * 8;
+                if (entAddr + 4 < heap.length) {
+                  heap[entAddr] = (e.x >> 8) & 0xFF;
+                  heap[entAddr + 1] = e.x & 0xFF;
+                  heap[entAddr + 2] = (e.y >> 8) & 0xFF;
+                  heap[entAddr + 3] = e.y & 0xFF;
+                }
+              }
+            }
+            // Régulation dynamique de l'horloge
+            if (typeof drift === 'number') {
+              if (drift > 1) {
+                netplayLocalFrame += 1; // Accélère d'une frame
+              } else if (drift < -1) {
+                netplayLocalFrame = Math.max(0, netplayLocalFrame - 1); // Temporise
+              }
+            }
+          } catch(e) {}
+        }
+        if (event.data.type === 'APPLY_PLAYER_ENTITY') {
+          // L'Hôte applique la position exacte de J2 reçue de l'Invité
+          const { frame, x, y } = event.data;
+          try {
+            const heap = window.EJS_emulator?.gameManager?.Module?.HEAPU8;
+            if (heap) {
+              const baseOffset = (window._csw_entity_offset || 0x100000);
+              const p2Addr = baseOffset + 8; // Slot 1 = J2
+              if (p2Addr + 4 < heap.length) {
+                heap[p2Addr] = (x >> 8) & 0xFF;
+                heap[p2Addr + 1] = x & 0xFF;
+                heap[p2Addr + 2] = (y >> 8) & 0xFF;
+                heap[p2Addr + 3] = y & 0xFF;
+              }
+            }
+          } catch(e) {}
+        }
         if (event.data.type === 'APP_VISIBILITY') {
           const isVis = !!event.data.visible;
           if (window.EJS_emulator) {
@@ -1465,6 +1509,73 @@
           }
         }
       });
+
+      // --- BOUCLE D'EXTRACTION SÉLECTIVE D'ENTITÉS & DELTA (60 FPS) ---
+      let netplayLocalFrame = 0;
+      const lastSentEntitiesMap = new Map();
+
+      function entitySyncLoop() {
+        if (window.EJS_emulator?.gameManager && isNetplay) {
+          netplayLocalFrame++;
+
+          // 1. Si Hôte (J1) : extraire les monstres et objets ayant bougé (Delta)
+          if (assignedPlayerIndex === 0) {
+            try {
+              const heap = window.EJS_emulator?.gameManager?.Module?.HEAPU8;
+              if (heap) {
+                const changedEntities = [];
+                const maxEntities = 24;
+                const baseOffset = (window._csw_entity_offset || 0x100000);
+
+                for (let id = 0; id < maxEntities; id++) {
+                  const entAddr = baseOffset + id * 8;
+                  if (entAddr + 4 < heap.length) {
+                    const x = (heap[entAddr] << 8) | heap[entAddr + 1];
+                    const y = (heap[entAddr + 2] << 8) | heap[entAddr + 3];
+                    const prev = lastSentEntitiesMap.get(id);
+                    if (!prev || prev.x !== x || prev.y !== y) {
+                      lastSentEntitiesMap.set(id, { x, y });
+                      changedEntities.push({ id, x, y });
+                    }
+                  }
+                }
+
+                if (changedEntities.length > 0 && window.parent && window.parent !== window) {
+                  window.parent.postMessage({
+                    type: 'WORLD_ENTITIES_DELTA',
+                    frame: netplayLocalFrame,
+                    entities: changedEntities
+                  }, '*');
+                }
+              }
+            } catch(e) {}
+          } else if (assignedPlayerIndex === 1) {
+            // 2. Si Invité (J2) : extraire sa position et la diffuser à l'Hôte
+            try {
+              const heap = window.EJS_emulator?.gameManager?.Module?.HEAPU8;
+              if (heap) {
+                const baseOffset = (window._csw_entity_offset || 0x100000);
+                const p2Addr = baseOffset + 8; // Slot 1 = J2
+                if (p2Addr + 4 < heap.length) {
+                  const p2X = (heap[p2Addr] << 8) | heap[p2Addr + 1];
+                  const p2Y = (heap[p2Addr + 2] << 8) | heap[p2Addr + 3];
+                  if (window.parent && window.parent !== window) {
+                    window.parent.postMessage({
+                      type: 'PLAYER_ENTITY_POS',
+                      frame: netplayLocalFrame,
+                      x: p2X,
+                      y: p2Y
+                    }, '*');
+                  }
+                }
+              }
+            } catch(e) {}
+          }
+        }
+
+        requestAnimationFrame(entitySyncLoop);
+      }
+      requestAnimationFrame(entitySyncLoop);
 
       // Déverrouillage automatique de l'audio mobile dès le premier toucher
       const unlockAudio = () => {

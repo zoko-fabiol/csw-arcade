@@ -79,6 +79,54 @@ export function EmulatorCore({
     && (settings?.touch?.portraitMode ?? 'pad-bottom') === 'pad-bottom';
 
   const hasSyncedInitialState = useRef(false);
+  const syncEngineRef = useRef(null);
+
+  // Initialisation du moteur de synchronisation sélective d'entités (Delta Monstres / J2)
+  useEffect(() => {
+    if (mode === 'netplay') {
+      const engine = new NetplaySyncEngine(netplayService, isHost);
+      syncEngineRef.current = engine;
+
+      engine.onWorldEntitiesReceived = ({ frame, entities, drift }) => {
+        if (iframeRef.current?.contentWindow) {
+          iframeRef.current.contentWindow.postMessage({
+            type: 'APPLY_WORLD_ENTITIES',
+            frame,
+            entities,
+            drift
+          }, '*');
+        }
+      };
+
+      engine.onPlayerEntityReceived = ({ frame, x, y, state }) => {
+        if (iframeRef.current?.contentWindow) {
+          iframeRef.current.contentWindow.postMessage({
+            type: 'APPLY_PLAYER_ENTITY',
+            frame,
+            x,
+            y,
+            state
+          }, '*');
+        }
+      };
+
+      engine.onClockAdjustment = (drift) => {
+        if (iframeRef.current?.contentWindow) {
+          iframeRef.current.contentWindow.postMessage({
+            type: 'ADJUST_CLOCK',
+            drift
+          }, '*');
+        }
+      };
+
+      engine.start();
+
+      return () => {
+        engine.stop();
+        syncEngineRef.current = null;
+      };
+    }
+  }, [mode, isHost]);
 
   const handleTouchInput = (buttonId, isPressed) => {
     const myIdx = netplayService.myPlayerIndex >= 0 ? netplayService.myPlayerIndex : (isHost ? 0 : 1);
@@ -230,6 +278,16 @@ export function EmulatorCore({
           stateSize: event.data.stateSize || 0,
           isHeartbeat: !!event.data.isHeartbeat
         }, event.data.toPlayerIndex);
+      }
+
+      // Hôte : relayer les deltas d'entités (monstres & objets) vers l'invité
+      if (event.data.type === 'WORLD_ENTITIES_DELTA' && mode === 'netplay') {
+        syncEngineRef.current?.sendWorldEntities(event.data.frame, event.data.entities);
+      }
+
+      // Invité : relayer la position du joueur 2 vers l'hôte
+      if (event.data.type === 'PLAYER_ENTITY_POS' && mode === 'netplay') {
+        syncEngineRef.current?.sendPlayerEntity(event.data.frame, event.data.x, event.data.y);
       }
     };
 

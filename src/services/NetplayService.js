@@ -59,6 +59,7 @@ class NetplayService {
     this.discoveredRooms = new Map();
     this.lobbyWs = null;
     this.lobbyHeartbeatInterval = null;
+    this.onDataReceived = null; // Callback binaire pour NetplaySyncEngine
 
     // --- REDONDANCE N-3 & FLUX GGPO ---
     this.localSeq = 0;
@@ -633,6 +634,17 @@ class NetplayService {
 
     conn.on('data', (data) => {
       if (!data) return;
+
+      // Détection binaire ultra-rapide (NetplaySyncEngine / Entités Delta)
+      if (data instanceof ArrayBuffer || (data && data.byteLength !== undefined)) {
+        const rawBuf = data instanceof ArrayBuffer ? data : data.buffer;
+        this.emit('binary_data', rawBuf);
+        if (typeof this.onDataReceived === 'function') {
+          try { this.onDataReceived(rawBuf); } catch(e) {}
+        }
+        return;
+      }
+
       if (typeof data === 'string') {
         try { data = JSON.parse(data); } catch(e) {}
       }
@@ -1942,6 +1954,24 @@ class NetplayService {
     // 2. Mode WebSocket LAN
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
       this.ws.send(JSON.stringify(startPayload));
+    }
+  }
+
+  // Envoi d'un paquet binaire ultra-léger (NetplaySyncEngine / Entités Delta)
+  sendBinary(buffer) {
+    if (this.peerConn && this.peerConn.open) {
+      try {
+        this.peerConn.send(buffer);
+        return;
+      } catch(e) {}
+    }
+    const targetChannel = (this.fastInputChannel && this.fastInputChannel.readyState === 'open')
+      ? this.fastInputChannel
+      : (this.reliableChannel && this.reliableChannel.readyState === 'open' ? this.reliableChannel : null);
+    if (targetChannel) {
+      try {
+        targetChannel.send(buffer);
+      } catch(e) {}
     }
   }
 
