@@ -257,8 +257,14 @@ class NetplayService {
   }
 
   // Connexion intelligente : Tente le WebSocket local d'abord, puis bascule en Firebase Cloud
-  async connect() {
-    if (this.mode === 'firebase') return Promise.resolve();
+  async connect(forceWs = false) {
+    const isLocalHost = typeof window !== 'undefined' && (
+      window.location.hostname === 'localhost' || 
+      window.location.hostname === '127.0.0.1' || 
+      window.location.hostname.startsWith('192.168.') || 
+      window.location.hostname.startsWith('10.')
+    );
+    if (this.mode === 'firebase' && !forceWs && !isLocalHost) return Promise.resolve();
     if (this.ws && (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING)) {
       return Promise.resolve();
     }
@@ -363,14 +369,23 @@ class NetplayService {
       }
 
       case 'JOINED_SUCCESS': {
+        const pIndex = typeof data.playerIndex === 'number' ? data.playerIndex : 1;
+        let players = data.players;
+        if (!players || !Array.isArray(players) || players.length === 0) {
+          players = [
+            { name: 'Hôte', slot: 1, isHost: true, playerIndex: 0, role: 'p1', ping: 0 },
+            { name: this.playerName || 'Joueur 2', slot: 2, isHost: false, playerIndex: 1, role: 'p2', ping: 0 }
+          ];
+        }
         this.currentRoom = {
           code: data.roomCode,
-          maxPlayers: data.maxPlayers,
+          maxPlayers: data.maxPlayers || 2,
           gameId: data.gameId,
-          gameTitle: data.gameTitle
+          gameTitle: data.gameTitle,
+          players
         };
-        this.myPlayerIndex = data.playerIndex;
-        this.myRole = data.role;
+        this.myPlayerIndex = pIndex;
+        this.myRole = data.role || `p${pIndex + 1}`;
         this.emit('joined_success', data);
         break;
       }
@@ -515,10 +530,7 @@ class NetplayService {
       });
       this.webrtcUnsubs = [];
     }
-    if (this.ntfyWs) {
-      try { this.ntfyWs.close(); } catch(e) {}
-      this.ntfyWs = null;
-    }
+    // Note: this.ntfyWs ne doit PAS être fermé ici car il sert de canal de signalisation persistant
     if (this.fastInputChannel) {
       try {
         this.fastInputChannel.onopen = null;
@@ -554,10 +566,24 @@ class NetplayService {
   // --- SIGNALING P2P UNIVERSEL SANS QUOTA (ntfy.sh WebSocket) ---
   setupNtfySignaling(roomCode, isHost, playerName = null) {
     if (playerName) this.playerName = playerName;
-    const cleanCode = roomCode.trim().toLowerCase();
-    const topic = `csw-arcade-${cleanCode}`;
+    let cleanCode = (roomCode || '').trim().toUpperCase();
+    if (!cleanCode.startsWith('ARC-') && cleanCode.length <= 4) {
+      cleanCode = `ARC-${cleanCode}`;
+    }
+    const topic = `csw-arcade-${cleanCode.toLowerCase().replace(/[^a-z0-9]/g, '')}`;
     this.currentTopic = topic;
     this.pendingNtfyCandidates = [];
+
+    // Si déjà connecté et actif sur ce topic, ne pas détruire la liaison WebSocket !
+    if (this.ntfyWs && (this.ntfyWs.readyState === WebSocket.OPEN || this.ntfyWs.readyState === WebSocket.CONNECTING) && this.currentTopic === topic) {
+      if (!isHost) {
+        this.sendNtfySignal(topic, {
+          type: 'GUEST_JOINED',
+          playerName: this.playerName || 'Invité'
+        });
+      }
+      return;
+    }
 
     if (this.ntfyWs) {
       try { this.ntfyWs.close(); } catch(e) {}
@@ -1144,6 +1170,10 @@ class NetplayService {
           try { localStorage.setItem('csw_my_active_room', wsRes.roomCode); } catch(e) {}
         }
 
+        // Toujours initialiser la signalisation Ntfy et le lobby global même en LAN pour WebRTC P2P
+        this.setupNtfySignaling(wsRes.roomCode, true);
+        this.startLobbyAnnouncement();
+
         // Mirrorer immédiatement dans Firebase pour que les amis sur le même Wi-Fi ou à distance puissent se joindre
         try {
           const roomRef = doc(db, 'rooms', wsRes.roomCode);
@@ -1268,10 +1298,13 @@ class NetplayService {
     }
   }
 
-  // Rejoindre un salon avec un code (ex: ARC-74)
+  // Rejoindre un salon avec un code (ex: ARC-74 ou 74)
   async joinRoom(roomCode, playerName = 'Invité') {
     await this.connect();
-    const cleanCode = roomCode.trim().toUpperCase();
+    let cleanCode = (roomCode || '').trim().toUpperCase();
+    if (!cleanCode.startsWith('ARC-') && cleanCode.length <= 4) {
+      cleanCode = `ARC-${cleanCode}`;
+    }
 
     // 1. Mode WebSocket LAN si serveur local actif
     if (this.mode === 'ws' && this.ws && this.ws.readyState === WebSocket.OPEN) {
@@ -1304,6 +1337,8 @@ class NetplayService {
           }, 2500);
         });
 
+        // Toujours initialiser la signalisation Ntfy pour WebRTC P2P direct
+        this.setupNtfySignaling(cleanCode, false, playerName);
         return wsRes;
       } catch(err) {
         console.log('[Netplay] Salon non trouvé sur LAN ou timeout, essai immédiat sur Cloud / WebRTC...');
@@ -1350,6 +1385,14 @@ class NetplayService {
         ],
         gameState: 'waiting'
       };
+    } else {
+      // S'assurer que le tableau des joueurs contient l'hôte et l'invité
+      const existingPlayers = Array.isArray(joinedRoomData.players) ? [...joinedRoomData.players] : [];
+      if (existingPlayers.length === 0) {
+        existingPlayers[0] = { name: joinedRoomData.hostName || 'Hôte', slot: 1, isHost: true, playerIndex: 0, role: 'p1' };
+      }
+      existingPlayers[1] = { name: playerName, slot: 2, isHost: false, playerIndex: 1, role: 'p2' };
+      joinedRoomData.players = existingPlayers;
     }
 
     this.currentRoom = joinedRoomData;
@@ -1365,7 +1408,8 @@ class NetplayService {
       gameTitle: joinedRoomData.gameTitle,
       maxPlayers: joinedRoomData.maxPlayers || 2,
       playerIndex,
-      role
+      role,
+      players: joinedRoomData.players
     };
 
     this.emit('joined_success', resData);
@@ -1569,11 +1613,13 @@ class NetplayService {
   }
 
   // Lancer la partie en tant qu'hôte
-  startGame() {
+  startGame(game = null) {
+    const gameId = game?.id || this.currentRoom?.gameId;
+    const gameTitle = game?.title || this.currentRoom?.gameTitle;
     const startMsg = {
       type: 'START_GAME',
-      gameId: this.currentRoom?.gameId,
-      gameTitle: this.currentRoom?.gameTitle
+      gameId,
+      gameTitle
     };
 
     // 1. WebRTC DataChannels P2P

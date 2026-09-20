@@ -208,7 +208,9 @@ export function setupNetplayHub(server) {
 
           case 'JOIN_ROOM': {
             const { roomCode, playerName = 'Joueur' } = data;
-            const room = rooms.get(roomCode?.toUpperCase());
+            const raw = (roomCode || '').trim().toUpperCase();
+            const fullCode = raw.startsWith('ARC-') ? raw : (raw.length <= 4 ? `ARC-${raw}` : raw);
+            const room = rooms.get(fullCode) || rooms.get(raw);
             if (!room) {
               ws.send(JSON.stringify({ type: 'ERROR', message: `Le salon "${roomCode}" n'existe pas.` }));
               return;
@@ -223,11 +225,27 @@ export function setupNetplayHub(server) {
               }
             }
 
+            const currentPlayersList = room.players.map((p, idx) => p ? {
+              slot: idx + 1,
+              name: p.name,
+              playerIndex: idx,
+              isHost: idx === 0,
+              ping: p.ping || 0
+            } : null);
+
             if (assignedSlot !== -1) {
               // Joueur actif assigné
-              room.players[assignedSlot] = {
+              const newPlayer = {
                 ws,
                 name: playerName || `Joueur ${assignedSlot + 1}`,
+                playerIndex: assignedSlot,
+                isHost: false,
+                ping: 0
+              };
+              room.players[assignedSlot] = newPlayer;
+              currentPlayersList[assignedSlot] = {
+                slot: assignedSlot + 1,
+                name: newPlayer.name,
                 playerIndex: assignedSlot,
                 isHost: false,
                 ping: 0
@@ -242,7 +260,8 @@ export function setupNetplayHub(server) {
                 maxPlayers: room.maxPlayers,
                 role,
                 gameId: room.gameId,
-                gameTitle: room.gameTitle
+                gameTitle: room.gameTitle,
+                players: currentPlayersList
               }));
             } else {
               // Plus de slots joueur disponibles -> Spectateur
@@ -256,7 +275,8 @@ export function setupNetplayHub(server) {
                 maxPlayers: room.maxPlayers,
                 role: 'spectator',
                 gameId: room.gameId,
-                gameTitle: room.gameTitle
+                gameTitle: room.gameTitle,
+                players: currentPlayersList
               }));
             }
 

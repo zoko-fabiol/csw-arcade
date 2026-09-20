@@ -108,10 +108,17 @@ export function NetplayModal({
       }),
       netplayService.on('game_started_by_host', (data) => {
         if (onLaunchGame) {
-          const gameToLaunch = games.find(g => g.id === data.gameId) || { id: data.gameId, title: data.gameTitle };
+          const targetId = data.gameId || activeRoom?.gameId;
+          const targetTitle = data.gameTitle || activeRoom?.gameTitle;
+          const gameToLaunch = games.find(g => 
+            g.id === targetId || 
+            g.filename === targetId || 
+            (targetTitle && g.title?.toLowerCase() === targetTitle.toLowerCase())
+          ) || (targetId ? { id: targetId, title: targetTitle || targetId } : games[0]);
+
           onLaunchGame(gameToLaunch, { 
             isNetplay: true, 
-            isHost: false,
+            isHost: false, 
             role: netplayService.myRole, 
             playerIndex: netplayService.myPlayerIndex 
           });
@@ -208,7 +215,7 @@ export function NetplayModal({
   };
 
   const handleStartHostedGame = () => {
-    netplayService.startGame();
+    netplayService.startGame(selectedGame);
     if (onLaunchGame && selectedGame) {
       onLaunchGame(selectedGame, { isNetplay: true, isHost: true, playerIndex: 0, role: 'p1' });
       onClose();
