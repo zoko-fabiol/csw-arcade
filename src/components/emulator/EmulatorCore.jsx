@@ -45,6 +45,7 @@ export function EmulatorCore({
   const [interrupted, setInterrupted] = useState({ isInterrupted: false, message: '' });
   const [syncNotification, setSyncNotification] = useState(null);
   const [isP2PDirect, setIsP2PDirect] = useState(() => netplayService.isP2PConnected);
+  const [inputDelay, setInputDelay] = useState(() => netplayService.inputDelayFrames || 0);
   const hasSyncedInitialState = useRef(false);
 
   // Détection automatique du mode tactile (mobile / tablette / tactile)
@@ -148,6 +149,7 @@ export function EmulatorCore({
     const unsubRoom = netplayService.on('room_update', (r) => setNetplayRoom(r));
     const unsubP2POn = netplayService.on('p2p_connected', () => setIsP2PDirect(true));
     const unsubP2POff = netplayService.on('p2p_disconnected', () => setIsP2PDirect(false));
+    const unsubDelay = netplayService.on('delay_update', (d) => setInputDelay(d));
 
     return () => {
       unsubInput();
@@ -159,6 +161,7 @@ export function EmulatorCore({
       unsubRoom();
       unsubP2POn();
       unsubP2POff();
+      unsubDelay();
     };
   }, [mode, isHost]);
 
@@ -413,8 +416,13 @@ export function EmulatorCore({
                 {netplayRoom?.code || 'NET'} {isHost ? 'J1' : `J${netplayService.myPlayerIndex >= 0 ? netplayService.myPlayerIndex + 1 : 2}`}
               </span>
               <span className={`px-1.5 py-0.2 rounded text-[9px] font-bold ${isP2PDirect ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40' : 'bg-amber-500/20 text-amber-300 border border-amber-500/40'}`}>
-                {isP2PDirect ? '⚡ P2P Direct' : '⏳ Relais'}
+                {isP2PDirect ? '⚡ UDP Direct' : '⏳ Relais'}
               </span>
+              {inputDelay > 0 && (
+                <span className="px-1.5 py-0.2 rounded text-[9px] font-mono font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/40" title="Buffer adaptatif de compensation intercontinentale GGPO">
+                  {inputDelay}F Delay
+                </span>
+              )}
             </div>
           ) : (
             <div className="flex items-center gap-1.5 px-2 sm:px-3 py-0.5 sm:py-1 rounded-full bg-cyan-950/80 border border-cyan-500/40 text-cyan-400 text-[10px] sm:text-[11px]">

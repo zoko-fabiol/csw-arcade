@@ -21,18 +21,22 @@ const RTC_CONFIG = {
     { urls: 'stun:stun4.l.google.com:19302' },
     { urls: 'stun:stun.cloudflare.com:3478' },
     { urls: 'stun:global.stun.twilio.com:3478' },
-    // Serveurs TURN publics gratuits pour traverser les NAT symétriques, 4G/5G et pare-feux à distance
+    { urls: 'stun:stun.services.mozilla.com' },
+    { urls: 'stun:stun.metered.ca:80' },
+    // Serveurs TURN pour traverser les CGNAT mobiles (Orange, MTN, Camtel) & pare-feux
     {
       urls: [
         'turn:openrelay.metered.ca:80',
         'turn:openrelay.metered.ca:443',
-        'turn:openrelay.metered.ca:443?transport=tcp'
+        'turn:openrelay.metered.ca:443?transport=tcp',
+        'turns:openrelay.metered.ca:443?transport=tcp'
       ],
       username: 'openrelayproject',
       credential: 'openrelayproject'
     }
   ],
-  iceCandidatePoolSize: 10
+  iceCandidatePoolSize: 10,
+  iceTransportPolicy: 'all'
 };
 
 class NetplayService {
@@ -48,12 +52,14 @@ class NetplayService {
     this.firestoreUnsub = null;
     this.isConnecting = false;
 
-    // --- WebRTC P2P DataChannel ---
+    // --- WebRTC P2P DataChannels ---
     this.pc = null;
-    this.webrtcChannel = null;
+    this.fastInputChannel = null; // Canal UDP ultra-rapide (ordered: false, maxRetransmits: 0)
+    this.reliableChannel = null; // Canal fiable ordonné pour états et contrôle
     this.webrtcUnsubs = [];
     this.webrtcPingInterval = null;
     this.isP2PConnected = false;
+    this.inputDelayFrames = 0; // Buffer adaptatif GGPO (0 à 3 frames)
 
     // --- REDONDANCE N-3 & FLUX GGPO ---
     this.localSeq = 0;
@@ -61,6 +67,12 @@ class NetplayService {
     this.inputHistory = []; // [ { seq, frame, buttonId, isPressed, playerIndex } ]
     this.lastRemoteSeq = new Map(); // playerIndex -> last received seq
     this.incomingStateChunks = new Map(); // transferId -> { chunks, receivedCount, totalChunks, isHeartbeat }
+  }
+
+  get webrtcChannel() {
+    return (this.fastInputChannel && this.fastInputChannel.readyState === 'open')
+      ? this.fastInputChannel
+      : this.reliableChannel;
   }
 
   // Système d'événements
@@ -345,17 +357,25 @@ class NetplayService {
       });
       this.webrtcUnsubs = [];
     }
-    if (this.webrtcChannel) {
+    if (this.fastInputChannel) {
       try {
-        this.webrtcChannel.onopen = null;
-        this.webrtcChannel.onclose = null;
-        this.webrtcChannel.onerror = null;
-        this.webrtcChannel.onmessage = null;
-        if (this.webrtcChannel.readyState !== 'closed') {
-          this.webrtcChannel.close();
-        }
+        this.fastInputChannel.onopen = null;
+        this.fastInputChannel.onclose = null;
+        this.fastInputChannel.onerror = null;
+        this.fastInputChannel.onmessage = null;
+        if (this.fastInputChannel.readyState !== 'closed') this.fastInputChannel.close();
       } catch(e) {}
-      this.webrtcChannel = null;
+      this.fastInputChannel = null;
+    }
+    if (this.reliableChannel) {
+      try {
+        this.reliableChannel.onopen = null;
+        this.reliableChannel.onclose = null;
+        this.reliableChannel.onerror = null;
+        this.reliableChannel.onmessage = null;
+        if (this.reliableChannel.readyState !== 'closed') this.reliableChannel.close();
+      } catch(e) {}
+      this.reliableChannel = null;
     }
     if (this.pc) {
       try {
@@ -370,36 +390,82 @@ class NetplayService {
   }
 
   setupDataChannel(dc) {
-    dc.onopen = () => {
-      console.log(`[Netplay WebRTC] ✓ DataChannel '${dc.label}' OUVERT ! Connexion P2P directe active (0 ms latence interne).`);
-      this.isP2PConnected = true;
-      this.emit('p2p_connected');
+    try {
+      dc.binaryType = 'arraybuffer';
+    } catch(e) {}
 
-      // Mesure du RTT P2P
-      if (this.webrtcPingInterval) clearInterval(this.webrtcPingInterval);
-      this.webrtcPingInterval = setInterval(() => {
-        if (dc.readyState === 'open') {
-          try {
-            dc.send(JSON.stringify({ type: 'PING', clientTime: Date.now() }));
-          } catch(e) {}
-        }
-      }, 2000);
+    dc.onopen = () => {
+      console.log(`[Netplay WebRTC] ✓ DataChannel '${dc.label}' OUVERT ! Liaison P2P active.`);
+      this.isP2PConnected = true;
+      this.emit('p2p_connected', { label: dc.label });
+
+      // Mesure du RTT P2P sur le canal de contrôle
+      if (!this.webrtcPingInterval && (dc.label === 'csw-reliable-channel' || dc.label === 'csw-arcade-netplay' || dc.label === 'csw-fast-inputs')) {
+        this.webrtcPingInterval = setInterval(() => {
+          const pingTarget = (this.reliableChannel && this.reliableChannel.readyState === 'open')
+            ? this.reliableChannel
+            : (this.fastInputChannel && this.fastInputChannel.readyState === 'open' ? this.fastInputChannel : null);
+          if (pingTarget) {
+            try {
+              pingTarget.send(JSON.stringify({ type: 'PING', clientTime: Date.now() }));
+            } catch(e) {}
+          }
+        }, 2000);
+      }
     };
 
     dc.onclose = () => {
       console.log(`[Netplay WebRTC] DataChannel '${dc.label}' FERMÉ.`);
-      this.isP2PConnected = false;
-      if (this.webrtcPingInterval) clearInterval(this.webrtcPingInterval);
-      if (this.currentRoom) {
-        this.emit('peer_left', { message: "Connexion P2P fermée ou perdue avec l'autre joueur." });
+      const hasOpenChannel = (this.fastInputChannel?.readyState === 'open') || (this.reliableChannel?.readyState === 'open');
+      if (!hasOpenChannel) {
+        this.isP2PConnected = false;
+        if (this.webrtcPingInterval) {
+          clearInterval(this.webrtcPingInterval);
+          this.webrtcPingInterval = null;
+        }
+        if (this.currentRoom) {
+          this.emit('peer_left', { message: "Connexion P2P fermée ou perdue avec l'autre joueur." });
+        }
       }
     };
 
     dc.onerror = (err) => {
-      console.warn('[Netplay WebRTC] Erreur DataChannel:', err);
+      console.warn(`[Netplay WebRTC] Erreur DataChannel '${dc.label}':`, err);
     };
 
     dc.onmessage = (event) => {
+      // 1. Décodage binaire ultra-rapide 9 octets (Zero garbage collection, latence minimale)
+      if (event.data instanceof ArrayBuffer) {
+        const u8 = new Uint8Array(event.data);
+        if (u8[0] === 0xA5 && u8.length >= 9) {
+          const incomingSeq = (u8[1] << 8) | u8[2];
+          const pIdx = u8[3];
+          const buttonId = u8[4];
+          const isPressed = u8[5] === 1;
+          const history = [];
+          for (let i = 0; i < 3; i++) {
+            const val = u8[6 + i];
+            if (val !== 0xFF) {
+              history.push({
+                buttonId: val & 0x0F,
+                isPressed: (val & 0x80) !== 0,
+                seq: Math.max(0, incomingSeq - (3 - i))
+              });
+            }
+          }
+          this.handleMessage({
+            type: 'REMOTE_INPUT',
+            playerIndex: pIdx,
+            buttonId,
+            isPressed,
+            seq: incomingSeq,
+            history
+          });
+          return;
+        }
+      }
+
+      // 2. Décodage JSON pour le contrôle et signaux
       try {
         const msg = JSON.parse(event.data);
         if (msg.type === 'PING') {
@@ -411,7 +477,22 @@ class NetplayService {
         if (msg.type === 'PONG') {
           if (msg.clientTime) {
             this.ping = Math.max(1, Date.now() - msg.clientTime);
+            // Calcul automatique du buffer de délai optimal (style Fightcade / GGPO)
+            // Ping < 40ms -> 0 frame delay
+            // Ping 40-90ms -> 1 frame delay (16ms)
+            // Ping 90-160ms (Cameroun-France) -> 2 frames delay (33ms)
+            // Ping > 160ms -> 3 frames delay (50ms)
+            if (this.ping < 40) {
+              this.inputDelayFrames = 0;
+            } else if (this.ping < 90) {
+              this.inputDelayFrames = 1;
+            } else if (this.ping < 160) {
+              this.inputDelayFrames = 2;
+            } else {
+              this.inputDelayFrames = 3;
+            }
             this.emit('ping', this.ping);
+            this.emit('delay_update', this.inputDelayFrames);
           }
           return;
         }
@@ -430,12 +511,20 @@ class NetplayService {
       const pendingCandidates = [];
       let isRemoteDescSet = false;
 
-      // Création du DataChannel bidirectionnel ordonné pour garantir l'ordre des touches et savestates
-      const dc = pc.createDataChannel('csw-arcade-netplay', {
+      // 1. Canal UDP rapide pour les inputs 60 FPS (ordered: false, maxRetransmits: 0 -> 0 blocage HOL)
+      const fastDc = pc.createDataChannel('csw-fast-inputs', {
+        ordered: false,
+        maxRetransmits: 0
+      });
+      this.fastInputChannel = fastDc;
+      this.setupDataChannel(fastDc);
+
+      // 2. Canal fiable ordonné pour états lourds (savestates) et signaux
+      const reliableDc = pc.createDataChannel('csw-reliable-channel', {
         ordered: true
       });
-      this.webrtcChannel = dc;
-      this.setupDataChannel(dc);
+      this.reliableChannel = reliableDc;
+      this.setupDataChannel(reliableDc);
 
       const callerCandidatesCol = collection(roomRef, 'callerCandidates');
       pc.onicecandidate = (event) => {
@@ -512,9 +601,14 @@ class NetplayService {
       let isRemoteDescSet = false;
 
       pc.ondatachannel = (event) => {
-        console.log('[Netplay WebRTC Invité] DataChannel capté depuis l\'hôte !');
-        this.webrtcChannel = event.channel;
-        this.setupDataChannel(event.channel);
+        const dc = event.channel;
+        console.log(`[Netplay WebRTC Invité] DataChannel capté depuis l'hôte : ${dc.label}`);
+        if (dc.label === 'csw-fast-inputs') {
+          this.fastInputChannel = dc;
+        } else {
+          this.reliableChannel = dc;
+        }
+        this.setupDataChannel(dc);
       };
 
       const calleeCandidatesCol = collection(roomRef, 'calleeCandidates');
@@ -957,31 +1051,69 @@ class NetplayService {
       this.inputHistory.shift();
     }
 
-    const payloadObj = {
-      type: 'SEND_INPUT',
-      playerIndex: pIdx,
-      buttonId,
-      isPressed: !!isPressed,
-      frame: this.currentFrame,
-      seq: this.localSeq,
-      history: historyPayload
-    };
+    // Format Binaire Ultra-Compact 9 octets (Zéro overhead JSON, 0 fragmentation UDP)
+    // [0]   : 0xA5 (Magic Header)
+    // [1-2] : seq 16 bits
+    // [3]   : playerIndex & 0x03
+    // [4]   : buttonId & 0x0F
+    // [5]   : isPressed (1 ou 0)
+    // [6-8] : Historique N-3 compacté ou 0xFF
+    const binPacket = new Uint8Array(9);
+    binPacket[0] = 0xA5;
+    binPacket[1] = (this.localSeq >> 8) & 0xFF;
+    binPacket[2] = this.localSeq & 0xFF;
+    binPacket[3] = pIdx & 0x03;
+    binPacket[4] = buttonId & 0x0F;
+    binPacket[5] = isPressed ? 1 : 0;
+    for (let i = 0; i < 3; i++) {
+      const h = historyPayload[i];
+      if (h) {
+        binPacket[6 + i] = (h.buttonId & 0x0F) | (h.isPressed ? 0x80 : 0);
+      } else {
+        binPacket[6 + i] = 0xFF;
+      }
+    }
 
-    // 1. PRIORITÉ ABSOLUE : WebRTC DataChannel P2P direct (<20ms)
-    if (this.webrtcChannel && this.webrtcChannel.readyState === 'open') {
+    // 1. PRIORITÉ ABSOLUE : Canal UDP rapide non ordonné sans retransmission
+    const targetChannel = (this.fastInputChannel && this.fastInputChannel.readyState === 'open')
+      ? this.fastInputChannel
+      : (this.reliableChannel && this.reliableChannel.readyState === 'open' ? this.reliableChannel : null);
+
+    if (targetChannel) {
       try {
-        this.webrtcChannel.send(JSON.stringify(payloadObj));
-      } catch(e) {}
-      return;
+        targetChannel.send(binPacket.buffer);
+        return;
+      } catch(e) {
+        try {
+          targetChannel.send(JSON.stringify({
+            type: 'SEND_INPUT',
+            playerIndex: pIdx,
+            buttonId,
+            isPressed: !!isPressed,
+            frame: this.currentFrame,
+            seq: this.localSeq,
+            history: historyPayload
+          }));
+          return;
+        } catch(e2) {}
+      }
     }
 
     // 2. Mode WebSocket LAN
     if (this.ws && this.ws.readyState === WebSocket.OPEN && this.currentRoom) {
-      this.ws.send(JSON.stringify(payloadObj));
+      this.ws.send(JSON.stringify({
+        type: 'SEND_INPUT',
+        playerIndex: pIdx,
+        buttonId,
+        isPressed: !!isPressed,
+        frame: this.currentFrame,
+        seq: this.localSeq,
+        history: historyPayload
+      }));
       return;
     }
 
-    // 3. Fallback Firebase Cloud (Bidirectionnel)
+    // 3. Fallback Firebase Cloud (Bidirectionnel de secours)
     if (this.currentRoom?.code) {
       try {
         const roomRef = doc(db, 'rooms', this.currentRoom.code);
@@ -1007,9 +1139,13 @@ class NetplayService {
       fromPlayerIndex: this.myPlayerIndex
     };
 
-    if (this.webrtcChannel && this.webrtcChannel.readyState === 'open') {
+    const targetChannel = (this.reliableChannel && this.reliableChannel.readyState === 'open')
+      ? this.reliableChannel
+      : (this.fastInputChannel && this.fastInputChannel.readyState === 'open' ? this.fastInputChannel : null);
+
+    if (targetChannel) {
       try {
-        this.webrtcChannel.send(JSON.stringify(payload));
+        targetChannel.send(JSON.stringify(payload));
         return;
       } catch(e) {}
     }
@@ -1051,8 +1187,12 @@ class NetplayService {
       time: Date.now()
     };
 
-    // 1. Envoi direct ultra-rapide via WebRTC DataChannel (avec chunking de sécurité à 32 Ko)
-    if (this.webrtcChannel && this.webrtcChannel.readyState === 'open') {
+    // 1. Envoi direct via le canal fiable ordonné WebRTC DataChannel (avec chunking à 32 Ko)
+    const targetStateChannel = (this.reliableChannel && this.reliableChannel.readyState === 'open')
+      ? this.reliableChannel
+      : (this.fastInputChannel && this.fastInputChannel.readyState === 'open' ? this.fastInputChannel : null);
+
+    if (targetStateChannel) {
       try {
         if (stateBase64 && stateBase64.length > 32768) {
           const CHUNK_SIZE = 32768;
@@ -1060,7 +1200,7 @@ class NetplayService {
           const transferId = 'sync_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
           for (let i = 0; i < totalChunks; i++) {
             const chunk = stateBase64.substring(i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE);
-            this.webrtcChannel.send(JSON.stringify({
+            targetStateChannel.send(JSON.stringify({
               type: 'STATE_CHUNK',
               transferId,
               chunkIndex: i,
@@ -1074,7 +1214,7 @@ class NetplayService {
             }));
           }
         } else {
-          this.webrtcChannel.send(JSON.stringify(syncMsg));
+          targetStateChannel.send(JSON.stringify(syncMsg));
         }
         return;
       } catch(e) {
