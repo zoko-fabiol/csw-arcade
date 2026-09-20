@@ -1005,8 +1005,12 @@
 
         if (!romBuffer) {
           const romCandidates = [
+            'https://archive.org/cors/neo-geo-mvs-romset/' + encodeURIComponent(targetZipName),
             '/api/rom-proxy?file=' + encodeURIComponent(targetZipName),
-            ...(fbneoShortName !== cleanInput ? ['/api/rom-proxy?file=' + encodeURIComponent(cleanInput + '.zip')] : []),
+            ...(fbneoShortName !== cleanInput ? [
+              'https://archive.org/cors/neo-geo-mvs-romset/' + encodeURIComponent(cleanInput + '.zip'),
+              '/api/rom-proxy?file=' + encodeURIComponent(cleanInput + '.zip')
+            ] : []),
             '/api/archive-rom/neo-geo-mvs-romset/' + encodeURIComponent(targetZipName),
             '/api/archive-rom/NeoGeoRomCollectionByGhostware/' + encodeURIComponent(targetZipName),
             '/roms/' + encodeURIComponent(targetZipName),

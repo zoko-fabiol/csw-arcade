@@ -7,7 +7,7 @@
   "rewrites": [
     {
       "source": "/api/archive-rom/(.*)",
-      "destination": "https://archive.org/download/$1"
+      "destination": "https://archive.org/cors/$1"
     },
     {
       "source": "/((?!api/|roms/|player.html|assets/|favicon|icons/|sw.js|manifest.json).*$)",

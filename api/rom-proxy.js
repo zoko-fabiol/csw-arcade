@@ -38,6 +38,7 @@ export default async function handler(request) {
   if (file) {
     const cleanZip = file.toLowerCase().endsWith('.zip') ? file.toLowerCase() : file.toLowerCase() + '.zip';
     candidateUrls.push(
+      `https://archive.org/cors/neo-geo-mvs-romset/${cleanZip}`,
       `https://archive.org/download/neo-geo-mvs-romset/${cleanZip}`,
       `https://archive.org/download/fbnarcade-fullset/${cleanZip}`,
       `https://archive.org/download/NeoGeoRomCollectionByGhostware/${cleanZip}`,
