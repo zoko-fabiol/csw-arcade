@@ -41,11 +41,11 @@ export function EmulatorCore({
   const [fps, setFps] = useState(60);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isTouchVisible, setIsTouchVisible] = useState(() => {
-    // Par défaut sur smartphone ou tablette : activé
+    // Par défaut sur smartphone, tablette ou écran vertical : activé
     if (typeof window !== 'undefined') {
-      return window.innerWidth <= 1024 || 'ontouchstart' in window;
+      return window.innerWidth <= 1024 || 'ontouchstart' in window || (navigator.maxTouchPoints > 0) || window.innerHeight > window.innerWidth;
     }
-    return false;
+    return true;
   });
   const [aspectRatio, setAspectRatio] = useState(settings?.video?.aspectRatio || '4:3');
   const [interrupted, setInterrupted] = useState({ isInterrupted: false, message: '' });
@@ -54,21 +54,29 @@ export function EmulatorCore({
   const [inputDelay, setInputDelay] = useState(0);
   const [syncNotification, setSyncNotification] = useState(null);
 
-  const deviceType = useDeviceType();
+  const { isMobile } = useDeviceType();
   const [windowOrientation, setWindowOrientation] = useState(() => 
     typeof window !== 'undefined' && window.innerHeight > window.innerWidth ? 'portrait' : 'landscape'
   );
 
-  // Détection du mode portrait mobile
+  // Détection réactive du mode portrait mobile avec resize et orientationchange
   useEffect(() => {
     const handleResize = () => {
-      setWindowOrientation(window.innerHeight > window.innerWidth ? 'portrait' : 'landscape');
+      const isPort = window.innerHeight > window.innerWidth;
+      setWindowOrientation(isPort ? 'portrait' : 'landscape');
     };
     window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
+    window.addEventListener('orientationchange', handleResize);
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      window.removeEventListener('orientationchange', handleResize);
+    };
   }, []);
 
-  const isPortraitPadMode = deviceType === 'mobile' && windowOrientation === 'portrait' && (settings?.touch?.portraitMode ?? 'pad-bottom') === 'pad-bottom';
+  const isPortrait = windowOrientation === 'portrait' || (typeof window !== 'undefined' && window.innerHeight > window.innerWidth);
+  const isPortraitPadMode = (isMobile || (typeof window !== 'undefined' && (window.innerWidth <= 1024 || 'ontouchstart' in window || navigator.maxTouchPoints > 0 || isPortrait))) 
+    && isPortrait 
+    && (settings?.touch?.portraitMode ?? 'pad-bottom') === 'pad-bottom';
 
   const hasSyncedInitialState = useRef(false);
 
