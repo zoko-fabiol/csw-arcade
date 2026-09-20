@@ -111,7 +111,7 @@ class NetplayService {
           if (msg.type === 'QUERY_ROOMS') {
             if (this.currentRoom && this.myPlayerIndex === 0) {
               const now = Date.now();
-              if (!this._lastLobbyAnnounce || now - this._lastLobbyAnnounce > 15000) {
+              if (!this._lastLobbyAnnounce || now - this._lastLobbyAnnounce > 1000) {
                 this.announceRoomToLobby();
               }
             }
@@ -121,7 +121,7 @@ class NetplayService {
 
       ws.onclose = () => {
         this.lobbyWs = null;
-        setTimeout(() => this.initLobbyDiscovery(), 20000);
+        setTimeout(() => this.initLobbyDiscovery(), 3000);
       };
 
       ws.onerror = () => {
@@ -672,6 +672,20 @@ class NetplayService {
           playerIndex: 1,
           role: 'p2'
         });
+
+        // Mettre à jour l'API des salons en direct (2/2 joueurs)
+        try {
+          fetch('/api/netplay/rooms', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              action: 'heartbeat',
+              roomCode: this.currentRoom.code,
+              players: this.currentRoom.players,
+              currentPlayers: 2
+            })
+          }).catch(() => {});
+        } catch(e) {}
       }
 
       // 2. Handshake : L'Invité reçoit l'acquittement de l'Hôte
@@ -693,9 +707,9 @@ class NetplayService {
         }
       }
 
-      // 3. Lancement du jeu
-      if (data.type === 'GAME_STARTED_BY_HOST' && !isHost) {
-        console.log('[Netplay PeerJS] Invité : Ordre de démarrage reçu de l\'Hôte !');
+      // 3. Lancement du jeu (supporte les deux types de message GAME_STARTED_BY_HOST et START_GAME)
+      if ((data.type === 'GAME_STARTED_BY_HOST' || data.type === 'START_GAME') && !isHost) {
+        console.log('[Netplay PeerJS] ✓ Invité : Signal de lancement reçu de l\'Hôte !', data);
         this.emit('game_started_by_host', data);
       }
 
@@ -1503,6 +1517,38 @@ class NetplayService {
       // 1. Initialiser le salon Hôte PeerJS (Zero Quota, Zero 429)
       this.setupPeerConnection(roomCode, true, hostName);
 
+      // 2. Publier immédiatement le salon dans l'API de découverte Vercel / LAN
+      try {
+        fetch('/api/netplay/rooms', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'create', room: initialRoom })
+        }).catch(() => {});
+      } catch(e) {}
+
+      // 3. Heartbeat périodique (toutes les 20s) pour garder le salon actif dans la liste des salons
+      if (this.roomHeartbeatInterval) clearInterval(this.roomHeartbeatInterval);
+      this.roomHeartbeatInterval = setInterval(() => {
+        if (this.currentRoom && this.myPlayerIndex === 0) {
+          fetch('/api/netplay/rooms', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+              action: 'heartbeat', 
+              roomCode: this.currentRoom.code,
+              players: this.currentRoom.players,
+              currentPlayers: (this.currentRoom.players || []).length
+            })
+          }).catch(() => {});
+        } else {
+          clearInterval(this.roomHeartbeatInterval);
+          this.roomHeartbeatInterval = null;
+        }
+      }, 20000);
+
+      // 4. Annonce et battement de cœur en temps réel sur le lobby global sans quota
+      this.startLobbyAnnouncement();
+
       const resData = {
         roomCode,
         gameId,
@@ -1515,7 +1561,7 @@ class NetplayService {
       };
 
       this.emit('room_created', resData);
-      console.log(`[Netplay Cloud] Salon ${roomCode} créé avec succès (Hôte en attente de connexions P2P directes) !`);
+      console.log(`[Netplay Cloud] Salon ${roomCode} créé avec succès et publié dans la liste des salons !`);
       return resData;
     } catch(err) {
       console.error('[Netplay Cloud] Erreur création salon:', err);
@@ -1857,20 +1903,29 @@ class NetplayService {
   startGame(game = null) {
     const gameId = game?.id || this.currentRoom?.gameId;
     const gameTitle = game?.title || this.currentRoom?.gameTitle;
-    const startMsg = {
-      type: 'START_GAME',
+    const startPayload = {
+      type: 'GAME_STARTED_BY_HOST',
       gameId,
-      gameTitle
+      gameTitle,
+      timestamp: Date.now()
     };
 
     // 0. Priorité PeerJS P2P (Zéro quota, connexion directe)
     if (this.peerConn && this.peerConn.open) {
       try {
-        this.peerConn.send({
-          type: 'GAME_STARTED_BY_HOST',
-          ...startMsg
-        });
-      } catch(e) {}
+        this.peerConn.send(startPayload);
+        // Émission de sécurité redondante pour garantir la réception immédiate
+        setTimeout(() => {
+          try {
+            if (this.peerConn && this.peerConn.open) {
+              this.peerConn.send(startPayload);
+            }
+          } catch(e) {}
+        }, 60);
+        console.log('[Netplay PeerJS] Ordre de démarrage transmis avec succès à l\'invité !');
+      } catch(e) {
+        console.warn('[Netplay PeerJS] Erreur envoi START_GAME:', e);
+      }
     }
 
     // 1. WebRTC DataChannels P2P natifs
@@ -1880,33 +1935,13 @@ class NetplayService {
 
     if (targetChannel) {
       try {
-        targetChannel.send(JSON.stringify(startMsg));
+        targetChannel.send(JSON.stringify(startPayload));
       } catch(e) {}
     }
 
-    // 2. Relais Ntfy (Zéro quota)
-    if (this.currentTopic) {
-      this.sendNtfySignal(this.currentTopic, {
-        type: 'GAME_STARTED_BY_HOST',
-        ...startMsg
-      });
-    }
-
-    // 3. Mode WebSocket LAN
+    // 2. Mode WebSocket LAN
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-      this.ws.send(JSON.stringify(startMsg));
-    }
-
-    // 4. Firestore optionnel
-    if (!this.isFirestoreQuotaExceeded && this.currentRoom?.code && this.myPlayerIndex === 0) {
-      try {
-        const roomRef = doc(db, 'rooms', this.currentRoom.code);
-        updateDoc(roomRef, { gameState: 'started', updatedAt: Date.now() }).catch((e) => {
-          if (e?.code === 'resource-exhausted' || e?.message?.includes('Quota exceeded')) {
-            this.isFirestoreQuotaExceeded = true;
-          }
-        });
-      } catch(e) {}
+      this.ws.send(JSON.stringify(startPayload));
     }
   }
 
@@ -1919,8 +1954,24 @@ class NetplayService {
       message: isHost ? "L'hôte a quitté la partie." : "L'autre joueur a quitté la partie."
     };
 
+    if (this.roomHeartbeatInterval) {
+      clearInterval(this.roomHeartbeatInterval);
+      this.roomHeartbeatInterval = null;
+    }
+
     // Stopper le battement de cœur du lobby global
     this.stopLobbyAnnouncement();
+
+    // Fermer le salon dans l'API des salons Vercel / LAN
+    if (isHost && this.currentRoom?.code) {
+      try {
+        fetch('/api/netplay/rooms', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'close', roomCode: this.currentRoom.code })
+        }).catch(() => {});
+      } catch(e) {}
+    }
 
     // 0. PeerJS P2P
     if (this.peerConn && this.peerConn.open) {
@@ -1939,36 +1990,10 @@ class NetplayService {
       } catch(e) {}
     }
 
-    // 2. Relais Ntfy
-    if (this.currentTopic) {
-      this.sendNtfySignal(this.currentTopic, leaveMsg);
-      if (this.ntfyWs) {
-        try { this.ntfyWs.close(); } catch(e) {}
-        this.ntfyWs = null;
-      }
-      this.currentTopic = null;
-    }
-
-    // 3. WS LAN
+    // 2. WS LAN
     if (this.ws && this.ws.readyState === WebSocket.OPEN && this.currentRoom) {
       try {
         this.ws.send(JSON.stringify(leaveMsg));
-      } catch(e) {}
-    }
-
-    // 4. Firestore optionnel (non bloquant)
-    if (this.currentRoom?.code) {
-      try {
-        const roomRef = doc(db, 'rooms', this.currentRoom.code);
-        if (isHost) {
-          deleteDoc(roomRef).catch(() => {});
-        } else {
-          const remaining = (this.currentRoom.players || []).filter(p => p.playerIndex !== this.myPlayerIndex);
-          updateDoc(roomRef, { 
-            players: remaining,
-            lastEvent: { type: 'PEER_LEFT', playerIndex: this.myPlayerIndex, time: Date.now() }
-          }).catch(() => {});
-        }
       } catch(e) {}
     }
 
@@ -1992,18 +2017,20 @@ class NetplayService {
     this.emit('left_room');
   }
 
-  // Récupérer la liste des salons actifs (LAN ou Cloud)
+  // Récupérer la liste des salons actifs (Vercel API, LAN ou Cloud)
   async fetchRooms() {
     const combined = new Map();
     const now = Date.now();
 
-    // 1. Tenter l'API locale LAN si sur serveur dev
+    // 1. API des salons (/api/netplay/rooms - Vercel Serverless & Vite LAN)
     try {
       const res = await fetch('/api/netplay/rooms');
       if (res.ok) {
         const data = await res.json();
         if (data.rooms && Array.isArray(data.rooms)) {
-          data.rooms.forEach(r => combined.set(r.code, r));
+          data.rooms.forEach(r => {
+            if (r && r.code) combined.set(r.code, r);
+          });
         }
       }
     } catch(e) {}

@@ -127,7 +127,14 @@ export function NetplayModal({
         }
       }),
       netplayService.on('rooms_discovered', (rooms) => {
-        setAvailableRooms(rooms);
+        setAvailableRooms(prev => {
+          const map = new Map();
+          (prev || []).forEach(r => { if (r && r.code) map.set(r.code, r); });
+          (rooms || []).forEach(r => { if (r && r.code) map.set(r.code, r); });
+          const list = Array.from(map.values());
+          list.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+          return list;
+        });
       }),
       netplayService.on('error', (err) => {
         setErrorMsg(err);
@@ -150,6 +157,18 @@ export function NetplayModal({
       unsubs.forEach(u => u());
     };
   }, [isOpen, asControllerOnly, games, onLaunchGame, onOpenMobileController, onClose]);
+
+  // Actualisation périodique automatique (toutes les 3 secondes) des salons ouverts
+  useEffect(() => {
+    if (!isOpen || activeTab !== 'join' || activeRoom) return;
+
+    loadRooms();
+    const interval = setInterval(() => {
+      loadRooms();
+    }, 3000);
+
+    return () => clearInterval(interval);
+  }, [isOpen, activeTab, activeRoom]);
 
   const [isProcessing, setIsProcessing] = useState(false);
 
@@ -535,7 +554,10 @@ export function NetplayModal({
               </button>
 
               <button
-                onClick={() => setActiveTab('join')}
+                onClick={() => {
+                  setActiveTab('join');
+                  loadRooms();
+                }}
                 className={`flex-1 py-2.5 text-xs font-bold transition-colors border-b-2 flex items-center justify-center gap-2 ${
                   activeTab === 'join'
                     ? 'border-rose-400 text-rose-300 bg-rose-950/20'
