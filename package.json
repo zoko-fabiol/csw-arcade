@@ -68,6 +68,7 @@
   "dependencies": {
     "firebase": "^10.12.0",
     "lucide-react": "^0.395.0",
+    "peerjs": "^1.5.5",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "ws": "^8.21.3"
