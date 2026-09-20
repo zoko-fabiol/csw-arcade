@@ -17,23 +17,37 @@ export function setupNetplayHub(server) {
   // REST API pour lister les salons ouverts sur le réseau local
   server.middlewares.use('/api/netplay/rooms', (req, res) => {
     try {
+      const now = Date.now();
       const activeRooms = [];
       for (const [code, r] of rooms.entries()) {
+        const age = now - (r.createdAt || 0);
+        const occupiedPlayers = r.players.filter(p => p !== null).length;
+        // Supprimer automatiquement les salons inactifs ou vides de plus de 25 minutes
+        if (occupiedPlayers <= 1 && age > 25 * 60 * 1000) {
+          rooms.delete(code);
+          continue;
+        }
+
         activeRooms.push({
           code,
           gameId: r.gameId,
           gameTitle: r.gameTitle,
           maxPlayers: r.maxPlayers,
-          currentPlayers: r.players.filter(p => p !== null).length,
+          currentPlayers: occupiedPlayers,
           slots: r.players.map((p, idx) => ({
             slot: idx + 1,
             role: `p${idx + 1}`,
             isOccupied: p !== null,
             playerName: p ? p.name : null
           })),
-          createdAt: r.createdAt
+          networkMode: 'local',
+          createdAt: r.createdAt || now
         });
       }
+
+      // Le dernier salon créé doit être en haut (tri par createdAt décroissant)
+      activeRooms.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+
       res.writeHead(200, {
         'Content-Type': 'application/json',
         'Access-Control-Allow-Origin': '*'
@@ -137,6 +151,20 @@ export function setupNetplayHub(server) {
         switch(data.type) {
           case 'CREATE_ROOM': {
             const { gameId, gameTitle, maxPlayers = 2, hostName = 'Hôte' } = data;
+
+            // Si cet hôte avait déjà un salon ouvert, supprimer immédiatement l'ancien salon !
+            const prevClientInfo = clientRooms.get(ws);
+            if (prevClientInfo && rooms.has(prevClientInfo.roomCode)) {
+              console.log(`[NetplayHub] Remplacement de l'ancien salon de l'hôte: ${prevClientInfo.roomCode}`);
+              rooms.delete(prevClientInfo.roomCode);
+            }
+            // Supprimer tout autre salon inactif créé précédemment par le même pseudo
+            for (const [c, r] of rooms.entries()) {
+              if (r.players[0]?.name === hostName && r.players.filter(Boolean).length <= 1) {
+                rooms.delete(c);
+              }
+            }
+
             const cleanMaxPlayers = Math.max(2, Math.min(4, Number(maxPlayers) || 2));
             const code = generateRoomCode();
 
@@ -350,6 +378,21 @@ export function setupNetplayHub(server) {
               clientTime: data.clientTime,
               serverTime: Date.now()
             }));
+            break;
+          }
+
+          case 'CLOSE_ROOM': {
+            const { roomCode } = data;
+            if (roomCode && rooms.has(roomCode)) {
+              console.log(`[NetplayHub] Fermeture explicite du salon ${roomCode}`);
+              const r = rooms.get(roomCode);
+              for (const p of r.players) {
+                if (p && p.ws !== ws && p.ws.readyState === WebSocket.OPEN) {
+                  p.ws.send(JSON.stringify({ type: 'HOST_DISCONNECTED', message: "Le salon a été fermé par l'hôte." }));
+                }
+              }
+              rooms.delete(roomCode);
+            }
             break;
           }
 

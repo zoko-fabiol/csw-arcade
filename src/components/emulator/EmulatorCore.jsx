@@ -13,7 +13,10 @@ import {
   RefreshCw,
   WifiOff,
   Sliders,
-  Smartphone
+  Smartphone,
+  Zap,
+  Clock,
+  Check
 } from 'lucide-react';
 import { emulatorBridge } from '../../services/emulatorBridge';
 import { inputManager } from '../../services/InputManager';
@@ -25,33 +28,49 @@ import { netplayService } from '../../services/NetplayService';
 
 export function EmulatorCore({ 
   game, 
-  mode = 'solo', 
-  settings, 
   onExit, 
-  onOpenSettings, 
-  isHost = true 
+  settings, 
+  onOpenSettings,
+  mode = 'solo', // 'solo' | 'netplay'
+  netplayRoom = null,
+  isHost = true,
+  playerIndex = 0
 }) {
-  const containerRef = useRef(null);
   const iframeRef = useRef(null);
-
-  const { isMobile, isLandscape } = useDeviceType();
-
-  const [isReady, setIsReady] = useState(false);
-  const [isFullscreen, setIsFullscreen] = useState(false);
+  const containerRef = useRef(null);
   const [fps, setFps] = useState(60);
-  const [ping, setPing] = useState(null);
-  const [errorMessage, setErrorMessage] = useState(null);
-  const [netplayRoom, setNetplayRoom] = useState(() => netplayService.currentRoom);
-  const [interrupted, setInterrupted] = useState({ isInterrupted: false, message: '' });
-  const [syncNotification, setSyncNotification] = useState(null);
-  const [isP2PDirect, setIsP2PDirect] = useState(() => netplayService.isP2PConnected);
-  const [inputDelay, setInputDelay] = useState(() => netplayService.inputDelayFrames || 0);
-  const hasSyncedInitialState = useRef(false);
-
-  // Détection automatique du mode tactile (mobile / tablette / tactile)
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const [isTouchVisible, setIsTouchVisible] = useState(() => {
-    return ('ontouchstart' in window || navigator.maxTouchPoints > 0 || window.innerWidth <= 1024);
+    // Par défaut sur smartphone ou tablette : activé
+    if (typeof window !== 'undefined') {
+      return window.innerWidth <= 1024 || 'ontouchstart' in window;
+    }
+    return false;
   });
+  const [aspectRatio, setAspectRatio] = useState(settings?.video?.aspectRatio || '4:3');
+  const [interrupted, setInterrupted] = useState({ isInterrupted: false, message: '' });
+  const [ping, setPing] = useState(null);
+  const [isP2PDirect, setIsP2PDirect] = useState(false);
+  const [inputDelay, setInputDelay] = useState(0);
+  const [syncNotification, setSyncNotification] = useState(null);
+
+  const deviceType = useDeviceType();
+  const [windowOrientation, setWindowOrientation] = useState(() => 
+    typeof window !== 'undefined' && window.innerHeight > window.innerWidth ? 'portrait' : 'landscape'
+  );
+
+  // Détection du mode portrait mobile
+  useEffect(() => {
+    const handleResize = () => {
+      setWindowOrientation(window.innerHeight > window.innerWidth ? 'portrait' : 'landscape');
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  const isPortraitPadMode = deviceType === 'mobile' && windowOrientation === 'portrait' && (settings?.touch?.portraitMode ?? 'pad-bottom') === 'pad-bottom';
+
+  const hasSyncedInitialState = useRef(false);
 
   const handleTouchInput = (buttonId, isPressed) => {
     const myIdx = netplayService.myPlayerIndex >= 0 ? netplayService.myPlayerIndex : (isHost ? 0 : 1);
@@ -68,6 +87,7 @@ export function EmulatorCore({
     }
   };
 
+  // Quitter le jeu et nettoyer la session netplay
   const handleExitGame = () => {
     if (mode === 'netplay') {
       try {
@@ -80,7 +100,7 @@ export function EmulatorCore({
   // Déclenchement manuel de resynchronisation sur l'autre joueur (J1 <-> J2)
   const handleTriggerResync = () => {
     if (mode !== 'netplay') return;
-    setSyncNotification('🔄 Synchronisation avec l\'autre joueur...');
+    setSyncNotification("Synchronisation avec l'autre joueur...");
     netplayService.requestStateSync();
   };
 
@@ -125,7 +145,7 @@ export function EmulatorCore({
             isHeartbeat: !!isHeartbeat
           }, '*');
           if (!isHeartbeat) {
-            setSyncNotification(`✓ Synchronisé sur le Joueur ${fromPlayerIndex + 1} !`);
+            setSyncNotification(`Synchronisé sur le Joueur ${fromPlayerIndex + 1} !`);
             setTimeout(() => setSyncNotification(null), 2500);
           }
         }
@@ -370,12 +390,9 @@ export function EmulatorCore({
   }, []);
 
   const isScanlinesActive = settings?.video?.scanlines ?? true;
-  const aspectRatio = settings?.video?.aspectRatio ?? '4:3';
   const myPlayerSlot = netplayService.myPlayerIndex >= 0 ? netplayService.myPlayerIndex : (isHost ? 0 : 1);
   const settingsParam = encodeURIComponent(JSON.stringify(settings || {}));
   const playerUrl = `./player.html?game=${encodeURIComponent(game.filename)}&settings=${settingsParam}&playerIndex=${myPlayerSlot}&netplay=${mode === 'netplay' ? 1 : 0}`;
-
-  const isPortraitPadMode = isMobile && !isLandscape && (settings?.touch?.portraitMode ?? 'pad-bottom') === 'pad-bottom' && isTouchVisible;
 
   return (
     <div 
@@ -415,8 +432,9 @@ export function EmulatorCore({
               <span className="sm:hidden">
                 {netplayRoom?.code || 'NET'} {isHost ? 'J1' : `J${netplayService.myPlayerIndex >= 0 ? netplayService.myPlayerIndex + 1 : 2}`}
               </span>
-              <span className={`px-1.5 py-0.2 rounded text-[9px] font-bold ${isP2PDirect ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40' : 'bg-amber-500/20 text-amber-300 border border-amber-500/40'}`}>
-                {isP2PDirect ? '⚡ UDP Direct' : '⏳ Relais'}
+              <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold flex items-center gap-1 ${isP2PDirect ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40' : 'bg-amber-500/20 text-amber-300 border border-amber-500/40'}`}>
+                {isP2PDirect ? <Zap className="w-2.5 h-2.5 fill-current" /> : <Clock className="w-2.5 h-2.5" />}
+                <span>{isP2PDirect ? 'UDP Direct' : 'Relais'}</span>
               </span>
               {inputDelay > 0 && (
                 <span className="px-1.5 py-0.2 rounded text-[9px] font-mono font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/40" title="Buffer adaptatif de compensation intercontinentale GGPO">
@@ -490,8 +508,13 @@ export function EmulatorCore({
 
       {/* Toast Notification de Synchronisation */}
       {syncNotification && (
-        <div className="absolute top-12 sm:top-16 left-1/2 -translate-x-1/2 z-[80] bg-cyan-950/95 border border-cyan-400/80 text-cyan-200 px-4 py-1.5 rounded-full text-xs font-sans shadow-lg shadow-cyan-500/20 backdrop-blur-md animate-in fade-in slide-in-from-top-2 pointer-events-none">
-          {syncNotification}
+        <div className="absolute top-12 sm:top-16 left-1/2 -translate-x-1/2 z-[80] bg-cyan-950/95 border border-cyan-400/80 text-cyan-200 px-4 py-1.5 rounded-full text-xs font-sans shadow-lg shadow-cyan-500/20 backdrop-blur-md animate-in fade-in slide-in-from-top-2 pointer-events-none flex items-center gap-1.5">
+          {syncNotification.includes('Synchronisé') ? (
+            <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+          ) : (
+            <RefreshCw className="w-3.5 h-3.5 text-cyan-400 animate-spin shrink-0" />
+          )}
+          <span>{syncNotification}</span>
         </div>
       )}
 

@@ -61,12 +61,170 @@ class NetplayService {
     this.ntfyWs = null;
     this.currentTopic = null;
 
+    // --- LOBBY GLOBAL EN TEMPS RÉEL (Zero-Quota Ntfy) ---
+    this.discoveredRooms = new Map();
+    this.lobbyWs = null;
+    this.lobbyHeartbeatInterval = null;
+
     // --- REDONDANCE N-3 & FLUX GGPO ---
     this.localSeq = 0;
     this.currentFrame = 0;
     this.inputHistory = []; // [ { seq, frame, buttonId, isPressed, playerIndex } ]
     this.lastRemoteSeq = new Map(); // playerIndex -> last received seq
-    this.incomingStateChunks = new Map(); // transferId -> { chunks, receivedCount, totalChunks, isHeartbeat }
+    this.myActiveRoomCode = (typeof localStorage !== 'undefined' ? localStorage.getItem('csw_my_active_room') : null);
+
+    // Initialisation immédiate du lobby global
+    this.initLobbyDiscovery();
+  }
+
+  // Connexion au lobby global temps réel sans quota
+  initLobbyDiscovery() {
+    if (typeof window === 'undefined') return;
+    if (this.lobbyWs && (this.lobbyWs.readyState === WebSocket.OPEN || this.lobbyWs.readyState === WebSocket.CONNECTING)) {
+      return;
+    }
+
+    try {
+      const ws = new WebSocket('wss://ntfy.sh/csw-arcade-global-lobby/ws');
+      this.lobbyWs = ws;
+
+      ws.onopen = () => {
+        console.log('[Netplay Lobby] Connecté au lobby global en temps réel (Zero-Quota)');
+        // Interroger les hôtes actifs
+        this.sendNtfySignal('csw-arcade-global-lobby', { type: 'QUERY_ROOMS' });
+      };
+
+      ws.onmessage = (event) => {
+        try {
+          const raw = JSON.parse(event.data);
+          if (raw.event !== 'message' || !raw.message) return;
+          const msg = JSON.parse(raw.message);
+          if (msg.sender === this.mySessionId) return;
+
+          if (msg.type === 'ROOM_ANNOUNCE' && msg.room && msg.room.code) {
+            this.discoveredRooms.set(msg.room.code, {
+              ...msg.room,
+              lastSeen: Date.now()
+            });
+            this.emit('rooms_discovered', Array.from(this.discoveredRooms.values()));
+          }
+
+          if (msg.type === 'ROOM_CLOSED' && msg.roomCode) {
+            this.discoveredRooms.delete(msg.roomCode);
+            this.emit('rooms_discovered', Array.from(this.discoveredRooms.values()));
+          }
+
+          if (msg.type === 'QUERY_ROOMS') {
+            if (this.currentRoom && this.myPlayerIndex === 0) {
+              this.announceRoomToLobby();
+            }
+          }
+        } catch(e) {}
+      };
+
+      ws.onclose = () => {
+        this.lobbyWs = null;
+        setTimeout(() => this.initLobbyDiscovery(), 6000);
+      };
+
+      ws.onerror = () => {
+        try { ws.close(); } catch(e) {}
+        this.lobbyWs = null;
+      };
+    } catch(err) {
+      console.warn('[Netplay Lobby] Erreur connexion lobby ws:', err);
+    }
+  }
+
+  startLobbyAnnouncement() {
+    this.announceRoomToLobby();
+    if (this.lobbyHeartbeatInterval) clearInterval(this.lobbyHeartbeatInterval);
+    this.lobbyHeartbeatInterval = setInterval(() => {
+      if (this.currentRoom && this.myPlayerIndex === 0) {
+        this.announceRoomToLobby();
+      } else {
+        clearInterval(this.lobbyHeartbeatInterval);
+        this.lobbyHeartbeatInterval = null;
+      }
+    }, 8000);
+  }
+
+  announceRoomToLobby() {
+    if (!this.currentRoom || this.myPlayerIndex !== 0) return;
+    const roomInfo = {
+      code: this.currentRoom.code,
+      gameId: this.currentRoom.gameId,
+      gameTitle: this.currentRoom.gameTitle,
+      maxPlayers: this.currentRoom.maxPlayers || 2,
+      currentPlayers: (this.currentRoom.players || []).length,
+      players: this.currentRoom.players || [],
+      hostName: this.currentRoom.hostName || this.currentRoom.players?.[0]?.name || 'Hôte',
+      networkMode: this.currentRoom.networkMode || 'online',
+      createdAt: this.currentRoom.createdAt || Date.now(),
+      updatedAt: Date.now()
+    };
+    this.discoveredRooms.set(roomInfo.code, {
+      ...roomInfo,
+      lastSeen: Date.now()
+    });
+    this.sendNtfySignal('csw-arcade-global-lobby', {
+      type: 'ROOM_ANNOUNCE',
+      room: roomInfo
+    });
+  }
+
+  stopLobbyAnnouncement() {
+    if (this.lobbyHeartbeatInterval) {
+      clearInterval(this.lobbyHeartbeatInterval);
+      this.lobbyHeartbeatInterval = null;
+    }
+    if (this.currentRoom?.code && this.myPlayerIndex === 0) {
+      this.discoveredRooms.delete(this.currentRoom.code);
+      this.sendNtfySignal('csw-arcade-global-lobby', {
+        type: 'ROOM_CLOSED',
+        roomCode: this.currentRoom.code
+      });
+    }
+  }
+
+  // Nettoyage de tout salon précédent créé par cet hôte
+  async cleanupPreviousRoom() {
+    const oldCode = this.myActiveRoomCode || (typeof localStorage !== 'undefined' ? localStorage.getItem('csw_my_active_room') : null);
+    if (!oldCode) return;
+
+    console.log(`[Netplay] Nettoyage de l'ancien salon de l'hôte : ${oldCode}`);
+
+    this.stopLobbyAnnouncement();
+
+    // 1. Fermeture via serveur WebSocket LAN
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      try {
+        this.ws.send(JSON.stringify({ type: 'CLOSE_ROOM', roomCode: oldCode }));
+      } catch(e) {}
+    }
+
+    // 2. Annonce de fermeture sur le lobby global et le topic Ntfy
+    try {
+      this.sendNtfySignal('csw-arcade-global-lobby', {
+        type: 'ROOM_CLOSED',
+        roomCode: oldCode
+      });
+      this.sendNtfySignal(`csw-arcade-${oldCode.toLowerCase().replace(/[^a-z0-9]/g, '')}`, {
+        type: 'HOST_DISCONNECTED',
+        message: "L'hôte a ouvert un nouveau salon."
+      });
+    } catch(e) {}
+
+    // 3. Suppression dans Firestore (non bloquante)
+    try {
+      deleteDoc(doc(db, 'rooms', oldCode)).catch(() => {});
+    } catch(e) {}
+
+    this.discoveredRooms.delete(oldCode);
+    this.myActiveRoomCode = null;
+    if (typeof localStorage !== 'undefined') {
+      try { localStorage.removeItem('csw_my_active_room'); } catch(e) {}
+    }
   }
 
   get webrtcChannel() {
@@ -428,8 +586,22 @@ class NetplayService {
           if (msg.sender === this.mySessionId) return;
 
           if (msg.type === 'GUEST_JOINED' && isHost) {
-            console.log('[Netplay P2P] Invité détecté dans le salon !');
+            console.log('[Netplay P2P] Invité détecté dans le salon :', msg.playerName);
             if (this.currentRoom) {
+              const currentGuests = (this.currentRoom.players || []).filter(p => !p.isHost);
+              const isSameGuest = currentGuests.some(p => p.name === msg.playerName);
+
+              // Si le salon a déjà un autre joueur activement connecté en P2P
+              if (this.isP2PConnected && currentGuests.length >= (this.currentRoom.maxPlayers - 1) && !isSameGuest) {
+                console.warn('[Netplay P2P] Salon déjà complet');
+                this.sendNtfySignal(topic, {
+                  type: 'ROOM_FULL',
+                  targetSession: msg.sender,
+                  message: `Le salon ${this.currentRoom.code} est complet (${this.currentRoom.maxPlayers}/${this.currentRoom.maxPlayers}).`
+                });
+                return;
+              }
+
               const newPlayer = {
                 name: msg.playerName || 'Joueur 2',
                 slot: 2,
@@ -444,8 +616,15 @@ class NetplayService {
                 type: 'ROOM_SYNC',
                 room: this.currentRoom
               });
+              this.announceRoomToLobby();
             }
             this.setupWebRTCHostNtfy(topic);
+          }
+
+          if (msg.type === 'ROOM_FULL' && !isHost) {
+            if (!msg.targetSession || msg.targetSession === this.mySessionId) {
+              this.emit('error', msg.message || 'Le salon est complet.');
+            }
           }
 
           if (msg.type === 'ROOM_SYNC' && !isHost) {
@@ -932,6 +1111,9 @@ class NetplayService {
   async createRoom({ gameId, gameTitle, maxPlayers = 2, hostName = 'Hôte', networkMode = 'local' }) {
     await this.connect();
 
+    // Nettoyage immédiat de tout salon ouvert précédemment par cet hôte
+    await this.cleanupPreviousRoom();
+
     // 1. Tenter le mode WebSocket LAN si disponible (serveur local)
     if (this.mode === 'ws' && this.ws && this.ws.readyState === WebSocket.OPEN) {
       try {
@@ -956,6 +1138,11 @@ class NetplayService {
             reject(new Error('Délai d\'attente création de salle LAN dépassé.'));
           }, 3000);
         });
+
+        this.myActiveRoomCode = wsRes.roomCode;
+        if (typeof localStorage !== 'undefined') {
+          try { localStorage.setItem('csw_my_active_room', wsRes.roomCode); } catch(e) {}
+        }
 
         // Mirrorer immédiatement dans Firebase pour que les amis sur le même Wi-Fi ou à distance puissent se joindre
         try {
@@ -1016,10 +1203,17 @@ class NetplayService {
     }
 
     // 2. Mode Firebase Cloud + WebRTC (Netlify / Internet / Même Wi-Fi sans serveur dédié)
-    return this.createFirebaseRoom({ gameId, gameTitle, maxPlayers, hostName, networkMode });
+    const res = await this.createFirebaseRoom({ gameId, gameTitle, maxPlayers, hostName, networkMode });
+    if (res?.roomCode) {
+      this.myActiveRoomCode = res.roomCode;
+      if (typeof localStorage !== 'undefined') {
+        try { localStorage.setItem('csw_my_active_room', res.roomCode); } catch(e) {}
+      }
+    }
+    return res;
   }
 
-  async createFirebaseRoom({ gameId, gameTitle, maxPlayers = 2, hostName = 'Hôte', networkMode = 'local' }) {
+  async createFirebaseRoom({ gameId, gameTitle, maxPlayers = 2, hostName = 'Hôte', networkMode = 'online' }) {
     try {
       const roomCode = this.generateRoomCode();
       const initialRoom = {
@@ -1045,46 +1239,15 @@ class NetplayService {
       // 1. Initialiser IMMÉDIATEMENT le relais de signalisation P2P sans quota (ntfy.sh WebSocket)
       this.setupNtfySignaling(roomCode, true);
 
-      // 2. Tenter Firestore en arrière-plan (sans bloquer ni crasher si quota dépassé ou hors-ligne)
-      try {
-        const roomRef = doc(db, 'rooms', roomCode);
-        await setDoc(roomRef, initialRoom);
+      // 2. Lancer la diffusion de battement de cœur dans le lobby global
+      this.startLobbyAnnouncement();
 
-        // Initialiser l'hôte WebRTC P2P direct
-        this.setupWebRTCHost(roomRef);
-
-        // Écoute en temps réel des changements de joueurs et des inputs
-        if (this.firestoreUnsub) this.firestoreUnsub();
-        let lastProcessedInputTime = 0;
-        let lastProcessedStateReq = 0;
-        let lastProcessedStateSync = 0;
-
-        this.firestoreUnsub = onSnapshot(roomRef, (snapshot) => {
-          if (!snapshot.exists()) {
-            this.emit('host_disconnected', 'Le salon a été fermé.');
-            return;
-          }
-          const data = snapshot.data();
-          this.currentRoom = data;
-          this.emit('room_update', data);
-
-          // Détection demande de savestate
-          if (data.stateRequest && data.stateRequest.fromPlayerIndex !== this.myPlayerIndex && data.stateRequest.time !== lastProcessedStateReq) {
-            lastProcessedStateReq = data.stateRequest.time;
-            this.emit('request_state', data.stateRequest);
-          }
-
-          // Réception du savestate
-          if (data.stateSync && (data.stateSync.toPlayerIndex === undefined || data.stateSync.toPlayerIndex === 0) && data.stateSync.fromPlayerIndex !== 0 && data.stateSync.time !== lastProcessedStateSync) {
-            lastProcessedStateSync = data.stateSync.time;
-            this.emit('sync_state', data.stateSync);
-          }
-        }, (err) => {
-          console.warn('[Netplay Cloud] Listener Firestore désactivé (quota ou hors-ligne):', err.message);
-        });
-      } catch(fbErr) {
-        console.warn('[Netplay Cloud] Firestore indisponible ou quota dépassé, basculement automatique WebRTC P2P direct (Zéro Quota):', fbErr.message);
-      }
+      // 3. Optionnel : Sauvegarde Firestore en tâche de fond STRICTEMENT non-bloquante avec timeout de 400ms
+      // Même si le quota Firebase est dépassé, la création est instantanée et le jeu fonctionne à 100% via P2P
+      Promise.race([
+        setDoc(doc(db, 'rooms', roomCode), initialRoom),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 400))
+      ]).catch(() => {});
 
       const resData = {
         roomCode,
@@ -1097,7 +1260,7 @@ class NetplayService {
       };
 
       this.emit('room_created', resData);
-      console.log(`[Netplay Cloud] Salon ${roomCode} créé avec succès (WebRTC P2P prêt) !`);
+      console.log(`[Netplay Cloud] Salon ${roomCode} créé INSTANTANÉMENT (WebRTC P2P sans quota prêt) !`);
       return resData;
     } catch(err) {
       console.error('[Netplay Cloud] Erreur création salon:', err);
@@ -1152,77 +1315,29 @@ class NetplayService {
     let playerIndex = 1;
     let role = 'p2';
 
-    // Tenter Firestore si disponible
-    try {
-      const roomRef = doc(db, 'rooms', cleanCode);
-      const snap = await getDoc(roomRef);
-
-      if (snap.exists()) {
-        const roomData = snap.data();
-        const currentPlayers = roomData.players || [];
-
-        if (currentPlayers.length >= roomData.maxPlayers) {
-          throw new Error(`Le salon ${cleanCode} est complet (${roomData.maxPlayers}/${roomData.maxPlayers}).`);
-        }
-
-        playerIndex = currentPlayers.length;
-        role = `p${playerIndex + 1}`;
-        const newPlayer = {
-          name: playerName,
-          slot: playerIndex + 1,
-          isHost: false,
-          playerIndex,
-          role,
-          ping: 25
-        };
-
-        const updatedPlayers = [...currentPlayers, newPlayer];
-        await updateDoc(roomRef, {
-          players: updatedPlayers,
-          updatedAt: Date.now()
-        }).catch(() => {});
-
-        joinedRoomData = { ...roomData, players: updatedPlayers };
-
-        // Lancement WebRTC Guest standard Firestore si offer déjà présent
-        if (roomData.offer) {
-          this.setupWebRTCGuest(roomRef, roomData.offer);
-        } else {
-          const unsubOffer = onSnapshot(roomRef, (snapshot) => {
-            const d = snapshot.data();
-            if (d?.offer && !this.pc) {
-              unsubOffer();
-              this.setupWebRTCGuest(roomRef, d.offer);
-            }
-          }, () => {});
-          this.webrtcUnsubs.push(unsubOffer);
-        }
-
-        if (this.firestoreUnsub) this.firestoreUnsub();
-        this.firestoreUnsub = onSnapshot(roomRef, (snapshot) => {
-          if (!snapshot.exists()) {
-            this.emit('host_disconnected', 'Le salon a été fermé.');
-            return;
-          }
-          const data = snapshot.data();
-          this.currentRoom = data;
-          this.emit('room_update', data);
-
-          if (data.gameState === 'started') {
-            this.emit('game_started_by_host', data);
-          }
-        }, (err) => {
-          console.warn('[Netplay] Écoute Firestore désactivée (quota ou hors-ligne):', err.message);
-        });
-      }
-    } catch(fbErr) {
-      if (fbErr.message && fbErr.message.includes('complet')) {
-        throw fbErr;
-      }
-      console.warn('[Netplay] Firestore indisponible ou quota dépassé pour joinRoom, fallback P2P:', fbErr.message);
+    // Récupérer les métadonnées depuis les salons découverts en temps réel dans le lobby
+    if (this.discoveredRooms.has(cleanCode)) {
+      joinedRoomData = this.discoveredRooms.get(cleanCode);
     }
 
-    // Si Firestore n'était pas joignable ou n'a pas répondu, métadonnées de secours
+    // Tenter Firestore avec timeout strict de 400ms pour compléter les métadonnées (non-bloquant)
+    try {
+      const snap = await Promise.race([
+        getDoc(doc(db, 'rooms', cleanCode)),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 400))
+      ]);
+
+      if (snap && snap.exists()) {
+        const d = snap.data();
+        if (!joinedRoomData) {
+          joinedRoomData = d;
+        }
+      }
+    } catch(fbErr) {
+      // Silencieux si quota dépassé
+    }
+
+    // Si pas encore de métadonnées, structure par défaut
     if (!joinedRoomData) {
       joinedRoomData = {
         code: cleanCode,
@@ -1248,13 +1363,13 @@ class NetplayService {
       roomCode: cleanCode,
       gameId: joinedRoomData.gameId,
       gameTitle: joinedRoomData.gameTitle,
-      maxPlayers: joinedRoomData.maxPlayers,
+      maxPlayers: joinedRoomData.maxPlayers || 2,
       playerIndex,
       role
     };
 
     this.emit('joined_success', resData);
-    console.log(`[Netplay Cloud] Salon ${cleanCode} rejoint avec succès (Slot J${playerIndex + 1}) !`);
+    console.log(`[Netplay Cloud] Salon ${cleanCode} rejoint instantanément (Slot J${playerIndex + 1}) !`);
     return resData;
   }
 
@@ -1503,6 +1618,9 @@ class NetplayService {
       message: isHost ? "L'hôte a quitté la partie." : "L'autre joueur a quitté la partie."
     };
 
+    // Stopper le battement de cœur du lobby global
+    this.stopLobbyAnnouncement();
+
     // 1. WebRTC DataChannels
     const targetChannel = (this.reliableChannel && this.reliableChannel.readyState === 'open')
       ? this.reliableChannel
@@ -1531,7 +1649,7 @@ class NetplayService {
       } catch(e) {}
     }
 
-    // 4. Firestore optionnel
+    // 4. Firestore optionnel (non bloquant)
     if (this.currentRoom?.code) {
       try {
         const roomRef = doc(db, 'rooms', this.currentRoom.code);
@@ -1554,6 +1672,13 @@ class NetplayService {
       this.firestoreUnsub = null;
     }
 
+    if (isHost) {
+      this.myActiveRoomCode = null;
+      if (typeof localStorage !== 'undefined') {
+        try { localStorage.removeItem('csw_my_active_room'); } catch(e) {}
+      }
+    }
+
     this.currentRoom = null;
     this.myPlayerIndex = -1;
     this.myRole = null;
@@ -1563,6 +1688,7 @@ class NetplayService {
   // Récupérer la liste des salons actifs (LAN ou Cloud)
   async fetchRooms() {
     const combined = new Map();
+    const now = Date.now();
 
     // 1. Tenter l'API locale LAN si sur serveur dev
     try {
@@ -1575,32 +1701,72 @@ class NetplayService {
       }
     } catch(e) {}
 
-    // 2. Récupération Cloud Firebase (Salons créés sur Netlify ou distants)
+    // 2. Récupérer les salons découverts en temps réel via Ntfy Global Lobby (Zéro Quota, Instantané)
+    this.sendNtfySignal('csw-arcade-global-lobby', { type: 'QUERY_ROOMS' });
+
+    for (const [code, r] of this.discoveredRooms.entries()) {
+      // Purge automatique : si le salon n'a pas émis de battement de cœur depuis plus de 25s (onglet fermé)
+      if (r.lastSeen && (now - r.lastSeen > 25000)) {
+        this.discoveredRooms.delete(code);
+      } else if (!combined.has(code)) {
+        combined.set(code, {
+          code: r.code,
+          gameId: r.gameId,
+          gameTitle: r.gameTitle,
+          maxPlayers: r.maxPlayers || 2,
+          currentPlayers: r.currentPlayers || (r.players ? r.players.length : 1),
+          players: r.players || [],
+          networkMode: r.networkMode || 'online',
+          createdAt: r.createdAt || now
+        });
+      }
+    }
+
+    // 3. Fallback Firestore avec timeout strict de 400ms (silencieux si quota dépassé)
     try {
-      const snap = await getDocs(collection(db, 'rooms'));
-      const now = Date.now();
-      snap.forEach(docSnap => {
-        const d = docSnap.data();
-        // Conserver les salons récents (< 2 heures)
-        if (d && (!d.updatedAt || (now - d.updatedAt) < 7200000)) {
+      const snap = await Promise.race([
+        getDocs(collection(db, 'rooms')),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 400))
+      ]);
+
+      if (snap && snap.forEach) {
+        snap.forEach(docSnap => {
+          const d = docSnap.data();
+          if (!d || !d.code) return;
+
+          const age = now - (d.createdAt || 0);
+          const lastActive = now - (d.updatedAt || d.createdAt || 0);
+          const playersCount = (d.players || []).length;
+          const isClosed = d.gameState === 'closed' || d.gameState === 'finished';
+
+          // NETTOYAGE : Si le salon est fermé, n'a plus de joueur, ou est inactif depuis plus de 10 min
+          if (isClosed || playersCount === 0 || lastActive > 10 * 60 * 1000 || age > 30 * 60 * 1000) {
+            deleteDoc(doc(db, 'rooms', d.code)).catch(() => {});
+            return;
+          }
+
           if (!combined.has(d.code)) {
             combined.set(d.code, {
               code: d.code,
               gameId: d.gameId,
               gameTitle: d.gameTitle,
               maxPlayers: d.maxPlayers || 2,
-              currentPlayers: (d.players || []).length,
+              currentPlayers: playersCount,
               players: d.players || [],
-              createdAt: d.createdAt
+              networkMode: d.networkMode || 'online',
+              createdAt: d.createdAt || now
             });
           }
-        }
-      });
+        });
+      }
     } catch(err) {
-      console.warn('[Netplay] Erreur lecture salons cloud:', err);
+      // Ignorer silencieusement si quota Firebase épuisé
     }
 
-    return Array.from(combined.values());
+    // Le dernier salon créé doit être en haut (tri par createdAt décroissant)
+    const list = Array.from(combined.values());
+    list.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+    return list;
   }
 }
 

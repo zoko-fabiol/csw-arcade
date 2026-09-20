@@ -386,7 +386,10 @@ export function SettingsModal({
                             : 'bg-neutral-950 border-neutral-800 text-neutral-400 hover:text-white'
                         }`}
                       >
-                        <span className="block font-bold">🕹️ Arcade Pad Bas</span>
+                        <span className="flex items-center gap-1.5 font-bold">
+                          <Gamepad2 className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+                          <span>Arcade Pad Bas</span>
+                        </span>
                         <span className="text-[9px] text-neutral-400 font-normal">Écran 4:3 en haut, manette en bas sans masquer le jeu</span>
                       </button>
 
@@ -398,7 +401,10 @@ export function SettingsModal({
                             : 'bg-neutral-950 border-neutral-800 text-neutral-400 hover:text-white'
                         }`}
                       >
-                        <span className="block font-bold">📱 Superposé</span>
+                        <span className="flex items-center gap-1.5 font-bold">
+                          <Smartphone className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+                          <span>Superposé</span>
+                        </span>
                         <span className="text-[9px] text-neutral-400 font-normal">Contrôles transparents sur toute la hauteur</span>
                       </button>
                     </div>

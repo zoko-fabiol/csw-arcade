@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Users, Wifi, Gamepad2, Radio, QrCode, Copy, Check, 
-  X, Play, ShieldAlert, ArrowRight, RefreshCw, Smartphone, Globe
+  X, Play, ShieldAlert, ArrowRight, RefreshCw, Smartphone, Globe,
+  Crown, Zap, Clock
 } from 'lucide-react';
 import { netplayService } from '../../services/NetplayService';
 
@@ -13,7 +14,12 @@ export function NetplayModal({
   onLaunchGame,
   onOpenMobileController
 }) {
-  const [networkMode, setNetworkMode] = useState('local'); // 'local' (Même Wi-Fi) | 'online' (Internet Distant)
+  const isCloudHost = typeof window !== 'undefined' && (
+    window.location.hostname.includes('netlify.app') || 
+    (window.location.protocol === 'https:' && !window.location.hostname.match(/^(localhost|127\.0\.0\.1|192\.168\.|10\.)/))
+  );
+
+  const [networkMode, setNetworkMode] = useState(() => isCloudHost ? 'online' : 'local'); // 'local' (Même Wi-Fi) | 'online' (Internet Distant)
   const [activeTab, setActiveTab] = useState('host'); // 'host' | 'join'
   const [selectedGameId, setSelectedGameId] = useState(currentGame?.id || games[0]?.id || '');
   const [playerName, setPlayerName] = useState(() => localStorage.getItem('csw_player_name') || 'Joueur ' + Math.floor(Math.random() * 90 + 10));
@@ -112,6 +118,9 @@ export function NetplayModal({
           onClose();
         }
       }),
+      netplayService.on('rooms_discovered', (rooms) => {
+        setAvailableRooms(rooms);
+      }),
       netplayService.on('error', (err) => {
         setErrorMsg(err);
       }),
@@ -152,12 +161,13 @@ export function NetplayModal({
     setErrorMsg(null);
     setIsProcessing(true);
     try {
+      const chosenMode = isCloudHost ? 'online' : networkMode;
       await netplayService.createRoom({
         gameId: selectedGame.id,
         gameTitle: selectedGame.title,
         maxPlayers: maxPlayersForGame,
         hostName: playerName,
-        networkMode: networkMode
+        networkMode: chosenMode
       });
       if (netplayService.currentRoom) {
         setActiveRoom(netplayService.currentRoom);
@@ -226,12 +236,13 @@ export function NetplayModal({
             <div>
               <h2 className="text-sm font-black text-white uppercase tracking-wider flex items-center gap-2">
                 Multijoueur Arcade
-                <span className={`px-2 py-0.5 rounded-full text-[10px] font-normal border ${
+                <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium border flex items-center gap-1 ${
                   isLocalMode 
                     ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40' 
                     : 'bg-rose-500/20 text-rose-300 border-rose-500/40'
                 }`}>
-                  {isLocalMode ? '🏠 Même Wi-Fi (LAN)' : '🌐 En Ligne (Distant)'}
+                  {isLocalMode ? <Wifi className="w-3 h-3 text-cyan-400" /> : <Globe className="w-3 h-3 text-rose-400" />}
+                  <span>{isLocalMode ? 'Même Wi-Fi (LAN)' : 'En Ligne (Distant)'}</span>
                 </span>
               </h2>
               <p className="text-[11px] text-neutral-400">
@@ -317,10 +328,11 @@ export function NetplayModal({
                 <div>
                   <div className="flex items-center gap-2">
                     <span className="text-[10px] uppercase font-bold text-neutral-400">Code de la Partie :</span>
-                    <span className={`text-[10px] px-2 py-0.2 rounded-full font-bold uppercase ${
+                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase flex items-center gap-1 ${
                       isLocalMode ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40' : 'bg-rose-500/20 text-rose-300 border border-rose-500/40'
                     }`}>
-                      {isLocalMode ? '🏠 Réseau Local' : '🌐 En Ligne'}
+                      {isLocalMode ? <Wifi className="w-2.5 h-2.5 text-cyan-400" /> : <Globe className="w-2.5 h-2.5 text-rose-400" />}
+                      <span>{isLocalMode ? 'Réseau Local' : 'En Ligne'}</span>
                     </span>
                   </div>
                   <div className="flex items-center gap-2 mt-0.5">
@@ -405,8 +417,14 @@ export function NetplayModal({
                         className={`p-2.5 rounded-xl border ${slotColors.border} ${slotColors.bg} flex flex-col justify-between min-h-[75px]`}
                       >
                         <div className="flex items-center justify-between">
-                          <span className={`text-[10px] font-black px-1.5 py-0.5 rounded ${slotColors.badge}`}>
-                            J{slotNum} {idx === 0 && '👑 HÔTE'}
+                          <span className={`text-[10px] font-black px-1.5 py-0.5 rounded flex items-center gap-1 ${slotColors.badge}`}>
+                            <span>J{slotNum}</span>
+                            {idx === 0 && (
+                              <span className="flex items-center gap-0.5 text-[9px] font-bold">
+                                <Crown className="w-2.5 h-2.5 fill-current" />
+                                HÔTE
+                              </span>
+                            )}
                           </span>
                           {isMe && (
                             <span className="text-[9px] font-bold text-cyan-300 border border-cyan-400/40 rounded px-1">
@@ -438,8 +456,18 @@ export function NetplayModal({
               }`}>
                 <div className="flex items-center gap-2">
                   <span className={`w-2 h-2 rounded-full ${isP2P ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400 animate-ping'}`} />
-                  <span className="font-bold">
-                    {isP2P ? '⚡ Tunnel P2P Direct Connecté (Latence minimale)' : '⏳ Négociation du tunnel direct P2P...'}
+                  <span className="font-bold flex items-center gap-1.5">
+                    {isP2P ? (
+                      <>
+                        <Zap className="w-3.5 h-3.5 text-emerald-400 fill-emerald-400 shrink-0" />
+                        <span>Tunnel P2P Direct Connecté (Latence minimale)</span>
+                      </>
+                    ) : (
+                      <>
+                        <Clock className="w-3.5 h-3.5 text-amber-400 animate-spin shrink-0" />
+                        <span>Négociation du tunnel direct P2P...</span>
+                      </>
+                    )}
                   </span>
                 </div>
                 {ping > 0 && (
@@ -513,8 +541,9 @@ export function NetplayModal({
                         Jeu Arcade à héberger :
                       </label>
                       {currentGame?.id === selectedGameId && (
-                        <span className="text-[10px] font-bold text-cyan-400 bg-cyan-950 border border-cyan-800 px-2 py-0.5 rounded">
-                          ✓ Pré-sélectionné
+                        <span className="text-[10px] font-bold text-cyan-400 bg-cyan-950 border border-cyan-800 px-2 py-0.5 rounded flex items-center gap-1">
+                          <Check className="w-3 h-3 text-cyan-400" />
+                          <span>Pré-sélectionné</span>
                         </span>
                       )}
                     </div>
@@ -537,12 +566,22 @@ export function NetplayModal({
                       <span className="text-[10px] uppercase font-bold text-neutral-400">Capacité du Jeu</span>
                       <p className="text-xs font-bold text-white">{selectedGame.title}</p>
                     </div>
-                    <span className={`px-2.5 py-1 rounded-lg text-xs font-black uppercase ${
+                    <span className={`px-2.5 py-1 rounded-lg text-xs font-black uppercase flex items-center gap-1.5 ${
                       maxPlayersForGame === 4 
                         ? 'bg-amber-400 text-black shadow-md shadow-amber-400/20' 
                         : 'bg-cyan-500 text-black shadow-md shadow-cyan-500/20'
                     }`}>
-                      {maxPlayersForGame === 4 ? '🎮 4 Joueurs Simultanés' : '👥 2 Joueurs Max'}
+                      {maxPlayersForGame === 4 ? (
+                        <>
+                          <Gamepad2 className="w-3.5 h-3.5" />
+                          <span>4 Joueurs Simultanés</span>
+                        </>
+                      ) : (
+                        <>
+                          <Users className="w-3.5 h-3.5" />
+                          <span>2 Joueurs Max</span>
+                        </>
+                      )}
                     </span>
                   </div>
 
@@ -694,8 +733,12 @@ export function NetplayModal({
                       </div>
                     ) : (
                       <div className="space-y-2">
-                        {availableRooms.map(r => {
-                          const isRoomOnline = r.networkMode === 'online';
+                        {[...availableRooms]
+                          .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
+                          .map(r => {
+                          const isRoomOnline = r.networkMode === 'online' || isCloudHost;
+                          const count = r.currentPlayers || (r.players ? r.players.length : 1);
+                          const maxP = r.maxPlayers || 2;
                           return (
                             <div
                               key={r.code}
@@ -707,16 +750,17 @@ export function NetplayModal({
                                   <span className="text-[10px] font-bold text-cyan-400 px-1.5 py-0.2 rounded bg-cyan-950 border border-cyan-800">
                                     {r.code}
                                   </span>
-                                  <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${
+                                  <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border flex items-center gap-1 ${
                                     isRoomOnline 
                                       ? 'text-rose-300 bg-rose-950/60 border-rose-800' 
                                       : 'text-cyan-300 bg-cyan-950/60 border-cyan-800'
                                   }`}>
-                                    {isRoomOnline ? '🌐 En Ligne' : '🏠 Wi-Fi'}
+                                    {isRoomOnline ? <Globe className="w-2.5 h-2.5" /> : <Wifi className="w-2.5 h-2.5" />}
+                                    <span>{isRoomOnline ? 'En Ligne' : 'Wi-Fi'}</span>
                                   </span>
                                 </div>
                                 <span className="text-[10px] text-neutral-400">
-                                  Joueurs : {r.currentPlayers} / {r.maxPlayers}
+                                  Joueurs : {count} / {maxP}
                                 </span>
                               </div>
 
