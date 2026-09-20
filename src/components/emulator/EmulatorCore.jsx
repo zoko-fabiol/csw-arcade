@@ -44,6 +44,7 @@ export function EmulatorCore({
   const [netplayRoom, setNetplayRoom] = useState(() => netplayService.currentRoom);
   const [interrupted, setInterrupted] = useState({ isInterrupted: false, message: '' });
   const [syncNotification, setSyncNotification] = useState(null);
+  const [isP2PDirect, setIsP2PDirect] = useState(() => netplayService.isP2PConnected);
   const hasSyncedInitialState = useRef(false);
 
   // Détection automatique du mode tactile (mobile / tablette / tactile)
@@ -55,10 +56,6 @@ export function EmulatorCore({
     const myIdx = netplayService.myPlayerIndex >= 0 ? netplayService.myPlayerIndex : (isHost ? 0 : 1);
     if (mode === 'netplay') {
       netplayService.sendInput(buttonId, isPressed, myIdx);
-      // Auto-resync sur le joueur en tête lors d'un appui sur Coin (8) ou Start (9)
-      if (isPressed && (buttonId === 8 || buttonId === 9)) {
-        netplayService.requestStateSync();
-      }
     }
     if (iframeRef.current?.contentWindow) {
       iframeRef.current.contentWindow.postMessage({
@@ -149,6 +146,8 @@ export function EmulatorCore({
 
     const unsubPing = netplayService.on('ping', (p) => setPing(p));
     const unsubRoom = netplayService.on('room_update', (r) => setNetplayRoom(r));
+    const unsubP2POn = netplayService.on('p2p_connected', () => setIsP2PDirect(true));
+    const unsubP2POff = netplayService.on('p2p_disconnected', () => setIsP2PDirect(false));
 
     return () => {
       unsubInput();
@@ -158,6 +157,8 @@ export function EmulatorCore({
       unsubHostDisc();
       unsubPing();
       unsubRoom();
+      unsubP2POn();
+      unsubP2POff();
     };
   }, [mode, isHost]);
 
@@ -186,12 +187,6 @@ export function EmulatorCore({
       if (event.data.type === 'LOCAL_INPUT' && mode === 'netplay') {
         const myIdx = netplayService.myPlayerIndex >= 0 ? netplayService.myPlayerIndex : (isHost ? 0 : 1);
         netplayService.sendInput(event.data.buttonId, event.data.isPressed, myIdx);
-
-        // Auto-resync sur le joueur en tête quand on réapparaît / remet un crédit (Coin 8 ou Start 9)
-        if (event.data.isPressed && (event.data.buttonId === 8 || event.data.buttonId === 9)) {
-          console.log('[EmulatorCore] Coin/Start détecté : synchronisation automatique sur le joueur en tête...');
-          netplayService.requestStateSync();
-        }
       }
 
       // L'iframe a extrait le savestate (soit l'hôte soit l'invité), l'envoyer au joueur distant
@@ -411,11 +406,14 @@ export function EmulatorCore({
             <div className="flex items-center gap-1.5 px-2 sm:px-3 py-0.5 sm:py-1 rounded-full bg-cyan-950/90 border border-cyan-500/50 text-cyan-300 text-[10px] sm:text-[11px]">
               <Radio className="w-3 h-3 animate-pulse text-cyan-400" />
               <span className="hidden sm:inline">
-                LAN {netplayRoom?.code ? `[${netplayRoom.code}]` : ''} {isHost ? '• HÔTE (J1)' : `• JOUEUR ${netplayService.myPlayerIndex >= 0 ? netplayService.myPlayerIndex + 1 : 2}`}
+                {netplayRoom?.code ? `[${netplayRoom.code}]` : ''} {isHost ? 'HÔTE (J1)' : `JOUEUR ${netplayService.myPlayerIndex >= 0 ? netplayService.myPlayerIndex + 1 : 2}`}
                 {netplayRoom ? ` (${netplayRoom.players ? netplayRoom.players.filter(Boolean).length : 2}/${netplayRoom.maxPlayers || 2}P)` : ''}
               </span>
               <span className="sm:hidden">
-                {netplayRoom?.code || 'LAN'} {isHost ? 'J1' : `J${netplayService.myPlayerIndex >= 0 ? netplayService.myPlayerIndex + 1 : 2}`}
+                {netplayRoom?.code || 'NET'} {isHost ? 'J1' : `J${netplayService.myPlayerIndex >= 0 ? netplayService.myPlayerIndex + 1 : 2}`}
+              </span>
+              <span className={`px-1.5 py-0.2 rounded text-[9px] font-bold ${isP2PDirect ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40' : 'bg-amber-500/20 text-amber-300 border border-amber-500/40'}`}>
+                {isP2PDirect ? '⚡ P2P Direct' : '⏳ Relais'}
               </span>
             </div>
           ) : (

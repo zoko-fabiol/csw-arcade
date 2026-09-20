@@ -120,6 +120,9 @@ export function NetplayModal({
       }),
       netplayService.on('p2p_connected', () => {
         setIsP2P(true);
+      }),
+      netplayService.on('p2p_disconnected', () => {
+        setIsP2P(false);
       })
     ];
 
@@ -191,6 +194,7 @@ export function NetplayModal({
   const handleLeaveCurrentRoom = () => {
     netplayService.leaveRoom();
     setActiveRoom(null);
+    setIsP2P(false);
   };
 
   if (!isOpen) return null;
@@ -410,6 +414,25 @@ export function NetplayModal({
                 </div>
               </div>
             </div>
+
+            {/* Indicateur de préparation P2P Direct */}
+            {activeRoom?.players?.length >= 2 && (
+              <div className={`px-3 py-2 rounded-xl border flex items-center justify-between text-xs ${
+                isP2P 
+                  ? 'bg-emerald-950/40 border-emerald-500/40 text-emerald-300' 
+                  : 'bg-amber-950/40 border-amber-500/40 text-amber-300'
+              }`}>
+                <div className="flex items-center gap-2">
+                  <span className={`w-2 h-2 rounded-full ${isP2P ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400 animate-ping'}`} />
+                  <span className="font-bold">
+                    {isP2P ? '⚡ Tunnel P2P Direct Connecté (Latence minimale)' : '⏳ Négociation du tunnel direct P2P...'}
+                  </span>
+                </div>
+                {ping > 0 && (
+                  <span className="text-[10px] font-mono font-bold">{ping}ms</span>
+                )}
+              </div>
+            )}
 
             {/* Actions du salon */}
             <div className="flex items-center justify-between gap-3 pt-2">

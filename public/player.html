@@ -435,31 +435,15 @@
         3: { value: getKeyCode(p2.start, 50), value2: "START" }        // 2 -> Start
       };
 
-      if (isNetplay) {
-        if (assignedPlayerIndex === 1) {
-          // Invité : touches configurées sur Port 1 uniquement, Port 0 réservé aux inputs réseau
-          return {
-            0: {},
-            1: p1Config,
-            2: {},
-            3: {}
-          };
-        } else {
-          // Hôte : touches configurées sur Port 0 uniquement, Port 1 réservé aux inputs réseau
-          return {
-            0: p1Config,
-            1: {},
-            2: {},
-            3: {}
-          };
-        }
-      }
-
+      // Ports 0 et 1 doivent être TOUJOURS initialisés avec un joypad dans RetroArch/FBNeo
+      // pour que le core alloue les périphériques d'arcade (RETRO_DEVICE_JOYPAD) sur les deux ports.
+      // L'isolation des touches locales (qui ne contrôle que J1 ou J2) est gérée strictement
+      // par rebuildKeyMap et pollGamepadsLoop via keyToInputMap.
       return {
         0: p1Config,
         1: p2Config,
-        2: {},
-        3: {}
+        2: p1Config,
+        3: p2Config
       };
     }
 
@@ -539,8 +523,13 @@
     rebuildKeyMap(activeSettings.controls);
 
     function dispatchDirectInput(player, buttonId, isPressed) {
-      if (window.EJS_emulator?.gameManager?.simulateInput) {
-        window.EJS_emulator.gameManager.simulateInput(player, buttonId, isPressed ? 1 : 0);
+      const gm = window.EJS_emulator?.gameManager;
+      if (!gm) return;
+      const val = isPressed ? 1 : 0;
+      if (gm.functions && typeof gm.functions.simulateInput === 'function') {
+        gm.functions.simulateInput(player, buttonId, val);
+      } else if (typeof gm.simulateInput === 'function') {
+        gm.simulateInput(player, buttonId, val);
       }
     }
 

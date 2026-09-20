@@ -17,7 +17,10 @@ const RTC_CONFIG = {
     { urls: 'stun:stun.l.google.com:19302' },
     { urls: 'stun:stun1.l.google.com:19302' },
     { urls: 'stun:stun2.l.google.com:19302' },
+    { urls: 'stun:stun3.l.google.com:19302' },
+    { urls: 'stun:stun4.l.google.com:19302' },
     { urls: 'stun:stun.cloudflare.com:3478' },
+    { urls: 'stun:global.stun.twilio.com:3478' },
     // Serveurs TURN publics gratuits pour traverser les NAT symétriques, 4G/5G et pare-feux à distance
     {
       urls: [
@@ -443,6 +446,13 @@ class NetplayService {
 
       pc.onconnectionstatechange = () => {
         console.log('[Netplay WebRTC Hôte] ConnectionState:', pc.connectionState);
+        if (pc.connectionState === 'connected') {
+          this.isP2PConnected = true;
+          this.emit('p2p_connected');
+        } else if (pc.connectionState === 'disconnected' || pc.connectionState === 'failed') {
+          this.isP2PConnected = false;
+          this.emit('p2p_disconnected');
+        }
       };
 
       const offer = await pc.createOffer();
@@ -516,6 +526,13 @@ class NetplayService {
 
       pc.onconnectionstatechange = () => {
         console.log('[Netplay WebRTC Invité] ConnectionState:', pc.connectionState);
+        if (pc.connectionState === 'connected') {
+          this.isP2PConnected = true;
+          this.emit('p2p_connected');
+        } else if (pc.connectionState === 'disconnected' || pc.connectionState === 'failed') {
+          this.isP2PConnected = false;
+          this.emit('p2p_disconnected');
+        }
       };
 
       await pc.setRemoteDescription(new RTCSessionDescription(offer));
