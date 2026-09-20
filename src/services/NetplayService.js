@@ -279,14 +279,15 @@ class NetplayService {
       return Promise.resolve();
     }
 
-    // Détection immédiate Netlify : Netlify ne gère pas les WebSockets persistants, bascule directe Firebase
-    const isNetlify = typeof window !== 'undefined' && (
+    // Détection immédiate Vercel / Netlify / Cloud : pas de WebSockets persistants Node.js locaux, bascule directe Firebase + WebRTC P2P
+    const isCloud = typeof window !== 'undefined' && (
+      window.location.hostname.includes('vercel.app') ||
       window.location.hostname.includes('netlify.app') || 
       (window.location.protocol === 'https:' && !window.location.hostname.match(/^(localhost|127\.0\.0\.1|192\.168\.|10\.)/))
     );
 
-    if (isNetlify) {
-      console.log('[Netplay] Environnement Cloud / Netlify détecté : activation du mode WebRTC + Firebase Cloud');
+    if (isCloud) {
+      console.log('[Netplay] Environnement Cloud (Vercel / Netlify) détecté : activation du mode WebRTC + Firebase Cloud');
       this.mode = 'firebase';
       this.emit('connected');
       return Promise.resolve();

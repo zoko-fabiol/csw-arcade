@@ -15,6 +15,7 @@ export function NetplayModal({
   onOpenMobileController
 }) {
   const isCloudHost = typeof window !== 'undefined' && (
+    window.location.hostname.includes('vercel.app') ||
     window.location.hostname.includes('netlify.app') || 
     (window.location.protocol === 'https:' && !window.location.hostname.match(/^(localhost|127\.0\.0\.1|192\.168\.|10\.)/))
   );

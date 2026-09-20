@@ -962,6 +962,8 @@
             '/roms/neogeo.zip',
             './roms/neogeo.zip',
             '/api/rom-proxy?file=neogeo.zip',
+            '/api/archive-rom/mame-merged/neogeo.zip',
+            '/api/archive-rom/NeoGeoRomCollectionByGhostware/neogeo.zip',
             '/api/rom-data/neogeo',
             'https://archive.org/download/mame-merged/neogeo.zip',
             'https://archive.org/download/NeoGeoRomCollectionByGhostware/neogeo.zip'
@@ -1005,6 +1007,8 @@
           const romCandidates = [
             '/api/rom-proxy?file=' + encodeURIComponent(targetZipName),
             ...(fbneoShortName !== cleanInput ? ['/api/rom-proxy?file=' + encodeURIComponent(cleanInput + '.zip')] : []),
+            '/api/archive-rom/neo-geo-mvs-romset/' + encodeURIComponent(targetZipName),
+            '/api/archive-rom/NeoGeoRomCollectionByGhostware/' + encodeURIComponent(targetZipName),
             '/roms/' + encodeURIComponent(targetZipName),
             './roms/' + encodeURIComponent(targetZipName),
             '/api/rom-data/' + encodeURIComponent(fbneoShortName),

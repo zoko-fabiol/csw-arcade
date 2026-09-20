@@ -274,9 +274,10 @@ function romManifestPlugin() {
   };
 }
 
-// Détection de l'environnement : Web pur (Netlify / PWA) vs Desktop Electron
-// Les plugins Electron ne sont activés QUE pour le build desktop dédié, jamais sur le web ou Netlify
+// Détection de l'environnement : Web pur (Vercel / Netlify / PWA) vs Desktop Electron
+// Les plugins Electron ne sont activés QUE pour le build desktop dédié, jamais sur Vercel, Netlify ou Web
 const isElectron = Boolean(
+  !process.env.VERCEL &&
   !process.env.NETLIFY && 
   process.env.BUILD_TARGET !== 'web' && 
   fs.existsSync(path.resolve(__dirname, 'electron/main.js')) &&
