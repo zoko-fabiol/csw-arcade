@@ -435,10 +435,30 @@
         3: { value: getKeyCode(p2.start, 50), value2: "START" }        // 2 -> Start
       };
 
-      // Ports 0 et 1 doivent être TOUJOURS initialisés avec un joypad dans RetroArch/FBNeo
-      // pour que le core alloue les périphériques d'arcade (RETRO_DEVICE_JOYPAD) sur les deux ports.
-      // L'isolation des touches locales (qui ne contrôle que J1 ou J2) est gérée strictement
-      // par rebuildKeyMap et pollGamepadsLoop via keyToInputMap.
+      // Ports 0 et 1 doivent être configurés selon le rôle du joueur.
+      // En Netplay, l'isolation doit être hermétique pour éviter que l'écouteur natif
+      // d'EmulatorJS ne mappe les touches sur le port adverse lors de la sélection des héros !
+      if (isNetplay) {
+        const mySlot = assignedPlayerIndex > 0 ? assignedPlayerIndex : 0;
+        if (mySlot === 0) {
+          // Hôte (J1) : Contrôle uniquement le Port 0. Port 1 strictement vide.
+          return {
+            0: p1Config,
+            1: {},
+            2: {},
+            3: {}
+          };
+        } else {
+          // Invité (J2) : Port 0 strictement vide (aucun impact sur P1). Port 1 configuré avec ses touches.
+          return {
+            0: {},
+            1: p1Config,
+            2: {},
+            3: {}
+          };
+        }
+      }
+
       return {
         0: p1Config,
         1: p2Config,
@@ -544,6 +564,14 @@
             buttonId: binding.buttonId,
             isPressed: isDown
           }, '*');
+
+          if (isNetplay && isDown && (binding.buttonId === 2 || binding.buttonId === 3)) {
+            window.parent.postMessage({
+              type: 'PLAYER_INSERTED_COIN_OR_START',
+              playerIndex: binding.player,
+              buttonId: binding.buttonId
+            }, '*');
+          }
         }
         return true;
       }
@@ -590,6 +618,14 @@
                   buttonId: btnId,
                   isPressed: isPressed
                 }, '*');
+
+                if (isNetplay && isPressed && (btnId === 2 || btnId === 3)) {
+                  window.parent.postMessage({
+                    type: 'PLAYER_INSERTED_COIN_OR_START',
+                    playerIndex: playerIdx,
+                    buttonId: btnId
+                  }, '*');
+                }
               }
             }
           };
@@ -1321,8 +1357,8 @@
 
           if (emu.Module) hookModuleCallMain(emu.Module);
 
-          // Sécurité anti-écran noir : masquage de l'overlay garanti
-          setTimeout(hideOverlay, 2000);
+          // Sécurité anti-écran noir : masquage de l'overlay garanti en mode solo uniquement
+          if (!isNetplay) setTimeout(hideOverlay, 2000);
           return origStartGame();
         };
 
@@ -1337,10 +1373,7 @@
       };
 
       window.EJS_onGameStart = () => {
-        console.log('[CSW-Arcade] Jeu Neo Geo démarré à 60 FPS !');
-        hideOverlay();
-        overlay.style.opacity = '0';
-        setTimeout(() => { overlay.style.display = 'none'; }, 400);
+        console.log('[CSW-Arcade] Core FBNeo chargé et initialisé !');
 
         // Application immédiate de la résolution, de l'aspect ratio et des filtres
         applyDirectVideoStyles(activeSettings.video);
@@ -1356,8 +1389,36 @@
         }
 
         if (window.parent) {
-          window.parent.postMessage({ type: 'EJS_GAME_STARTED', game: rawGame }, '*');
           window.parent.postMessage({ type: 'ROM_DOWNLOADED', game: rawGame }, '*');
+        }
+
+        if (isNetplay) {
+          // --- BARRIÈRE DE DÉMARRAGE SIMULTANÉ (FRAME 0) ---
+          // Dès que le core a fini de décompresser la ROM, on le met immédiatement en pause.
+          // Les deux machines doivent attendre que les deux pairs soient prêts pour déverrouiller la Frame 0 ensemble !
+          try {
+            if (typeof window.EJS_emulator?.pause === 'function') {
+              window.EJS_emulator.pause();
+            }
+          } catch(e) {}
+
+          if (loadingDesc) {
+            loadingDesc.innerText = "Synchronisation de départ à la frame près...";
+          }
+
+          console.log('[Player Netplay] Core FBNeo en pause à la Frame 0. En attente du second joueur...');
+          if (window.parent) {
+            window.parent.postMessage({ type: 'CORE_READY_BARRIER', game: rawGame }, '*');
+          }
+        } else {
+          // Mode Solo : démarrage immédiat sans attente réseau
+          hideOverlay();
+          overlay.style.opacity = '0';
+          setTimeout(() => { overlay.style.display = 'none'; }, 400);
+
+          if (window.parent) {
+            window.parent.postMessage({ type: 'EJS_GAME_STARTED', game: rawGame }, '*');
+          }
         }
       };
 
@@ -1368,6 +1429,33 @@
         if (!event.data) return;
         if (event.data.type === 'UPDATE_SETTINGS' && event.data.settings) {
           applyLiveSettings(event.data.settings);
+        }
+        if (event.data.type === 'START_SIMULATION_NOW') {
+          console.log('[Player] ✓ Top départ simultané reçu ! Déblocage de la Frame 0 à l\'instant précis...');
+          const startTime = event.data.startTime || Date.now();
+          const delay = Math.max(0, startTime - Date.now());
+
+          setTimeout(() => {
+            hideOverlay();
+            if (overlay) {
+              overlay.style.opacity = '0';
+              setTimeout(() => { overlay.style.display = 'none'; }, 300);
+            }
+
+            try {
+              if (typeof window.EJS_emulator?.play === 'function') {
+                window.EJS_emulator.play();
+              }
+              if (window.EJS_emulator?.audioContext && window.EJS_emulator.audioContext.state === 'suspended') {
+                window.EJS_emulator.audioContext.resume();
+              }
+            } catch(e) {}
+
+            console.log('[Player] ✓ Moteur WebAssembly FBNeo déverrouillé et lancé à 60 FPS synchronisés !');
+            if (window.parent) {
+              window.parent.postMessage({ type: 'EJS_GAME_STARTED', game: rawGame }, '*');
+            }
+          }, delay);
         }
         if (event.data.type === 'KEY_EVENT') {
           handleDirectKey(event.data.code, event.data.keyCode, event.data.eventType === 'keydown');

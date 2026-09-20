@@ -1,4 +1,4 @@
-const SHELL_CACHE_NAME = 'csw-arcade-shell-v8';
+const SHELL_CACHE_NAME = 'csw-arcade-shell-v9';
 const ENGINE_CACHE_NAME = 'csw-arcade-engine-v5';
 
 // Assets essentiels du moteur WebAssembly (FBNeo + EmulatorJS)

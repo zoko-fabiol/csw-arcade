@@ -132,6 +132,9 @@ export function EmulatorCore({
     const myIdx = netplayService.myPlayerIndex >= 0 ? netplayService.myPlayerIndex : (isHost ? 0 : 1);
     if (mode === 'netplay') {
       netplayService.sendInput(buttonId, isPressed, myIdx);
+      if (isPressed && (buttonId === 2 || buttonId === 3)) {
+        netplayService.requestSurvivorCatchup();
+      }
     }
     if (iframeRef.current?.contentWindow) {
       iframeRef.current.contentWindow.postMessage({
@@ -227,6 +230,30 @@ export function EmulatorCore({
     const unsubP2POff = netplayService.on('p2p_disconnected', () => setIsP2PDirect(false));
     const unsubDelay = netplayService.on('delay_update', (d) => setInputDelay(d));
 
+    // Déverrouillage simultané Frame 0 commandé par la barrière
+    const unsubSimStart = netplayService.on('start_simulation_now', (data) => {
+      console.log('[EmulatorCore] Top départ synchronisé reçu ! Transmission à l\'iframe...');
+      if (iframeRef.current?.contentWindow) {
+        iframeRef.current.contentWindow.postMessage({
+          type: 'START_SIMULATION_NOW',
+          startTime: data?.startTime || Date.now()
+        }, '*');
+      }
+    });
+
+    // Demande de rattrapage / savestate du survivant (respawn après Game Over / crédit)
+    const unsubSurvivorReq = netplayService.on('survivor_catchup_requested', ({ fromPlayerIndex }) => {
+      const myIdx = netplayService.myPlayerIndex >= 0 ? netplayService.myPlayerIndex : (isHost ? 0 : 1);
+      if (fromPlayerIndex !== myIdx && iframeRef.current?.contentWindow) {
+        console.log(`[EmulatorCore] Le joueur J${(fromPlayerIndex ?? 0) + 1} réapparaît (respawn). Extraction immédiate de l'état du survivant...`);
+        iframeRef.current.contentWindow.postMessage({
+          type: 'GET_STATE',
+          toPlayerIndex: fromPlayerIndex,
+          isHeartbeat: false
+        }, '*');
+      }
+    });
+
     return () => {
       unsubInput();
       unsubReqState();
@@ -238,6 +265,8 @@ export function EmulatorCore({
       unsubP2POn();
       unsubP2POff();
       unsubDelay();
+      unsubSimStart();
+      unsubSurvivorReq();
     };
   }, [mode, isHost]);
 
@@ -253,19 +282,26 @@ export function EmulatorCore({
     const handleMessage = (event) => {
       if (!event.data) return;
 
+      // Barrière de synchronisation : notification que le core FBNeo est prêt dans l'iframe
+      if (event.data.type === 'CORE_READY_BARRIER' && mode === 'netplay') {
+        console.log('[EmulatorCore] Core FBNeo prêt et verrouillé à la Frame 0. Notification à la barrière Netplay...');
+        netplayService.notifyCoreReady();
+      }
+
       if (event.data.type === 'EJS_GAME_STARTED') {
         setIsReady(true);
-        // Si invité en Netplay, demander immédiatement et UNE SEULE FOIS le savestate initial à l'hôte
-        if (mode === 'netplay' && !isHost && !hasSyncedInitialState.current) {
-          console.log('[EmulatorCore] Invité prêt, demande de synchronisation initiale à l\'hôte...');
-          netplayService.requestStateSync();
-        }
       }
 
       // Quand un joueur local joue au clavier ou à la manette dans l'iframe, diffuser l'input à l'autre joueur
       if (event.data.type === 'LOCAL_INPUT' && mode === 'netplay') {
         const myIdx = netplayService.myPlayerIndex >= 0 ? netplayService.myPlayerIndex : (isHost ? 0 : 1);
         netplayService.sendInput(event.data.buttonId, event.data.isPressed, myIdx);
+      }
+
+      // Quand un joueur insère une pièce (COIN) ou appuie sur START pour respawner
+      if (event.data.type === 'PLAYER_INSERTED_COIN_OR_START' && mode === 'netplay') {
+        console.log('[EmulatorCore] Crédit / Start pressé : demande de Flash-Savestate au survivant...');
+        netplayService.requestSurvivorCatchup();
       }
 
       // L'iframe a extrait le savestate (soit l'hôte soit l'invité), l'envoyer au joueur distant

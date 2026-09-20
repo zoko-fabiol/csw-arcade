@@ -68,6 +68,11 @@ class NetplayService {
     this.lastRemoteSeq = new Map(); // playerIndex -> last received seq
     this.myActiveRoomCode = (typeof localStorage !== 'undefined' ? localStorage.getItem('csw_my_active_room') : null);
 
+    // --- BARRIÈRE DE DÉMARRAGE SYNCHRONISÉ FRAME 0 ---
+    this.localCoreReady = false;
+    this.remoteCoreReady = false;
+    this.startBarrierTimer = null;
+
     // Initialisation immédiate du lobby global
     this.initLobbyDiscovery();
   }
@@ -515,6 +520,28 @@ class NetplayService {
         }
         break;
       }
+
+      case 'PEER_CORE_READY': {
+        console.log(`[Netplay] Le pair distant J${(data.fromPlayerIndex ?? 1) + 1} a chargé sa ROM et est prêt !`);
+        this.remoteCoreReady = true;
+        this.checkAndReleaseStartBarrier();
+        break;
+      }
+
+      case 'START_SIMULATION_NOW': {
+        console.log('[Netplay] Ordre de lancement simultané reçu ! Top départ Frame 0 à', data.startTime);
+        const delay = Math.max(0, (data.startTime || Date.now()) - Date.now());
+        setTimeout(() => {
+          this.emit('start_simulation_now', data);
+        }, delay);
+        break;
+      }
+
+      case 'REQUEST_SURVIVOR_CATCHUP': {
+        console.log(`[Netplay] Demande d'autorité du survivant reçue pour le retour en jeu de J${(data.fromPlayerIndex ?? 0) + 1}`);
+        this.emit('survivor_catchup_requested', data);
+        break;
+      }
     }
   }
 
@@ -755,6 +782,11 @@ class NetplayService {
       }
       if (data.type === 'HOST_DISCONNECTED') {
         this.emit('host_disconnected', data.message || "L'hôte a fermé le salon.");
+      }
+
+      // 8. Barrière de synchronisation Frame 0 & Autorité du survivant
+      if (data.type === 'PEER_CORE_READY' || data.type === 'START_SIMULATION_NOW' || data.type === 'REQUEST_SURVIVOR_CATCHUP') {
+        this.handleMessage(data);
       }
     });
 
@@ -1778,6 +1810,92 @@ class NetplayService {
     // 3. Remarque : Zéro écriture Firestore pour les inputs (les inputs transitent exclusivement via P2P UDP ou WS LAN)
   }
 
+  // Envoi de messages de contrôle fiables (P2P DataChannel, PeerJS ou WS LAN)
+  sendControlMessage(payload) {
+    if (this.peerConn && this.peerConn.open) {
+      try {
+        this.peerConn.send(payload);
+        return true;
+      } catch(e) {}
+    }
+
+    const targetChannel = (this.reliableChannel && this.reliableChannel.readyState === 'open')
+      ? this.reliableChannel
+      : (this.fastInputChannel && this.fastInputChannel.readyState === 'open' ? this.fastInputChannel : null);
+
+    if (targetChannel) {
+      try {
+        targetChannel.send(JSON.stringify(payload));
+        return true;
+      } catch(e) {}
+    }
+
+    if (this.ws && this.ws.readyState === WebSocket.OPEN && this.currentRoom) {
+      try {
+        this.ws.send(JSON.stringify(payload));
+        return true;
+      } catch(e) {}
+    }
+
+    return false;
+  }
+
+  // Barrière de synchronisation Frame 0 : Notification de fin de chargement du core
+  notifyCoreReady() {
+    this.localCoreReady = true;
+    console.log(`[Netplay] Moteur local prêt pour J${this.myPlayerIndex + 1}. Signalement au pair...`);
+    this.sendControlMessage({
+      type: 'PEER_CORE_READY',
+      fromPlayerIndex: this.myPlayerIndex
+    });
+    this.checkAndReleaseStartBarrier();
+
+    // Sécurité : si après 12 secondes l'autre joueur n'a pas répondu, débloquer automatiquement
+    if (this.startBarrierTimer) clearTimeout(this.startBarrierTimer);
+    this.startBarrierTimer = setTimeout(() => {
+      if (!this.remoteCoreReady) {
+        console.warn('[Netplay] Timeout barrière : le second joueur tarde, déverrouillage de sécurité...');
+        this.emit('start_simulation_now', { startTime: Date.now() });
+      }
+    }, 12000);
+  }
+
+  // Vérification et déblocage coordonné de la barrière de départ simultané
+  checkAndReleaseStartBarrier() {
+    // Seul l'hôte donne le top départ pour éviter tout conflit d'horodatage
+    if (this.myPlayerIndex === 0 && this.localCoreReady && this.remoteCoreReady) {
+      if (this.startBarrierTimer) {
+        clearTimeout(this.startBarrierTimer);
+        this.startBarrierTimer = null;
+      }
+
+      // Marge de synchronisation (60 ms) pour garantir que le paquet atteint l'invité avant la frame 0
+      const startTime = Date.now() + 60;
+      console.log('[Netplay] Barrière franchie ! Top départ Frame 0 synchronisé calé à', startTime);
+
+      const startMsg = {
+        type: 'START_SIMULATION_NOW',
+        startTime
+      };
+
+      this.sendControlMessage(startMsg);
+
+      const delay = Math.max(0, startTime - Date.now());
+      setTimeout(() => {
+        this.emit('start_simulation_now', startMsg);
+      }, delay);
+    }
+  }
+
+  // Autorité Dynamique du Survivant : demande flash de savestate au joueur actif
+  requestSurvivorCatchup() {
+    console.log(`[Netplay] Joueur J${this.myPlayerIndex + 1} demande le Flash-Savestate du survivant (Respawn/Crédit)...`);
+    this.sendControlMessage({
+      type: 'REQUEST_SURVIVOR_CATCHUP',
+      fromPlayerIndex: this.myPlayerIndex
+    });
+  }
+
   // Demander la synchronisation de l'état (Guest -> Host)
   requestStateSync() {
     const payload = {
@@ -2044,6 +2162,12 @@ class NetplayService {
     this.currentRoom = null;
     this.myPlayerIndex = -1;
     this.myRole = null;
+    this.localCoreReady = false;
+    this.remoteCoreReady = false;
+    if (this.startBarrierTimer) {
+      clearTimeout(this.startBarrierTimer);
+      this.startBarrierTimer = null;
+    }
     this.emit('left_room');
   }
 
