@@ -1178,6 +1178,12 @@
       window.EJS_gameParentUrl = 'neogeo.zip';
       window.EJS_dontExtractBIOS = true;
       window.EJS_pathtodata = 'emulatorjs/';
+      window.EJS_paths = {
+        'fbneo-wasm.data': 'emulatorjs/cores/fbneo-wasm.data',
+        'fbneo-legacy-wasm.data': 'emulatorjs/cores/fbneo-legacy-wasm.data',
+        'fbneo.json': 'emulatorjs/cores/reports/fbneo.json',
+        'version.json': 'emulatorjs/version.json'
+      };
       window.EJS_startOnLoaded = true;
       window.EJS_volume = initialVol;
       window.EJS_color = '#00f0ff';
@@ -1397,6 +1403,7 @@
                     type: 'STATE_DATA',
                     stateBase64: base64,
                     stateSize: u8.byteLength,
+                    toPlayerIndex: event.data.toPlayerIndex,
                     isHeartbeat: !!event.data.isHeartbeat,
                     requestId: event.data.requestId
                   }, '*');

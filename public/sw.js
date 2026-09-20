@@ -1,7 +1,23 @@
-const SHELL_CACHE_NAME = 'csw-arcade-shell-v2';
-const ENGINE_CACHE_NAME = 'csw-arcade-engine-v2';
+const SHELL_CACHE_NAME = 'csw-arcade-shell-v3';
+const ENGINE_CACHE_NAME = 'csw-arcade-engine-v3';
 
-const PRECACHE_ASSETS = [
+// Assets essentiels du moteur WebAssembly (FBNeo + EmulatorJS)
+const ENGINE_ASSETS = [
+  '/emulatorjs/loader.js',
+  '/emulatorjs/emulator.min.js',
+  '/emulatorjs/emulator.min.css',
+  '/emulatorjs/version.json',
+  '/emulatorjs/localization/en-US.json',
+  '/emulatorjs/localization/fr-FR.json',
+  '/emulatorjs/localization/fr.json',
+  '/emulatorjs/cores/reports/fbneo.json',
+  '/emulatorjs/cores/fbneo-wasm.data',
+  '/emulatorjs/cores/fbneo-legacy-wasm.data',
+  '/emulatorjs/compression/extract7z.js'
+];
+
+// Assets de l'interface et du shell CSW-Arcade
+const SHELL_ASSETS = [
   '/',
   '/index.html',
   '/player.html',
@@ -10,24 +26,30 @@ const PRECACHE_ASSETS = [
   '/roms-manifest.json',
   '/icons/icon-192.png',
   '/icons/icon-512.png',
-  '/icons/apple-touch-icon.png',
-  '/emulatorjs/loader.js',
-  '/emulatorjs/emulator.min.js',
-  '/emulatorjs/emulator.min.css',
-  '/emulatorjs/version.json',
-  '/emulatorjs/localization/en-US.json',
-  '/emulatorjs/cores/reports/fbneo.json',
-  '/emulatorjs/cores/fbneo-wasm.data',
-  '/emulatorjs/compression/extract7z.js'
+  '/icons/apple-touch-icon.png'
 ];
 
-// Installation : pré-mise en cache immédiate du shell applicatif
+// Installation résiliente : mise en cache garantie sans échec atomique bloquant
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(SHELL_CACHE_NAME).then((cache) => {
-      console.log('[CSW-Arcade SW] Précache du shell applicatif (index, player, manifest)...');
-      return cache.addAll(PRECACHE_ASSETS);
-    }).then(() => self.skipWaiting())
+    Promise.all([
+      caches.open(ENGINE_CACHE_NAME).then(async (cache) => {
+        console.log('[CSW-Arcade SW] Précache autonome du moteur WebAssembly (FBNeo)...');
+        await Promise.allSettled(
+          ENGINE_ASSETS.map((url) =>
+            cache.add(url).catch((err) => console.warn('[CSW-Arcade SW] Warning cache moteur:', url, err.message))
+          )
+        );
+      }),
+      caches.open(SHELL_CACHE_NAME).then(async (cache) => {
+        console.log('[CSW-Arcade SW] Précache du shell applicatif...');
+        await Promise.allSettled(
+          SHELL_ASSETS.map((url) =>
+            cache.add(url).catch((err) => console.warn('[CSW-Arcade SW] Warning cache shell:', url, err.message))
+          )
+        );
+      })
+    ]).then(() => self.skipWaiting())
   );
 });
 
@@ -39,7 +61,7 @@ self.addEventListener('activate', (event) => {
         cacheNames
           .filter((name) => name !== SHELL_CACHE_NAME && name !== ENGINE_CACHE_NAME)
           .map((name) => {
-            console.log('[CSW-Arcade SW] Suppression ancien cache:', name);
+            console.log('[CSW-Arcade SW] Nettoyage ancien cache obsolète:', name);
             return caches.delete(name);
           })
       );
@@ -57,24 +79,23 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // 1. STRATÉGIE CACHE-FIRST POUR LE MOTEUR EMULATORJS EMBARQUÉ ET CDN
-  // Permet un démarrage instantané 100% hors-ligne sans dépendance réseau
+  // 1. STRATÉGIE CACHE-FIRST POUR LE MOTEUR EMULATORJS ET WASM
+  // Permet un démarrage instantané 100% hors-ligne sans dépendance réseau une fois hébergé
   if (url.pathname.startsWith('/emulatorjs/') || url.hostname.includes('cdn.emulatorjs.org')) {
     event.respondWith(
-      caches.open(ENGINE_CACHE_NAME).then((cache) => {
-        return cache.match(event.request).then((cachedResponse) => {
-          if (cachedResponse) {
-            return cachedResponse;
+      caches.match(event.request).then((cachedResponse) => {
+        if (cachedResponse) {
+          return cachedResponse;
+        }
+        return fetch(event.request).then((networkResponse) => {
+          if (networkResponse && (networkResponse.status === 200 || networkResponse.type === 'opaque')) {
+            const clone = networkResponse.clone();
+            caches.open(ENGINE_CACHE_NAME).then((cache) => cache.put(event.request, clone));
           }
-          return fetch(event.request).then((networkResponse) => {
-            if (networkResponse && (networkResponse.status === 200 || networkResponse.type === 'opaque')) {
-              cache.put(event.request, networkResponse.clone());
-            }
-            return networkResponse;
-          }).catch((err) => {
-            console.warn('[CSW-Arcade SW] Échec réseau moteur hors-ligne:', url.pathname);
-            throw err;
-          });
+          return networkResponse;
+        }).catch(() => {
+          // Secours : recherche sans paramètres d'URL (ex: hash ou query)
+          return caches.match(url.pathname);
         });
       })
     );
@@ -82,9 +103,7 @@ self.addEventListener('fetch', (event) => {
   }
 
   // 2. STRATÉGIE POUR LES ASSETS STATIQUES LOCAUX (Vite Chunks, CSS, Images, HTML)
-  // Cache-first avec mise à jour en arrière-plan (Stale-While-Revalidate)
   if (url.origin === self.location.origin) {
-    // Si requête de navigation HTML
     if (event.request.mode === 'navigate') {
       event.respondWith(
         fetch(event.request)
@@ -96,29 +115,24 @@ self.addEventListener('fetch', (event) => {
             return networkResponse;
           })
           .catch(() => {
-            return caches.match('/index.html');
+            return caches.match('/index.html') || caches.match('/');
           })
       );
       return;
     }
 
-    // Fichiers statiques et player.html
     event.respondWith(
-      caches.match(event.request).then((cached) => {
+      caches.match(event.request).then((cachedResponse) => {
         const fetchPromise = fetch(event.request).then((networkResponse) => {
           if (networkResponse && networkResponse.status === 200) {
             const clone = networkResponse.clone();
             caches.open(SHELL_CACHE_NAME).then((cache) => cache.put(event.request, clone));
           }
           return networkResponse;
-        }).catch(() => null);
+        }).catch(() => cachedResponse);
 
-        return cached || fetchPromise.then(res => res || new Response('Hors-ligne', { status: 503 }));
+        return cachedResponse || fetchPromise;
       })
     );
-    return;
   }
-
-  // Fallback réseau standard
-  event.respondWith(fetch(event.request));
 });

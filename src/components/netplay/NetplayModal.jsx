@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Users, Wifi, Gamepad2, Radio, QrCode, Copy, Check, 
-  X, Play, ShieldAlert, ArrowRight, RefreshCw, Smartphone
+  X, Play, ShieldAlert, ArrowRight, RefreshCw, Smartphone, Globe
 } from 'lucide-react';
 import { netplayService } from '../../services/NetplayService';
 
@@ -13,6 +13,7 @@ export function NetplayModal({
   onLaunchGame,
   onOpenMobileController
 }) {
+  const [networkMode, setNetworkMode] = useState('local'); // 'local' (Même Wi-Fi) | 'online' (Internet Distant)
   const [activeTab, setActiveTab] = useState('host'); // 'host' | 'join'
   const [selectedGameId, setSelectedGameId] = useState(currentGame?.id || games[0]?.id || '');
   const [playerName, setPlayerName] = useState(() => localStorage.getItem('csw_player_name') || 'Joueur ' + Math.floor(Math.random() * 90 + 10));
@@ -27,13 +28,27 @@ export function NetplayModal({
   const [isP2P, setIsP2P] = useState(false);
   const [showQrModal, setShowQrModal] = useState(false);
 
+  // Synchronisation dynamique quand l'utilisateur clique sur le bouton 2P/4P LAN d'un jeu
+  useEffect(() => {
+    if (isOpen && currentGame?.id) {
+      setSelectedGameId(currentGame.id);
+      setActiveTab('host');
+    }
+  }, [currentGame, isOpen]);
+
   const selectedGame = games.find(g => g.id === selectedGameId) || currentGame || games[0] || {};
   const maxPlayersForGame = selectedGame.players || 2;
 
   const [lanInfo, setLanInfo] = useState(null);
 
-  // Détermination de l'URL de partage LAN / Même Wi-Fi / Netlify
-  const shareBaseUrl = lanInfo?.lanUrl || (typeof window !== 'undefined' ? window.location.origin : '');
+  // Détermination de l'URL de partage adaptée : Réseau Local (Wi-Fi/IP) vs En Ligne (Netlify/Internet)
+  const currentMode = activeRoom?.networkMode || networkMode;
+  const isLocalMode = currentMode === 'local';
+
+  const shareBaseUrl = isLocalMode 
+    ? (lanInfo?.lanUrl || (typeof window !== 'undefined' ? window.location.origin : ''))
+    : (typeof window !== 'undefined' ? window.location.origin : '');
+
   const shareRoomUrl = activeRoom?.code ? `${shareBaseUrl}/?join=${activeRoom.code}` : shareBaseUrl;
 
   // Sauvegarder le nom du joueur
@@ -135,7 +150,8 @@ export function NetplayModal({
         gameId: selectedGame.id,
         gameTitle: selectedGame.title,
         maxPlayers: maxPlayersForGame,
-        hostName: playerName
+        hostName: playerName,
+        networkMode: networkMode
       });
     } catch(err) {
       setErrorMsg(err.message || 'Échec de la création du salon.');
@@ -186,17 +202,23 @@ export function NetplayModal({
         {/* Entête Modal */}
         <div className="flex items-center justify-between px-5 py-3.5 bg-neutral-950 border-b border-neutral-800">
           <div className="flex items-center gap-2.5">
-            <div className="p-1.5 rounded-lg bg-cyan-500/10 border border-cyan-500/30 text-cyan-400">
-              <Radio className="w-4 h-4 animate-pulse" />
+            <div className={`p-1.5 rounded-lg border ${isLocalMode ? 'bg-cyan-500/10 border-cyan-500/30 text-cyan-400' : 'bg-rose-500/10 border-rose-500/30 text-rose-400'}`}>
+              {isLocalMode ? <Wifi className="w-4 h-4 animate-pulse" /> : <Globe className="w-4 h-4 animate-pulse" />}
             </div>
             <div>
               <h2 className="text-sm font-black text-white uppercase tracking-wider flex items-center gap-2">
-                Multijoueur Même Réseau & En Ligne
-                <span className="px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 text-[10px] font-normal border border-cyan-500/40">
-                  {isP2P ? '⚡ P2P Direct' : (netplayService.mode === 'ws' ? 'LAN Local' : 'P2P WebRTC')}
+                Multijoueur Arcade
+                <span className={`px-2 py-0.5 rounded-full text-[10px] font-normal border ${
+                  isLocalMode 
+                    ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40' 
+                    : 'bg-rose-500/20 text-rose-300 border-rose-500/40'
+                }`}>
+                  {isLocalMode ? '🏠 Même Wi-Fi (LAN)' : '🌐 En Ligne (Distant)'}
                 </span>
               </h2>
-              <p className="text-[11px] text-neutral-400">Jouez ensemble sur le même réseau Wi-Fi ou à distance en ligne</p>
+              <p className="text-[11px] text-neutral-400">
+                {isLocalMode ? 'Jouez avec vos appareils connectés à votre box Wi-Fi locale' : 'Jouez à distance avec des amis n\'importe où sur Internet'}
+              </p>
             </div>
           </div>
           
@@ -205,6 +227,41 @@ export function NetplayModal({
             className="p-1 rounded-lg text-neutral-400 hover:text-white hover:bg-neutral-800 transition-colors"
           >
             <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Sélecteur des 2 Modes de Connexion */}
+        <div className="px-5 py-2.5 bg-neutral-950/80 border-b border-neutral-800 grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            onClick={() => setNetworkMode('local')}
+            className={`py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 border ${
+              networkMode === 'local'
+                ? 'bg-cyan-500/20 text-cyan-300 border-cyan-400 shadow-md shadow-cyan-500/20'
+                : 'bg-neutral-900/80 text-neutral-400 border-neutral-800 hover:text-neutral-200 hover:bg-neutral-800'
+            }`}
+          >
+            <Wifi className="w-3.5 h-3.5 shrink-0 text-cyan-400" />
+            <div className="text-left min-w-0">
+              <span className="block leading-tight truncate">Réseau Local</span>
+              <span className="text-[9px] font-normal text-cyan-400/80 block truncate">Même Wi-Fi / Box</span>
+            </div>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setNetworkMode('online')}
+            className={`py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 border ${
+              networkMode === 'online'
+                ? 'bg-rose-500/20 text-rose-300 border-rose-400 shadow-md shadow-rose-500/20'
+                : 'bg-neutral-900/80 text-neutral-400 border-neutral-800 hover:text-neutral-200 hover:bg-neutral-800'
+            }`}
+          >
+            <Globe className="w-3.5 h-3.5 shrink-0 text-rose-400" />
+            <div className="text-left min-w-0">
+              <span className="block leading-tight truncate">En Ligne</span>
+              <span className="text-[9px] font-normal text-rose-400/80 block truncate">Internet / Distant</span>
+            </div>
           </button>
         </div>
 
@@ -240,7 +297,14 @@ export function NetplayModal({
             <div className="p-4 rounded-xl bg-neutral-950 border border-cyan-500/40 flex flex-col gap-3">
               <div className="flex items-center justify-between">
                 <div>
-                  <span className="text-[10px] uppercase font-bold text-neutral-400">Code de la Partie :</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] uppercase font-bold text-neutral-400">Code de la Partie :</span>
+                    <span className={`text-[10px] px-2 py-0.2 rounded-full font-bold uppercase ${
+                      isLocalMode ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40' : 'bg-rose-500/20 text-rose-300 border border-rose-500/40'
+                    }`}>
+                      {isLocalMode ? '🏠 Réseau Local' : '🌐 En Ligne'}
+                    </span>
+                  </div>
                   <div className="flex items-center gap-2 mt-0.5">
                     <span className="text-2xl font-black text-cyan-400 tracking-widest">{activeRoom.code}</span>
                     <button
@@ -262,12 +326,18 @@ export function NetplayModal({
               </div>
 
               {/* Info Réseau Wi-Fi / Cloud */}
-              <div className="p-2.5 rounded-xl bg-neutral-900 border border-cyan-500/30 flex items-center justify-between text-xs">
+              <div className={`p-2.5 rounded-xl bg-neutral-900 border ${isLocalMode ? 'border-cyan-500/30' : 'border-rose-500/30'} flex items-center justify-between text-xs`}>
                 <div className="flex items-center gap-2 min-w-0">
-                  <Smartphone className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+                  {isLocalMode ? (
+                    <Smartphone className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+                  ) : (
+                    <Globe className="w-3.5 h-3.5 text-rose-400 shrink-0" />
+                  )}
                   <div className="min-w-0">
-                    <span className="text-[10px] text-cyan-300 font-bold uppercase block truncate">
-                      {lanInfo?.lanUrl ? 'Accès Mobile (Même Wi-Fi LAN) :' : 'Lien de partage (Même Wi-Fi & Web) :'}
+                    <span className={`text-[10px] ${isLocalMode ? 'text-cyan-300' : 'text-rose-300'} font-bold uppercase block truncate`}>
+                      {isLocalMode 
+                        ? 'Accès Mobile / Même Wi-Fi (Scan QR ou Lien) :' 
+                        : 'Lien de partage En Ligne (WhatsApp / Discord) :'}
                     </span>
                     <span className="text-xs font-mono text-white select-all truncate block">{shareRoomUrl}</span>
                   </div>
@@ -401,9 +471,16 @@ export function NetplayModal({
                 <div className="space-y-4">
                   {/* Sélection du Jeu */}
                   <div>
-                    <label className="text-[11px] uppercase font-bold text-neutral-400 block mb-1.5">
-                      Jeu Arcade à héberger :
-                    </label>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="text-[11px] uppercase font-bold text-neutral-400">
+                        Jeu Arcade à héberger :
+                      </label>
+                      {currentGame?.id === selectedGameId && (
+                        <span className="text-[10px] font-bold text-cyan-400 bg-cyan-950 border border-cyan-800 px-2 py-0.5 rounded">
+                          ✓ Pré-sélectionné
+                        </span>
+                      )}
+                    </div>
                     <select
                       value={selectedGameId}
                       onChange={(e) => setSelectedGameId(e.target.value)}
@@ -432,45 +509,65 @@ export function NetplayModal({
                     </span>
                   </div>
 
-                  <div className="p-3 rounded-xl bg-cyan-950/30 border border-cyan-500/30 flex items-center justify-between text-xs">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <Smartphone className="w-4 h-4 text-cyan-400 shrink-0" />
-                      <div className="min-w-0">
-                        <span className="text-[10px] text-cyan-300 font-bold uppercase block truncate">
-                          {lanInfo?.lanUrl ? 'Accès mobile sur le même Wi-Fi :' : 'Adresse du salon (Même Wi-Fi & Web) :'}
+                  {/* Carte Explicative du Mode Actif (Local vs En Ligne) */}
+                  <div className={`p-3 rounded-xl border ${
+                    networkMode === 'local' 
+                      ? 'bg-cyan-950/30 border-cyan-500/30' 
+                      : 'bg-rose-950/30 border-rose-500/30'
+                  } flex flex-col gap-2`}>
+                    <div className="flex items-center justify-between text-xs">
+                      <div className="flex items-center gap-2 min-w-0">
+                        {networkMode === 'local' ? (
+                          <Wifi className="w-4 h-4 text-cyan-400 shrink-0" />
+                        ) : (
+                          <Globe className="w-4 h-4 text-rose-400 shrink-0" />
+                        )}
+                        <span className={`text-[10px] font-bold uppercase truncate ${
+                          networkMode === 'local' ? 'text-cyan-300' : 'text-rose-300'
+                        }`}>
+                          {networkMode === 'local'
+                            ? 'Mode Réseau Local (Même Box / Wi-Fi) :'
+                            : 'Mode En Ligne (Partage WebRTC / Cloud) :'}
                         </span>
-                        <span className="text-xs font-mono text-white select-all truncate block">{shareBaseUrl}</span>
+                      </div>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <button
+                          onClick={() => handleCopyCode(shareBaseUrl)}
+                          className="p-1 rounded bg-neutral-800 hover:bg-neutral-700 text-neutral-300 transition-colors flex items-center gap-1 text-[10px]"
+                          title="Copier l'adresse"
+                        >
+                          <Copy className="w-3.5 h-3.5" />
+                          <span className="hidden xs:inline">Copier</span>
+                        </button>
+                        {networkMode === 'local' && (
+                          <button
+                            onClick={() => setShowQrModal(true)}
+                            className="p-1 rounded bg-neutral-800 hover:bg-neutral-700 text-cyan-300 transition-colors"
+                            title="Afficher le QR Code"
+                          >
+                            <QrCode className="w-3.5 h-3.5" />
+                          </button>
+                        )}
                       </div>
                     </div>
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      <button
-                        onClick={() => handleCopyCode(shareBaseUrl)}
-                        className="p-1.5 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-cyan-300 transition-colors flex items-center gap-1 text-[11px]"
-                        title="Copier l'adresse"
-                      >
-                        <Copy className="w-3.5 h-3.5" />
-                        <span className="hidden xs:inline">Copier</span>
-                      </button>
-                      <button
-                        onClick={() => setShowQrModal(true)}
-                        className="p-1.5 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-cyan-300 transition-colors"
-                        title="Afficher le QR Code"
-                      >
-                        <QrCode className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  </div>
 
-                  <p className="text-[11px] text-neutral-400 leading-relaxed">
-                    Une fois le salon créé, vos amis sur le même réseau Wi-Fi ou à distance pourront se joindre à vous en entrant votre code ou en scannant le QR code.
-                  </p>
+                    <p className="text-[11px] text-neutral-300 leading-relaxed">
+                      {networkMode === 'local'
+                        ? 'Pour jouer avec vos proches dans la même maison. Connectez vos téléphones ou PC au même réseau Wi-Fi, puis scannez le QR Code ou partagez le lien local. Latence ultra-faible (1 à 5 ms).'
+                        : 'Pour jouer avec un ami à distance via Internet (4G/5G, fibre). Un lien direct et un code seront générés pour se connecter instantanément sans aucune configuration de box.'}
+                    </p>
+                  </div>
 
                   <button
                     onClick={handleCreateRoom}
-                    className="w-full py-3 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-black font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg shadow-cyan-500/30 active:scale-98 transition-transform"
+                    className={`w-full py-3 rounded-xl font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg active:scale-98 transition-all ${
+                      networkMode === 'local'
+                        ? 'bg-cyan-500 hover:bg-cyan-400 text-black shadow-cyan-500/30'
+                        : 'bg-rose-500 hover:bg-rose-400 text-white shadow-rose-500/30'
+                    }`}
                   >
-                    <Radio className="w-4 h-4" />
-                    <span>Ouvrir le Salon Réseau</span>
+                    {networkMode === 'local' ? <Wifi className="w-4 h-4" /> : <Globe className="w-4 h-4" />}
+                    <span>{networkMode === 'local' ? 'Ouvrir le Salon Réseau Local (Wi-Fi)' : 'Ouvrir le Salon En Ligne (Internet)'}</span>
                   </button>
                 </div>
               ) : (
@@ -516,12 +613,12 @@ export function NetplayModal({
                     />
                   </div>
 
-                  {/* Salons ouverts détectés sur le réseau local */}
+                  {/* Salons ouverts détectés (Local Wi-Fi et En Ligne Cloud) */}
                   <div>
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-[11px] uppercase font-bold text-neutral-400 flex items-center gap-1.5">
-                        <Wifi className="w-3.5 h-3.5 text-cyan-400" />
-                        Salons ouverts sur le réseau local :
+                        {networkMode === 'local' ? <Wifi className="w-3.5 h-3.5 text-cyan-400" /> : <Globe className="w-3.5 h-3.5 text-rose-400" />}
+                        Salons ouverts ({networkMode === 'local' ? 'Même Wi-Fi' : 'En Ligne / Cloud'}) :
                       </span>
                       <button
                         onClick={loadRooms}
@@ -534,35 +631,45 @@ export function NetplayModal({
 
                     {availableRooms.length === 0 ? (
                       <div className="p-4 rounded-xl bg-neutral-950/60 border border-neutral-800 text-center text-xs text-neutral-500">
-                        Aucun salon ouvert détecté pour le moment sur votre réseau.
+                        Aucun salon ouvert détecté pour le moment.
                       </div>
                     ) : (
                       <div className="space-y-2">
-                        {availableRooms.map(r => (
-                          <div
-                            key={r.code}
-                            className="p-3 rounded-xl bg-neutral-950 border border-neutral-800 hover:border-cyan-500/50 flex items-center justify-between transition-colors"
-                          >
-                            <div>
-                              <div className="flex items-center gap-2">
-                                <span className="font-bold text-white text-xs">{r.gameTitle}</span>
-                                <span className="text-[10px] font-bold text-cyan-400 px-1.5 py-0.2 rounded bg-cyan-950 border border-cyan-800">
-                                  {r.code}
+                        {availableRooms.map(r => {
+                          const isRoomOnline = r.networkMode === 'online';
+                          return (
+                            <div
+                              key={r.code}
+                              className="p-3 rounded-xl bg-neutral-950 border border-neutral-800 hover:border-cyan-500/50 flex items-center justify-between transition-colors"
+                            >
+                              <div>
+                                <div className="flex items-center gap-2">
+                                  <span className="font-bold text-white text-xs">{r.gameTitle}</span>
+                                  <span className="text-[10px] font-bold text-cyan-400 px-1.5 py-0.2 rounded bg-cyan-950 border border-cyan-800">
+                                    {r.code}
+                                  </span>
+                                  <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${
+                                    isRoomOnline 
+                                      ? 'text-rose-300 bg-rose-950/60 border-rose-800' 
+                                      : 'text-cyan-300 bg-cyan-950/60 border-cyan-800'
+                                  }`}>
+                                    {isRoomOnline ? '🌐 En Ligne' : '🏠 Wi-Fi'}
+                                  </span>
+                                </div>
+                                <span className="text-[10px] text-neutral-400">
+                                  Joueurs : {r.currentPlayers} / {r.maxPlayers}
                                 </span>
                               </div>
-                              <span className="text-[10px] text-neutral-400">
-                                Joueurs : {r.currentPlayers} / {r.maxPlayers}
-                              </span>
-                            </div>
 
-                            <button
-                              onClick={() => handleJoinRoom(r.code)}
-                              className="px-3 py-1.5 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-black text-xs font-bold transition-colors"
-                            >
-                              Rejoindre
-                            </button>
-                          </div>
-                        ))}
+                              <button
+                                onClick={() => handleJoinRoom(r.code)}
+                                className="px-3 py-1.5 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-black text-xs font-bold transition-colors shadow-sm"
+                              >
+                                Rejoindre
+                              </button>
+                            </div>
+                          );
+                        })}
                       </div>
                     )}
                   </div>

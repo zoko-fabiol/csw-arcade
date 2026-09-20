@@ -10,6 +10,7 @@ import {
   Gamepad2, 
   Loader2, 
   Radio,
+  RefreshCw,
   WifiOff,
   Sliders,
   Smartphone
@@ -42,6 +43,7 @@ export function EmulatorCore({
   const [errorMessage, setErrorMessage] = useState(null);
   const [netplayRoom, setNetplayRoom] = useState(() => netplayService.currentRoom);
   const [interrupted, setInterrupted] = useState({ isInterrupted: false, message: '' });
+  const [syncNotification, setSyncNotification] = useState(null);
   const hasSyncedInitialState = useRef(false);
 
   // Détection automatique du mode tactile (mobile / tablette / tactile)
@@ -53,6 +55,10 @@ export function EmulatorCore({
     const myIdx = netplayService.myPlayerIndex >= 0 ? netplayService.myPlayerIndex : (isHost ? 0 : 1);
     if (mode === 'netplay') {
       netplayService.sendInput(buttonId, isPressed, myIdx);
+      // Auto-resync sur le joueur en tête lors d'un appui sur Coin (8) ou Start (9)
+      if (isPressed && (buttonId === 8 || buttonId === 9)) {
+        netplayService.requestStateSync();
+      }
     }
     if (iframeRef.current?.contentWindow) {
       iframeRef.current.contentWindow.postMessage({
@@ -73,7 +79,14 @@ export function EmulatorCore({
     onExit();
   };
 
-  // Écoute des entrées des joueurs distants et synchronisation d'état en mode Netplay
+  // Déclenchement manuel de resynchronisation sur l'autre joueur (J1 <-> J2)
+  const handleTriggerResync = () => {
+    if (mode !== 'netplay') return;
+    setSyncNotification('🔄 Synchronisation avec l\'autre joueur...');
+    netplayService.requestStateSync();
+  };
+
+  // Écoute des entrées des joueurs distants et synchronisation bidirectionnelle d'état
   useEffect(() => {
     if (mode !== 'netplay') return;
 
@@ -91,27 +104,33 @@ export function EmulatorCore({
       }
     });
 
-    // L'hôte reçoit une demande de synchronisation d'état (d'un joueur arrivant en cours de partie)
+    // Réception d'une demande de savestate (Bidirectionnel : J1 demande à J2 OU J2 demande à J1)
     const unsubReqState = netplayService.on('request_state', ({ fromPlayerIndex }) => {
-      if (isHost && iframeRef.current?.contentWindow) {
-        console.log('[EmulatorCore] Demande de savestate reçue pour le joueur', fromPlayerIndex);
+      const myIdx = netplayService.myPlayerIndex >= 0 ? netplayService.myPlayerIndex : (isHost ? 0 : 1);
+      if (fromPlayerIndex !== myIdx && iframeRef.current?.contentWindow) {
+        console.log(`[EmulatorCore] Demande de savestate reçue du joueur J${(fromPlayerIndex ?? 0) + 1}. Capture en cours...`);
         iframeRef.current.contentWindow.postMessage({ type: 'GET_STATE', toPlayerIndex: fromPlayerIndex }, '*');
       }
     });
 
-    // L'invité reçoit le savestate officiel de l'hôte (initial ou heartbeat autoritaire)
-    const unsubSyncState = netplayService.on('sync_state', ({ stateBase64, stateData, isHeartbeat }) => {
-      if (!isHost && iframeRef.current?.contentWindow) {
-        if (!isHeartbeat) {
-          console.log('[EmulatorCore] Savestate initial reçu de l\'hôte, synchronisation...');
+    // Réception du savestate (Bidirectionnel : J1 ou J2 applique l'état de l'autre joueur)
+    const unsubSyncState = netplayService.on('sync_state', ({ stateBase64, stateData, fromPlayerIndex, toPlayerIndex, isHeartbeat }) => {
+      const myIdx = netplayService.myPlayerIndex >= 0 ? netplayService.myPlayerIndex : (isHost ? 0 : 1);
+      if (fromPlayerIndex !== myIdx && (toPlayerIndex === undefined || toPlayerIndex === null || toPlayerIndex === myIdx)) {
+        if (iframeRef.current?.contentWindow) {
+          console.log(`[EmulatorCore] Savestate reçu du joueur distant J${(fromPlayerIndex ?? 0) + 1}. Application...`);
           hasSyncedInitialState.current = true;
+          iframeRef.current.contentWindow.postMessage({
+            type: 'LOAD_STATE',
+            stateBase64: stateBase64 || null,
+            state: stateData || null,
+            isHeartbeat: !!isHeartbeat
+          }, '*');
+          if (!isHeartbeat) {
+            setSyncNotification(`✓ Synchronisé sur le Joueur ${fromPlayerIndex + 1} !`);
+            setTimeout(() => setSyncNotification(null), 2500);
+          }
         }
-        iframeRef.current.contentWindow.postMessage({
-          type: 'LOAD_STATE',
-          stateBase64: stateBase64 || null,
-          state: stateData || null,
-          isHeartbeat: !!isHeartbeat
-        }, '*');
       }
     });
 
@@ -131,16 +150,6 @@ export function EmulatorCore({
     const unsubPing = netplayService.on('ping', (p) => setPing(p));
     const unsubRoom = netplayService.on('room_update', (r) => setNetplayRoom(r));
 
-    // Heartbeat autoritaire périodique de l'hôte (toutes les 3.5s pour forcer la synchronisation absolue et la mort identique des personnages)
-    let heartbeatInterval = null;
-    if (isHost) {
-      heartbeatInterval = setInterval(() => {
-        if (iframeRef.current?.contentWindow) {
-          iframeRef.current.contentWindow.postMessage({ type: 'GET_STATE', isHeartbeat: true }, '*');
-        }
-      }, 3500);
-    }
-
     return () => {
       unsubInput();
       unsubReqState();
@@ -149,7 +158,6 @@ export function EmulatorCore({
       unsubHostDisc();
       unsubPing();
       unsubRoom();
-      if (heartbeatInterval) clearInterval(heartbeatInterval);
     };
   }, [mode, isHost]);
 
@@ -167,9 +175,9 @@ export function EmulatorCore({
 
       if (event.data.type === 'EJS_GAME_STARTED') {
         setIsReady(true);
-        // Si invité en Netplay, demander immédiatement et UNE SEULE FOIS le savestate actuel à l'hôte
+        // Si invité en Netplay, demander immédiatement et UNE SEULE FOIS le savestate initial à l'hôte
         if (mode === 'netplay' && !isHost && !hasSyncedInitialState.current) {
-          console.log('[EmulatorCore] Invité prêt, demande unique de synchronisation à froid à l\'hôte...');
+          console.log('[EmulatorCore] Invité prêt, demande de synchronisation initiale à l\'hôte...');
           netplayService.requestStateSync();
         }
       }
@@ -178,18 +186,24 @@ export function EmulatorCore({
       if (event.data.type === 'LOCAL_INPUT' && mode === 'netplay') {
         const myIdx = netplayService.myPlayerIndex >= 0 ? netplayService.myPlayerIndex : (isHost ? 0 : 1);
         netplayService.sendInput(event.data.buttonId, event.data.isPressed, myIdx);
+
+        // Auto-resync sur le joueur en tête quand on réapparaît / remet un crédit (Coin 8 ou Start 9)
+        if (event.data.isPressed && (event.data.buttonId === 8 || event.data.buttonId === 9)) {
+          console.log('[EmulatorCore] Coin/Start détecté : synchronisation automatique sur le joueur en tête...');
+          netplayService.requestStateSync();
+        }
       }
 
-      // L'iframe de l'hôte a extrait le savestate, l'envoyer au joueur distant
-      if (event.data.type === 'STATE_DATA' && mode === 'netplay' && isHost) {
+      // L'iframe a extrait le savestate (soit l'hôte soit l'invité), l'envoyer au joueur distant
+      if (event.data.type === 'STATE_DATA' && mode === 'netplay') {
         if (!event.data.isHeartbeat) {
-          console.log('[EmulatorCore] Savestate extrait par l\'iframe, transmission au joueur distant...');
+          console.log('[EmulatorCore] Savestate extrait par l\'iframe, transmission au joueur demandeur...');
         }
         netplayService.sendStateSync({
           stateBase64: event.data.stateBase64 || null,
           stateSize: event.data.stateSize || 0,
           isHeartbeat: !!event.data.isHeartbeat
-        });
+        }, event.data.toPlayerIndex);
       }
     };
 
@@ -423,6 +437,17 @@ export function EmulatorCore({
 
         {/* Commandes Utilitaires */}
         <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+          {mode === 'netplay' && (
+            <button
+              onClick={handleTriggerResync}
+              className="flex items-center gap-1.5 px-2.5 py-1 sm:py-1.5 rounded-lg bg-cyan-950/80 border border-cyan-500/50 hover:bg-cyan-900 text-cyan-300 transition-all active:scale-95 text-[10px] sm:text-xs font-bold shadow-sm"
+              title="Synchroniser mon jeu sur le joueur en tête (J1 ↔ J2)"
+            >
+              <RefreshCw className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-cyan-400" />
+              <span className="hidden xs:inline">SYNCHRO</span>
+            </button>
+          )}
+
           <button
             onClick={() => setIsTouchVisible(!isTouchVisible)}
             className={`p-1.5 sm:p-2 rounded-lg border transition-all ${
@@ -456,6 +481,13 @@ export function EmulatorCore({
           </button>
         </div>
       </div>
+
+      {/* Toast Notification de Synchronisation */}
+      {syncNotification && (
+        <div className="absolute top-12 sm:top-16 left-1/2 -translate-x-1/2 z-[80] bg-cyan-950/95 border border-cyan-400/80 text-cyan-200 px-4 py-1.5 rounded-full text-xs font-sans shadow-lg shadow-cyan-500/20 backdrop-blur-md animate-in fade-in slide-in-from-top-2 pointer-events-none">
+          {syncNotification}
+        </div>
+      )}
 
       {/* Zone de Rendu : Deux modes intelligents */}
       {isPortraitPadMode ? (

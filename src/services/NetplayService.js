@@ -16,7 +16,18 @@ const RTC_CONFIG = {
   iceServers: [
     { urls: 'stun:stun.l.google.com:19302' },
     { urls: 'stun:stun1.l.google.com:19302' },
-    { urls: 'stun:stun2.l.google.com:19302' }
+    { urls: 'stun:stun2.l.google.com:19302' },
+    { urls: 'stun:stun.cloudflare.com:3478' },
+    // Serveurs TURN publics gratuits pour traverser les NAT symétriques, 4G/5G et pare-feux à distance
+    {
+      urls: [
+        'turn:openrelay.metered.ca:80',
+        'turn:openrelay.metered.ca:443',
+        'turn:openrelay.metered.ca:443?transport=tcp'
+      ],
+      username: 'openrelayproject',
+      credential: 'openrelayproject'
+    }
   ],
   iceCandidatePoolSize: 10
 };
@@ -251,13 +262,15 @@ class NetplayService {
       }
 
       case 'STATE_CHUNK': {
-        const { transferId, chunkIndex, totalChunks, chunk, stateSize, isHeartbeat, time } = data;
+        const { transferId, chunkIndex, totalChunks, chunk, stateSize, fromPlayerIndex, toPlayerIndex, isHeartbeat, time } = data;
         if (!this.incomingStateChunks.has(transferId)) {
           this.incomingStateChunks.set(transferId, {
             chunks: new Array(totalChunks),
             receivedCount: 0,
             totalChunks,
             stateSize,
+            fromPlayerIndex,
+            toPlayerIndex,
             isHeartbeat,
             time
           });
@@ -274,6 +287,8 @@ class NetplayService {
           this.emit('sync_state', {
             stateBase64: fullBase64,
             stateSize: transfer.stateSize,
+            fromPlayerIndex: transfer.fromPlayerIndex,
+            toPlayerIndex: transfer.toPlayerIndex,
             isHeartbeat: transfer.isHeartbeat,
             time: transfer.time
           });
@@ -409,6 +424,8 @@ class NetplayService {
       this.closeWebRTC();
       const pc = new RTCPeerConnection(RTC_CONFIG);
       this.pc = pc;
+      const pendingCandidates = [];
+      let isRemoteDescSet = false;
 
       // Création du DataChannel bidirectionnel ordonné pour garantir l'ordre des touches et savestates
       const dc = pc.createDataChannel('csw-arcade-netplay', {
@@ -436,25 +453,37 @@ class NetplayService {
       });
 
       // Écoute de l'answer de l'invité
-      const unsubAnswer = onSnapshot(roomRef, (snapshot) => {
+      const unsubAnswer = onSnapshot(roomRef, async (snapshot) => {
         const d = snapshot.data();
         if (d?.answer && !pc.currentRemoteDescription) {
           console.log('[Netplay WebRTC Hôte] Réponse SDP reçue de l\'invité ! Établissement du tunnel...');
-          pc.setRemoteDescription(new RTCSessionDescription(d.answer)).catch(err => {
+          try {
+            await pc.setRemoteDescription(new RTCSessionDescription(d.answer));
+            isRemoteDescSet = true;
+            while (pendingCandidates.length > 0) {
+              const cand = pendingCandidates.shift();
+              try { await pc.addIceCandidate(cand); } catch(e) {}
+            }
+          } catch(err) {
             console.warn('[Netplay WebRTC] Erreur remote description hôte:', err);
-          });
+          }
         }
       });
       this.webrtcUnsubs.push(unsubAnswer);
 
-      // Écoute des candidats ICE de l'invité
+      // Écoute des candidats ICE de l'invité avec mise en file d'attente sécurisée
       const calleeCandidatesCol = collection(roomRef, 'calleeCandidates');
       const unsubCallee = onSnapshot(calleeCandidatesCol, (snapshot) => {
         snapshot.docChanges().forEach(async (change) => {
           if (change.type === 'added') {
-            try {
-              await pc.addIceCandidate(new RTCIceCandidate(change.doc.data()));
-            } catch (e) {}
+            const cand = new RTCIceCandidate(change.doc.data());
+            if (isRemoteDescSet && pc.remoteDescription) {
+              try {
+                await pc.addIceCandidate(cand);
+              } catch (e) {}
+            } else {
+              pendingCandidates.push(cand);
+            }
           }
         });
       });
@@ -469,6 +498,8 @@ class NetplayService {
       this.closeWebRTC();
       const pc = new RTCPeerConnection(RTC_CONFIG);
       this.pc = pc;
+      const pendingCandidates = [];
+      let isRemoteDescSet = false;
 
       pc.ondatachannel = (event) => {
         console.log('[Netplay WebRTC Invité] DataChannel capté depuis l\'hôte !');
@@ -488,6 +519,7 @@ class NetplayService {
       };
 
       await pc.setRemoteDescription(new RTCSessionDescription(offer));
+      isRemoteDescSet = true;
       const answer = await pc.createAnswer();
       await pc.setLocalDescription(answer);
 
@@ -495,14 +527,25 @@ class NetplayService {
         answer: { type: answer.type, sdp: answer.sdp }
       });
 
-      // Écoute des candidats ICE de l'hôte
+      // Vider les candidats qui ont pu arriver avant ou pendant le setLocalDescription
+      while (pendingCandidates.length > 0) {
+        const cand = pendingCandidates.shift();
+        try { await pc.addIceCandidate(cand); } catch(e) {}
+      }
+
+      // Écoute des candidats ICE de l'hôte avec mise en file d'attente sécurisée
       const callerCandidatesCol = collection(roomRef, 'callerCandidates');
       const unsubCaller = onSnapshot(callerCandidatesCol, (snapshot) => {
         snapshot.docChanges().forEach(async (change) => {
           if (change.type === 'added') {
-            try {
-              await pc.addIceCandidate(new RTCIceCandidate(change.doc.data()));
-            } catch (e) {}
+            const cand = new RTCIceCandidate(change.doc.data());
+            if (isRemoteDescSet && pc.remoteDescription) {
+              try {
+                await pc.addIceCandidate(cand);
+              } catch (e) {}
+            } else {
+              pendingCandidates.push(cand);
+            }
           }
         });
       });
@@ -538,7 +581,7 @@ class NetplayService {
   }
 
   // Créer un salon (l'utilisateur devient J1 / Hôte)
-  async createRoom({ gameId, gameTitle, maxPlayers = 2, hostName = 'Hôte' }) {
+  async createRoom({ gameId, gameTitle, maxPlayers = 2, hostName = 'Hôte', networkMode = 'local' }) {
     await this.connect();
 
     // 1. Tenter le mode WebSocket LAN si disponible (serveur local)
@@ -556,7 +599,8 @@ class NetplayService {
             gameId,
             gameTitle,
             maxPlayers,
-            hostName
+            hostName,
+            networkMode
           }));
 
           setTimeout(() => {
@@ -574,6 +618,7 @@ class NetplayService {
             gameTitle,
             maxPlayers: wsRes.maxPlayers || maxPlayers,
             hostName,
+            networkMode,
             createdAt: Date.now(),
             updatedAt: Date.now(),
             players: [
@@ -605,11 +650,15 @@ class NetplayService {
             // Détection demande de savestate
             if (this.myPlayerIndex === 0 && data.stateRequest && data.stateRequest.time !== lastProcessedStateReq) {
               lastProcessedStateReq = data.stateRequest.time;
-              this.emit('request_state', data.stateRequest);
+              this.handleMessage({
+                type: 'REQUEST_INITIAL_STATE',
+                fromPlayerIndex: data.stateRequest.fromPlayerIndex,
+                requestId: data.stateRequest.requestId
+              });
             }
           });
-        } catch(e) {
-          console.warn('[Netplay] Mirroring cloud non-bloquant:', e.message);
+        } catch(fbErr) {
+          console.warn('[Netplay] Mirroring Firestore facultatif ignoré:', fbErr.message);
         }
 
         return wsRes;
@@ -619,10 +668,10 @@ class NetplayService {
     }
 
     // 2. Mode Firebase Cloud + WebRTC (Netlify / Internet / Même Wi-Fi sans serveur dédié)
-    return this.createFirebaseRoom({ gameId, gameTitle, maxPlayers, hostName });
+    return this.createFirebaseRoom({ gameId, gameTitle, maxPlayers, hostName, networkMode });
   }
 
-  async createFirebaseRoom({ gameId, gameTitle, maxPlayers = 2, hostName = 'Hôte' }) {
+  async createFirebaseRoom({ gameId, gameTitle, maxPlayers = 2, hostName = 'Hôte', networkMode = 'local' }) {
     try {
       const roomCode = this.generateRoomCode();
       const initialRoom = {
@@ -631,6 +680,7 @@ class NetplayService {
         gameTitle,
         maxPlayers,
         hostName,
+        networkMode,
         createdAt: Date.now(),
         updatedAt: Date.now(),
         players: [
@@ -654,6 +704,7 @@ class NetplayService {
       if (this.firestoreUnsub) this.firestoreUnsub();
       let lastProcessedInputTime = 0;
       let lastProcessedStateReq = 0;
+      let lastProcessedStateSync = 0;
 
       this.firestoreUnsub = onSnapshot(roomRef, (snapshot) => {
         if (!snapshot.exists()) {
@@ -673,10 +724,16 @@ class NetplayService {
           });
         }
 
-        // Détection demande de savestate
-        if (this.myPlayerIndex === 0 && data.stateRequest && data.stateRequest.time !== lastProcessedStateReq) {
+        // Détection demande de savestate (Bidirectionnel : J2 demande l'état à J1)
+        if (data.stateRequest && data.stateRequest.fromPlayerIndex !== this.myPlayerIndex && data.stateRequest.time !== lastProcessedStateReq) {
           lastProcessedStateReq = data.stateRequest.time;
           this.emit('request_state', data.stateRequest);
+        }
+
+        // Réception du savestate envoyé par J2 vers J1 (Bidirectionnel : J2 -> J1)
+        if (data.stateSync && (data.stateSync.toPlayerIndex === undefined || data.stateSync.toPlayerIndex === 0) && data.stateSync.fromPlayerIndex !== 0 && data.stateSync.time !== lastProcessedStateSync) {
+          lastProcessedStateSync = data.stateSync.time;
+          this.emit('sync_state', data.stateSync);
         }
       });
 
@@ -793,6 +850,7 @@ class NetplayService {
       if (this.firestoreUnsub) this.firestoreUnsub();
       let lastProcessedInputTime = 0;
       let lastProcessedStateSync = 0;
+      let lastProcessedStateReq = 0;
 
       this.firestoreUnsub = onSnapshot(roomRef, (snapshot) => {
         if (!snapshot.exists()) {
@@ -817,8 +875,14 @@ class NetplayService {
           });
         }
 
-        // Réception du savestate initial envoyé par l'hôte via Firebase
-        if (data.stateSync && data.stateSync.time !== lastProcessedStateSync) {
+        // Réception d'une demande de savestate (Bidirectionnel : J1 demande l'état à J2)
+        if (data.stateRequest && data.stateRequest.fromPlayerIndex !== this.myPlayerIndex && data.stateRequest.time !== lastProcessedStateReq) {
+          lastProcessedStateReq = data.stateRequest.time;
+          this.emit('request_state', data.stateRequest);
+        }
+
+        // Réception du savestate envoyé par l'hôte via Firebase (J1 -> J2)
+        if (data.stateSync && (data.stateSync.toPlayerIndex === undefined || data.stateSync.toPlayerIndex === this.myPlayerIndex) && data.stateSync.fromPlayerIndex !== this.myPlayerIndex && data.stateSync.time !== lastProcessedStateSync) {
           lastProcessedStateSync = data.stateSync.time;
           this.emit('sync_state', data.stateSync);
         }
@@ -961,6 +1025,7 @@ class NetplayService {
 
     const syncMsg = {
       type: 'SYNC_STATE',
+      fromPlayerIndex: this.myPlayerIndex,
       toPlayerIndex,
       stateBase64,
       stateSize,
@@ -985,6 +1050,8 @@ class NetplayService {
               totalChunks,
               chunk,
               stateSize,
+              fromPlayerIndex: this.myPlayerIndex,
+              toPlayerIndex,
               isHeartbeat,
               time: syncMsg.time
             }));
