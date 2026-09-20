@@ -134,6 +134,8 @@ export function NetplayModal({
     };
   }, [isOpen, asControllerOnly, games, onLaunchGame, onOpenMobileController, onClose]);
 
+  const [isProcessing, setIsProcessing] = useState(false);
+
   const loadRooms = async () => {
     setIsLoadingRooms(true);
     try {
@@ -148,6 +150,7 @@ export function NetplayModal({
 
   const handleCreateRoom = async () => {
     setErrorMsg(null);
+    setIsProcessing(true);
     try {
       await netplayService.createRoom({
         gameId: selectedGame.id,
@@ -156,8 +159,13 @@ export function NetplayModal({
         hostName: playerName,
         networkMode: networkMode
       });
+      if (netplayService.currentRoom) {
+        setActiveRoom(netplayService.currentRoom);
+      }
     } catch(err) {
       setErrorMsg(err.message || 'Échec de la création du salon.');
+    } finally {
+      setIsProcessing(false);
     }
   };
 
@@ -168,10 +176,16 @@ export function NetplayModal({
       return;
     }
     setErrorMsg(null);
+    setIsProcessing(true);
     try {
       await netplayService.joinRoom(code, playerName);
+      if (netplayService.currentRoom) {
+        setActiveRoom(netplayService.currentRoom);
+      }
     } catch(err) {
       setErrorMsg(err.message || 'Échec de connexion au salon.');
+    } finally {
+      setIsProcessing(false);
     }
   };
 
@@ -583,14 +597,27 @@ export function NetplayModal({
 
                   <button
                     onClick={handleCreateRoom}
+                    disabled={isProcessing}
                     className={`w-full py-3 rounded-xl font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg active:scale-98 transition-all ${
                       networkMode === 'local'
                         ? 'bg-cyan-500 hover:bg-cyan-400 text-black shadow-cyan-500/30'
                         : 'bg-rose-500 hover:bg-rose-400 text-white shadow-rose-500/30'
-                    }`}
+                    } ${isProcessing ? 'opacity-70 cursor-wait' : ''}`}
                   >
-                    {networkMode === 'local' ? <Wifi className="w-4 h-4" /> : <Globe className="w-4 h-4" />}
-                    <span>{networkMode === 'local' ? 'Ouvrir le Salon Réseau Local (Wi-Fi)' : 'Ouvrir le Salon En Ligne (Internet)'}</span>
+                    {isProcessing ? (
+                      <span className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                    ) : networkMode === 'local' ? (
+                      <Wifi className="w-4 h-4" />
+                    ) : (
+                      <Globe className="w-4 h-4" />
+                    )}
+                    <span>
+                      {isProcessing
+                        ? 'Création du salon...'
+                        : networkMode === 'local'
+                        ? 'Ouvrir le Salon Réseau Local (Wi-Fi)'
+                        : 'Ouvrir le Salon En Ligne (Internet)'}
+                    </span>
                   </button>
                 </div>
               ) : (
@@ -611,10 +638,19 @@ export function NetplayModal({
                       />
                       <button
                         onClick={() => handleJoinRoom()}
-                        className="px-4 py-2 rounded-xl bg-rose-500 hover:bg-rose-400 text-white font-bold text-xs uppercase flex items-center gap-1.5 shadow-md shadow-rose-500/20 active:scale-98 transition-transform"
+                        disabled={isProcessing}
+                        className={`px-4 py-2 rounded-xl bg-rose-500 hover:bg-rose-400 text-white font-bold text-xs uppercase flex items-center gap-1.5 shadow-md shadow-rose-500/20 active:scale-98 transition-transform ${
+                          isProcessing ? 'opacity-70 cursor-wait' : ''
+                        }`}
                       >
-                        <span>Rejoindre</span>
-                        <ArrowRight className="w-3.5 h-3.5" />
+                        {isProcessing ? (
+                          <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        ) : (
+                          <>
+                            <span>Rejoindre</span>
+                            <ArrowRight className="w-3.5 h-3.5" />
+                          </>
+                        )}
                       </button>
                     </div>
                   </div>

@@ -21,22 +21,19 @@ const RTC_CONFIG = {
     { urls: 'stun:stun4.l.google.com:19302' },
     { urls: 'stun:stun.cloudflare.com:3478' },
     { urls: 'stun:global.stun.twilio.com:3478' },
-    { urls: 'stun:stun.services.mozilla.com' },
     { urls: 'stun:stun.metered.ca:80' },
     // Serveurs TURN pour traverser les CGNAT mobiles (Orange, MTN, Camtel) & pare-feux
     {
       urls: [
         'turn:openrelay.metered.ca:80',
         'turn:openrelay.metered.ca:443',
-        'turn:openrelay.metered.ca:443?transport=tcp',
-        'turns:openrelay.metered.ca:443?transport=tcp'
+        'turn:openrelay.metered.ca:443?transport=tcp'
       ],
       username: 'openrelayproject',
       credential: 'openrelayproject'
     }
   ],
-  iceCandidatePoolSize: 10,
-  iceTransportPolicy: 'all'
+  iceCandidatePoolSize: 10
 };
 
 class NetplayService {
@@ -60,6 +57,9 @@ class NetplayService {
     this.webrtcPingInterval = null;
     this.isP2PConnected = false;
     this.inputDelayFrames = 0; // Buffer adaptatif GGPO (0 à 3 frames)
+    this.mySessionId = 'csw_' + Math.random().toString(36).slice(2, 10);
+    this.ntfyWs = null;
+    this.currentTopic = null;
 
     // --- REDONDANCE N-3 & FLUX GGPO ---
     this.localSeq = 0;
@@ -357,6 +357,10 @@ class NetplayService {
       });
       this.webrtcUnsubs = [];
     }
+    if (this.ntfyWs) {
+      try { this.ntfyWs.close(); } catch(e) {}
+      this.ntfyWs = null;
+    }
     if (this.fastInputChannel) {
       try {
         this.fastInputChannel.onopen = null;
@@ -387,6 +391,239 @@ class NetplayService {
       this.pc = null;
     }
     this.isP2PConnected = false;
+  }
+
+  // --- SIGNALING P2P UNIVERSEL SANS QUOTA (ntfy.sh WebSocket) ---
+  setupNtfySignaling(roomCode, isHost, playerName = null) {
+    if (playerName) this.playerName = playerName;
+    const cleanCode = roomCode.trim().toLowerCase();
+    const topic = `csw-arcade-${cleanCode}`;
+    this.currentTopic = topic;
+    this.pendingNtfyCandidates = [];
+
+    if (this.ntfyWs) {
+      try { this.ntfyWs.close(); } catch(e) {}
+      this.ntfyWs = null;
+    }
+
+    try {
+      const ntfyWs = new WebSocket(`wss://ntfy.sh/${topic}/ws`);
+      this.ntfyWs = ntfyWs;
+
+      ntfyWs.onopen = () => {
+        console.log(`[Netplay] Tunnel direct P2P sans quota connecté (${topic})`);
+        if (!isHost) {
+          this.sendNtfySignal(topic, {
+            type: 'GUEST_JOINED',
+            playerName: this.playerName || 'Invité'
+          });
+        }
+      };
+
+      ntfyWs.onmessage = (event) => {
+        try {
+          const raw = JSON.parse(event.data);
+          if (raw.event !== 'message' || !raw.message) return;
+          const msg = JSON.parse(raw.message);
+          if (msg.sender === this.mySessionId) return;
+
+          if (msg.type === 'GUEST_JOINED' && isHost) {
+            console.log('[Netplay P2P] Invité détecté dans le salon !');
+            if (this.currentRoom) {
+              const newPlayer = {
+                name: msg.playerName || 'Joueur 2',
+                slot: 2,
+                isHost: false,
+                playerIndex: 1,
+                role: 'p2',
+                ping: 20
+              };
+              this.currentRoom.players = [this.currentRoom.players[0], newPlayer];
+              this.emit('room_update', this.currentRoom);
+              this.sendNtfySignal(topic, {
+                type: 'ROOM_SYNC',
+                room: this.currentRoom
+              });
+            }
+            this.setupWebRTCHostNtfy(topic);
+          }
+
+          if (msg.type === 'ROOM_SYNC' && !isHost) {
+            if (msg.room) {
+              this.currentRoom = { ...this.currentRoom, ...msg.room };
+              this.emit('room_update', this.currentRoom);
+            }
+          }
+
+          if (msg.type === 'WEBRTC_OFFER' && !isHost) {
+            console.log('[Netplay P2P] Offre WebRTC reçue !');
+            this.setupWebRTCGuestNtfy(topic, msg.offer);
+          }
+
+          if (msg.type === 'WEBRTC_ANSWER' && isHost) {
+            console.log('[Netplay P2P] Réponse WebRTC reçue !');
+            if (this.pc && !this.pc.currentRemoteDescription) {
+              this.pc.setRemoteDescription(new RTCSessionDescription(msg.answer))
+                .then(() => {
+                  while (this.pendingNtfyCandidates && this.pendingNtfyCandidates.length > 0) {
+                    const c = this.pendingNtfyCandidates.shift();
+                    try { this.pc.addIceCandidate(new RTCIceCandidate(c)); } catch(e) {}
+                  }
+                })
+                .catch(console.warn);
+            }
+          }
+
+          if (msg.type === 'ICE_CANDIDATE') {
+            if (this.pc && this.pc.remoteDescription && msg.candidate) {
+              this.pc.addIceCandidate(new RTCIceCandidate(msg.candidate)).catch(() => {});
+            } else if (msg.candidate) {
+              if (!this.pendingNtfyCandidates) this.pendingNtfyCandidates = [];
+              this.pendingNtfyCandidates.push(msg.candidate);
+            }
+          }
+
+          if (msg.type === 'GAME_STARTED_BY_HOST' && !isHost) {
+            this.emit('game_started_by_host', msg);
+          }
+
+          if (msg.type === 'PEER_LEFT') {
+            this.emit('peer_left', msg);
+          }
+
+          if (msg.type === 'HOST_DISCONNECTED') {
+            this.emit('host_disconnected', msg.message || "Le salon a été fermé par l'hôte.");
+          }
+        } catch(e) {}
+      };
+    } catch(err) {
+      console.warn('[Netplay] Erreur initialisation ntfy ws:', err);
+    }
+  }
+
+  sendNtfySignal(topic, data) {
+    try {
+      fetch(`https://ntfy.sh/${topic}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sender: this.mySessionId,
+          ...data
+        })
+      }).catch(() => {});
+    } catch(e) {}
+  }
+
+  async setupWebRTCHostNtfy(topic) {
+    try {
+      this.closeWebRTC();
+      if (!this.ntfyWs) {
+        this.setupNtfySignaling(this.currentRoom?.code || topic, true);
+      }
+      const pc = new RTCPeerConnection(RTC_CONFIG);
+      this.pc = pc;
+
+      const fastDc = pc.createDataChannel('csw-fast-inputs', {
+        ordered: false,
+        maxRetransmits: 0
+      });
+      this.fastInputChannel = fastDc;
+      this.setupDataChannel(fastDc);
+
+      const reliableDc = pc.createDataChannel('csw-reliable-channel', {
+        ordered: true
+      });
+      this.reliableChannel = reliableDc;
+      this.setupDataChannel(reliableDc);
+
+      pc.onicecandidate = (event) => {
+        if (event.candidate) {
+          this.sendNtfySignal(topic, {
+            type: 'ICE_CANDIDATE',
+            candidate: event.candidate.toJSON()
+          });
+        }
+      };
+
+      pc.onconnectionstatechange = () => {
+        console.log('[Netplay WebRTC Hôte Ntfy] ConnectionState:', pc.connectionState);
+        if (pc.connectionState === 'connected') {
+          this.isP2PConnected = true;
+          this.emit('p2p_connected');
+        } else if (pc.connectionState === 'disconnected' || pc.connectionState === 'failed') {
+          this.isP2PConnected = false;
+          this.emit('p2p_disconnected');
+        }
+      };
+
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+
+      this.sendNtfySignal(topic, {
+        type: 'WEBRTC_OFFER',
+        offer: { type: offer.type, sdp: offer.sdp }
+      });
+    } catch(err) {
+      console.warn('[Netplay WebRTC] Erreur initialisation Hôte Ntfy:', err);
+    }
+  }
+
+  async setupWebRTCGuestNtfy(topic, offer) {
+    try {
+      this.closeWebRTC();
+      if (!this.ntfyWs) {
+        this.setupNtfySignaling(this.currentRoom?.code || topic, false);
+      }
+      const pc = new RTCPeerConnection(RTC_CONFIG);
+      this.pc = pc;
+
+      pc.ondatachannel = (event) => {
+        const dc = event.channel;
+        console.log(`[Netplay WebRTC Invité Ntfy] DataChannel capté : ${dc.label}`);
+        if (dc.label === 'csw-fast-inputs') {
+          this.fastInputChannel = dc;
+        } else {
+          this.reliableChannel = dc;
+        }
+        this.setupDataChannel(dc);
+      };
+
+      pc.onicecandidate = (event) => {
+        if (event.candidate) {
+          this.sendNtfySignal(topic, {
+            type: 'ICE_CANDIDATE',
+            candidate: event.candidate.toJSON()
+          });
+        }
+      };
+
+      pc.onconnectionstatechange = () => {
+        console.log('[Netplay WebRTC Invité Ntfy] ConnectionState:', pc.connectionState);
+        if (pc.connectionState === 'connected') {
+          this.isP2PConnected = true;
+          this.emit('p2p_connected');
+        } else if (pc.connectionState === 'disconnected' || pc.connectionState === 'failed') {
+          this.isP2PConnected = false;
+          this.emit('p2p_disconnected');
+        }
+      };
+
+      await pc.setRemoteDescription(new RTCSessionDescription(offer));
+      while (this.pendingNtfyCandidates && this.pendingNtfyCandidates.length > 0) {
+        const c = this.pendingNtfyCandidates.shift();
+        try { await pc.addIceCandidate(new RTCIceCandidate(c)); } catch(e) {}
+      }
+
+      const answer = await pc.createAnswer();
+      await pc.setLocalDescription(answer);
+
+      this.sendNtfySignal(topic, {
+        type: 'WEBRTC_ANSWER',
+        answer: { type: answer.type, sdp: answer.sdp }
+      });
+    } catch(err) {
+      console.warn('[Netplay WebRTC] Erreur initialisation Invité Ntfy:', err);
+    }
   }
 
   setupDataChannel(dc) {
@@ -801,52 +1038,53 @@ class NetplayService {
         inputs: {}
       };
 
-      const roomRef = doc(db, 'rooms', roomCode);
-      await setDoc(roomRef, initialRoom);
-
       this.currentRoom = initialRoom;
       this.myPlayerIndex = 0;
       this.myRole = 'p1';
 
-      // Initialiser l'hôte WebRTC P2P direct
-      this.setupWebRTCHost(roomRef);
+      // 1. Initialiser IMMÉDIATEMENT le relais de signalisation P2P sans quota (ntfy.sh WebSocket)
+      this.setupNtfySignaling(roomCode, true);
 
-      // Écoute en temps réel des changements de joueurs et des inputs
-      if (this.firestoreUnsub) this.firestoreUnsub();
-      let lastProcessedInputTime = 0;
-      let lastProcessedStateReq = 0;
-      let lastProcessedStateSync = 0;
+      // 2. Tenter Firestore en arrière-plan (sans bloquer ni crasher si quota dépassé ou hors-ligne)
+      try {
+        const roomRef = doc(db, 'rooms', roomCode);
+        await setDoc(roomRef, initialRoom);
 
-      this.firestoreUnsub = onSnapshot(roomRef, (snapshot) => {
-        if (!snapshot.exists()) {
-          this.emit('host_disconnected', 'Le salon a été fermé.');
-          return;
-        }
-        const data = snapshot.data();
-        this.currentRoom = data;
-        this.emit('room_update', data);
+        // Initialiser l'hôte WebRTC P2P direct
+        this.setupWebRTCHost(roomRef);
 
-        // SYMETRIQUE : Détection des inputs distants pour l'hôte (venant du joueur 2)
-        if (this.myPlayerIndex === 0 && data.lastInput && data.lastInput.playerIndex > 0 && data.lastInput.time !== lastProcessedInputTime) {
-          lastProcessedInputTime = data.lastInput.time;
-          this.handleMessage({
-            type: 'REMOTE_INPUT',
-            ...data.lastInput
-          });
-        }
+        // Écoute en temps réel des changements de joueurs et des inputs
+        if (this.firestoreUnsub) this.firestoreUnsub();
+        let lastProcessedInputTime = 0;
+        let lastProcessedStateReq = 0;
+        let lastProcessedStateSync = 0;
 
-        // Détection demande de savestate (Bidirectionnel : J2 demande l'état à J1)
-        if (data.stateRequest && data.stateRequest.fromPlayerIndex !== this.myPlayerIndex && data.stateRequest.time !== lastProcessedStateReq) {
-          lastProcessedStateReq = data.stateRequest.time;
-          this.emit('request_state', data.stateRequest);
-        }
+        this.firestoreUnsub = onSnapshot(roomRef, (snapshot) => {
+          if (!snapshot.exists()) {
+            this.emit('host_disconnected', 'Le salon a été fermé.');
+            return;
+          }
+          const data = snapshot.data();
+          this.currentRoom = data;
+          this.emit('room_update', data);
 
-        // Réception du savestate envoyé par J2 vers J1 (Bidirectionnel : J2 -> J1)
-        if (data.stateSync && (data.stateSync.toPlayerIndex === undefined || data.stateSync.toPlayerIndex === 0) && data.stateSync.fromPlayerIndex !== 0 && data.stateSync.time !== lastProcessedStateSync) {
-          lastProcessedStateSync = data.stateSync.time;
-          this.emit('sync_state', data.stateSync);
-        }
-      });
+          // Détection demande de savestate
+          if (data.stateRequest && data.stateRequest.fromPlayerIndex !== this.myPlayerIndex && data.stateRequest.time !== lastProcessedStateReq) {
+            lastProcessedStateReq = data.stateRequest.time;
+            this.emit('request_state', data.stateRequest);
+          }
+
+          // Réception du savestate
+          if (data.stateSync && (data.stateSync.toPlayerIndex === undefined || data.stateSync.toPlayerIndex === 0) && data.stateSync.fromPlayerIndex !== 0 && data.stateSync.time !== lastProcessedStateSync) {
+            lastProcessedStateSync = data.stateSync.time;
+            this.emit('sync_state', data.stateSync);
+          }
+        }, (err) => {
+          console.warn('[Netplay Cloud] Listener Firestore désactivé (quota ou hors-ligne):', err.message);
+        });
+      } catch(fbErr) {
+        console.warn('[Netplay Cloud] Firestore indisponible ou quota dépassé, basculement automatique WebRTC P2P direct (Zéro Quota):', fbErr.message);
+      }
 
       const resData = {
         roomCode,
@@ -862,7 +1100,7 @@ class NetplayService {
       console.log(`[Netplay Cloud] Salon ${roomCode} créé avec succès (WebRTC P2P prêt) !`);
       return resData;
     } catch(err) {
-      console.error('[Netplay Cloud] Erreur création salon Firebase:', err);
+      console.error('[Netplay Cloud] Erreur création salon:', err);
       throw new Error('Échec de la création du salon : ' + err.message);
     }
   }
@@ -903,132 +1141,121 @@ class NetplayService {
           }, 2500);
         });
 
-        // Mirroring / écoute Firebase en parallèle pour la synchronisation WebRTC
-        try {
-          const roomRef = doc(db, 'rooms', cleanCode);
-          const snap = await getDoc(roomRef);
-          if (snap.exists()) {
-            const data = snap.data();
-            if (data.offer) {
-              this.setupWebRTCGuest(roomRef, data.offer);
-            }
-          }
-        } catch(e) {}
-
         return wsRes;
       } catch(err) {
-        console.log('[Netplay] Salon non trouvé sur LAN ou timeout, essai immédiat sur Firebase Cloud / WebRTC...');
+        console.log('[Netplay] Salon non trouvé sur LAN ou timeout, essai immédiat sur Cloud / WebRTC...');
       }
     }
 
-    // 2. Mode Firebase Cloud + WebRTC (Netlify / Internet / Même Wi-Fi)
+    // 2. Mode Cloud + WebRTC (Netlify / Internet / Même Wi-Fi)
+    let joinedRoomData = null;
+    let playerIndex = 1;
+    let role = 'p2';
+
+    // Tenter Firestore si disponible
     try {
       const roomRef = doc(db, 'rooms', cleanCode);
       const snap = await getDoc(roomRef);
 
-      if (!snap.exists()) {
-        throw new Error(`Le salon ${cleanCode} n'existe pas ou est fermé.`);
-      }
+      if (snap.exists()) {
+        const roomData = snap.data();
+        const currentPlayers = roomData.players || [];
 
-      const roomData = snap.data();
-      const currentPlayers = roomData.players || [];
-
-      if (currentPlayers.length >= roomData.maxPlayers) {
-        throw new Error(`Le salon ${cleanCode} est complet (${roomData.maxPlayers}/${roomData.maxPlayers}).`);
-      }
-
-      const playerIndex = currentPlayers.length;
-      const role = `p${playerIndex + 1}`;
-      const newPlayer = {
-        name: playerName,
-        slot: playerIndex + 1,
-        isHost: false,
-        playerIndex,
-        role,
-        ping: 25
-      };
-
-      const updatedPlayers = [...currentPlayers, newPlayer];
-      await updateDoc(roomRef, {
-        players: updatedPlayers,
-        updatedAt: Date.now()
-      });
-
-      this.currentRoom = { ...roomData, players: updatedPlayers };
-      this.myPlayerIndex = playerIndex;
-      this.myRole = role;
-
-      if (this.firestoreUnsub) this.firestoreUnsub();
-      let lastProcessedInputTime = 0;
-      let lastProcessedStateSync = 0;
-      let lastProcessedStateReq = 0;
-
-      this.firestoreUnsub = onSnapshot(roomRef, (snapshot) => {
-        if (!snapshot.exists()) {
-          this.emit('host_disconnected', 'Le salon a été fermé.');
-          return;
-        }
-        const data = snapshot.data();
-        this.currentRoom = data;
-        this.emit('room_update', data);
-
-        // Détection du démarrage du match par l'hôte
-        if (data.gameState === 'started') {
-          this.emit('game_started_by_host', data);
+        if (currentPlayers.length >= roomData.maxPlayers) {
+          throw new Error(`Le salon ${cleanCode} est complet (${roomData.maxPlayers}/${roomData.maxPlayers}).`);
         }
 
-        // SYMETRIQUE : Si un input arrive depuis le Cloud pour l'invité (venant de l'hôte J1)
-        if (data.lastInput && data.lastInput.playerIndex !== this.myPlayerIndex && data.lastInput.time !== lastProcessedInputTime) {
-          lastProcessedInputTime = data.lastInput.time;
-          this.handleMessage({
-            type: 'REMOTE_INPUT',
-            ...data.lastInput
-          });
+        playerIndex = currentPlayers.length;
+        role = `p${playerIndex + 1}`;
+        const newPlayer = {
+          name: playerName,
+          slot: playerIndex + 1,
+          isHost: false,
+          playerIndex,
+          role,
+          ping: 25
+        };
+
+        const updatedPlayers = [...currentPlayers, newPlayer];
+        await updateDoc(roomRef, {
+          players: updatedPlayers,
+          updatedAt: Date.now()
+        }).catch(() => {});
+
+        joinedRoomData = { ...roomData, players: updatedPlayers };
+
+        // Lancement WebRTC Guest standard Firestore si offer déjà présent
+        if (roomData.offer) {
+          this.setupWebRTCGuest(roomRef, roomData.offer);
+        } else {
+          const unsubOffer = onSnapshot(roomRef, (snapshot) => {
+            const d = snapshot.data();
+            if (d?.offer && !this.pc) {
+              unsubOffer();
+              this.setupWebRTCGuest(roomRef, d.offer);
+            }
+          }, () => {});
+          this.webrtcUnsubs.push(unsubOffer);
         }
 
-        // Réception d'une demande de savestate (Bidirectionnel : J1 demande l'état à J2)
-        if (data.stateRequest && data.stateRequest.fromPlayerIndex !== this.myPlayerIndex && data.stateRequest.time !== lastProcessedStateReq) {
-          lastProcessedStateReq = data.stateRequest.time;
-          this.emit('request_state', data.stateRequest);
-        }
-
-        // Réception du savestate envoyé par l'hôte via Firebase (J1 -> J2)
-        if (data.stateSync && (data.stateSync.toPlayerIndex === undefined || data.stateSync.toPlayerIndex === this.myPlayerIndex) && data.stateSync.fromPlayerIndex !== this.myPlayerIndex && data.stateSync.time !== lastProcessedStateSync) {
-          lastProcessedStateSync = data.stateSync.time;
-          this.emit('sync_state', data.stateSync);
-        }
-      });
-
-      // Lancement WebRTC Guest
-      if (roomData.offer) {
-        this.setupWebRTCGuest(roomRef, roomData.offer);
-      } else {
-        const unsubOffer = onSnapshot(roomRef, (snapshot) => {
-          const d = snapshot.data();
-          if (d?.offer && !this.pc) {
-            unsubOffer();
-            this.setupWebRTCGuest(roomRef, d.offer);
+        if (this.firestoreUnsub) this.firestoreUnsub();
+        this.firestoreUnsub = onSnapshot(roomRef, (snapshot) => {
+          if (!snapshot.exists()) {
+            this.emit('host_disconnected', 'Le salon a été fermé.');
+            return;
           }
+          const data = snapshot.data();
+          this.currentRoom = data;
+          this.emit('room_update', data);
+
+          if (data.gameState === 'started') {
+            this.emit('game_started_by_host', data);
+          }
+        }, (err) => {
+          console.warn('[Netplay] Écoute Firestore désactivée (quota ou hors-ligne):', err.message);
         });
-        this.webrtcUnsubs.push(unsubOffer);
       }
-
-      const resData = {
-        roomCode: cleanCode,
-        gameId: roomData.gameId,
-        gameTitle: roomData.gameTitle,
-        maxPlayers: roomData.maxPlayers,
-        playerIndex,
-        role
-      };
-
-      this.emit('joined_success', resData);
-      console.log(`[Netplay Cloud] Salon ${cleanCode} rejoint avec succès (Slot J${playerIndex + 1}) !`);
-      return resData;
-    } catch(err) {
-      console.error('[Netplay Cloud] Erreur connexion salon:', err);
-      throw new Error(err.message || 'Impossible de rejoindre le salon.');
+    } catch(fbErr) {
+      if (fbErr.message && fbErr.message.includes('complet')) {
+        throw fbErr;
+      }
+      console.warn('[Netplay] Firestore indisponible ou quota dépassé pour joinRoom, fallback P2P:', fbErr.message);
     }
+
+    // Si Firestore n'était pas joignable ou n'a pas répondu, métadonnées de secours
+    if (!joinedRoomData) {
+      joinedRoomData = {
+        code: cleanCode,
+        gameId: 'arcade',
+        gameTitle: 'Partie Arcade Multijoueur',
+        maxPlayers: 2,
+        players: [
+          { name: 'Hôte', slot: 1, isHost: true, playerIndex: 0, role: 'p1' },
+          { name: playerName, slot: 2, isHost: false, playerIndex: 1, role: 'p2' }
+        ],
+        gameState: 'waiting'
+      };
+    }
+
+    this.currentRoom = joinedRoomData;
+    this.myPlayerIndex = playerIndex;
+    this.myRole = role;
+
+    // Relais de signalisation P2P garanti sans quota (ntfy.sh WebSocket)
+    this.setupNtfySignaling(cleanCode, false, playerName);
+
+    const resData = {
+      roomCode: cleanCode,
+      gameId: joinedRoomData.gameId,
+      gameTitle: joinedRoomData.gameTitle,
+      maxPlayers: joinedRoomData.maxPlayers,
+      playerIndex,
+      role
+    };
+
+    this.emit('joined_success', resData);
+    console.log(`[Netplay Cloud] Salon ${cleanCode} rejoint avec succès (Slot J${playerIndex + 1}) !`);
+    return resData;
   }
 
   // Envoyer un input (D-pad ou bouton) vers l'autre joueur avec redondance N-3
@@ -1113,23 +1340,7 @@ class NetplayService {
       return;
     }
 
-    // 3. Fallback Firebase Cloud (Bidirectionnel de secours)
-    if (this.currentRoom?.code) {
-      try {
-        const roomRef = doc(db, 'rooms', this.currentRoom.code);
-        updateDoc(roomRef, {
-          lastInput: {
-            playerIndex: pIdx,
-            role: this.myRole || (pIdx === 0 ? 'p1' : 'p2'),
-            buttonId,
-            isPressed: !!isPressed,
-            seq: this.localSeq,
-            history: historyPayload,
-            time: Date.now()
-          }
-        }).catch(() => {});
-      } catch(e) {}
-    }
+    // 3. Remarque : Zéro écriture Firestore pour les inputs (les inputs transitent exclusivement via P2P UDP ou WS LAN)
   }
 
   // Demander la synchronisation de l'état (Guest -> Host)
@@ -1250,16 +1461,31 @@ class NetplayService {
       gameTitle: this.currentRoom?.gameTitle
     };
 
-    if (this.webrtcChannel && this.webrtcChannel.readyState === 'open') {
+    // 1. WebRTC DataChannels P2P
+    const targetChannel = (this.reliableChannel && this.reliableChannel.readyState === 'open')
+      ? this.reliableChannel
+      : (this.fastInputChannel && this.fastInputChannel.readyState === 'open' ? this.fastInputChannel : null);
+
+    if (targetChannel) {
       try {
-        this.webrtcChannel.send(JSON.stringify(startMsg));
+        targetChannel.send(JSON.stringify(startMsg));
       } catch(e) {}
     }
 
+    // 2. Relais Ntfy (Zéro quota)
+    if (this.currentTopic) {
+      this.sendNtfySignal(this.currentTopic, {
+        type: 'GAME_STARTED_BY_HOST',
+        ...startMsg
+      });
+    }
+
+    // 3. Mode WebSocket LAN
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
       this.ws.send(JSON.stringify(startMsg));
     }
 
+    // 4. Firestore optionnel
     if (this.currentRoom?.code && this.myPlayerIndex === 0) {
       try {
         const roomRef = doc(db, 'rooms', this.currentRoom.code);
@@ -1277,18 +1503,35 @@ class NetplayService {
       message: isHost ? "L'hôte a quitté la partie." : "L'autre joueur a quitté la partie."
     };
 
-    if (this.webrtcChannel && this.webrtcChannel.readyState === 'open') {
+    // 1. WebRTC DataChannels
+    const targetChannel = (this.reliableChannel && this.reliableChannel.readyState === 'open')
+      ? this.reliableChannel
+      : (this.fastInputChannel && this.fastInputChannel.readyState === 'open' ? this.fastInputChannel : null);
+
+    if (targetChannel) {
       try {
-        this.webrtcChannel.send(JSON.stringify(leaveMsg));
+        targetChannel.send(JSON.stringify(leaveMsg));
       } catch(e) {}
     }
 
+    // 2. Relais Ntfy
+    if (this.currentTopic) {
+      this.sendNtfySignal(this.currentTopic, leaveMsg);
+      if (this.ntfyWs) {
+        try { this.ntfyWs.close(); } catch(e) {}
+        this.ntfyWs = null;
+      }
+      this.currentTopic = null;
+    }
+
+    // 3. WS LAN
     if (this.ws && this.ws.readyState === WebSocket.OPEN && this.currentRoom) {
       try {
         this.ws.send(JSON.stringify(leaveMsg));
       } catch(e) {}
     }
 
+    // 4. Firestore optionnel
     if (this.currentRoom?.code) {
       try {
         const roomRef = doc(db, 'rooms', this.currentRoom.code);
