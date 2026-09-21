@@ -266,7 +266,7 @@ export function EmulatorCore({
       }
 
       if (event.data.type === 'EJS_GAME_STARTED') {
-        setIsReady(true);
+        console.log('[EmulatorCore] EJS_GAME_STARTED reçu de l\'iframe player');
       }
 
       // Relais Iframe -> WebRTC des paquets binaires Rollback ultra-rapides (0x5A / 0xCB)

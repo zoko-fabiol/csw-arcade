@@ -1873,18 +1873,31 @@ class NetplayService {
     });
     this.checkAndReleaseStartBarrier();
 
-    // Sécurité : si après 12 secondes l'autre joueur n'a pas répondu, débloquer automatiquement
+    // Sécurité : si après 5 secondes l'autre joueur n'a pas répondu, débloquer automatiquement
     if (this.startBarrierTimer) clearTimeout(this.startBarrierTimer);
     this.startBarrierTimer = setTimeout(() => {
       if (!this.remoteCoreReady) {
         console.warn('[Netplay] Timeout barrière : le second joueur tarde, déverrouillage de sécurité...');
         this.emit('start_simulation_now', { startTime: Date.now() });
       }
-    }, 12000);
+    }, 5000);
   }
 
   // Vérification et déblocage coordonné de la barrière de départ simultané
   checkAndReleaseStartBarrier() {
+    const connectedPeerCount = this.connections ? Object.keys(this.connections).length : 0;
+    const isSinglePlayer = !this.isP2PConnected && connectedPeerCount === 0 && (!this.currentRoom?.players || this.currentRoom.players.filter(Boolean).length <= 1);
+
+    if (isSinglePlayer && this.localCoreReady) {
+      if (this.startBarrierTimer) {
+        clearTimeout(this.startBarrierTimer);
+        this.startBarrierTimer = null;
+      }
+      console.log('[Netplay] Joueur seul dans le salon : déverrouillage immédiat de la Frame 0...');
+      this.emit('start_simulation_now', { startTime: Date.now() });
+      return;
+    }
+
     // Seul l'hôte donne le top départ pour éviter tout conflit d'horodatage
     if (this.myPlayerIndex === 0 && this.localCoreReady && this.remoteCoreReady) {
       if (this.startBarrierTimer) {

@@ -1696,7 +1696,7 @@
               if (window.EJS_emulator?.audioContext && window.EJS_emulator.audioContext.state === 'suspended') {
                 window.EJS_emulator.audioContext.resume();
               }
-              if (!isNetplay && typeof window.EJS_emulator?.play === 'function') {
+              if (typeof window.EJS_emulator?.play === 'function') {
                 window.EJS_emulator.play();
               }
             } catch(e) {}
@@ -1856,9 +1856,8 @@
 
           this.gm = null;
           this.module = null;
-          this.stepFn = null;
-
-          this.loop = this.loop.bind(this);
+          this.originalMainLoopFunc = null;
+          this.hookAttached = false;
         }
 
         init() {
@@ -1868,8 +1867,6 @@
             console.warn('[Rollback] gameManager ou Module absent');
             return false;
           }
-
-          this.stepFn = this.module._retro_run || (this.module.cwrap ? this.module.cwrap('retro_run', 'void', []) : null) || this.module.Browser?.mainLoop?.func;
 
           try {
             if (this.gm.functions?.saveStateInfo) {
@@ -1885,7 +1882,7 @@
           }
 
           this.captureSnapshot(0);
-          console.log('[Rollback Engine] ✓ Initialisé avec succès (Ring Buffer 128 frames préalloué, stepSync=' + !!this.stepFn + ')');
+          console.log('[Rollback Engine] ✓ Initialisé avec succès (Ring Buffer 128 frames préalloué)');
           return true;
         }
 
@@ -2071,22 +2068,30 @@
             this.applyInputs(0, p1Mask);
             this.applyInputs(1, p2Mask);
 
-            if (this.stepFn) this.stepFn();
+            if (this.originalMainLoopFunc) {
+              this.originalMainLoopFunc();
+            }
             this.captureSnapshot(f + 1);
           }
 
           if (!wasMuted && window.EJS_emulator) window.EJS_emulator.muted = false;
         }
 
-        tick() {
+        onFrame() {
+          // 1. Dépouiller les paquets réseau reçus et exécuter rollback si nécessaire
+          this.processIncomingInputs();
+
           const frame = this.currentFrame;
           const rIdx = frame & this.BUFFER_MASK;
 
+          // 2. Échantillonner les inputs locaux physiques (0 ms d'input lag)
           const localMask = this.localPhysicalMask;
           this.localInputs[rIdx] = localMask;
 
+          // 3. Envoyer le paquet 0x5A avec redondance N, N-1, N-2, N-3
           this.send0x5APacket(frame, localMask);
 
+          // 4. Déterminer l'input distant (Reçu ou Prédit)
           let remoteMask = 0;
           if (this.remotePredicted[rIdx] === 0 && this.remoteFrameNums[rIdx] === frame) {
             remoteMask = this.remoteInputs[rIdx];
@@ -2098,15 +2103,21 @@
             this.stats.predictedFramesCount++;
           }
 
+          // 5. Sauvegarder l'état avant d'exécuter la frame
           this.captureSnapshot(frame);
 
+          // 6. Injecter les inputs dans FBNeo pour J1 et J2
           const p1Mask = assignedPlayerIndex === 0 ? localMask : remoteMask;
           const p2Mask = assignedPlayerIndex === 0 ? remoteMask : localMask;
           this.applyInputs(0, p1Mask);
           this.applyInputs(1, p2Mask);
 
-          if (this.stepFn) this.stepFn();
+          // 7. Exécuter la frame originale FBNeo (CPU + Audio + Rendu WebGL)
+          if (this.originalMainLoopFunc) {
+            this.originalMainLoopFunc();
+          }
 
+          // 8. Checksum Work RAM 68000 toutes les 30 frames
           if (frame % 30 === 0) {
             this.sendChecksumPacket(frame);
           }
@@ -2114,32 +2125,12 @@
           this.currentFrame++;
           this.stats.currentFrame = this.currentFrame;
           this.fpsCount++;
-        }
 
-        loop(timestamp) {
-          if (!this.isRunning) return;
-          if (!this.lastTimestamp) this.lastTimestamp = timestamp;
-          const delta = timestamp - this.lastTimestamp;
-          this.lastTimestamp = timestamp;
-
-          this.timeAccumulator += Math.min(delta, 100);
-          this.processIncomingInputs();
-
-          while (this.timeAccumulator >= this.FRAME_TIME) {
-            const lag = this.remoteFrameAdvancement - this.currentFrame;
-            if (lag > 1 && lag <= 3) {
-              for (let k = 0; k < lag - 1; k++) {
-                this.tick();
-              }
-            }
-            this.tick();
-            this.timeAccumulator -= this.FRAME_TIME;
-          }
-
-          if (timestamp - this.lastFpsTimer >= 500) {
-            this.stats.fps = Math.round((this.fpsCount * 1000) / (timestamp - this.lastFpsTimer));
+          const now = performance.now();
+          if (now - this.lastFpsTimer >= 500) {
+            this.stats.fps = Math.round((this.fpsCount * 1000) / (now - this.lastFpsTimer));
             this.fpsCount = 0;
-            this.lastFpsTimer = timestamp;
+            this.lastFpsTimer = now;
             this.stats.frameAdvantage = this.currentFrame - this.remoteFrameAdvancement;
 
             if (window.parent && window.parent !== window) {
@@ -2149,19 +2140,38 @@
               }, '*');
             }
           }
-
-          requestAnimationFrame(this.loop);
         }
 
         start() {
           if (this.isRunning) return;
           this.init();
           this.isRunning = true;
-          this.lastTimestamp = performance.now();
           this.lastFpsTimer = performance.now();
-          this.timeAccumulator = 0;
-          requestAnimationFrame(this.loop);
-          console.log('[Rollback Engine] ✓ Boucle 60 FPS Rollback active !');
+
+          const attachHook = () => {
+            const ml = this.module?.Browser?.mainLoop;
+            if (ml && typeof ml.func === 'function' && !this.hookAttached) {
+              this.originalMainLoopFunc = ml.func;
+              const self = this;
+              ml.func = function() {
+                if (self.isRunning) {
+                  self.onFrame();
+                } else if (self.originalMainLoopFunc) {
+                  self.originalMainLoopFunc.apply(this, arguments);
+                }
+              };
+              this.hookAttached = true;
+              console.log('[Rollback Engine] ✓ Hook GGPO attaché sur Module.Browser.mainLoop.func (60 FPS synchronisé !)');
+              return true;
+            }
+            return false;
+          };
+
+          if (!attachHook()) {
+            const checkInterval = setInterval(() => {
+              if (attachHook()) clearInterval(checkInterval);
+            }, 30);
+          }
         }
 
         stop() {
