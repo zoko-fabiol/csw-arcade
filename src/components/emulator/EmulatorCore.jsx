@@ -286,10 +286,9 @@ export function EmulatorCore({
         netplayService.sendInput(event.data.buttonId, event.data.isPressed, myIdx);
       }
 
-      // Quand un joueur insère une pièce (COIN) ou appuie sur START pour respawner
+      // Notification crédit / start pour information
       if (event.data.type === 'PLAYER_INSERTED_COIN_OR_START' && mode === 'netplay') {
-        console.log('[EmulatorCore] Crédit / Start pressé : demande de Flash-Savestate au survivant...');
-        netplayService.requestSurvivorCatchup();
+        console.log('[EmulatorCore] Crédit / Start synchronisé pour le joueur', event.data.playerIndex + 1);
       }
 
       // L'iframe a extrait le savestate (soit l'hôte soit l'invité), l'envoyer au joueur distant
