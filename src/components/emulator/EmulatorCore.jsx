@@ -100,62 +100,8 @@ export function EmulatorCore({
     return () => window.removeEventListener('keydown', handleF8);
   }, []);
 
-  // Initialisation du moteur de synchronisation sélective d'entités (Delta Monstres / J2)
-  useEffect(() => {
-    if (mode === 'netplay') {
-      const engine = new NetplaySyncEngine(netplayService, isHost);
-      syncEngineRef.current = engine;
-
-      engine.onWorldEntitiesReceived = ({ frame, entities, drift }) => {
-        if (iframeRef.current?.contentWindow) {
-          iframeRef.current.contentWindow.postMessage({
-            type: 'APPLY_WORLD_ENTITIES',
-            frame,
-            entities,
-            drift
-          }, '*');
-        }
-      };
-
-      engine.onPlayerEntityReceived = ({ frame, x, y, state }) => {
-        if (iframeRef.current?.contentWindow) {
-          iframeRef.current.contentWindow.postMessage({
-            type: 'APPLY_PLAYER_ENTITY',
-            frame,
-            x,
-            y,
-            state
-          }, '*');
-        }
-      };
-
-      engine.onClockAdjustment = (drift) => {
-        if (iframeRef.current?.contentWindow) {
-          iframeRef.current.contentWindow.postMessage({
-            type: 'ADJUST_CLOCK',
-            drift
-          }, '*');
-        }
-      };
-
-      engine.start();
-
-      return () => {
-        engine.stop();
-        syncEngineRef.current = null;
-      };
-    }
-  }, [mode, isHost]);
-
   const handleTouchInput = (buttonId, isPressed) => {
     const myIdx = netplayService.myPlayerIndex >= 0 ? netplayService.myPlayerIndex : (isHost ? 0 : 1);
-    if (mode === 'netplay') {
-      rollbackManagerRef.current?.setLocalButtonState(buttonId, isPressed);
-      netplayService.sendInput(buttonId, isPressed, myIdx);
-      if (isPressed && (buttonId === 2 || buttonId === 3)) {
-        netplayService.requestSurvivorCatchup();
-      }
-    }
     if (iframeRef.current?.contentWindow) {
       iframeRef.current.contentWindow.postMessage({
         type: 'TOUCH_INPUT',
@@ -274,9 +220,14 @@ export function EmulatorCore({
       }
     });
 
-    // Réception des paquets binaires Rollback (0x5A) et Checksums (0xCB)
+    // Relais bidirectionnel WebRTC -> Iframe pour les paquets binaires Rollback (0x5A) et Checksums (0xCB)
     const unsubBinary = netplayService.on('binary_data', (buf) => {
-      rollbackManagerRef.current?.handleIncomingBinary(buf);
+      if (iframeRef.current?.contentWindow) {
+        iframeRef.current.contentWindow.postMessage({
+          type: 'NETPLAY_BINARY_PACKET',
+          buffer: buf
+        }, '*');
+      }
     });
 
     return () => {
@@ -293,11 +244,6 @@ export function EmulatorCore({
       unsubSimStart();
       unsubSurvivorReq();
       unsubBinary();
-      if (rollbackManagerRef.current) {
-        rollbackManagerRef.current.stop();
-        rollbackManagerRef.current = null;
-        delete window.__csw_rollback_manager;
-      }
     };
   }, [mode, isHost]);
 
@@ -321,39 +267,16 @@ export function EmulatorCore({
 
       if (event.data.type === 'EJS_GAME_STARTED') {
         setIsReady(true);
-        if (mode === 'netplay') {
-          const gm = iframeRef.current?.contentWindow?.EJS_emulator?.gameManager;
-          if (gm && !rollbackManagerRef.current) {
-            console.log('[EmulatorCore] Démarrage du moteur Rollback GGPO 60 FPS...');
-            try {
-              iframeRef.current?.contentWindow?.EJS_emulator?.pause();
-            } catch(e) {}
+      }
 
-            const myIdx = netplayService.myPlayerIndex >= 0 ? netplayService.myPlayerIndex : (isHost ? 0 : 1);
-            const rm = new RollbackManager({
-              gameManager: gm,
-              playerIndex: myIdx,
-              sendBinary: (buf) => netplayService.sendBinary(buf),
-              onRollback: (distance, frame) => {
-                // Notifier l'overlay ou les stats
-              },
-              onStatsUpdate: (stats) => {
-                setRollbackStats(stats);
-              },
-              onDesync: (frame, local, remote) => {
-                console.warn(`[EmulatorCore] Divergence frame ${frame}: local=${local}, remote=${remote}`);
-                if (!isHost) {
-                  netplayService.requestStateSync();
-                }
-              }
-            });
+      // Relais Iframe -> WebRTC des paquets binaires Rollback ultra-rapides (0x5A / 0xCB)
+      if (event.data.type === 'NETPLAY_BINARY_PACKET' && event.data.buffer && mode === 'netplay') {
+        netplayService.sendBinary(event.data.buffer);
+      }
 
-            rm.init(gm);
-            rm.start();
-            rollbackManagerRef.current = rm;
-            window.__csw_rollback_manager = rm;
-          }
-        }
+      // Réception de la télémétrie GGPO émise par le moteur Rollback de l'iframe
+      if (event.data.type === 'ROLLBACK_TELEMETRY' && event.data.stats && mode === 'netplay') {
+        setRollbackStats(event.data.stats);
       }
 
       // Quand un joueur local joue au clavier ou à la manette dans l'iframe, diffuser l'input à l'autre joueur
