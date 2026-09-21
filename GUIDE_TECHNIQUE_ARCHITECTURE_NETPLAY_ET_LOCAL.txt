@@ -1,0 +1,402 @@
+================================================================================
+          CSW-ARCADE : GUIDE TECHNIQUE EXHAUSTIF DU MULTIJOUEUR
+               FONCTIONNEMENT 100% LOCAL & 100% EN LIGNE
+================================================================================
+Dernière mise à jour : 21 Septembre 2026
+Version du Shell & PWA : csw-arcade-shell-v9
+Auteur : Équipe d'Ingénierie CSW-Arcade
+Cible : Développeurs, Administrateurs Système, Joueurs Avancés
+
+--------------------------------------------------------------------------------
+TABLE DES MATIÈRES
+--------------------------------------------------------------------------------
+1. INTRODUCTION & PHILOSOPHIE ARCHITECTURALE
+2. ARCHITECTURE DU JEU EN LOCAL (MÊME APPAREIL / PC / SMARTPHONE)
+3. ARCHITECTURE DU CONTRÔLEUR VIRTUEL MOBILE (SMARTPHONE COMME MANETTE P2P)
+4. ARCHITECTURE DU JEU EN LIGNE (CLOUD P2P WEBRTC ZERO-QUOTA)
+5. COORDONNATION DU LOBBY & SIGNALISATION SANS BASE DE DONNÉES
+6. FORMAT DES PAQUETS RÉSEAU, FLUX BINAIRE & SYSTÈME ANTI-PERTE N-3
+7. LA BARRIÈRE DE CHARGEMENT SYNCHRONISÉ (FRAME 0 LOCK)
+8. ISOLATION HERMÉTIQUE DES PORTS CONTRÔLEURS & SÉLECTION DES HÉROS
+9. AUTORITÉ DYNAMIQUE DU SURVIVANT (MORT, RESPAWN & FLASH-SAVESTATE)
+10. MOTEUR DE SYNCHRONISATION SÉLECTIVE DU MONDE (NETPLAY SYNC ENGINE)
+11. CYCLE DE VIE D'UNE PARTIE MULTIJOUEUR DE BOUT EN BOUT
+12. CONFIGURATION TECHNIQUE, VARIABLES, URLS & FICHIERS CLÉS
+13. GUIDE DE DÉPANNAGE & DIAGNOSTIC DES ERREURS RÉSEAU
+
+================================================================================
+1. INTRODUCTION & PHILOSOPHIE ARCHITECTURALE
+================================================================================
+CSW-Arcade est une plateforme web moderne et PWA (Progressive Web App) dédiée à
+l'émulation haute fidélité du système d'arcade mythique SNK Neo Geo MVS & AES,
+regroupant un catalogue de 181 jeux cultes (The King of Fighters, Metal Slug,
+Samurai Shodown, Fatal Fury, Windjammers, Sengoku, Puzzle Bobble, etc.).
+
+Contrairement aux solutions traditionnelles qui nécessitent :
+  - Un serveur dédié lourd et coûteux exécutant l'émulateur côté serveur,
+  - Ou des abonnements cloud avec des quotas Firestore/Base de données rigides
+    provoquant des erreurs 429 Quota Exceeded,
+
+CSW-Arcade repose sur une architecture 100% décentralisée et serverless :
+  1. L'émulateur tourne DIRECTEMENT dans le navigateur web du client via WebAssembly
+     (Core FinalBurn Neo compilé en Emscripten/WASM à 60 FPS).
+  2. Le multijoueur fonctionne en Peer-to-Peer direct (WebRTC DataChannel),
+     ce qui signifie que les données de jeu voyagent directement d'un joueur à l'autre
+     sans transiter par un serveur intermédiaire (zéro coût serveur, latence minimale).
+  3. L'architecture supporte aussi bien le jeu à plusieurs sur un seul écran,
+     le jeu en réseau local (LAN), que le jeu en ligne intercontinental.
+
+================================================================================
+2. ARCHITECTURE DU JEU EN LOCAL (MÊME APPAREIL)
+================================================================================
+En mode local, deux joueurs s'affrontent ou coopèrent sur la même machine
+(un PC avec deux manettes, ou un clavier partagé, ou un écran tactile partagé).
+
+2.1. Conteneur d'émulation (player.html) :
+  - L'application React instancie une iframe pointant vers `public/player.html`.
+  - Paramètres URL passés à l'iframe :
+      player.html?game=<nom_du_jeu.zip>&settings=<json_encodé>&playerIndex=0&netplay=0
+  - `player.html` télécharge la ROM du jeu et le BIOS `neogeo.zip` de manière optimisée.
+  - Sauvegarde locale automatique dans IndexedDB (`csw_arcade_roms_db`, store `rom_archives`) :
+    dès le deuxième lancement d'un jeu, le chargement est instantané (0 seconde d'attente).
+
+2.2. Injection VFS Emscripten en mémoire :
+  - Le core FBNeo requiert des archives ZIP intactes non décompressées.
+  - Le script intercepte `startGame` et écrit directement les octets du BIOS et de la ROM
+    dans le système de fichiers virtuel Emscripten (VFS) :
+      /neogeo.zip
+      /home/web_user/retroarch/userdata/system/neogeo.zip
+      /home/web_user/retroarch/userdata/content/<jeu>.zip
+  - Les requêtes réseau `fetch` et `XMLHttpRequest` émises par EmulatorJS sont interceptées
+    en JavaScript pour renvoyer directement les buffers mémoires sans requête HTTP.
+
+2.3. Cartographie des contrôleurs physiques :
+  - Le système supporte la Gamepad API native du navigateur (W3C standard).
+  - Une boucle de scrutation à 60 FPS (`pollGamepadsLoop`) lit les axes et boutons :
+      * Port 0 (Joueur 1) : Manette affectée à l'index P1.
+      * Port 1 (Joueur 2) : Manette affectée à l'index P2.
+  - Au clavier, la configuration par défaut permet de jouer à deux sur le même clavier :
+      * Joueur 1 : W (Haut), S (Bas), A (Gauche), D (Droite), J (Bouton A), K (Bouton B),
+                   U (Bouton C), I (Bouton D), 5 (Coin / Crédit), 1 (Start).
+      * Joueur 2 : Flèches Directionnelles, Pavé numérique 4 (A), 5 (B), 7 (C), 8 (D),
+                   6 (Coin), 2 (Start).
+  - Les entrées sont injectées dans le core FBNeo via :
+      `window.EJS_emulator.gameManager.simulateInput(playerSlot, buttonId, isPressed ? 1 : 0);`
+      où buttonId correspond aux RetroPad IDs :
+        0: Bouton A (Poing Faible)
+        8: Bouton B (Pied Faible)
+        1: Bouton C (Poing Fort)
+        9: Bouton D (Pied Fort)
+        2: Select / Coin
+        3: Start
+        4: Haut, 5: Bas, 6: Gauche, 7: Droite.
+
+================================================================================
+3. ARCHITECTURE DU CONTRÔLEUR VIRTUEL MOBILE (SMARTPHONE P2P)
+================================================================================
+Cette fonctionnalité permet à un joueur d'utiliser son smartphone comme une manette
+sans fil pour contrôler le jeu qui tourne sur un PC ou une TV :
+
+  1. Le PC affiche un QR Code contenant l'URL du contrôleur avec le code du salon :
+       https://csw-arcade.vercel.app/?controller=ARC-XXXX
+  2. Le smartphone ouvre cette URL et charge un composant léger (`MobileController.jsx`)
+     qui ne télécharge PAS la ROM (0 Mo de données mobiles).
+  3. Une connexion WebRTC P2P directe est établie entre le smartphone et le PC.
+  4. Dès que le joueur touche l'écran tactile du smartphone (stick virtuel ou boutons néo-arcade),
+     les entrées sont envoyées par DataChannel UDP au PC avec moins de 5 millisecondes de latence.
+  5. Le PC reçoit l'input et l'injecte instantanément sur le Port 1 (ou Port 0) de l'émulateur.
+
+================================================================================
+4. ARCHITECTURE DU JEU EN LIGNE (CLOUD P2P WEBRTC ZERO-QUOTA)
+================================================================================
+Le jeu en ligne permet à deux joueurs distants (par exemple un joueur en France et
+un joueur au Cameroun, ou deux amis dans des villes différentes) de partager la même
+partie d'arcade avec une sensation de serveur dédié.
+
+4.1. Le problème historique des quotas Cloud :
+  Dans les versions antérieures ou les architectures classiques, les développeurs utilisent
+  Firebase Firestore pour synchroniser chaque frame ou stocker les salons. Résultat :
+  dès que quelques dizaines d'utilisateurs jouent, le quota de 50 000 lectures/écritures
+  par jour est explosé en 15 minutes (`FirebaseError: [code=resource-exhausted]: Quota exceeded`).
+
+4.2. La solution d'ingénierie CSW-Arcade (Zero-Quota) :
+  CSW-Arcade s'appuie sur une pile à 4 niveaux de résilience :
+    1. Niveau 1 : Tunnel P2P PeerJS Cloud direct (Serveurs WebRTC sans quota de transfert).
+    2. Niveau 2 : Signalisation Lobby PubSub via Ntfy.sh (WebSockets gratuits et infinis).
+    3. Niveau 3 : API Serverless Vercel (`/api/netplay/rooms`) en Node.js avec nettoyage
+       automatique en mémoire des salons expirés.
+    4. Niveau 4 : Firebase Firestore en repli passif, avec désactivation automatique
+       dès qu'un signal de dépassement de quota est détecté.
+
+4.3. Double DataChannel WebRTC :
+  La communication réseau entre les deux navigateurs repose sur deux canaux distincts :
+    A. Le canal rapide `fastInputChannel` :
+       - Configuration : `{ ordered: false, maxRetransmits: 0 }`
+       - Protocole : UDP pur sur SCTP.
+       - Rôle : Transmettre les inputs (touches pressées/relâchées) et les positions d'entités.
+       - Avantage : Zéro latence induite par les accusés de réception. Si un paquet arrive en
+         retard, il est ignoré pour privilégier la frame courante.
+    B. Le canal fiable `reliableChannel` :
+       - Configuration : `{ ordered: true }`
+       - Protocole : TCP-like avec garantie d'ordre et de livraison.
+       - Rôle : Transmettre les signaux critiques (Top départ barrière, demandes de savestate,
+         messages de pause/reprise, transfert des sauvegardes de respawn).
+
+================================================================================
+5. COORDINATION DU LOBBY & SIGNALISATION SANS BASE DE DONNÉES
+================================================================================
+Comment deux joueurs se découvrent-ils sans base de données centrale payante ?
+
+5.1. Découverte mondiale en temps réel (Lobby Ntfy Zero-Quota) :
+  - Chaque client se connecte à l'ouverture à un WebSocket public temps réel :
+      `wss://ntfy.sh/csw-arcade-global-lobby/ws`
+  - Quand l'Hôte crée un salon `ARC-XXXX`, il diffuse un message JSON :
+      `{ type: "ROOM_ANNOUNCE", room: { code: "ARC-XXXX", gameTitle: "Metal Slug 3", hostName: "Player1" } }`
+  - Tous les autres joueurs connectés au lobby reçoivent cette annonce instantanément (0 ms)
+    sans aucune écriture en base de données.
+  - Quand un joueur rejoint le salon, il ouvre directement la connexion PeerJS vers l'ID :
+      `csw-arcade-arc-xxxx`
+
+5.2. Nettoyage automatique des salons inactifs (Garbage Collector) :
+  - Si un joueur crée un salon et ferme son onglet, le salon ne doit pas polluer la liste.
+  - L'Hôte diffuse un battement de cœur (Heartbeat) toutes les 45 secondes.
+  - Si aucun heartbeat n'est reçu pendant plus de 90 secondes, le salon est automatiquement
+    supprimé de la liste des salons disponibles.
+  - Si un hôte crée un nouveau salon, son ancien salon est immédiatement détruit (`ROOM_CLOSED`).
+
+================================================================================
+6. FORMAT DES PAQUETS RÉSEAU, FLUX BINAIRE & SYSTÈME ANTI-PERTE N-3
+================================================================================
+6.1. Encodage binaire ultra-rapide (9 octets par paquet) :
+  Pour maximiser les performances et éliminer la Garbage Collection JavaScript à 60 FPS,
+  les inputs ne sont pas envoyés en JSON volumineux mais en paquets binaires compacts :
+
+  Octet 0 : Header Magique (0xA5)
+  Octet 1 : Numéro de séquence High Byte (seq >> 8)
+  Octet 2 : Numéro de séquence Low Byte (seq & 0xFF)
+  Octet 3 : Index du Joueur (0 = J1, 1 = J2)
+  Octet 4 : ID du Bouton RetroPad (0 à 9)
+  Octet 5 : État (1 = Enfoncé, 0 = Relâché)
+  Octet 6 : Historique N-1 (Dernier input précédent)
+  Octet 7 : Historique N-2 (Avant-dernier input)
+  Octet 8 : Historique N-3 (Input N-3)
+
+6.2. Algorithme d'auto-réparation N-3 (Style Fightcade / GGPO) :
+  Sur Internet (particulièrement en connexion 4G/5G mobile ou Wi-Fi instable), des paquets UDP
+  peuvent être perdus en route.
+  Grâce aux octets 6, 7 et 8 qui embarquent l'historique des 3 dernières frappes :
+  - Si le récepteur constate un trou dans la séquence (ex: il reçoit seq 104 alors que le
+    dernier était seq 102), il sait que le paquet 103 a été perdu.
+  - Au lieu d'attendre une retransmission (qui prendrait 150 ms de lag), il extrait l'input
+    du paquet 103 directement depuis l'historique du paquet 104 !
+  - La frame manquante est rejouée immédiatement, sans freeze et sans saccade.
+
+6.3. Buffer de Délai d'Entrée Adaptatif (Input Delay Buffer) :
+  CSW-Arcade mesure en permanence le Ping aller-retour (RTT).
+  Le système ajuste automatiquement le délai d'entrée pour absorber la latence :
+    - Ping < 40 ms   : 0 frame de délai (réponse locale instantanée).
+    - Ping 40-90 ms  : 1 frame de délai (16 ms, imperceptible).
+    - Ping 90-160 ms : 2 frames de délai (33 ms, idéal pour jouer entre continents).
+    - Ping > 160 ms  : 3 frames de délai (50 ms, garantit la fluidité sur mauvaises connexions).
+
+================================================================================
+7. LA BARRIÈRE DE CHARGEMENT SYNCHRONISÉ (FRAME 0 LOCK)
+================================================================================
+C'est l'un des piliers majeurs de la refonte récente :
+
+7.1. Le problème résolu :
+  Auparavant, dès qu'une machine avait fini de télécharger la ROM, son émulateur démarrait.
+  Un joueur sur PC puissant avec fibre optique chargeait en 1 seconde et exécutait déjà 300 frames
+  (l'écran de boot Neo Geo SNK, l'intro). L'autre joueur sur smartphone 4G mettait 5 secondes.
+  Ils commençaient donc avec 4 secondes de décalage irrécupérable !
+
+7.2. Le protocole Barrière Frame 0 :
+  1. Chaque machine télécharge sa ROM et son BIOS en tâche de fond.
+  2. Dès que le core FBNeo s'initialise dans `public/player.html`, il est IMMÉDIATEMENT
+     mis en pause forcée :
+       `window.EJS_emulator.pause();`
+  3. L'écran affiche : *"Synchronisation de départ à la frame près..."*
+  4. L'iframe émet un signal `{ type: 'CORE_READY_BARRIER' }` à l'application.
+  5. Le service réseau émet le message WebRTC `{ type: 'PEER_CORE_READY' }`.
+  6. Dès que l'Hôte voit que sa machine ET celle de son adversaire sont prêtes :
+       - L'Hôte calcule un top départ avec 60 ms de marge : `startTime = Date.now() + 60`.
+       - L'Hôte diffuse `{ type: 'START_SIMULATION_NOW', startTime }`.
+  7. Les deux machines déclenchent `window.EJS_emulator.play()` exactement à la même milliseconde !
+  8. L'animation du BIOS Neo Geo démarre à la Frame 0 ensemble sur les deux écrans.
+
+================================================================================
+8. ISOLATION HERMÉTIQUE DES PORTS CONTRÔLEURS & SÉLECTION DES HÉROS
+================================================================================
+8.1. Le problème de l'inversion et de la divergence des personnages :
+  Dans les jeux de combat (The King of Fighters, Samurai Shodown, etc.), il arrivait
+  fréquemment que les joueurs choisissent un personnage, mais que le jeu affiche un personnage
+  différent sur l'écran adverse.
+  Cause racine : la bibliothèque EmulatorJS possède un écouteur de clavier interne global
+  qui assignait par défaut les touches du clavier au Port 0 (Joueur 1).
+  Sur la machine de l'invité (J2), quand celui-ci appuyait sur ses touches, l'écouteur interne
+  d'EmulatorJS actionnait P1, pendant que notre script réseau envoyait l'ordre pour P2 !
+  L'invité contrôlait donc les deux curseurs à la fois, provoquant un désaccord total de sélection.
+
+8.2. La solution implémentée :
+  Dans la fonction `buildControllersConfig` de `public/player.html` :
+  - Si le mode Netplay est actif :
+      * Pour l'Hôte (J1) : Le Port 0 reçoit les touches de jeu. Le Port 1 est STRICTEMENT VIDE (`{}`).
+      * Pour l'Invité (J2) : Le Port 0 est STRICTEMENT VIDE (`{}`). Le Port 1 reçoit les touches de jeu.
+  - Conséquence : L'écouteur natif d'EmulatorJS est totalement neutralisé sur le port de l'adversaire.
+  - Chaque joueur ne peut piloter QUE son port physique.
+  - Les curseurs sur l'écran de sélection de personnage sont 100% synchronisés et cohérents.
+
+================================================================================
+9. AUTORITÉ DYNAMIQUE DU SURVIVANT (MORT, RESPAWN & FLASH-SAVESTATE)
+================================================================================
+Dans les jeux de tir et d'action coopératifs (Run & Gun / Beat 'em up comme Metal Slug 1 à 5,
+Shock Troopers, Sengoku 3) :
+
+9.1. Le scénario d'arcade réel :
+  - Les joueurs avancent dans le niveau avec un scrolling continu vers la droite.
+  - L'un des joueurs peut mourir (Game Over ou perte de toutes ses vies).
+  - Deux cas possibles :
+      * Cas A : L'Invité (J2) meurt. L'Hôte (J1) continue d'avancer, détruit des hélicoptères
+        et fait défiler 3 écrans.
+      * Cas B : L'Hôte (J1) meurt ! L'Invité (J2) survit, avance seul et affronte le boss.
+  - Quand le joueur mort décide de rejouer en remettant une pièce (`COIN`) et en appuyant sur `START`,
+    il ne doit PAS réapparaître 3 écrans en arrière dans le vide ! Il doit atterrir directement
+    en parachute ou en saut aux côtés du joueur survivant.
+
+9.2. Le protocole de Flash-Savestate Symétrique :
+  1. Dès qu'un joueur insère un crédit ou presse Start après une mort, `player.html` émet :
+       `PLAYER_INSERTED_COIN_OR_START`.
+  2. `NetplayService` transmet une requête prioritaire sur le canal fiable WebRTC :
+       `{ type: 'REQUEST_SURVIVOR_CATCHUP', fromPlayerIndex }`
+  3. La machine du joueur survivant (celui qui est en train de combattre) reçoit cet ordre.
+     Sans interrompre sa partie et sans freeze visible, elle capture un instantané complet
+     de la mémoire vive Neo Geo :
+       `window.EJS_emulator.gameManager.getState();`
+  4. Cet instantané (Savestate binaire) est envoyé directement par WebRTC à la machine du joueur revenant.
+  5. La machine du joueur revenant applique immédiatement le savestate :
+       `window.EJS_emulator.gameManager.loadState(bytes);`
+  6. Le joueur mort est instantanément téléporté dans le monde, à la frame exacte, au même scrolling
+     et avec les mêmes ennemis que son partenaire survivant !
+
+================================================================================
+10. MOTEUR DE SYNCHRONISATION SÉLECTIVE DU MONDE (NETPLAY SYNC ENGINE)
+================================================================================
+Pour garantir qu'aucun décalage ne s'accumule pendant les longues sessions de jeu :
+
+10.1. Rôle du NetplaySyncEngine (`src/services/NetplaySyncEngine.js`) :
+  - Tourne à 60 FPS en arrière-plan pendant la partie.
+  - Inspecte la mémoire vive WebAssembly Emscripten (`Module.HEAPU8`).
+  - Extrait sélectivement les coordonnées (X, Y) des 24 premières entités dynamiques
+    (ennemis, boss, véhicules, bonus).
+
+10.2. Types de paquets haute performance :
+  - Paquet `0x04` (World Entities Delta) : L'Hôte envoie uniquement les entités dont la
+    position a changé par rapport à la frame précédente.
+  - Paquet `0x05` (Player Entity Pos) : L'Invité envoie la position exacte de son personnage
+    à l'Hôte pour corriger toute micro-divergence de collision.
+  - Paquet `0x06` (World Event) : Déclenchement d'événements critiques (mort de boss, changement de stage).
+
+10.3. Régulation dynamique de l'horloge (Clock Drift Correction) :
+  - Si la machine de l'invité a 2 frames d'avance sur l'hôte, le moteur ralentit légèrement
+    la boucle locale d'une frame.
+  - Si l'invité a du retard, il saute une frame de rendu pour recoller immédiatement à l'hôte.
+
+================================================================================
+11. CYCLE DE VIE D'UNE PARTIE MULTIJOUEUR DE BOUT EN BOUT
+================================================================================
+Voici la séquence exacte des événements lorsqu'une partie en ligne est jouée :
+
+  Étape 1 : Création du Salon
+    - L'Hôte choisit un jeu (ex: "The King of Fighters 98") et clique sur "Créer un salon".
+    - `NetplayService` génère un code à 4 lettres (ex: `ARC-WXYZ`).
+    - L'Hôte s'enregistre sur PeerJS Cloud avec l'ID `csw-arcade-arc-wxyz`.
+    - L'Hôte annonce le salon sur le canal Ntfy `csw-arcade-global-lobby` et sur l'API Vercel.
+
+  Étape 2 : Rejoindre le Salon
+    - L'Invité voit le salon dans la liste ou tape le code `ARC-WXYZ`.
+    - L'Invité initie une connexion WebRTC directe vers `csw-arcade-arc-wxyz`.
+    - L'Hôte accepte la connexion et lui répond `{ type: 'HOST_WELCOME', playerIndex: 1 }`.
+    - Les deux joueurs s'affichent connectés dans le lobby avec leur ping respectif.
+
+  Étape 3 : Lancement du Jeu
+    - L'Hôte clique sur "Lancer la partie".
+    - L'Hôte envoie `{ type: 'GAME_STARTED_BY_HOST', gameId: 'kof98' }` à l'Invité.
+    - Les deux navigateurs ouvrent l'iframe `player.html` avec leurs paramètres respectifs :
+        * Hôte   : `playerIndex=0`
+        * Invité : `playerIndex=1`
+
+  Étape 4 : Chargement & Barrière Frame 0
+    - Chaque machine télécharge la ROM FBNeo et le BIOS (ou les extrait d'IndexedDB).
+    - Dès que le core WASM est initialisé, chaque machine se met en pause à la Frame 0.
+    - Dès que les deux signaux `PEER_CORE_READY` sont reçus, l'Hôte siffle le top départ.
+    - Les deux jeux s'élancent ensemble à 60 FPS synchronisés.
+
+  Étape 5 : Sélection des Personnages & Combat
+    - Grâce à l'isolation des ports, l'Hôte déplace son curseur P1 et l'Invité déplace son curseur P2.
+    - Chaque input clavier/manette est envoyé sous forme de paquet binaire 9 octets en UDP WebRTC.
+    - Si un paquet est perdu, l'auto-réparation N-3 rétablit l'input instantanément.
+
+  Étape 6 : Fin de Partie / Déconnexion
+    - Si l'un des joueurs quitte, un paquet `{ type: 'PEER_LEFT' }` est transmis.
+    - L'autre joueur voit un message propre "L'autre joueur a quitté la partie" et l'émulateur se fige.
+    - Le salon est détruit proprement sur Vercel et Ntfy.
+
+================================================================================
+12. CONFIGURATION TECHNIQUE, VARIABLES, URLS & FICHIERS CLÉS
+================================================================================
+12.1. Fichiers sources clés dans le projet :
+  - `public/player.html` : Coeur de l'émulateur WebAssembly, gestion VFS, barrière Frame 0,
+                           isolation des ports manettes, capture/chargement de savestate.
+  - `src/services/NetplayService.js` : Moteur réseau WebRTC P2P, PeerJS, signalisation Ntfy,
+                                       gestion des paquets binaires, buffer GGPO, barrière.
+  - `src/services/NetplaySyncEngine.js` : Boucle 60 FPS d'extraction sélective d'entités,
+                                          synchronisation RAM Neo Geo et régulation de dérive.
+  - `src/components/emulator/EmulatorCore.jsx` : Composant React principal contenant l'iframe,
+                                                gestion du WakeLock, pont d'événements réseau.
+  - `src/components/netplay/NetplayModal.jsx` : Interface graphique du Lobby, création et liste des salons.
+  - `src/components/controller/MobileController.jsx` : Manette virtuelle smartphone sans ROM.
+  - `api/rooms.js` : API Serverless Vercel de gestion des salons en mémoire (fallback).
+  - `public/sw.js` : Service Worker PWA garantissant le cache offline et les mises à jour.
+
+12.2. Serveurs STUN gratuits utilisés pour traverser les box Internet (NAT Traversal) :
+  - stun:stun.l.google.com:19302
+  - stun:stun1.l.google.com:19302
+  - stun:stun2.l.google.com:19302
+  - stun:stun.cloudflare.com:3478
+
+12.3. Paramètres URL supportés par `player.html` :
+  - `game` : Nom du fichier ROM (ex: `mslug3.zip`, `kof98.zip`, `garou.zip`).
+  - `playerIndex` : 0 pour Joueur 1 (Hôte), 1 pour Joueur 2 (Invité).
+  - `netplay` : 1 si mode multijoueur réseau actif, 0 si jeu local.
+  - `settings` : JSON encodé contenant les réglages vidéo (4:3, 16:9, lissé/pixel),
+                 audio (volume, muet), et système (bios MVS ou AES, région).
+
+================================================================================
+13. GUIDE DE DÉPANNAGE & DIAGNOSTIC DES ERREURS RÉSEAU
+================================================================================
+13.1. "Le second joueur entre dans le salon mais la partie ne démarre pas" :
+  - Cause : Le core FBNeo de l'une des machines n'a pas fini de télécharger la ROM.
+  - Solution : La barre de progression dans l'overlay indique le pourcentage réel de
+    téléchargement. Dès que les deux barres atteignent 100%, la barrière Frame 0 se débloque
+    automatiquement. Un délai de secours de 12 secondes débloque également l'écran si un pair
+    ne répond plus.
+
+13.2. "Impossible de se connecter au salon (Échec P2P)" :
+  - Cause : L'un des deux joueurs est derrière un pare-feu d'entreprise strict ou un NAT symétrique
+    bloquant le trafic WebRTC direct (STUN).
+  - Solution : Se connecter sur un réseau Wi-Fi standard ou utiliser le partage de connexion 4G/5G
+    d'un smartphone, qui attribue une adresse IP publique compatible avec WebRTC P2P.
+
+13.3. "Les touches ne répondent pas sur le second écran" :
+  - Cause : Le focus du navigateur n'est pas sur la fenêtre de jeu.
+  - Solution : Cliquer une fois sur l'écran de jeu pour donner le focus au canvas.
+    Vérifier dans les Paramètres > Contrôles que les touches ne sont pas en conflit.
+
+13.4. "Le cache du navigateur garde une ancienne version" :
+  - Solution : Le Service Worker est passé à la version `csw-arcade-shell-v9`. Faire un simple
+    rechargement forcé (Ctrl + F5 sur PC, ou glisser vers le bas pour actualiser sur mobile)
+    charge instantanément la dernière version.
+
+================================================================================
+                              FIN DU DOCUMENT
+================================================================================

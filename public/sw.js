@@ -1,5 +1,5 @@
-const SHELL_CACHE_NAME = 'csw-arcade-shell-v9';
-const ENGINE_CACHE_NAME = 'csw-arcade-engine-v5';
+const SHELL_CACHE_NAME = 'csw-arcade-shell-v11';
+const ENGINE_CACHE_NAME = 'csw-arcade-engine-v6';
 
 // Assets essentiels du moteur WebAssembly (FBNeo + EmulatorJS)
 const ENGINE_ASSETS = [
@@ -74,8 +74,15 @@ self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
   const url = new URL(event.request.url);
 
-  // Ignorer les API dynamiques de salons et les flux WebSockets / WebRTC
-  if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/ws/') || url.protocol === 'ws:' || url.protocol === 'wss:') {
+  // Ignorer les API dynamiques de salons, les ROMs lourdes, le benchmark et les flux WebSockets / WebRTC
+  if (
+    url.pathname.startsWith('/api/') ||
+    url.pathname.startsWith('/ws/') ||
+    url.pathname.startsWith('/roms/') ||
+    url.pathname.includes('benchmark') ||
+    url.protocol === 'ws:' ||
+    url.protocol === 'wss:'
+  ) {
     return;
   }
 

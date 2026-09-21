@@ -73,8 +73,20 @@ class NetplayService {
     this.remoteCoreReady = false;
     this.startBarrierTimer = null;
 
+    // --- SIMULATEUR DE CONDITIONS RÉSEAU (DEBUG / TESTS) ---
+    this.networkSimulator = { latency: 0, jitter: 0, packetLoss: 0 };
+
     // Initialisation immédiate du lobby global
     this.initLobbyDiscovery();
+  }
+
+  setNetworkSimulator(sim) {
+    this.networkSimulator = {
+      latency: Math.max(0, sim?.latency || 0),
+      jitter: Math.max(0, sim?.jitter || 0),
+      packetLoss: Math.max(0, Math.min(100, sim?.packetLoss || 0))
+    };
+    console.log('[Netplay] Simulateur réseau mis à jour :', this.networkSimulator);
   }
 
   // Connexion au lobby global temps réel sans quota
@@ -1162,9 +1174,20 @@ class NetplayService {
     };
 
     dc.onmessage = (event) => {
-      // 1. Décodage binaire ultra-rapide 9 octets (Zero garbage collection, latence minimale)
+      // 1. Détection binaire ultra-rapide (Rollback inputs 0x5A, Checksums 0xCB, Entités Delta)
       if (event.data instanceof ArrayBuffer) {
         const u8 = new Uint8Array(event.data);
+
+        // Paquets Rollback Netcode (0x5A) et Checksum (0xCB)
+        if (u8[0] === 0x5A || u8[0] === 0xCB) {
+          this.emit('binary_data', event.data);
+          if (typeof this.onDataReceived === 'function') {
+            try { this.onDataReceived(event.data); } catch(e) {}
+          }
+          return;
+        }
+
+        // Paquet binaire rétro-compatible 0xA5
         if (u8[0] === 0xA5 && u8.length >= 9) {
           const incomingSeq = (u8[1] << 8) | u8[2];
           const pIdx = u8[3];
@@ -2075,21 +2098,41 @@ class NetplayService {
     }
   }
 
-  // Envoi d'un paquet binaire ultra-léger (NetplaySyncEngine / Entités Delta)
+  // Envoi d'un paquet binaire ultra-léger (Rollback Inputs 0x5A / Checksums 0xCB / NetplaySyncEngine)
   sendBinary(buffer) {
-    if (this.peerConn && this.peerConn.open) {
-      try {
-        this.peerConn.send(buffer);
-        return;
-      } catch(e) {}
+    // Simulateur Réseau : Perte artificielle de paquets UDP
+    if (this.networkSimulator.packetLoss > 0) {
+      if (Math.random() * 100 < this.networkSimulator.packetLoss) {
+        return; // Paquet délibérément abandonné
+      }
     }
-    const targetChannel = (this.fastInputChannel && this.fastInputChannel.readyState === 'open')
-      ? this.fastInputChannel
-      : (this.reliableChannel && this.reliableChannel.readyState === 'open' ? this.reliableChannel : null);
-    if (targetChannel) {
-      try {
-        targetChannel.send(buffer);
-      } catch(e) {}
+
+    const doSend = () => {
+      if (this.peerConn && this.peerConn.open) {
+        try {
+          this.peerConn.send(buffer);
+          return;
+        } catch(e) {}
+      }
+      const targetChannel = (this.fastInputChannel && this.fastInputChannel.readyState === 'open')
+        ? this.fastInputChannel
+        : (this.reliableChannel && this.reliableChannel.readyState === 'open' ? this.reliableChannel : null);
+      if (targetChannel) {
+        try {
+          targetChannel.send(buffer);
+        } catch(e) {}
+      }
+    };
+
+    // Simulateur Réseau : Latence et jitter artificiels
+    if (this.networkSimulator.latency > 0) {
+      const jitterOffset = this.networkSimulator.jitter > 0
+        ? (Math.random() * 2 - 1) * this.networkSimulator.jitter
+        : 0;
+      const totalDelay = Math.max(0, this.networkSimulator.latency + jitterOffset);
+      setTimeout(doSend, totalDelay);
+    } else {
+      doSend();
     }
   }
 

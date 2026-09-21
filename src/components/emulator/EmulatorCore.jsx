@@ -16,7 +16,8 @@ import {
   Smartphone,
   Zap,
   Clock,
-  Check
+  Check,
+  Activity
 } from 'lucide-react';
 import { emulatorBridge } from '../../services/emulatorBridge';
 import { inputManager } from '../../services/InputManager';
@@ -25,6 +26,8 @@ import { emulatorLoader } from '../../services/emulatorLoader';
 import { TouchOverlay } from './TouchOverlay';
 import { useDeviceType } from '../../utils/deviceDetector';
 import { netplayService } from '../../services/NetplayService';
+import { RollbackManager } from '../../services/RollbackManager';
+import { NetplayDebugOverlay } from './NetplayDebugOverlay';
 
 export function EmulatorCore({ 
   game, 
@@ -80,6 +83,22 @@ export function EmulatorCore({
 
   const hasSyncedInitialState = useRef(false);
   const syncEngineRef = useRef(null);
+  const rollbackManagerRef = useRef(null);
+  const [rollbackStats, setRollbackStats] = useState({});
+  const [showDebugOverlay, setShowDebugOverlay] = useState(false);
+  const [networkSim, setNetworkSim] = useState({ latency: 0, jitter: 0, packetLoss: 0 });
+
+  // Raccourci F8 pour basculer le HUD GGPO Rollback
+  useEffect(() => {
+    const handleF8 = (e) => {
+      if (e.key === 'F8' || e.keyCode === 119) {
+        e.preventDefault();
+        setShowDebugOverlay((prev) => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleF8);
+    return () => window.removeEventListener('keydown', handleF8);
+  }, []);
 
   // Initialisation du moteur de synchronisation sélective d'entités (Delta Monstres / J2)
   useEffect(() => {
@@ -131,6 +150,7 @@ export function EmulatorCore({
   const handleTouchInput = (buttonId, isPressed) => {
     const myIdx = netplayService.myPlayerIndex >= 0 ? netplayService.myPlayerIndex : (isHost ? 0 : 1);
     if (mode === 'netplay') {
+      rollbackManagerRef.current?.setLocalButtonState(buttonId, isPressed);
       netplayService.sendInput(buttonId, isPressed, myIdx);
       if (isPressed && (buttonId === 2 || buttonId === 3)) {
         netplayService.requestSurvivorCatchup();
@@ -254,6 +274,11 @@ export function EmulatorCore({
       }
     });
 
+    // Réception des paquets binaires Rollback (0x5A) et Checksums (0xCB)
+    const unsubBinary = netplayService.on('binary_data', (buf) => {
+      rollbackManagerRef.current?.handleIncomingBinary(buf);
+    });
+
     return () => {
       unsubInput();
       unsubReqState();
@@ -267,6 +292,12 @@ export function EmulatorCore({
       unsubDelay();
       unsubSimStart();
       unsubSurvivorReq();
+      unsubBinary();
+      if (rollbackManagerRef.current) {
+        rollbackManagerRef.current.stop();
+        rollbackManagerRef.current = null;
+        delete window.__csw_rollback_manager;
+      }
     };
   }, [mode, isHost]);
 
@@ -290,10 +321,44 @@ export function EmulatorCore({
 
       if (event.data.type === 'EJS_GAME_STARTED') {
         setIsReady(true);
+        if (mode === 'netplay') {
+          const gm = iframeRef.current?.contentWindow?.EJS_emulator?.gameManager;
+          if (gm && !rollbackManagerRef.current) {
+            console.log('[EmulatorCore] Démarrage du moteur Rollback GGPO 60 FPS...');
+            try {
+              iframeRef.current?.contentWindow?.EJS_emulator?.pause();
+            } catch(e) {}
+
+            const myIdx = netplayService.myPlayerIndex >= 0 ? netplayService.myPlayerIndex : (isHost ? 0 : 1);
+            const rm = new RollbackManager({
+              gameManager: gm,
+              playerIndex: myIdx,
+              sendBinary: (buf) => netplayService.sendBinary(buf),
+              onRollback: (distance, frame) => {
+                // Notifier l'overlay ou les stats
+              },
+              onStatsUpdate: (stats) => {
+                setRollbackStats(stats);
+              },
+              onDesync: (frame, local, remote) => {
+                console.warn(`[EmulatorCore] Divergence frame ${frame}: local=${local}, remote=${remote}`);
+                if (!isHost) {
+                  netplayService.requestStateSync();
+                }
+              }
+            });
+
+            rm.init(gm);
+            rm.start();
+            rollbackManagerRef.current = rm;
+            window.__csw_rollback_manager = rm;
+          }
+        }
       }
 
       // Quand un joueur local joue au clavier ou à la manette dans l'iframe, diffuser l'input à l'autre joueur
       if (event.data.type === 'LOCAL_INPUT' && mode === 'netplay') {
+        rollbackManagerRef.current?.setLocalButtonState(event.data.buttonId, event.data.isPressed);
         const myIdx = netplayService.myPlayerIndex >= 0 ? netplayService.myPlayerIndex : (isHost ? 0 : 1);
         netplayService.sendInput(event.data.buttonId, event.data.isPressed, myIdx);
       }
@@ -543,6 +608,14 @@ export function EmulatorCore({
                   {inputDelay}F Delay
                 </span>
               )}
+              <button
+                onClick={() => setShowDebugOverlay(prev => !prev)}
+                className={`px-1.5 py-0.5 rounded text-[9px] font-bold flex items-center gap-1 transition-all ${showDebugOverlay ? 'bg-cyan-500/30 text-cyan-200 border border-cyan-400' : 'bg-neutral-800 text-neutral-300 hover:text-cyan-300'}`}
+                title="Afficher/Masquer le HUD GGPO Rollback (F8)"
+              >
+                <Activity className="w-2.5 h-2.5" />
+                <span>HUD</span>
+              </button>
             </div>
           ) : (
             <div className="flex items-center gap-1.5 px-2 sm:px-3 py-0.5 sm:py-1 rounded-full bg-cyan-950/80 border border-cyan-500/40 text-cyan-400 text-[10px] sm:text-[11px]">
@@ -713,6 +786,21 @@ export function EmulatorCore({
             </button>
           </div>
         </div>
+      )}
+
+      {/* Overlay Debug GGPO Rollback & Simulateur Réseau */}
+      {mode === 'netplay' && (
+        <NetplayDebugOverlay
+          visible={showDebugOverlay}
+          stats={rollbackStats}
+          networkStats={{ ping: ping ?? 0, jitter: 1.5, packetLoss: networkSim.packetLoss }}
+          networkSimulator={networkSim}
+          onSimulatorChange={(sim) => {
+            setNetworkSim(sim);
+            netplayService.setNetworkSimulator(sim);
+          }}
+          onClose={() => setShowDebugOverlay(false)}
+        />
       )}
     </div>
   );
