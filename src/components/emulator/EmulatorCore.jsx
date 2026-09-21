@@ -281,8 +281,7 @@ export function EmulatorCore({
 
       // Quand un joueur local joue au clavier ou à la manette dans l'iframe, diffuser l'input à l'autre joueur
       if (event.data.type === 'LOCAL_INPUT' && mode === 'netplay') {
-        rollbackManagerRef.current?.setLocalButtonState(event.data.buttonId, event.data.isPressed);
-        const myIdx = netplayService.myPlayerIndex >= 0 ? netplayService.myPlayerIndex : (isHost ? 0 : 1);
+        const myIdx = typeof event.data.playerIndex === 'number' ? event.data.playerIndex : (netplayService.myPlayerIndex >= 0 ? netplayService.myPlayerIndex : (isHost ? 0 : 1));
         netplayService.sendInput(event.data.buttonId, event.data.isPressed, myIdx);
       }
 

@@ -2004,6 +2004,15 @@
             const h2 = view.getUint16(11, false);
             const h3 = view.getUint16(13, false);
 
+            if (frame >= this.remoteFrameAdvancement) {
+              this.remoteFrameAdvancement = frame;
+              if (assignedPlayerIndex === 0) {
+                this.p2Mask = curMask;
+              } else {
+                this.p1Mask = curMask;
+              }
+            }
+
             this.incomingQueue.push({
               frame,
               inputs: [
@@ -2102,36 +2111,20 @@
           const frame = this.currentFrame;
           const rIdx = frame & this.BUFFER_MASK;
 
-          // 2. Échantillonner les inputs locaux physiques (0 ms d'input lag)
+          // 2. Enregistrer les inputs actuels dans l'historique
           const localMask = (assignedPlayerIndex === 0) ? this.p1Mask : this.p2Mask;
+          const remoteMask = (assignedPlayerIndex === 0) ? this.p2Mask : this.p1Mask;
+
           this.localInputs[rIdx] = localMask;
+          this.remoteInputs[rIdx] = remoteMask;
 
           // 3. Envoyer le paquet 0x5A avec redondance N, N-1, N-2, N-3
           this.send0x5APacket(frame, localMask);
 
-          // 4. Déterminer l'input distant (Reçu ou Prédit)
-          let remoteMask = 0;
-          if (this.remotePredicted[rIdx] === 0 && this.remoteFrameNums[rIdx] === frame) {
-            remoteMask = this.remoteInputs[rIdx];
-          } else {
-            const prevIdx = (frame - 1) & this.BUFFER_MASK;
-            remoteMask = frame > 0 ? this.remoteInputs[prevIdx] : ((assignedPlayerIndex === 0) ? this.p2Mask : this.p1Mask);
-            this.remoteInputs[rIdx] = remoteMask;
-            this.remotePredicted[rIdx] = 1;
-            this.stats.predictedFramesCount++;
-          }
-
-          // Mettre à jour le masque du joueur distant
-          if (assignedPlayerIndex === 0) {
-            this.p2Mask = remoteMask;
-          } else {
-            this.p1Mask = remoteMask;
-          }
-
-          // 5. Sauvegarder l'état avant d'exécuter la frame
+          // 4. Sauvegarder l'état avant d'exécuter la frame
           this.captureSnapshot(frame);
 
-          // 6. Injecter les inputs dans FBNeo pour J1 et J2
+          // 5. Injecter les inputs dans FBNeo pour J1 et J2
           this.applyInputs(0, this.p1Mask);
           this.applyInputs(1, this.p2Mask);
 
