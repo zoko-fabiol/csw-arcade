@@ -118,6 +118,13 @@ export function RemoteStreamPlayer({
     };
 
     try {
+      if (videoRef.current) {
+        videoRef.current.muted = true;
+        videoRef.current.defaultMuted = true;
+        videoRef.current.playsInline = true;
+        videoRef.current.setAttribute('playsinline', '');
+        videoRef.current.setAttribute('webkit-playsinline', '');
+      }
       // 1. Tenter la lecture
       await videoRef.current.play();
       console.log('[RemoteStreamPlayer] ✓ Lecture vidéo démarrée ! Dimensions:', videoRef.current.videoWidth, 'x', videoRef.current.videoHeight);
@@ -127,6 +134,7 @@ export function RemoteStreamPlayer({
       // 2. Fallback muet garanti pour démarrer le flux visuel immédiatement
       if (videoRef.current) {
         videoRef.current.muted = true;
+        videoRef.current.defaultMuted = true;
         setIsMuted(true);
         setAudioBlockedNotice(true);
         try {

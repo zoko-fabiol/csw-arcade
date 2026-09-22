@@ -32,11 +32,25 @@ const RTC_CONFIG = {
       username: 'openrelayproject',
       credential: 'openrelayproject'
     },
+    {
+      urls: [
+        'turn:openrelay.metered.ca:80',
+        'turn:openrelay.metered.ca:443',
+        'turn:openrelay.metered.ca:443?transport=tcp'
+      ],
+      username: 'openrelay',
+      credential: 'openrelay'
+    },
     // TURNS (TLS port 443 pour contourner les pare-feux stricts et filtrages 4G/Box)
     {
       urls: 'turns:openrelay.metered.ca:443?transport=tcp',
       username: 'openrelayproject',
       credential: 'openrelayproject'
+    },
+    {
+      urls: 'turns:openrelay.metered.ca:443?transport=tcp',
+      username: 'openrelay',
+      credential: 'openrelay'
     }
   ],
   iceCandidatePoolSize: 10,
@@ -1367,26 +1381,38 @@ class NetplayService {
       this.reliableChannel = reliableDc;
       this.setupDataChannel(reliableDc);
 
-      // Si le flux vidéo du jeu a déjà été capturé sur l'hôte, l'attacher directement à this.pc
+      // Attacher le flux vidéo du jeu ou injecter un flux préliminaire
+      // pour que l'offre initiale SDP contienne immédiatement les sections m=video complètes (avec SSRC et MSID)
       try {
         if (this.localVideoStream) {
           console.log('[Netplay WebRTC Hôte] Pistes vidéo du jeu attachées directement à this.pc');
           this.localVideoStream.getTracks().forEach(track => {
             try { pc.addTrack(track, this.localVideoStream); } catch(e) {}
           });
+        } else if (typeof document !== 'undefined') {
+          try {
+            const dummyCanvas = document.createElement('canvas');
+            dummyCanvas.width = 320;
+            dummyCanvas.height = 240;
+            const ctx = dummyCanvas.getContext('2d');
+            if (ctx) {
+              ctx.fillStyle = '#050505';
+              ctx.fillRect(0, 0, 320, 240);
+            }
+            const dummyStream = dummyCanvas.captureStream ? dummyCanvas.captureStream(5) : null;
+            if (dummyStream && dummyStream.getVideoTracks().length > 0) {
+              this._dummyVideoStream = dummyStream;
+              dummyStream.getTracks().forEach(track => {
+                pc.addTrack(track, dummyStream);
+              });
+              console.log('[Netplay WebRTC Hôte] Piste vidéo préliminaire active injectée dans l\'offre initiale');
+            }
+          } catch(dummyErr) {
+            console.warn('[Netplay WebRTC Hôte] Erreur dummy canvas:', dummyErr);
+          }
         }
-        // Déclarer systématiquement les transceivers vidéo et audio (sendonly) dès la création
-        // Cela garantit que l'offre initiale SDP contient immédiatement les sections média requises
-        const senders = pc.getSenders ? pc.getSenders() : [];
-        let vTcvr = null;
-        if (!senders.some(s => s.track?.kind === 'video')) {
-          vTcvr = pc.addTransceiver('video', { direction: 'sendonly' });
-        } else {
-          vTcvr = pc.getTransceivers().find(t => t.sender?.track?.kind === 'video');
-        }
-        if (!senders.some(s => s.track?.kind === 'audio')) {
-          pc.addTransceiver('audio', { direction: 'sendonly' });
-        }
+
+        const vTcvr = pc.getTransceivers ? pc.getTransceivers().find(t => t.sender?.track?.kind === 'video' || t.receiver?.track?.kind === 'video') : null;
 
         // Prioriser les codecs VP8 et H.264 supportés universellement par tous les smartphones
         if (vTcvr && 'setCodecPreferences' in vTcvr && typeof RTCRtpReceiver?.getCapabilities === 'function') {
@@ -1482,24 +1508,22 @@ class NetplayService {
       const pc = new RTCPeerConnection(RTC_CONFIG);
       this.pc = pc;
 
-      // Déclarer immédiatement les transceivers vidéo et audio en réception
-      try {
-        pc.addTransceiver('video', { direction: 'recvonly' });
-        pc.addTransceiver('audio', { direction: 'recvonly' });
-      } catch(e) {}
-
-      // Écoute directe des flux vidéo/audio WebRTC émis par l'Hôte sans écrasement
+      // Écoute directe des flux vidéo/audio WebRTC émis par l'Hôte
       pc.ontrack = (event) => {
         console.log('[Netplay WebRTC Invité] ✓ Piste média reçue de l\'Hôte sur this.pc (kind: ' + event.track.kind + ')');
-        if (!this.remoteStream) {
-          this.remoteStream = new MediaStream();
+        const nativeStream = (event.streams && event.streams[0]) ? event.streams[0] : null;
+        if (nativeStream) {
+          this.remoteStream = nativeStream;
+        } else {
+          if (!this.remoteStream) {
+            this.remoteStream = new MediaStream();
+          }
+          const existing = this.remoteStream.getTracks().find(t => t.kind === event.track.kind);
+          if (existing) {
+            try { this.remoteStream.removeTrack(existing); } catch(e) {}
+          }
+          this.remoteStream.addTrack(event.track);
         }
-        // Remplacer l'ancienne piste du même type ou ajouter la nouvelle
-        const existing = this.remoteStream.getTracks().find(t => t.kind === event.track.kind);
-        if (existing) {
-          try { this.remoteStream.removeTrack(existing); } catch(e) {}
-        }
-        this.remoteStream.addTrack(event.track);
         this.emit('stream_received', this.remoteStream);
       };
 
@@ -1734,24 +1758,37 @@ class NetplayService {
       this.reliableChannel = reliableDc;
       this.setupDataChannel(reliableDc);
 
-      // Si le flux vidéo du jeu a déjà été capturé sur l'hôte, l'attacher directement à this.pc
+      // Attacher le flux vidéo du jeu ou injecter un flux préliminaire
       try {
         if (this.localVideoStream) {
           console.log('[Netplay WebRTC Hôte Firestore] Pistes vidéo attachées directement à this.pc');
           this.localVideoStream.getTracks().forEach(track => {
             try { pc.addTrack(track, this.localVideoStream); } catch(e) {}
           });
+        } else if (typeof document !== 'undefined') {
+          try {
+            const dummyCanvas = document.createElement('canvas');
+            dummyCanvas.width = 320;
+            dummyCanvas.height = 240;
+            const ctx = dummyCanvas.getContext('2d');
+            if (ctx) {
+              ctx.fillStyle = '#050505';
+              ctx.fillRect(0, 0, 320, 240);
+            }
+            const dummyStream = dummyCanvas.captureStream ? dummyCanvas.captureStream(5) : null;
+            if (dummyStream && dummyStream.getVideoTracks().length > 0) {
+              this._dummyVideoStream = dummyStream;
+              dummyStream.getTracks().forEach(track => {
+                pc.addTrack(track, dummyStream);
+              });
+              console.log('[Netplay WebRTC Hôte Firestore] Piste vidéo préliminaire active injectée dans l\'offre');
+            }
+          } catch(dummyErr) {
+            console.warn('[Netplay WebRTC Hôte Firestore] Erreur dummy canvas:', dummyErr);
+          }
         }
-        const senders = pc.getSenders ? pc.getSenders() : [];
-        let vTcvr = null;
-        if (!senders.some(s => s.track?.kind === 'video')) {
-          vTcvr = pc.addTransceiver('video', { direction: 'sendonly' });
-        } else {
-          vTcvr = pc.getTransceivers().find(t => t.sender?.track?.kind === 'video');
-        }
-        if (!senders.some(s => s.track?.kind === 'audio')) {
-          pc.addTransceiver('audio', { direction: 'sendonly' });
-        }
+
+        const vTcvr = pc.getTransceivers ? pc.getTransceivers().find(t => t.sender?.track?.kind === 'video' || t.receiver?.track?.kind === 'video') : null;
 
         if (vTcvr && 'setCodecPreferences' in vTcvr && typeof RTCRtpReceiver?.getCapabilities === 'function') {
           const cap = RTCRtpReceiver.getCapabilities('video');
@@ -1858,23 +1895,22 @@ class NetplayService {
       const pendingCandidates = [];
       let isRemoteDescSet = false;
 
-      // Déclarer immédiatement les transceivers vidéo et audio en réception
-      try {
-        pc.addTransceiver('video', { direction: 'recvonly' });
-        pc.addTransceiver('audio', { direction: 'recvonly' });
-      } catch(e) {}
-
-      // Écoute directe des flux vidéo/audio WebRTC émis par l'Hôte sans écrasement
+      // Écoute directe des flux vidéo/audio WebRTC émis par l'Hôte
       pc.ontrack = (event) => {
         console.log('[Netplay WebRTC Invité Firestore] ✓ Piste média reçue (kind: ' + event.track.kind + ')');
-        if (!this.remoteStream) {
-          this.remoteStream = new MediaStream();
+        const nativeStream = (event.streams && event.streams[0]) ? event.streams[0] : null;
+        if (nativeStream) {
+          this.remoteStream = nativeStream;
+        } else {
+          if (!this.remoteStream) {
+            this.remoteStream = new MediaStream();
+          }
+          const existing = this.remoteStream.getTracks().find(t => t.kind === event.track.kind);
+          if (existing) {
+            try { this.remoteStream.removeTrack(existing); } catch(e) {}
+          }
+          this.remoteStream.addTrack(event.track);
         }
-        const existing = this.remoteStream.getTracks().find(t => t.kind === event.track.kind);
-        if (existing) {
-          try { this.remoteStream.removeTrack(existing); } catch(e) {}
-        }
-        this.remoteStream.addTrack(event.track);
         this.emit('stream_received', this.remoteStream);
       };
 
@@ -2782,10 +2818,11 @@ class NetplayService {
           }
         });
 
-        // Déclencher une renégociation SDP à chaud UNIQUEMENT si de nouvelles pistes ont dû être créées
-        if (needsRenegotiation && this.isHost) {
+        // Toujours déclencher une renégociation SDP à chaud pour propager immédiatement à l'invité
+        // les paramètres de codecs, SSRCs et synchronisation du flux vidéo réel du jeu
+        if (this.isHost) {
           const topic = this.currentRoom?.code || this.currentTopic;
-          await this.renegotiateWebRTC(topic);
+          this.renegotiateWebRTC(topic);
         }
       } catch (err) {
         console.warn('[Netplay WebRTC] Erreur injection pistes vidéo sur this.pc:', err);

@@ -30,11 +30,25 @@ const RTC_CONFIG = {
       username: 'openrelayproject',
       credential: 'openrelayproject'
     },
+    {
+      urls: [
+        'turn:openrelay.metered.ca:80',
+        'turn:openrelay.metered.ca:443',
+        'turn:openrelay.metered.ca:443?transport=tcp'
+      ],
+      username: 'openrelay',
+      credential: 'openrelay'
+    },
     // TURNS (TLS port 443 pour contourner les pare-feux stricts et filtrages 4G/Box)
     {
       urls: 'turns:openrelay.metered.ca:443?transport=tcp',
       username: 'openrelayproject',
       credential: 'openrelayproject'
+    },
+    {
+      urls: 'turns:openrelay.metered.ca:443?transport=tcp',
+      username: 'openrelay',
+      credential: 'openrelay'
     }
   ],
   iceCandidatePoolSize: 10,
