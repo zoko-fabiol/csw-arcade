@@ -1124,7 +1124,7 @@
             desynchronized: true,
             alpha: false,
             antialias: false,
-            preserveDrawingBuffer: false
+            preserveDrawingBuffer: true
           });
         }
         return _origGetContext.call(this, type, attributes);
@@ -2273,6 +2273,15 @@
       const stream = canvas.captureStream ? canvas.captureStream(60) : (canvas.mozCaptureStream ? canvas.mozCaptureStream(60) : null);
       if (!stream) return null;
 
+      // S'assurer que la piste vidéo est bien active et force une émission initiale
+      const videoTracks = stream.getVideoTracks();
+      if (videoTracks.length > 0) {
+        videoTracks[0].enabled = true;
+        if (typeof videoTracks[0].requestFrame === 'function') {
+          try { videoTracks[0].requestFrame(); } catch(e) {}
+        }
+      }
+
       try {
         const audioCtx = window.EJS_emulator?.audioContext;
         if (audioCtx && typeof audioCtx.createMediaStreamDestination === 'function') {
@@ -2280,7 +2289,10 @@
           if (window.EJS_emulator.soundNode) {
             window.EJS_emulator.soundNode.connect(audioDest);
           }
-          audioDest.stream.getAudioTracks().forEach(t => stream.addTrack(t));
+          audioDest.stream.getAudioTracks().forEach(t => {
+            t.enabled = true;
+            stream.addTrack(t);
+          });
         }
       } catch(e) {
         console.warn('[Player] Erreur capture audio stream:', e);
