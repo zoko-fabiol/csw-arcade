@@ -314,11 +314,11 @@ export function NetplayModal({
                     : 'bg-rose-500/20 text-rose-300 border-rose-500/40'
                 }`}>
                   {isLocalMode ? <Wifi className="w-3 h-3 text-cyan-400" /> : <Globe className="w-3 h-3 text-rose-400" />}
-                  <span>{isLocalMode ? 'Même Wi-Fi (LAN)' : 'En Ligne (Distant)'}</span>
+                  <span>{isLocalMode ? 'Connexion Locale' : 'Connexion En Ligne'}</span>
                 </span>
               </h2>
               <p className="text-[11px] text-neutral-400">
-                {isLocalMode ? 'Jouez avec vos appareils connectés à votre box Wi-Fi locale' : 'Jouez à distance avec des amis n\'importe où sur Internet'}
+                {isLocalMode ? 'Partie en réseau local' : 'Partie en ligne à distance'}
               </p>
             </div>
           </div>
@@ -345,7 +345,7 @@ export function NetplayModal({
             <Wifi className="w-3.5 h-3.5 shrink-0 text-cyan-400" />
             <div className="text-left min-w-0">
               <span className="block leading-tight truncate">Réseau Local</span>
-              <span className="text-[9px] font-normal text-cyan-400/80 block truncate">Même Wi-Fi / Box</span>
+              <span className="text-[9px] font-normal text-cyan-400/80 block truncate">Connexion Locale</span>
             </div>
           </button>
 
@@ -361,7 +361,7 @@ export function NetplayModal({
             <Globe className="w-3.5 h-3.5 shrink-0 text-rose-400" />
             <div className="text-left min-w-0">
               <span className="block leading-tight truncate">En Ligne</span>
-              <span className="text-[9px] font-normal text-rose-400/80 block truncate">Internet / Distant</span>
+              <span className="text-[9px] font-normal text-rose-400/80 block truncate">Connexion En Ligne</span>
             </div>
           </button>
         </div>
@@ -881,7 +881,7 @@ export function NetplayModal({
                     {isProcessing && (
                       <div className="mt-2.5 p-2.5 rounded-xl bg-cyan-950/50 border border-cyan-500/40 text-cyan-300 text-[11px] flex items-center gap-2 animate-pulse">
                         <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping shrink-0" />
-                        <span>Connexion en cours... Traversée des Box Wi-Fi et relais TURN mondiaux actifs...</span>
+                        <span>Connexion en cours...</span>
                       </div>
                     )}
                   </div>
@@ -908,7 +908,7 @@ export function NetplayModal({
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-[11px] uppercase font-bold text-neutral-400 flex items-center gap-1.5">
                         {networkMode === 'local' ? <Wifi className="w-3.5 h-3.5 text-cyan-400" /> : <Globe className="w-3.5 h-3.5 text-rose-400" />}
-                        Salons ouverts ({networkMode === 'local' ? 'Même Wi-Fi' : 'En Ligne / Cloud'}) :
+                        Salons ouverts ({networkMode === 'local' ? 'Local' : 'En Ligne'}) :
                       </span>
                       <button
                         onClick={loadRooms}

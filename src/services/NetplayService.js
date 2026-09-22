@@ -583,13 +583,60 @@ class NetplayService {
         }
         this._lastVideoStreamReqTime = now;
 
-        console.log('[Netplay PeerJS] Demande de flux vidéo reçue de l\'invité ! PeerID:', data?.peerId, 'forced:', isForced);
+        console.log('[Netplay] Demande de flux vidéo reçue de l\'invité ! PeerID:', data?.peerId, 'forced:', isForced);
         if (data?.peerId) {
           this.remotePeerId = data.peerId;
         }
         this.emit('video_stream_requested');
         if (this.localVideoStream) {
           this.startVideoStream(this.localVideoStream);
+        }
+        break;
+      }
+
+      case 'WEBRTC_RENEGOTIATE_OFFER': {
+        if (this.pc && data?.offer) {
+          try {
+            console.log('[Netplay WebRTC Invité] Traitement offre de renégociation vidéo...');
+            this.pc.setRemoteDescription(new RTCSessionDescription(data.offer)).then(async () => {
+              const answer = await this.pc.createAnswer();
+              await this.pc.setLocalDescription(answer);
+              const ansPayload = {
+                type: 'WEBRTC_RENEGOTIATE_ANSWER',
+                answer: { type: answer.type, sdp: answer.sdp }
+              };
+              if (this.reliableChannel && this.reliableChannel.readyState === 'open') {
+                try { this.reliableChannel.send(JSON.stringify(ansPayload)); } catch(e) {}
+              }
+              const topic = this.currentRoom?.code || this.currentTopic;
+              if (topic) {
+                this.sendNtfySignal(topic, {
+                  type: 'WEBRTC_ANSWER',
+                  answer: { type: answer.type, sdp: answer.sdp }
+                });
+              }
+            }).catch(err => {
+              console.warn('[Netplay WebRTC Invité] Erreur setRemoteDescription renégociation:', err);
+            });
+          } catch(err) {
+            console.warn('[Netplay WebRTC Invité] Erreur renégociation vidéo:', err);
+          }
+        }
+        break;
+      }
+
+      case 'WEBRTC_RENEGOTIATE_ANSWER': {
+        if (this.pc && data?.answer) {
+          try {
+            console.log('[Netplay WebRTC Hôte] Réponse renégociation reçue, application...');
+            this.pc.setRemoteDescription(new RTCSessionDescription(data.answer)).then(() => {
+              console.log('[Netplay WebRTC Hôte] ✓ Renégociation flux vidéo 60 FPS finalisée avec succès !');
+            }).catch(err => {
+              console.warn('[Netplay WebRTC Hôte] Erreur setRemoteDescription answer renégociation:', err);
+            });
+          } catch(err) {
+            console.warn('[Netplay WebRTC Hôte] Erreur traitement answer renégociation:', err);
+          }
         }
         break;
       }
@@ -1215,6 +1262,11 @@ class NetplayService {
     }).catch(() => {
       this.sendFirestoreSignal(topic, data);
     });
+
+    // Miroir direct Firestore pour les signaux critiques (évite tout délai ou perte ntfy)
+    if (data.type === 'GUEST_JOINED' || data.type === 'WEBRTC_OFFER' || data.type === 'WEBRTC_ANSWER' || data.type === 'ROOM_SYNC') {
+      this.sendFirestoreSignal(topic, data);
+    }
   }
 
   async sendFirestoreSignal(topic, data) {
@@ -1262,6 +1314,14 @@ class NetplayService {
       this.reliableChannel = reliableDc;
       this.setupDataChannel(reliableDc);
 
+      // Si le flux vidéo du jeu a déjà été capturé sur l'hôte, l'attacher directement à this.pc
+      if (this.localVideoStream) {
+        console.log('[Netplay WebRTC Hôte] Pistes vidéo du jeu attachées directement à this.pc');
+        this.localVideoStream.getTracks().forEach(track => {
+          try { pc.addTrack(track, this.localVideoStream); } catch(e) {}
+        });
+      }
+
       pc.oniceconnectionstatechange = () => {
         const iceState = pc.iceConnectionState;
         console.log('[Netplay WebRTC Hôte Ntfy] iceConnectionState:', iceState);
@@ -1301,12 +1361,33 @@ class NetplayService {
 
   async setupWebRTCGuestNtfy(topic, offer) {
     try {
+      // Si this.pc est déjà connecté, effectuer une renégociation SDP à chaud sans couper la connexion !
+      if (this.pc && (this.pc.connectionState === 'connected' || this.isP2PConnected)) {
+        console.log('[Netplay WebRTC Invité] Renégociation SDP à chaud sans coupure...');
+        await this.pc.setRemoteDescription(new RTCSessionDescription(offer));
+        const answer = await this.pc.createAnswer();
+        await this.pc.setLocalDescription(answer);
+        this.sendNtfySignal(topic, {
+          type: 'WEBRTC_ANSWER',
+          answer: { type: answer.type, sdp: answer.sdp }
+        });
+        return;
+      }
+
       this.closeWebRTC();
       if (!this.ntfyWs) {
         this.setupNtfySignaling(this.currentRoom?.code || topic, false);
       }
       const pc = new RTCPeerConnection(RTC_CONFIG);
       this.pc = pc;
+
+      // Écoute directe des flux vidéo/audio WebRTC émis par l'Hôte
+      pc.ontrack = (event) => {
+        console.log('[Netplay WebRTC Invité] ✓ Flux vidéo/audio reçu de l\'Hôte sur this.pc ! (kind: ' + event.track.kind + ')');
+        const stream = (event.streams && event.streams[0]) ? event.streams[0] : new MediaStream([event.track]);
+        this.remoteStream = stream;
+        this.emit('stream_received', stream);
+      };
 
       // Émission groupée des candidats ICE (STUN & TURN Relais) pour éviter tout quota / 429
       pc.onicecandidate = (event) => {
@@ -1858,6 +1939,14 @@ class NetplayService {
       // 1. Initialiser le salon Hôte PeerJS (Zero Quota, Zero 429) et le tunnel de signalisation Ntfy
       this.setupPeerConnection(roomCode, true, hostName);
       this.setupNtfySignaling(roomCode, true, hostName);
+
+      // 1b. Enregistrement direct dans Firestore pour visibilité garantie dans le Lobby
+      if (db) {
+        try {
+          const roomRef = doc(db, 'rooms', roomCode);
+          setDoc(roomRef, initialRoom).catch(() => {});
+        } catch(e) {}
+      }
 
       // 2. Publier immédiatement le salon dans l'API de découverte Vercel / LAN
       try {
@@ -2453,75 +2542,141 @@ class NetplayService {
   }
 
   // Lancement du flux vidéo P2P vers l'invité (Mode Remote Play Stream 60 FPS)
-  startVideoStream(stream) {
+  async startVideoStream(stream) {
     if (stream) {
       this.localVideoStream = stream;
     }
     const targetStream = stream || this.localVideoStream;
-    if (!this.peer || !this.remotePeerId || !targetStream) {
-      console.warn('[Netplay PeerJS] Impossible de lancer le stream : peer, remotePeerId ou stream manquant', {
-        hasPeer: !!this.peer,
-        remotePeerId: this.remotePeerId,
-        hasStream: !!targetStream
-      });
+    if (!targetStream) {
+      console.warn('[Netplay] Impossible de lancer le stream : aucun flux vidéo disponible');
       return;
     }
 
     const videoTracks = targetStream.getVideoTracks();
-    console.log('[Netplay PeerJS] Traitement flux vidéo WebRTC P2P vers :', this.remotePeerId, 'Pistes vidéo:', videoTracks.length);
+    const audioTracks = targetStream.getAudioTracks();
+    console.log('[Netplay] Traitement flux vidéo WebRTC 60 FPS vers invité. Pistes vidéo:', videoTracks.length, 'audio:', audioTracks.length);
 
-    try {
-      // 1. Si un appel est déjà actif et connecté, mettre à jour la piste vidéo à chaud sans coupure (replaceTrack)
-      if (this.currentMediaCall && this.currentMediaCall.peerConnection) {
-        const pc = this.currentMediaCall.peerConnection;
-        const state = pc.connectionState || pc.iceConnectionState;
-        if (state === 'connected' || state === 'completed') {
-          console.log('[Netplay PeerJS] Appel média déjà connecté ! Remplacement de piste à chaud (0 ms coupure)...');
-          const senders = pc.getSenders ? pc.getSenders() : [];
-          const videoSender = senders.find(s => s.track && s.track.kind === 'video');
-          const newVideoTrack = videoTracks[0];
-          if (videoSender && newVideoTrack) {
-            videoSender.replaceTrack(newVideoTrack).catch(e => console.warn('[Netplay PeerJS] replaceTrack non critique:', e));
+    // 1. PRIORITÉ ABSOLUE : Injection directe dans RTCPeerConnection (this.pc) avec TURN/STUN
+    if (this.pc && this.pc.signalingState !== 'closed') {
+      try {
+        let senders = [];
+        try { senders = this.pc.getSenders() || []; } catch(e) {}
+        let needsRenegotiation = false;
+
+        targetStream.getTracks().forEach(track => {
+          const existingSender = senders.find(s => s.track && s.track.kind === track.kind);
+          if (existingSender) {
+            console.log(`[Netplay WebRTC Hôte] Remplacement de piste à chaud sur this.pc (${track.kind})...`);
+            existingSender.replaceTrack(track).catch(e => console.warn('[Netplay WebRTC] replaceTrack non critique:', e));
+          } else {
+            console.log(`[Netplay WebRTC Hôte] Ajout de piste directe sur this.pc (${track.kind})...`);
+            try {
+              this.pc.addTrack(track, targetStream);
+              needsRenegotiation = true;
+            } catch(e) {
+              console.warn('[Netplay WebRTC] addTrack exception:', e);
+            }
+          }
+        });
+
+        // Déclencher une renégociation SDP à chaud si de nouvelles pistes ont été ajoutées
+        if (needsRenegotiation && this.isHost) {
+          const topic = this.currentRoom?.code || this.currentTopic;
+          await this.renegotiateWebRTC(topic);
+        }
+      } catch (err) {
+        console.warn('[Netplay WebRTC] Erreur injection pistes vidéo sur this.pc:', err);
+      }
+    }
+
+    // 2. PeerJS fallback (si actif en parallèle)
+    if (this.peer && this.remotePeerId) {
+      try {
+        // 1. Si un appel est déjà actif et connecté, mettre à jour la piste vidéo à chaud sans coupure (replaceTrack)
+        if (this.currentMediaCall && this.currentMediaCall.peerConnection) {
+          const pc = this.currentMediaCall.peerConnection;
+          const state = pc.connectionState || pc.iceConnectionState;
+          if (state === 'connected' || state === 'completed') {
+            console.log('[Netplay PeerJS] Appel média déjà connecté ! Remplacement de piste à chaud (0 ms coupure)...');
+            const senders = pc.getSenders ? pc.getSenders() : [];
+            const videoSender = senders.find(s => s.track && s.track.kind === 'video');
+            const newVideoTrack = videoTracks[0];
+            if (videoSender && newVideoTrack) {
+              videoSender.replaceTrack(newVideoTrack).catch(e => console.warn('[Netplay PeerJS] replaceTrack non critique:', e));
+              return;
+            }
+          } else if (state === 'connecting' || state === 'checking') {
+            console.log('[Netplay PeerJS] Négociation ICE déjà en cours (' + state + '), temporisation sans interruption.');
             return;
           }
-        } else if (state === 'connecting' || state === 'checking') {
-          console.log('[Netplay PeerJS] Négociation ICE déjà en cours (' + state + '), temporisation sans interruption.');
+        }
+
+        // 2. Anti-spam / Debounce : Ne pas détruire un appel récent (< 3.5s) pour laisser le temps à ICE
+        const now = Date.now();
+        if (this._lastMediaCallTime && (now - this._lastMediaCallTime < 3500)) {
+          console.log('[Netplay PeerJS] Appel média initié très récemment (< 3.5s), attente de l\'établissement ICE.');
           return;
         }
-      }
+        this._lastMediaCallTime = now;
 
-      // 2. Anti-spam / Debounce : Ne pas détruire un appel récent (< 3.5s) pour laisser le temps à ICE
-      const now = Date.now();
-      if (this._lastMediaCallTime && (now - this._lastMediaCallTime < 3500)) {
-        console.log('[Netplay PeerJS] Appel média initié très récemment (< 3.5s), attente de l\'établissement ICE.');
-        return;
-      }
-      this._lastMediaCallTime = now;
-
-      if (this.currentMediaCall) {
-        try { this.currentMediaCall.close(); } catch(e) {}
-        this.currentMediaCall = null;
-      }
-
-      console.log('[Netplay PeerJS] Lancement initial de l\'appel vidéo WebRTC P2P vers l\'invité :', this.remotePeerId);
-      const call = this.peer.call(this.remotePeerId, targetStream);
-      this.currentMediaCall = call;
-
-      call.on('error', (err) => {
-        console.warn('[Netplay PeerJS] Erreur media call:', err);
-        if (this.currentMediaCall === call) {
+        if (this.currentMediaCall) {
+          try { this.currentMediaCall.close(); } catch(e) {}
           this.currentMediaCall = null;
         }
-      });
 
-      call.on('close', () => {
-        console.log('[Netplay PeerJS] Media call clôturé.');
-        if (this.currentMediaCall === call) {
-          this.currentMediaCall = null;
-        }
-      });
-    } catch(e) {
-      console.warn('[Netplay PeerJS] Erreur startVideoStream:', e);
+        console.log('[Netplay PeerJS] Lancement initial de l\'appel vidéo WebRTC P2P vers l\'invité :', this.remotePeerId);
+        const call = this.peer.call(this.remotePeerId, targetStream);
+        this.currentMediaCall = call;
+
+        call.on('error', (err) => {
+          console.warn('[Netplay PeerJS] Erreur media call:', err);
+          if (this.currentMediaCall === call) {
+            this.currentMediaCall = null;
+          }
+        });
+
+        call.on('close', () => {
+          console.log('[Netplay PeerJS] Media call clôturé.');
+          if (this.currentMediaCall === call) {
+            this.currentMediaCall = null;
+          }
+        });
+      } catch(e) {
+        console.warn('[Netplay PeerJS] Erreur startVideoStream:', e);
+      }
+    }
+  }
+
+  // Renégociation SDP à chaud pour diffuser les pistes vidéo/audio à l'invité
+  async renegotiateWebRTC(topic) {
+    if (!this.pc || this.pc.signalingState === 'closed') return;
+    try {
+      console.log('[Netplay WebRTC Hôte] Création nouvelle offre SDP pour renégociation vidéo...');
+      const offer = await this.pc.createOffer();
+      await this.pc.setLocalDescription(offer);
+
+      const renegotiatePayload = {
+        type: 'WEBRTC_RENEGOTIATE_OFFER',
+        offer: { type: offer.type, sdp: offer.sdp }
+      };
+
+      // 1. Envoyer instantanément par DataChannel direct (0 ms latence, aucun serveur externe)
+      if (this.reliableChannel && this.reliableChannel.readyState === 'open') {
+        try {
+          this.reliableChannel.send(JSON.stringify(renegotiatePayload));
+          console.log('[Netplay WebRTC Hôte] Offre de renégociation envoyée via DataChannel direct !');
+        } catch(e) {}
+      }
+
+      // 2. Envoyer également via Ntfy & Firestore en secours
+      if (topic) {
+        this.sendNtfySignal(topic, {
+          type: 'WEBRTC_OFFER',
+          offer: { type: offer.type, sdp: offer.sdp }
+        });
+      }
+    } catch (err) {
+      console.warn('[Netplay WebRTC] Erreur renégociation:', err);
     }
   }
 
