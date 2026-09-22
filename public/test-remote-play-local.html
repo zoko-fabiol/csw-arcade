@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>CSW-Arcade : Banc d'Essai Remote Play Stream P2P (Local)</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      background-color: #050811;
+      color: #f1f5f9;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, monospace;
+      margin: 0;
+      padding: 16px;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid #1e293b;
+      padding-bottom: 12px;
+      margin-bottom: 16px;
+    }
+    h1 {
+      font-size: 18px;
+      margin: 0;
+      color: #00f0ff;
+      letter-spacing: 0.5px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .badge {
+      font-size: 11px;
+      background: rgba(0, 240, 255, 0.15);
+      border: 1px solid rgba(0, 240, 255, 0.4);
+      color: #38bdf8;
+      padding: 3px 8px;
+      border-radius: 6px;
+      font-weight: bold;
+    }
+    .status-bar {
+      display: flex;
+      gap: 16px;
+      font-size: 12px;
+      background: #090d1a;
+      border: 1px solid #1e293b;
+      padding: 8px 14px;
+      border-radius: 8px;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+    .status-item { display: flex; align-items: center; gap: 6px; }
+    .status-dot { width: 8px; height: 8px; border-radius: 50%; background: #22c55e; }
+    .status-dot.waiting { background: #eab308; }
+    .status-dot.error { background: #ef4444; }
+
+    .split-container {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      flex: 1;
+    }
+    @media (max-width: 900px) {
+      .split-container { grid-template-columns: 1fr; }
+    }
+
+    .panel {
+      background: #090d1a;
+      border: 1px solid #1e293b;
+      border-radius: 12px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+    }
+    .panel-header {
+      padding: 10px 14px;
+      background: #0e1424;
+      border-bottom: 1px solid #1e293b;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 13px;
+      font-weight: bold;
+    }
+    .panel-header.host { border-top: 3px solid #00f0ff; color: #00f0ff; }
+    .panel-header.guest { border-top: 3px solid #f43f5e; color: #f43f5e; }
+
+    .screen-area {
+      flex: 1;
+      min-height: 380px;
+      background: #000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+    }
+    iframe, video {
+      width: 100%;
+      height: 100%;
+      border: none;
+      object-fit: contain;
+      image-rendering: pixelated;
+    }
+
+    /* Contrôles interactifs Invité */
+    .controls-bar {
+      padding: 12px;
+      background: #0e1424;
+      border-top: 1px solid #1e293b;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .control-row {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .btn {
+      background: #1e293b;
+      color: #f1f5f9;
+      border: 1px solid #334155;
+      padding: 6px 14px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-family: inherit;
+      font-weight: bold;
+      cursor: pointer;
+      user-select: none;
+      transition: all 0.1s;
+    }
+    .btn:hover { background: #334155; color: #fff; }
+    .btn:active, .btn.pressed {
+      transform: scale(0.95);
+      background: #00f0ff;
+      color: #000;
+      border-color: #00f0ff;
+    }
+    .btn-coin { border-color: #eab308; color: #eab308; }
+    .btn-coin:hover { background: #eab308; color: #000; }
+    .btn-start { border-color: #22c55e; color: #22c55e; }
+    .btn-start:hover { background: #22c55e; color: #000; }
+    .btn-act { min-width: 44px; height: 36px; }
+
+    .telemetry {
+      display: flex;
+      gap: 12px;
+      font-size: 11px;
+      color: #94a3b8;
+      padding: 6px 12px;
+      background: #050811;
+      border-top: 1px solid #1e293b;
+    }
+    .telemetry span b { color: #f1f5f9; }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>
+      <span>CSW-ARCADE</span>
+      <span class="badge">BANC D'ESSAI REMOTE PLAY STREAM P2P</span>
+    </h1>
+    <div style="display: flex; gap: 8px;">
+      <button id="btn-toggle-host-audio" class="btn">Muter Son Hôte (Écouter Invité)</button>
+      <button id="btn-restart" class="btn" style="border-color: #00f0ff; color: #00f0ff;">Recharger le banc</button>
+    </div>
+  </header>
+
+  <div class="status-bar">
+    <div class="status-item">
+      <div id="p2p-dot" class="status-dot waiting"></div>
+      <span id="p2p-status">Initialisation WebRTC P2P local...</span>
+    </div>
+    <div class="status-item">
+      <span>Latence transport: <b id="stat-latency" style="color: #22c55e;">0 ms</b></span>
+    </div>
+    <div class="status-item">
+      <span>FPS Flux Vidéo: <b id="stat-fps" style="color: #38bdf8;">--</b></span>
+    </div>
+    <div class="status-item">
+      <span>Résolution: <b id="stat-res">320x224 (Neo Geo)</b></span>
+    </div>
+  </div>
+
+  <div class="split-container">
+    <!-- PANNEAU 1 : L'HÔTE (Calcul du jeu) -->
+    <div class="panel">
+      <div class="panel-header host">
+        <span>1. MACHINE HÔTE (Exécution Émulateur FBNeo)</span>
+        <span class="badge" style="border-color: #00f0ff; color: #00f0ff;">Calcul Local</span>
+      </div>
+      <div class="screen-area">
+        <iframe id="host-frame" src=""></iframe>
+      </div>
+      <div class="telemetry">
+        <span>Rôle: <b>Hôte (Joueur 1)</b></span>
+        <span>Canvas: <b>CaptureStream 60 FPS</b></span>
+        <span>Audio: <b>WebAudio 44.1 kHz</b></span>
+      </div>
+    </div>
+
+    <!-- PANNEAU 2 : L'INVITÉ (Stream Vidéo Pur + Contrôles J2) -->
+    <div class="panel">
+      <div class="panel-header guest">
+        <span>2. MACHINE INVITÉ (Récepteur Vidéo P2P Léger)</span>
+        <span class="badge" style="border-color: #f43f5e; color: #f43f5e;">Zéro ROM / 0 Mo</span>
+      </div>
+      <div class="screen-area">
+        <video id="guest-video" autoplay playsinline muted></video>
+        <div id="video-overlay-msg" style="position: absolute; color: #94a3b8; font-size: 13px; text-align: center; pointer-events: none;">
+          En attente du flux vidéo de l'Hôte...
+        </div>
+      </div>
+
+      <!-- Contrôles interactifs du Joueur 2 -->
+      <div class="controls-bar">
+        <div class="control-row">
+          <button class="btn btn-coin" id="btn-j2-coin">COIN (Touche 5 ou 6)</button>
+          <button class="btn btn-start" id="btn-j2-start">START J2 (Touche 2)</button>
+          <span style="font-size: 11px; color: #94a3b8; margin-left: 8px;">(Clavier : Flèches + J / K / U / I ou Manette J2)</span>
+        </div>
+
+        <div class="control-row">
+          <!-- D-Pad J2 -->
+          <button class="btn btn-act" id="btn-j2-up">▲</button>
+          <button class="btn btn-act" id="btn-j2-down">▼</button>
+          <button class="btn btn-act" id="btn-j2-left">◄</button>
+          <button class="btn btn-act" id="btn-j2-right">►</button>
+          
+          <div style="width: 16px;"></div>
+
+          <!-- Boutons Neo Geo J2 -->
+          <button class="btn btn-act" id="btn-j2-a" style="border-color: #f43f5e; color: #f43f5e;">A (Tir)</button>
+          <button class="btn btn-act" id="btn-j2-b" style="border-color: #38bdf8; color: #38bdf8;">B</button>
+          <button class="btn btn-act" id="btn-j2-c" style="border-color: #eab308; color: #eab308;">C</button>
+          <button class="btn btn-act" id="btn-j2-d" style="border-color: #22c55e; color: #22c55e;">D</button>
+        </div>
+      </div>
+
+      <div class="telemetry">
+        <span>Rôle: <b>Invité (Joueur 2)</b></span>
+        <span>Affichage: <b>&lt;video&gt; Hardware</b></span>
+        <span>Contrôles J2: <b>DataChannel direct</b></span>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // --- BANC D'ESSAI LOCAL REMOTE PLAY STREAM ---
+    const params = new URLSearchParams(window.location.search);
+    const game = params.get('game') || 'androdun.zip';
+    const hostFrame = document.getElementById('host-frame');
+    const guestVideo = document.getElementById('guest-video');
+    const p2pDot = document.getElementById('p2p-dot');
+    const p2pStatus = document.getElementById('p2p-status');
+    const statLatency = document.getElementById('stat-latency');
+    const statFps = document.getElementById('stat-fps');
+    const videoOverlayMsg = document.getElementById('video-overlay-msg');
+
+    // 1. Démarrer l'Hôte dans l'iframe
+    hostFrame.src = `/player.html?game=${encodeURIComponent(game)}&netplay=0&playerIndex=0&t=${Date.now()}`;
+
+    // 2. Initialisation des deux pairs WebRTC locaux (Host <-> Guest en boucle locale)
+    const pcHost = new RTCPeerConnection();
+    const pcGuest = new RTCPeerConnection();
+
+    let dataChannelGuestToHost = null;
+    let streamAttached = false;
+
+    // Échange des candidats ICE locaux
+    pcHost.onicecandidate = (e) => { if (e.candidate) pcGuest.addIceCandidate(e.candidate); };
+    pcGuest.onicecandidate = (e) => { if (e.candidate) pcHost.addIceCandidate(e.candidate); };
+
+    // Canal de données pour les entrées du Joueur 2 (Guest -> Host)
+    const dcHost = pcHost.createDataChannel('csw-j2-inputs', { ordered: false, maxRetransmits: 0 });
+    
+    dcHost.onmessage = (event) => {
+      // L'hôte reçoit les entrées du Joueur 2 et les injecte dans son émulateur !
+      try {
+        const inputData = JSON.parse(event.data);
+        if (inputData.type === 'J2_INPUT') {
+          hostFrame.contentWindow.postMessage({
+            type: 'NETPLAY_INPUT',
+            playerIndex: 1,
+            buttonId: inputData.buttonId,
+            isPressed: inputData.isPressed
+          }, '*');
+
+          // Si c'est Coin (2), injecter aussi sur le slot 0 pour garantir l'incrément arcade
+          if (inputData.buttonId === 2) {
+            hostFrame.contentWindow.postMessage({
+              type: 'NETPLAY_INPUT',
+              playerIndex: 0,
+              buttonId: 2,
+              isPressed: inputData.isPressed
+            }, '*');
+          }
+        }
+      } catch(e) {}
+    };
+
+    pcGuest.ondatachannel = (e) => {
+      dataChannelGuestToHost = e.channel;
+      dataChannelGuestToHost.onopen = () => {
+        console.log('[Banc Local] Canal de contrôles J2 connecté avec succès !');
+        p2pDot.className = 'status-dot';
+        p2pStatus.innerText = 'Liaison P2P locale connectée (Stream 60 FPS + Contrôles J2)';
+      };
+    };
+
+    // Réception du flux média par l'invité
+    pcGuest.ontrack = (event) => {
+      console.log('[Banc Local] Piste reçue par l\'invité :', event.track.kind);
+      if (!guestVideo.srcObject) {
+        guestVideo.srcObject = event.streams[0];
+        videoOverlayMsg.style.display = 'none';
+        guestVideo.play().catch(() => {});
+      }
+    };
+
+    // Mesure du FPS réel sur le lecteur vidéo de l'invité
+    let frameCount = 0;
+    let lastFpsTime = performance.now();
+    function measureFps() {
+      frameCount++;
+      const now = performance.now();
+      if (now - lastFpsTime >= 1000) {
+        const fps = Math.round((frameCount * 1000) / (now - lastFpsTime));
+        statFps.innerText = `${fps} FPS`;
+        frameCount = 0;
+        lastFpsTime = now;
+      }
+      requestAnimationFrame(measureFps);
+    }
+    requestAnimationFrame(measureFps);
+
+    // Fonction de capture et d'établissement du stream WebRTC
+    async function startLocalStreaming() {
+      if (streamAttached) return;
+      let canvas = null;
+      try {
+        const iframeDoc = hostFrame.contentDocument || hostFrame.contentWindow?.document;
+        canvas = iframeDoc?.querySelector('#game canvas') || iframeDoc?.querySelector('canvas');
+      } catch(e) {}
+
+      if (!canvas) {
+        setTimeout(startLocalStreaming, 250);
+        return;
+      }
+
+      console.log('[Banc Local] Canvas du jeu détecté ! Capture en 60 FPS...');
+      streamAttached = true;
+      p2pStatus.innerText = 'Capture du Canvas FBNeo à 60 FPS en cours...';
+
+      // 1. Capture du Canvas à 60 FPS
+      const mediaStream = canvas.captureStream ? canvas.captureStream(60) : canvas.mozCaptureStream(60);
+
+      // 2. Capture de l'audio si présent
+      try {
+        const win = hostFrame.contentWindow;
+        if (win.EJS_emulator?.audioContext) {
+          const audioDest = win.EJS_emulator.audioContext.createMediaStreamDestination();
+          if (win.EJS_emulator.soundNode) {
+            win.EJS_emulator.soundNode.connect(audioDest);
+          }
+          audioDest.stream.getAudioTracks().forEach(t => mediaStream.addTrack(t));
+        }
+      } catch(e) {
+        console.warn('[Banc Local] Audio stream optionnel:', e);
+      }
+
+      // 3. Ajouter les pistes au WebRTC local
+      mediaStream.getTracks().forEach(track => pcHost.addTrack(track, mediaStream));
+
+      // 4. Négociation SDP WebRTC
+      const offer = await pcHost.createOffer();
+      await pcHost.setLocalDescription(offer);
+      await pcGuest.setRemoteDescription(offer);
+
+      const answer = await pcGuest.createAnswer();
+      await pcGuest.setLocalDescription(answer);
+      await pcHost.setRemoteDescription(answer);
+
+      console.log('[Banc Local] ✓✓ Négociation WebRTC réussie ! Le flux vidéo 60 FPS est connecté.');
+    }
+
+    // Écoute des messages de l'iframe hôte
+    window.addEventListener('message', (event) => {
+      if (event.data?.type === 'EJS_GAME_STARTED' || event.data?.type === 'ROM_DOWNLOADED') {
+        console.log('[Banc Local] Jeu prêt sur l\'hôte, démarrage capture stream...');
+        setTimeout(startLocalStreaming, 400);
+      }
+    });
+
+    // Envoi des inputs du Joueur 2 vers l'Hôte via le DataChannel
+    function sendJ2Input(buttonId, isPressed) {
+      if (dataChannelGuestToHost && dataChannelGuestToHost.readyState === 'open') {
+        dataChannelGuestToHost.send(JSON.stringify({
+          type: 'J2_INPUT',
+          buttonId,
+          isPressed: !!isPressed
+        }));
+      } else {
+        // Injection directe de secours dans l'iframe hôte
+        hostFrame.contentWindow?.postMessage({
+          type: 'NETPLAY_INPUT',
+          playerIndex: 1,
+          buttonId,
+          isPressed: !!isPressed
+        }, '*');
+        if (buttonId === 2) {
+          hostFrame.contentWindow?.postMessage({
+            type: 'NETPLAY_INPUT',
+            playerIndex: 0,
+            buttonId: 2,
+            isPressed: !!isPressed
+          }, '*');
+        }
+      }
+    }
+
+    // Liaison des boutons interactifs de l'écran Invité
+    function bindBtn(id, buttonId) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      const down = () => { el.classList.add('pressed'); sendJ2Input(buttonId, true); };
+      const up = () => { el.classList.remove('pressed'); sendJ2Input(buttonId, false); };
+      el.addEventListener('mousedown', down);
+      el.addEventListener('mouseup', up);
+      el.addEventListener('touchstart', (e) => { e.preventDefault(); down(); });
+      el.addEventListener('touchend', (e) => { e.preventDefault(); up(); });
+    }
+
+    bindBtn('btn-j2-coin', 2);
+    bindBtn('btn-j2-start', 3);
+    bindBtn('btn-j2-up', 4);
+    bindBtn('btn-j2-down', 5);
+    bindBtn('btn-j2-left', 6);
+    bindBtn('btn-j2-right', 7);
+    bindBtn('btn-j2-a', 0);
+    bindBtn('btn-j2-b', 8);
+    bindBtn('btn-j2-c', 1);
+    bindBtn('btn-j2-d', 9);
+
+    // Contrôles clavier sur la fenêtre principale
+    const KEY_MAP = {
+      ArrowUp: 4, ArrowDown: 5, ArrowLeft: 6, ArrowRight: 7,
+      KeyW: 4, KeyS: 5, KeyA: 6, KeyD: 7,
+      KeyJ: 0, KeyK: 8, KeyU: 1, KeyI: 9,
+      Numpad4: 0, Numpad5: 8, Numpad7: 1, Numpad8: 9,
+      Digit5: 2, Digit6: 2, KeyC: 2,
+      Digit1: 3, Digit2: 3, Enter: 3
+    };
+
+    window.addEventListener('keydown', (e) => {
+      const btn = KEY_MAP[e.code];
+      if (btn !== undefined) {
+        sendJ2Input(btn, true);
+      }
+    });
+
+    window.addEventListener('keyup', (e) => {
+      const btn = KEY_MAP[e.code];
+      if (btn !== undefined) {
+        sendJ2Input(btn, false);
+      }
+    });
+
+    // Polling Gamepad physique pour Joueur 2
+    const lastPadState = {};
+    function pollGamepads() {
+      if (navigator.getGamepads) {
+        const pads = navigator.getGamepads();
+        const gp = pads[0] || pads[1];
+        if (gp && gp.connected) {
+          const check = (btnId, pressed) => {
+            if (lastPadState[btnId] !== pressed) {
+              lastPadState[btnId] = pressed;
+              sendJ2Input(btnId, pressed);
+            }
+          };
+          check(4, !!gp.buttons[12]?.pressed || gp.axes[1] < -0.4);
+          check(5, !!gp.buttons[13]?.pressed || gp.axes[1] > 0.4);
+          check(6, !!gp.buttons[14]?.pressed || gp.axes[0] < -0.4);
+          check(7, !!gp.buttons[15]?.pressed || gp.axes[0] > 0.4);
+          check(0, !!gp.buttons[0]?.pressed); // A
+          check(8, !!gp.buttons[1]?.pressed); // B
+          check(1, !!gp.buttons[2]?.pressed); // C
+          check(9, !!gp.buttons[3]?.pressed); // D
+          check(2, !!gp.buttons[8]?.pressed); // Select / Coin
+          check(3, !!gp.buttons[9]?.pressed); // Start
+        }
+      }
+      requestAnimationFrame(pollGamepads);
+    }
+    requestAnimationFrame(pollGamepads);
+
+    // Commutateur audio Hôte
+    const muteBtn = document.getElementById('btn-toggle-host-audio');
+    let isHostMuted = false;
+    muteBtn.onclick = () => {
+      isHostMuted = !isHostMuted;
+      try {
+        const win = hostFrame.contentWindow;
+        if (win.EJS_emulator) win.EJS_emulator.muted = isHostMuted;
+      } catch(e) {}
+      guestVideo.muted = !isHostMuted;
+      muteBtn.innerText = isHostMuted ? "Son Hôte Muté (Son Invité Actif)" : "Muter Son Hôte (Écouter Invité)";
+    };
+
+    document.getElementById('btn-restart').onclick = () => {
+      window.location.reload();
+    };
+  </script>
+</body>
+</html>

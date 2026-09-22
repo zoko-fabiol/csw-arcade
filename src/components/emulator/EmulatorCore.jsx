@@ -37,7 +37,8 @@ export function EmulatorCore({
   mode = 'solo', // 'solo' | 'netplay'
   netplayRoom = null,
   isHost = true,
-  playerIndex = 0
+  playerIndex = 0,
+  isStreamingHost = false
 }) {
   const iframeRef = useRef(null);
   const containerRef = useRef(null);
@@ -277,6 +278,15 @@ export function EmulatorCore({
 
       if (event.data.type === 'EJS_GAME_STARTED') {
         console.log('[EmulatorCore] EJS_GAME_STARTED reçu de l\'iframe player');
+        if (isStreamingHost && isHost && mode === 'netplay') {
+          setTimeout(() => {
+            const stream = iframeRef.current?.contentWindow?.captureGameStream?.();
+            if (stream) {
+              console.log('[EmulatorCore] Capture vidéo 60 FPS prête ! Diffusion WebRTC P2P vers l\'invité...');
+              netplayService.startVideoStream(stream);
+            }
+          }, 350);
+        }
       }
 
       // Relais Iframe -> WebRTC des paquets binaires Rollback ultra-rapides (0x5A / 0xCB)
@@ -325,7 +335,26 @@ export function EmulatorCore({
 
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
-  }, [mode, isHost]);
+  }, [mode, isHost, isStreamingHost]);
+
+  // Capture et diffusion vidéo 60 FPS continue pour le mode Remote Play Stream
+  useEffect(() => {
+    if (!isStreamingHost || !isHost || mode !== 'netplay') return;
+    let attempts = 0;
+    const interval = setInterval(() => {
+      attempts++;
+      if (iframeRef.current?.contentWindow?.captureGameStream) {
+        const stream = iframeRef.current.contentWindow.captureGameStream();
+        if (stream) {
+          console.log('[EmulatorCore] Stream 60 FPS capturé avec succès (tentative ' + attempts + ')');
+          netplayService.startVideoStream(stream);
+          clearInterval(interval);
+        }
+      }
+      if (attempts >= 30) clearInterval(interval);
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [isStreamingHost, isHost, mode]);
 
   // Screen Wake Lock API et veille zéro-consommation en arrière-plan
   useEffect(() => {
@@ -490,7 +519,7 @@ export function EmulatorCore({
   const isScanlinesActive = settings?.video?.scanlines ?? true;
   const myPlayerSlot = netplayService.myPlayerIndex >= 0 ? netplayService.myPlayerIndex : (playerIndex !== undefined ? playerIndex : (isHost ? 0 : 1));
   const settingsParam = encodeURIComponent(JSON.stringify(settings || {}));
-  const playerUrl = `./player.html?game=${encodeURIComponent(game.filename)}&settings=${settingsParam}&playerIndex=${myPlayerSlot}&netplay=${mode === 'netplay' ? 1 : 0}`;
+  const playerUrl = `./player.html?game=${encodeURIComponent(game.filename)}&settings=${settingsParam}&playerIndex=${myPlayerSlot}&netplay=${(mode === 'netplay' && !isStreamingHost) ? 1 : 0}`;
 
   return (
     <div 

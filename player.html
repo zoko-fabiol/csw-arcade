@@ -2266,6 +2266,29 @@
       document.body.appendChild(s);
     }
 
+    // API Universelle de Streaming P2P (Canvas 60 FPS + WebAudio Destination)
+    window.captureGameStream = function() {
+      const canvas = document.querySelector('#game canvas') || document.querySelector('canvas');
+      if (!canvas) return null;
+      const stream = canvas.captureStream ? canvas.captureStream(60) : (canvas.mozCaptureStream ? canvas.mozCaptureStream(60) : null);
+      if (!stream) return null;
+
+      try {
+        const audioCtx = window.EJS_emulator?.audioContext;
+        if (audioCtx && typeof audioCtx.createMediaStreamDestination === 'function') {
+          const audioDest = audioCtx.createMediaStreamDestination();
+          if (window.EJS_emulator.soundNode) {
+            window.EJS_emulator.soundNode.connect(audioDest);
+          }
+          audioDest.stream.getAudioTracks().forEach(t => stream.addTrack(t));
+        }
+      } catch(e) {
+        console.warn('[Player] Erreur capture audio stream:', e);
+      }
+
+      return stream;
+    };
+
     // Déclencher le préchargement
     preloadAssetsAndBoot();
   </script>

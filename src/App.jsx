@@ -5,6 +5,7 @@ import { useSettings } from './hooks/useSettings';
 import { Sidebar } from './components/layout/Sidebar';
 import { GameLibrary } from './components/games/GameLibrary';
 import { EmulatorCore } from './components/emulator/EmulatorCore';
+import { RemoteStreamPlayer } from './components/emulator/RemoteStreamPlayer';
 import { NetplayModal } from './components/netplay/NetplayModal';
 import { MobileControllerView } from './components/netplay/MobileControllerView';
 import { WebRTCNetplayDemo } from './components/netplay/WebRTCNetplayDemo';
@@ -32,7 +33,8 @@ export default function App() {
   const [netplaySession, setNetplaySession] = useState({
     isHost: true,
     playerIndex: 0,
-    role: 'p1'
+    role: 'p1',
+    playMode: 'stream'
   });
 
   // Audit des ROMs locales
@@ -86,7 +88,8 @@ export default function App() {
     setNetplaySession({
       isHost: options.isHost ?? true,
       playerIndex: options.playerIndex ?? 0,
-      role: options.role ?? 'p1'
+      role: options.role ?? 'p1',
+      playMode: options.playMode || 'stream'
     });
     setActiveGame(game);
     setGameMode('netplay');
@@ -96,7 +99,7 @@ export default function App() {
   const handleExitGame = () => {
     if (gameMode === 'netplay') {
       netplayService.leaveRoom();
-      setNetplaySession({ isHost: true, playerIndex: 0, role: 'p1' });
+      setNetplaySession({ isHost: true, playerIndex: 0, role: 'p1', playMode: 'stream' });
     }
     setActiveGame(null);
     setGameMode(null);
@@ -236,15 +239,26 @@ export default function App() {
 
       {/* Vue Plein Écran de l'Émulateur */}
       {activeGame && (
-        <EmulatorCore
-          game={activeGame}
-          mode={gameMode}
-          settings={settings}
-          onExit={handleExitGame}
-          onOpenSettings={() => setIsSettingsOpen(true)}
-          isHost={netplaySession.isHost}
-          playerIndex={netplaySession.playerIndex}
-        />
+        gameMode === 'netplay' && !netplaySession.isHost && netplaySession.playMode === 'stream' ? (
+          <RemoteStreamPlayer
+            game={activeGame}
+            playerIndex={netplaySession.playerIndex}
+            settings={settings}
+            onExit={handleExitGame}
+            onOpenSettings={() => setIsSettingsOpen(true)}
+          />
+        ) : (
+          <EmulatorCore
+            game={activeGame}
+            mode={gameMode}
+            settings={settings}
+            onExit={handleExitGame}
+            onOpenSettings={() => setIsSettingsOpen(true)}
+            isHost={netplaySession.isHost}
+            playerIndex={netplaySession.playerIndex}
+            isStreamingHost={gameMode === 'netplay' && netplaySession.isHost && netplaySession.playMode === 'stream'}
+          />
+        )
       )}
     </div>
   );

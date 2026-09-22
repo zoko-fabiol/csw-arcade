@@ -34,6 +34,7 @@ export function NetplayModal({
   const [ping, setPing] = useState(0);
   const [isP2P, setIsP2P] = useState(false);
   const [showQrModal, setShowQrModal] = useState(false);
+  const [playMode, setPlayMode] = useState('stream'); // 'stream' | 'rollback'
 
   // Synchronisation dynamique quand l'utilisateur clique sur le bouton 2P/4P LAN d'un jeu
   useEffect(() => {
@@ -121,7 +122,8 @@ export function NetplayModal({
             isNetplay: true, 
             isHost: false, 
             role: netplayService.myRole || 'p2', 
-            playerIndex: netplayService.myPlayerIndex >= 0 ? netplayService.myPlayerIndex : 1 
+            playerIndex: netplayService.myPlayerIndex >= 0 ? netplayService.myPlayerIndex : 1,
+            playMode: data.playMode || activeRoom?.playMode || 'stream'
           });
           onClose();
         }
@@ -194,7 +196,8 @@ export function NetplayModal({
         gameTitle: selectedGame.title,
         maxPlayers: maxPlayersForGame,
         hostName: playerName,
-        networkMode: chosenMode
+        networkMode: chosenMode,
+        playMode
       });
       if (netplayService.currentRoom) {
         setActiveRoom(netplayService.currentRoom);
@@ -235,9 +238,9 @@ export function NetplayModal({
   };
 
   const handleStartHostedGame = () => {
-    netplayService.startGame(selectedGame);
+    netplayService.startGame(selectedGame, { playMode });
     if (onLaunchGame && selectedGame) {
-      onLaunchGame(selectedGame, { isNetplay: true, isHost: true, playerIndex: 0, role: 'p1' });
+      onLaunchGame(selectedGame, { isNetplay: true, isHost: true, playerIndex: 0, role: 'p1', playMode });
       onClose();
     }
   };
@@ -503,6 +506,55 @@ export function NetplayModal({
               </div>
             )}
 
+            {/* Sélecteur de Mode Multijoueur dans le Salon */}
+            <div className="p-3 rounded-xl bg-neutral-950 border border-neutral-800 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] uppercase font-bold text-neutral-400">Mode de Synchronisation :</span>
+                <span className="text-[10px] font-bold text-cyan-400">
+                  {playMode === 'stream' ? '60 FPS P2P' : 'Double Core'}
+                </span>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setPlayMode('stream')}
+                  disabled={netplayService.myPlayerIndex !== 0}
+                  className={`p-2.5 rounded-lg border text-left transition-all ${
+                    playMode === 'stream'
+                      ? 'bg-cyan-500/15 border-cyan-400 text-white shadow-sm shadow-cyan-500/20'
+                      : 'bg-neutral-900 border-neutral-800 text-neutral-400 hover:text-neutral-300'
+                  }`}
+                >
+                  <div className="flex items-center gap-1.5 font-bold text-xs text-cyan-300 mb-0.5">
+                    <Zap className="w-3.5 h-3.5 text-cyan-400" />
+                    <span>Remote Play Stream</span>
+                  </div>
+                  <p className="text-[10px] text-neutral-400 leading-tight">
+                    60 FPS fluide direct. Zéro ROM à télécharger pour l'invité. 100% sans désynchronisation.
+                  </p>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setPlayMode('rollback')}
+                  disabled={netplayService.myPlayerIndex !== 0}
+                  className={`p-2.5 rounded-lg border text-left transition-all ${
+                    playMode === 'rollback'
+                      ? 'bg-cyan-500/15 border-cyan-400 text-white shadow-sm shadow-cyan-500/20'
+                      : 'bg-neutral-900 border-neutral-800 text-neutral-400 hover:text-neutral-300'
+                  }`}
+                >
+                  <div className="flex items-center gap-1.5 font-bold text-xs text-amber-300 mb-0.5">
+                    <Gamepad2 className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Rollback GGPO</span>
+                  </div>
+                  <p className="text-[10px] text-neutral-400 leading-tight">
+                    Double émulateur WebAssembly local. Nécessite le téléchargement de la ROM sur les deux appareils.
+                  </p>
+                </button>
+              </div>
+            </div>
+
             {/* Actions du salon */}
             <div className="flex items-center justify-between gap-3 pt-2">
               <button
@@ -671,6 +723,50 @@ export function NetplayModal({
                         ? 'Pour jouer avec vos proches dans la même maison. Connectez vos téléphones ou PC au même réseau Wi-Fi, puis scannez le QR Code ou partagez le lien local. Latence ultra-faible (1 à 5 ms).'
                         : 'Pour jouer avec un ami à distance via Internet (4G/5G, fibre). Un lien direct et un code seront générés pour se connecter instantanément sans aucune configuration de box.'}
                     </p>
+                  </div>
+
+                  {/* Choix du Moteur Multijoueur */}
+                  <div className="p-3 rounded-xl bg-neutral-950 border border-neutral-800 space-y-2">
+                    <span className="text-[10px] uppercase font-bold text-neutral-400 block">
+                      Moteur de Jeu Multijoueur :
+                    </span>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setPlayMode('stream')}
+                        className={`p-2.5 rounded-lg border text-left transition-all ${
+                          playMode === 'stream'
+                            ? 'bg-cyan-500/15 border-cyan-400 text-white shadow-sm shadow-cyan-500/20'
+                            : 'bg-neutral-900 border-neutral-800 text-neutral-400 hover:text-neutral-300'
+                        }`}
+                      >
+                        <div className="flex items-center gap-1.5 font-bold text-xs text-cyan-300 mb-0.5">
+                          <Zap className="w-3.5 h-3.5 text-cyan-400" />
+                          <span>Remote Play Stream</span>
+                        </div>
+                        <p className="text-[10px] text-neutral-400 leading-tight">
+                          60 FPS P2P fluide. L'invité joue directement sur le même écran vidéo.
+                        </p>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setPlayMode('rollback')}
+                        className={`p-2.5 rounded-lg border text-left transition-all ${
+                          playMode === 'rollback'
+                            ? 'bg-cyan-500/15 border-cyan-400 text-white shadow-sm shadow-cyan-500/20'
+                            : 'bg-neutral-900 border-neutral-800 text-neutral-400 hover:text-neutral-300'
+                        }`}
+                      >
+                        <div className="flex items-center gap-1.5 font-bold text-xs text-amber-300 mb-0.5">
+                          <Gamepad2 className="w-3.5 h-3.5 text-amber-400" />
+                          <span>Rollback GGPO</span>
+                        </div>
+                        <p className="text-[10px] text-neutral-400 leading-tight">
+                          Double émulation WASM. Prédictions d'entrées et retours en arrière.
+                        </p>
+                      </button>
+                    </div>
                   </div>
 
                   <button

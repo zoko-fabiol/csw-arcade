@@ -600,6 +600,7 @@ class NetplayService {
 
         peer.on('connection', (conn) => {
           console.log(`[Netplay PeerJS] ✓ Connexion entrante reçue de : ${conn.peer}`);
+          this.remotePeerId = conn.peer;
           this.peerConn = conn;
           this.setupPeerDataConnection(conn, true);
         });
@@ -622,6 +623,17 @@ class NetplayService {
           debug: 1
         });
         this.peer = peer;
+
+        // Réception du flux vidéo 60 FPS émis par l'hôte en mode Remote Play
+        peer.on('call', (call) => {
+          console.log('[Netplay PeerJS] Appel vidéo entrant reçu de l\'Hôte !');
+          call.answer(); // Répond sans renvoyer de vidéo
+          call.on('stream', (remoteStream) => {
+            console.log('[Netplay PeerJS] ✓ Flux vidéo & audio WebRTC 60 FPS reçu avec succès !');
+            this.remoteStream = remoteStream;
+            this.emit('stream_received', remoteStream);
+          });
+        });
 
         peer.on('open', (myId) => {
           console.log(`[Netplay PeerJS] Invité connecté au broker (ID: ${myId}), liaison vers l'Hôte : ${hostPeerId}`);
@@ -1476,7 +1488,7 @@ class NetplayService {
   }
 
   // Créer un salon (l'utilisateur devient J1 / Hôte)
-  async createRoom({ gameId, gameTitle, maxPlayers = 2, hostName = 'Hôte', networkMode = 'local' }) {
+  async createRoom({ gameId, gameTitle, maxPlayers = 2, hostName = 'Hôte', networkMode = 'local', playMode = 'stream' }) {
     await this.connect();
 
     // Nettoyage immédiat de tout salon ouvert précédemment par cet hôte
@@ -1498,7 +1510,8 @@ class NetplayService {
             gameTitle,
             maxPlayers,
             hostName,
-            networkMode
+            networkMode,
+            playMode
           }));
 
           setTimeout(() => {
@@ -1580,7 +1593,7 @@ class NetplayService {
     }
 
     // 2. Mode Firebase Cloud + WebRTC (Netlify / Internet / Même Wi-Fi sans serveur dédié)
-    const res = await this.createFirebaseRoom({ gameId, gameTitle, maxPlayers, hostName, networkMode });
+    const res = await this.createFirebaseRoom({ gameId, gameTitle, maxPlayers, hostName, networkMode, playMode });
     if (res?.roomCode) {
       this.myActiveRoomCode = res.roomCode;
       if (typeof localStorage !== 'undefined') {
@@ -1590,7 +1603,7 @@ class NetplayService {
     return res;
   }
 
-  async createFirebaseRoom({ gameId, gameTitle, maxPlayers = 2, hostName = 'Hôte', networkMode = 'online' }) {
+  async createFirebaseRoom({ gameId, gameTitle, maxPlayers = 2, hostName = 'Hôte', networkMode = 'online', playMode = 'stream' }) {
     try {
       const roomCode = this.generateRoomCode();
       const initialRoom = {
@@ -1600,6 +1613,7 @@ class NetplayService {
         maxPlayers,
         hostName,
         networkMode,
+        playMode,
         createdAt: Date.now(),
         updatedAt: Date.now(),
         players: [
@@ -2099,13 +2113,15 @@ class NetplayService {
   }
 
   // Lancer la partie en tant qu'hôte
-  startGame(game = null) {
+  startGame(game = null, options = {}) {
     const gameId = game?.id || this.currentRoom?.gameId;
     const gameTitle = game?.title || this.currentRoom?.gameTitle;
+    const playMode = options.playMode || this.currentRoom?.playMode || 'stream';
     const startPayload = {
       type: 'GAME_STARTED_BY_HOST',
       gameId,
       gameTitle,
+      playMode,
       timestamp: Date.now()
     };
 
@@ -2141,6 +2157,21 @@ class NetplayService {
     // 2. Mode WebSocket LAN
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
       this.ws.send(JSON.stringify(startPayload));
+    }
+  }
+
+  // Lancement du flux vidéo P2P vers l'invité (Mode Remote Play Stream 60 FPS)
+  startVideoStream(stream) {
+    if (!this.peer || !this.remotePeerId) {
+      console.warn('[Netplay PeerJS] Impossible de lancer le stream : peer ou remotePeerId manquant');
+      return;
+    }
+    console.log('[Netplay PeerJS] Lancement de l\'appel vidéo WebRTC P2P vers l\'invité :', this.remotePeerId);
+    try {
+      const call = this.peer.call(this.remotePeerId, stream);
+      call.on('error', (err) => console.warn('[Netplay PeerJS] Erreur media call:', err));
+    } catch(e) {
+      console.warn('[Netplay PeerJS] Erreur startVideoStream:', e);
     }
   }
 
