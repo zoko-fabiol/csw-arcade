@@ -15,14 +15,29 @@ import {
 
 const RTC_CONFIG = {
   iceServers: [
+    // 1. STUN Google & Cloudflare (Découverte IP / Port)
     { urls: 'stun:stun.l.google.com:19302' },
     { urls: 'stun:stun1.l.google.com:19302' },
     { urls: 'stun:stun2.l.google.com:19302' },
     { urls: 'stun:stun3.l.google.com:19302' },
     { urls: 'stun:stun4.l.google.com:19302' },
-    { urls: 'stun:stun.cloudflare.com:3478' }
+    { urls: 'stun:stun.cloudflare.com:3478' },
+    { urls: 'stun:openrelay.metered.ca:80' },
+
+    // 2. TURN Relais OpenRelay (Metered) - Contourne les Box Wi-Fi résidentielles (NAT Symétriques)
+    {
+      urls: [
+        'turn:openrelay.metered.ca:80',
+        'turn:openrelay.metered.ca:443',
+        'turn:openrelay.metered.ca:443?transport=tcp',
+        'turns:openrelay.metered.ca:443?transport=tcp'
+      ],
+      username: 'openrelayproject',
+      credential: 'openrelayproject'
+    }
   ],
-  iceCandidatePoolSize: 10
+  iceCandidatePoolSize: 10,
+  iceTransportPolicy: 'all'
 };
 
 class NetplayService {
@@ -1044,7 +1059,17 @@ class NetplayService {
           if (msg.type === 'ROOM_SYNC' && !isHost) {
             if (msg.room) {
               this.currentRoom = { ...this.currentRoom, ...msg.room };
+              this.myPlayerIndex = 1;
+              this.myRole = 'p2';
               this.emit('room_update', this.currentRoom);
+              this.emit('joined_success', {
+                roomCode: this.currentRoom.code,
+                gameId: this.currentRoom.gameId,
+                gameTitle: this.currentRoom.gameTitle,
+                playerIndex: this.myPlayerIndex,
+                role: this.myRole,
+                players: this.currentRoom.players
+              });
             }
           }
 
@@ -1116,6 +1141,16 @@ class NetplayService {
       const pc = new RTCPeerConnection(RTC_CONFIG);
       this.pc = pc;
 
+      // Émission continue des candidats ICE (STUN & TURN Relais) vers le pair distant
+      pc.onicecandidate = (event) => {
+        if (event.candidate) {
+          this.sendNtfySignal(topic, {
+            type: 'ICE_CANDIDATE',
+            candidate: event.candidate.toJSON ? event.candidate.toJSON() : event.candidate
+          });
+        }
+      };
+
       const fastDc = pc.createDataChannel('csw-fast-inputs', {
         ordered: false,
         maxRetransmits: 0
@@ -1143,14 +1178,14 @@ class NetplayService {
       const offer = await pc.createOffer();
       await pc.setLocalDescription(offer);
 
-      // Attente compacte Vanilla ICE pour intégrer tous les candidats dans l'offre unique
+      // Attente compacte Vanilla ICE pour intégrer un maximum de candidats locaux et STUN
       await new Promise((resolve) => {
         if (pc.iceGatheringState === 'complete') return resolve();
         const check = () => {
           if (pc.iceGatheringState === 'complete') resolve();
         };
         pc.onicegatheringstatechange = check;
-        setTimeout(resolve, 600);
+        setTimeout(resolve, 1000);
       });
 
       this.sendNtfySignal(topic, {
@@ -1170,6 +1205,16 @@ class NetplayService {
       }
       const pc = new RTCPeerConnection(RTC_CONFIG);
       this.pc = pc;
+
+      // Émission continue des candidats ICE (STUN & TURN Relais) vers l'hôte
+      pc.onicecandidate = (event) => {
+        if (event.candidate) {
+          this.sendNtfySignal(topic, {
+            type: 'ICE_CANDIDATE',
+            candidate: event.candidate.toJSON ? event.candidate.toJSON() : event.candidate
+          });
+        }
+      };
 
       pc.ondatachannel = (event) => {
         const dc = event.channel;
@@ -1198,14 +1243,14 @@ class NetplayService {
       const answer = await pc.createAnswer();
       await pc.setLocalDescription(answer);
 
-      // Attente compacte Vanilla ICE pour intégrer tous les candidats dans la réponse unique
+      // Attente compacte Vanilla ICE pour intégrer les candidats dans la réponse
       await new Promise((resolve) => {
         if (pc.iceGatheringState === 'complete') return resolve();
         const check = () => {
           if (pc.iceGatheringState === 'complete') resolve();
         };
         pc.onicegatheringstatechange = check;
-        setTimeout(resolve, 600);
+        setTimeout(resolve, 1000);
       });
 
       this.sendNtfySignal(topic, {
@@ -1671,8 +1716,9 @@ class NetplayService {
       this.myRole = 'p1';
       this.playerName = hostName;
 
-      // 1. Initialiser le salon Hôte PeerJS (Zero Quota, Zero 429)
+      // 1. Initialiser le salon Hôte PeerJS (Zero Quota, Zero 429) et le tunnel de signalisation Ntfy
       this.setupPeerConnection(roomCode, true, hostName);
+      this.setupNtfySignaling(roomCode, true, hostName);
 
       // 2. Publier immédiatement le salon dans l'API de découverte Vercel / LAN
       try {
@@ -1782,18 +1828,29 @@ class NetplayService {
     return new Promise((resolve, reject) => {
       let settled = false;
 
+      // Délai étendu à 20 secondes pour permettre la traversée des Box Wi-Fi et relais TURN
       const timer = setTimeout(() => {
         if (!settled) {
           settled = true;
           cleanup();
-          reject(new Error(`Délai dépassé (10s). Impossible de joindre l'hôte du salon ${cleanCode}. Vérifiez que le code est exact et que l'hôte a bien son salon ouvert.`));
+          reject(new Error(`Délai dépassé (20s). Impossible de joindre l'hôte du salon ${cleanCode}. Vérifiez que le code est exact et que l'hôte a bien son salon ouvert.`));
         }
-      }, 10000);
+      }, 20000);
+
+      // Relance automatique de signalisation à mi-parcours (7s) si toujours en attente
+      const retryTimer = setTimeout(() => {
+        if (!settled && !this.isP2PConnected) {
+          console.log(`[Netplay Cloud] Négociation P2P/TURN en cours... Relance du signal pour ${cleanCode}`);
+          try {
+            this.setupPeerConnection(cleanCode, false, playerName);
+            this.setupNtfySignaling(cleanCode, false, playerName);
+          } catch(e) {}
+        }
+      }, 7000);
 
       const onSuccess = (data) => {
         if (!settled) {
           settled = true;
-          clearTimeout(timer);
           cleanup();
           resolve(data);
         }
@@ -1802,7 +1859,6 @@ class NetplayService {
       const onError = (err) => {
         if (!settled) {
           settled = true;
-          clearTimeout(timer);
           cleanup();
           const msg = typeof err === 'string' ? err : (err?.message || 'Échec de connexion au salon');
           reject(new Error(msg));
@@ -1810,6 +1866,8 @@ class NetplayService {
       };
 
       const cleanup = () => {
+        clearTimeout(timer);
+        clearTimeout(retryTimer);
         this.off('joined_success', onSuccess);
         this.off('error', onError);
       };
@@ -1817,8 +1875,9 @@ class NetplayService {
       this.on('joined_success', onSuccess);
       this.on('error', onError);
 
-      console.log(`[Netplay Cloud] Tentative de connexion directe P2P vers le salon ${cleanCode}...`);
+      console.log(`[Netplay Cloud] Tentative de connexion P2P / Relais TURN vers le salon ${cleanCode}...`);
       this.setupPeerConnection(cleanCode, false, playerName);
+      this.setupNtfySignaling(cleanCode, false, playerName);
     });
   }
 

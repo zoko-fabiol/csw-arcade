@@ -877,6 +877,13 @@ export function NetplayModal({
                         )}
                       </button>
                     </div>
+
+                    {isProcessing && (
+                      <div className="mt-2.5 p-2.5 rounded-xl bg-cyan-950/50 border border-cyan-500/40 text-cyan-300 text-[11px] flex items-center gap-2 animate-pulse">
+                        <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping shrink-0" />
+                        <span>Connexion en cours... Traversée des Box Wi-Fi et relais TURN mondiaux actifs...</span>
+                      </div>
+                    )}
                   </div>
 
                   {/* Option Manette Sans Fil Mobile */}
