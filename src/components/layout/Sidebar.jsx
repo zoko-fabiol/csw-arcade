@@ -11,7 +11,14 @@ import {
   RefreshCw,
   Radio,
   Download,
-  X
+  X,
+  Zap,
+  Swords,
+  Crosshair,
+  Rocket,
+  Trophy,
+  Puzzle,
+  Footprints
 } from 'lucide-react';
 import { useDeviceType } from '../../utils/deviceDetector';
 
@@ -30,15 +37,15 @@ export function Sidebar({
   onCloseMobile
 }) {
   const genres = [
-    { id: 'Tous les Jeux', full: 'Tous les Jeux', short: 'Tous les Jeux' },
-    { id: 'Disponibles', full: 'Disponibles (Prêts)', short: 'Disponibles' },
-    { id: 'Versus Fighting', full: 'Versus Fighting', short: 'VS Fighting' },
-    { id: 'Run and Gun', full: 'Run and Gun', short: 'Run & Gun' },
-    { id: "Shoot 'em up", full: "Shoot 'em up", short: 'Shmup' },
-    { id: 'Sports / Arcade', full: 'Sports / Arcade', short: 'Sports' },
-    { id: "Beat 'em up", full: "Beat 'em up", short: "Beat'em up" },
-    { id: 'Puzzle / Maze', full: 'Puzzle / Maze', short: 'Puzzle' },
-    { id: 'Platformer / Action', full: 'Platformer / Action', short: 'Plateforme' }
+    { id: 'Tous les Jeux', full: 'Tous les Jeux', short: 'Tous', icon: Gamepad2, color: 'text-cyan-400' },
+    { id: 'Disponibles', full: 'Disponibles (Prêts)', short: 'Disponibles', icon: Zap, color: 'text-amber-400' },
+    { id: 'Versus Fighting', full: 'Versus Fighting', short: 'VS Fighting', icon: Swords, color: 'text-rose-400' },
+    { id: 'Run and Gun', full: 'Run and Gun', short: 'Run & Gun', icon: Crosshair, color: 'text-orange-400' },
+    { id: "Shoot 'em up", full: "Shoot 'em up", short: 'Shmup', icon: Rocket, color: 'text-purple-400' },
+    { id: 'Sports / Arcade', full: 'Sports / Arcade', short: 'Sports', icon: Trophy, color: 'text-emerald-400' },
+    { id: "Beat 'em up", full: "Beat 'em up", short: "Beat'em up", icon: Flame, color: 'text-red-400' },
+    { id: 'Puzzle / Maze', full: 'Puzzle / Maze', short: 'Puzzle', icon: Puzzle, color: 'text-sky-400' },
+    { id: 'Platformer / Action', full: 'Platformer / Action', short: 'Plateforme', icon: Footprints, color: 'text-teal-400' }
   ];
 
   const { isMobile } = useDeviceType();
@@ -187,6 +194,7 @@ export function Sidebar({
           </span>
           {genres.map((genre) => {
             const isActive = selectedGenre === genre.id;
+            const Icon = genre.icon;
             return (
               <button
                 key={genre.id}
@@ -197,7 +205,10 @@ export function Sidebar({
                     : 'text-neutral-400 hover:bg-neutral-800/60 hover:text-neutral-200 border border-transparent'
                 }`}
               >
-                <span className="truncate">{genre.full}</span>
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <Icon className={`w-3.5 h-3.5 shrink-0 ${isActive ? 'text-cyan-400' : genre.color}`} />
+                  <span className="truncate">{genre.full}</span>
+                </div>
                 {isActive && (
                   <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 shadow-sm shadow-cyan-400 shrink-0" />
                 )}
