@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   Gamepad2, 
   Users, 
@@ -43,6 +43,34 @@ export function Sidebar({
 
   const { isMobile } = useDeviceType();
   const [deferredPrompt, setDeferredPrompt] = useState(null);
+  const touchStartX = useRef(null);
+
+  // Fermeture rapide avec la touche Échap sur mobile
+  useEffect(() => {
+    if (!isOpenMobile) return;
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape' && typeof onCloseMobile === 'function') {
+        onCloseMobile();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpenMobile, onCloseMobile]);
+
+  // Gestes tactiles pour fermer en balayant vers la gauche
+  const handleTouchStart = (e) => {
+    touchStartX.current = e.touches[0].clientX;
+  };
+
+  const handleTouchEnd = (e) => {
+    if (touchStartX.current === null) return;
+    const touchEndX = e.changedTouches[0].clientX;
+    const diffX = touchStartX.current - touchEndX;
+    if (diffX > 45 && typeof onCloseMobile === 'function') {
+      onCloseMobile();
+    }
+    touchStartX.current = null;
+  };
 
   useEffect(() => {
     const handleBeforeInstallPrompt = (e) => {
@@ -256,8 +284,12 @@ export function Sidebar({
             className="fixed inset-0 bg-black/80 backdrop-blur-sm transition-opacity"
             onClick={onCloseMobile}
           />
-          {/* Tiroir coulissant */}
-          <div className="relative w-72 max-w-[85vw] bg-neutral-900 border-r border-neutral-800 h-full shadow-2xl z-10 animate-in slide-in-from-left duration-200">
+          {/* Tiroir coulissant avec support swipe-to-close */}
+          <div 
+            onTouchStart={handleTouchStart}
+            onTouchEnd={handleTouchEnd}
+            className="relative w-72 max-w-[85vw] bg-neutral-900 border-r border-neutral-800 h-full shadow-2xl z-10 animate-in slide-in-from-left duration-200"
+          >
             {content}
           </div>
         </div>

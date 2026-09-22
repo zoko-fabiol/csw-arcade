@@ -116,8 +116,15 @@ export function EmulatorCore({
     }
   };
 
-  // Quitter le jeu et nettoyer la session netplay
+  const [showQuitConfirm, setShowQuitConfirm] = useState(false);
+
+  // Demande de confirmation avant de quitter pour éviter les clics accidentels
   const handleExitGame = () => {
+    setShowQuitConfirm(true);
+  };
+
+  const handleConfirmExit = () => {
+    setShowQuitConfirm(false);
     if (mode === 'netplay') {
       try {
         netplayService.leaveRoom();
@@ -505,6 +512,11 @@ export function EmulatorCore({
       const tag = document.activeElement?.tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA') return;
 
+      if (e.key === 'Escape') {
+        setShowQuitConfirm(prev => !prev);
+        return;
+      }
+
       if (iframeRef.current?.contentWindow) {
         iframeRef.current.contentWindow.postMessage({
           type: 'KEY_EVENT',
@@ -759,7 +771,7 @@ export function EmulatorCore({
               {interrupted.message || "L'autre joueur a quitté la partie ou a été déconnecté. La session est terminée."}
             </p>
             <button
-              onClick={handleExitGame}
+              onClick={handleConfirmExit}
               className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white font-bold tracking-wide shadow-lg shadow-red-600/30 active:scale-95 transition-all text-xs sm:text-sm uppercase flex items-center justify-center gap-2 font-sans"
             >
               <ArrowLeft className="w-4 h-4" />
@@ -782,6 +794,45 @@ export function EmulatorCore({
           }}
           onClose={() => setShowDebugOverlay(false)}
         />
+      )}
+
+      {/* Modal de Confirmation de Sortie de Jeu */}
+      {showQuitConfirm && (
+        <div 
+          className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-in fade-in cursor-pointer select-none"
+          onClick={() => setShowQuitConfirm(false)}
+        >
+          <div 
+            className="p-5 max-w-xs w-full bg-neutral-900 border border-neutral-700 rounded-2xl shadow-2xl text-center space-y-4 font-mono cursor-default"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="w-12 h-12 rounded-full bg-rose-500/20 border border-rose-500/40 text-rose-400 flex items-center justify-center mx-auto">
+              <ArrowLeft className="w-6 h-6" />
+            </div>
+            <div>
+              <h4 className="text-sm font-bold text-white uppercase tracking-wider">Quitter la partie ?</h4>
+              <p className="text-xs text-neutral-400 mt-1">
+                {mode === 'netplay' 
+                  ? 'Vous allez quitter le salon multijoueur en cours.' 
+                  : 'Votre progression non sauvegardée sera perdue.'}
+              </p>
+            </div>
+            <div className="grid grid-cols-2 gap-2 pt-1">
+              <button
+                onClick={() => setShowQuitConfirm(false)}
+                className="py-2.5 px-3 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-neutral-300 font-bold text-xs transition-colors"
+              >
+                Annuler
+              </button>
+              <button
+                onClick={handleConfirmExit}
+                className="py-2.5 px-3 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs transition-colors shadow-lg shadow-rose-600/30"
+              >
+                Quitter
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

@@ -31,6 +31,18 @@ export function RemoteStreamPlayer({
   const [windowOrientation, setWindowOrientation] = useState(() => 
     typeof window !== 'undefined' && window.innerHeight > window.innerWidth ? 'portrait' : 'landscape'
   );
+  const [showQuitConfirm, setShowQuitConfirm] = useState(false);
+
+  // Écouteur Échap pour demander confirmation de sortie
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        setShowQuitConfirm(prev => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   // Détection réactive de l'orientation mobile
   useEffect(() => {
@@ -265,6 +277,11 @@ export function RemoteStreamPlayer({
   };
 
   const handleExit = () => {
+    setShowQuitConfirm(true);
+  };
+
+  const handleConfirmExit = () => {
+    setShowQuitConfirm(false);
     netplayService.leaveRoom();
     onExit();
   };
@@ -420,6 +437,41 @@ export function RemoteStreamPlayer({
               isPortraitPad={false}
             />
           )}
+        </div>
+      )}
+
+      {/* Modal de Confirmation de Sortie de Jeu */}
+      {showQuitConfirm && (
+        <div 
+          className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-in fade-in cursor-pointer select-none"
+          onClick={() => setShowQuitConfirm(false)}
+        >
+          <div 
+            className="p-5 max-w-xs w-full bg-neutral-900 border border-neutral-700 rounded-2xl shadow-2xl text-center space-y-4 font-mono cursor-default"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="w-12 h-12 rounded-full bg-rose-500/20 border border-rose-500/40 text-rose-400 flex items-center justify-center mx-auto">
+              <ArrowLeft className="w-6 h-6" />
+            </div>
+            <div>
+              <h4 className="text-sm font-bold text-white uppercase tracking-wider">Quitter la partie ?</h4>
+              <p className="text-xs text-neutral-400 mt-1">Vous allez vous déconnecter de la session multijoueur en cours.</p>
+            </div>
+            <div className="grid grid-cols-2 gap-2 pt-1">
+              <button
+                onClick={() => setShowQuitConfirm(false)}
+                className="py-2.5 px-3 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-neutral-300 font-bold text-xs transition-colors"
+              >
+                Annuler
+              </button>
+              <button
+                onClick={handleConfirmExit}
+                className="py-2.5 px-3 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs transition-colors shadow-lg shadow-rose-600/30"
+              >
+                Quitter
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

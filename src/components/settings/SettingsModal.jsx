@@ -84,6 +84,20 @@ export function SettingsModal({
     };
   }, [listeningAction, activePlayer, updateKeyBinding]);
 
+  // Fermeture rapide avec la touche Échap si pas en cours de remapping
+  useEffect(() => {
+    if (!isOpen || listeningAction) return;
+
+    const handleEscape = (e) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+
+    window.addEventListener('keydown', handleEscape);
+    return () => window.removeEventListener('keydown', handleEscape);
+  }, [isOpen, listeningAction, onClose]);
+
   if (!isOpen) return null;
 
   const controlLabels = [
@@ -100,8 +114,14 @@ export function SettingsModal({
   ];
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-md p-2 sm:p-4 font-mono select-none">
-      <div className="relative w-full max-w-3xl bg-neutral-900 border border-neutral-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh]">
+    <div 
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-md p-2 sm:p-4 font-mono select-none cursor-pointer"
+      onClick={onClose}
+    >
+      <div 
+        className="relative w-full max-w-3xl bg-neutral-900 border border-neutral-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh] cursor-default"
+        onClick={(e) => e.stopPropagation()}
+      >
         
         {/* Header Modale */}
         <div className="p-3.5 sm:p-5 border-b border-neutral-800 flex items-center justify-between bg-neutral-950/60">

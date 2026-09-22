@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   Users, Wifi, Gamepad2, Radio, QrCode, Copy, Check, 
   X, Play, ShieldAlert, ArrowRight, RefreshCw, Smartphone, Globe,
-  Crown, Zap, Clock
+  Crown, Zap, Clock, Share2
 } from 'lucide-react';
 import { netplayService } from '../../services/NetplayService';
 
@@ -237,6 +237,42 @@ export function NetplayModal({
     } catch(e) {}
   };
 
+  const handleShareRoom = async (urlToShare) => {
+    const targetUrl = urlToShare || shareRoomUrl;
+    const shareData = {
+      title: 'CSW-Arcade - Rejoins ma partie !',
+      text: `Viens me défier sur ${activeRoom?.gameTitle || selectedGame?.title || 'CSW-Arcade'} ! Code salon : ${activeRoom?.code || ''}`,
+      url: targetUrl
+    };
+    if (typeof navigator !== 'undefined' && navigator.share) {
+      try {
+        await navigator.share(shareData);
+      } catch (err) {
+        if (err.name !== 'AbortError') {
+          handleCopyCode(targetUrl);
+        }
+      }
+    } else {
+      handleCopyCode(targetUrl);
+    }
+  };
+
+  // Fermeture rapide avec la touche Échap
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        if (showQrModal) {
+          setShowQrModal(false);
+        } else {
+          onClose();
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, showQrModal, onClose]);
+
   const handleStartHostedGame = () => {
     netplayService.startGame(selectedGame, { playMode });
     if (onLaunchGame && selectedGame) {
@@ -254,8 +290,14 @@ export function NetplayModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/80 backdrop-blur-md animate-in fade-in font-mono">
-      <div className="relative w-full max-w-xl bg-neutral-900 border border-cyan-500/50 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+    <div 
+      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/80 backdrop-blur-md animate-in fade-in font-mono cursor-pointer"
+      onClick={onClose}
+    >
+      <div 
+        className="relative w-full max-w-xl bg-neutral-900 border border-cyan-500/50 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] cursor-default"
+        onClick={(e) => e.stopPropagation()}
+      >
         
         {/* Entête Modal */}
         <div className="flex items-center justify-between px-5 py-3.5 bg-neutral-950 border-b border-neutral-800">
@@ -402,7 +444,15 @@ export function NetplayModal({
                     <span className="text-xs font-mono text-white select-all truncate block">{shareRoomUrl}</span>
                   </div>
                 </div>
-                <div className="flex items-center gap-1.5 shrink-0">
+                <div className="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">
+                  <button
+                    onClick={() => handleShareRoom(shareRoomUrl)}
+                    className="p-1 px-2.5 rounded bg-cyan-500 hover:bg-cyan-400 text-black font-bold transition-all shadow-sm flex items-center gap-1.5 text-[10px] active:scale-95"
+                    title="Partager le salon (WhatsApp / SMS / Discord)"
+                  >
+                    <Share2 className="w-3.5 h-3.5" />
+                    <span>Inviter</span>
+                  </button>
                   <button
                     onClick={() => handleCopyCode(shareRoomUrl)}
                     className="p-1 rounded bg-neutral-800 hover:bg-neutral-700 text-cyan-300 transition-colors flex items-center gap-1 text-[10px]"
@@ -917,10 +967,30 @@ export function NetplayModal({
           </div>
         )}
 
+        {/* Pied de Modale avec Bouton Fermer Ergonomique */}
+        <div className="p-3 sm:p-4 bg-neutral-950 border-t border-neutral-800 flex items-center justify-between shrink-0">
+          <span className="text-[10px] text-neutral-500 font-mono">
+            {activeRoom ? `Salon : ${activeRoom.code} (${activeRoom.maxPlayers}P)` : 'CSW-Arcade Netplay P2P'}
+          </span>
+          <button
+            onClick={onClose}
+            className="px-4 py-1.5 sm:py-2 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-neutral-300 hover:text-white font-bold text-xs transition-colors active:scale-95 flex items-center gap-1.5"
+          >
+            <X className="w-3.5 h-3.5" />
+            <span>Fermer [Échap]</span>
+          </button>
+        </div>
+
         {/* Modal QR Code Popup pour rejoindre sur mobile ou même Wi-Fi */}
         {showQrModal && (
-          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-in fade-in">
-            <div className="relative p-6 bg-neutral-900 border border-cyan-500/50 rounded-2xl flex flex-col items-center gap-4 shadow-2xl max-w-xs text-center w-full">
+          <div 
+            className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-in fade-in cursor-pointer"
+            onClick={() => setShowQrModal(false)}
+          >
+            <div 
+              className="relative p-6 bg-neutral-900 border border-cyan-500/50 rounded-2xl flex flex-col items-center gap-4 shadow-2xl max-w-xs text-center w-full cursor-default"
+              onClick={(e) => e.stopPropagation()}
+            >
               <div className="flex items-center justify-between w-full">
                 <span className="text-xs font-black uppercase text-cyan-300 tracking-wider flex items-center gap-1.5">
                   <QrCode className="w-4 h-4 text-cyan-400" />

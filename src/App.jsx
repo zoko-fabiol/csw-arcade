@@ -180,6 +180,7 @@ export default function App() {
       <GameLibrary
         games={gamesData}
         selectedGenre={selectedGenre}
+        onSelectGenre={setSelectedGenre}
         isBiosReady={isBiosReady}
         isRomAvailable={isRomAvailable}
         onLaunchSolo={handleLaunchSolo}

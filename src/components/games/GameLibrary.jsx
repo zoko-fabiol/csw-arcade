@@ -1,14 +1,39 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { Search, LayoutGrid, List, AlertOctagon, Terminal, Menu, UploadCloud, Check, HardDrive } from 'lucide-react';
+import { 
+  Search, 
+  LayoutGrid, 
+  List, 
+  AlertOctagon, 
+  Terminal, 
+  Menu, 
+  UploadCloud, 
+  Check, 
+  HardDrive,
+  X,
+  Dices
+} from 'lucide-react';
 import { GameCard } from './GameCard';
 import { GameListItem } from './GameListItem';
 import { romStorage } from '../../services/romStorage';
 
 const VIEW_MODE_STORAGE_KEY = 'csw_arcade_view_mode';
 
+const GENRE_PILLS = [
+  { id: 'Tous les Jeux', label: 'Tous', icon: '🎮' },
+  { id: 'Disponibles', label: 'Prêts', icon: '⚡' },
+  { id: 'Versus Fighting', label: 'VS Fighting', icon: '🥊' },
+  { id: 'Run and Gun', label: 'Run & Gun', icon: '🔫' },
+  { id: "Shoot 'em up", label: 'Shmup', icon: '🚀' },
+  { id: 'Sports / Arcade', label: 'Sports', icon: '⚽' },
+  { id: "Beat 'em up", label: "Beat'em up", icon: '👊' },
+  { id: 'Puzzle / Maze', label: 'Puzzle', icon: '🧩' },
+  { id: 'Platformer / Action', label: 'Plateforme', icon: '🏃' }
+];
+
 export function GameLibrary({
   games,
   selectedGenre,
+  onSelectGenre,
   isBiosReady,
   isRomAvailable,
   onLaunchSolo,
@@ -25,6 +50,15 @@ export function GameLibrary({
       return 'grid';
     }
   });
+
+  const handleRandomPlay = () => {
+    const pool = filteredGames.length > 0 ? filteredGames : games;
+    const readyPool = pool.filter(g => isRomAvailable(g.filename));
+    const targetPool = readyPool.length > 0 ? readyPool : pool;
+    if (targetPool.length === 0) return;
+    const randomGame = targetPool[Math.floor(Math.random() * targetPool.length)];
+    if (onLaunchSolo) onLaunchSolo(randomGame);
+  };
 
   const handleImportFiles = async (e) => {
     const files = e.target.files;
@@ -112,20 +146,39 @@ export function GameLibrary({
           </div>
         </div>
 
-        {/* Barre d'Outils Droite : Recherche & Sélecteur Grille / Liste */}
+        {/* Barre d'Outils Droite : Recherche, Aléatoire & Sélecteur Grille / Liste */}
         <div className="flex items-center gap-2 sm:gap-3 w-full sm:w-auto">
           
-          {/* Champ de Recherche Instantanée */}
+          {/* Champ de Recherche Instantanée avec Bouton Vider */}
           <div className="relative flex-1 min-w-0 sm:w-56 md:w-72 lg:w-80">
-            <Search className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-neutral-500 absolute left-3 top-1/2 -translate-y-1/2" />
+            <Search className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-neutral-500 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Rechercher (ex: kof, slug)..."
-              className="w-full pl-9 pr-3 py-1.5 sm:py-2 bg-neutral-900/90 border border-neutral-800 rounded-xl text-xs font-mono text-neutral-200 placeholder:text-neutral-500 focus:outline-none focus:border-cyan-500/80 focus:ring-1 focus:ring-cyan-500/50 transition-all"
+              className="w-full pl-9 pr-8 py-1.5 sm:py-2 bg-neutral-900/90 border border-neutral-800 rounded-xl text-xs font-mono text-neutral-200 placeholder:text-neutral-500 focus:outline-none focus:border-cyan-500/80 focus:ring-1 focus:ring-cyan-500/50 transition-all"
             />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery('')}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-white p-0.5 rounded transition-colors"
+                title="Effacer la recherche"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
           </div>
+
+          {/* Bouton Partie Rapide / Jeu Aléatoire */}
+          <button
+            onClick={handleRandomPlay}
+            title="Lancer un jeu aléatoire instantané"
+            className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 sm:py-2 bg-gradient-to-r from-amber-500/20 to-orange-500/20 hover:from-amber-500/30 hover:to-orange-500/30 border border-amber-500/40 rounded-xl text-xs font-mono text-amber-300 transition-all shrink-0 active:scale-95"
+          >
+            <Dices className="w-4 h-4 text-amber-400 shrink-0" />
+            <span className="hidden sm:inline font-bold">Aléatoire</span>
+          </button>
 
           {/* Importateur de ROMs vers stockage local */}
           <input
@@ -183,6 +236,31 @@ export function GameLibrary({
 
         </div>
       </header>
+
+      {/* Barre de Filtres Rapides Horizontale (Chips Défilables au Doigt sur Mobile & Desktop) */}
+      <div className="px-3 sm:px-5 py-2 bg-neutral-950 border-b border-neutral-800/60 flex items-center gap-1.5 sm:gap-2 overflow-x-auto no-scrollbar shrink-0 select-none">
+        {GENRE_PILLS.map((pill) => {
+          const isSelected = selectedGenre === pill.id || (pill.id === 'Tous les Jeux' && (!selectedGenre || selectedGenre === 'Tous'));
+          return (
+            <button
+              key={pill.id}
+              onClick={() => {
+                if (typeof onSelectGenre === 'function') {
+                  onSelectGenre(pill.id);
+                }
+              }}
+              className={`px-3 py-1 rounded-full text-xs font-mono whitespace-nowrap transition-all flex items-center gap-1.5 shrink-0 ${
+                isSelected
+                  ? 'bg-cyan-500 text-black font-bold shadow-md shadow-cyan-500/20 scale-105'
+                  : 'bg-neutral-900/90 text-neutral-400 hover:text-neutral-200 hover:bg-neutral-800 border border-neutral-800 active:scale-95'
+              }`}
+            >
+              <span className="text-[11px]">{pill.icon}</span>
+              <span>{pill.label}</span>
+            </button>
+          );
+        })}
+      </div>
 
       {/* Zone de Contenu Principale */}
       <main className="flex-1 overflow-y-auto p-2.5 sm:p-6 space-y-3.5 sm:space-y-6">
