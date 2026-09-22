@@ -12,7 +12,8 @@ import {
   Keyboard,
   Smartphone,
   Vibrate,
-  Eye
+  Eye,
+  Compass
 } from 'lucide-react';
 import { GamepadVisualizer } from './GamepadVisualizer';
 import { useDeviceType } from '../../utils/deviceDetector';
@@ -391,6 +392,46 @@ export function SettingsModal({
                           {item.label}
                         </button>
                       ))}
+                    </div>
+                  </div>
+
+                  {/* 4. Type de Joystick Directionnel */}
+                  <div className="p-3 bg-neutral-900/90 border border-neutral-800 rounded-xl space-y-2">
+                    <span className="font-bold text-neutral-200 block text-xs">Comportement de l'Analogue Directionnel</span>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        onClick={() => updateTouchSetting('joystickMode', 'floating')}
+                        className={`py-2 px-2.5 rounded-lg text-[11px] font-bold border text-left transition-all ${
+                          (settings.touch?.joystickMode ?? 'floating') === 'floating'
+                            ? 'bg-cyan-500/20 border-cyan-500 text-cyan-300 shadow-sm'
+                            : 'bg-neutral-950 border-neutral-800 text-neutral-400 hover:text-white'
+                        }`}
+                      >
+                        <span className="flex items-center gap-1.5 font-bold">
+                          <Compass className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+                          <span>Flottant Dynamique (Fortnite)</span>
+                        </span>
+                        <span className="text-[9px] text-neutral-400 font-normal block mt-0.5">
+                          Suit votre pouce n'importe où sur la zone gauche
+                        </span>
+                      </button>
+
+                      <button
+                        onClick={() => updateTouchSetting('joystickMode', 'fixed')}
+                        className={`py-2 px-2.5 rounded-lg text-[11px] font-bold border text-left transition-all ${
+                          (settings.touch?.joystickMode ?? 'floating') === 'fixed'
+                            ? 'bg-cyan-500/20 border-cyan-500 text-cyan-300 shadow-sm'
+                            : 'bg-neutral-950 border-neutral-800 text-neutral-400 hover:text-white'
+                        }`}
+                      >
+                        <span className="flex items-center gap-1.5 font-bold">
+                          <Gamepad2 className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+                          <span>Position Fixe</span>
+                        </span>
+                        <span className="text-[9px] text-neutral-400 font-normal block mt-0.5">
+                          Reste ancré à sa place prédéfinie
+                        </span>
+                      </button>
                     </div>
                   </div>
 

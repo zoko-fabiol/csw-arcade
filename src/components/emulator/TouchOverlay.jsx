@@ -188,22 +188,49 @@ export function TouchOverlay({
   }, [onInput, isEditMode, isStylusActive, triggerHaptic]);
 
   // Joystick analogique tactile 360° avec centrage par ressort et 8 directions Neo Geo
+  const isFloatingMode = (settings?.touch?.joystickMode ?? 'floating') === 'floating';
   const joystickRef = useRef(null);
   const [stickPos, setStickPos] = useState({ x: 0, y: 0 });
   const [isStickActive, setIsStickActive] = useState(false);
+  const [floatingOrigin, setFloatingOrigin] = useState(null); // { x, y } coordonnées écran du centre flottant
+  const floatingOriginRef = useRef(null);
   const activeTouchIdRef = useRef(null);
   const isCompactStickRef = useRef(false);
 
+  // Initialisation instantanée du joystick flottant à l'endroit du contact tactile
+  const startFloatingStick = useCallback((clientX, clientY, identifier, isCompact = false) => {
+    if (isEditMode || isStylusActive) return;
+    isCompactStickRef.current = isCompact;
+    activeTouchIdRef.current = identifier;
+    floatingOriginRef.current = { x: clientX, y: clientY };
+    setFloatingOrigin({ x: clientX, y: clientY });
+    setIsStickActive(true);
+    setStickPos({ x: 0, y: 0 });
+    setActiveDirections({ up: false, down: false, left: false, right: false });
+  }, [isEditMode, isStylusActive]);
+
   const handleStickMove = useCallback((clientX, clientY, isCompact = false) => {
-    if (isEditMode || isStylusActive || !joystickRef.current) return;
-    const rect = joystickRef.current.getBoundingClientRect();
-    const centerX = rect.left + rect.width / 2;
-    const centerY = rect.top + rect.height / 2;
+    if (isEditMode || isStylusActive) return;
+
+    let centerX = 0;
+    let centerY = 0;
+    const isFloating = isFloatingMode && floatingOriginRef.current !== null;
+
+    if (isFloating) {
+      centerX = floatingOriginRef.current.x;
+      centerY = floatingOriginRef.current.y;
+    } else {
+      if (!joystickRef.current) return;
+      const rect = joystickRef.current.getBoundingClientRect();
+      centerX = rect.left + rect.width / 2;
+      centerY = rect.top + rect.height / 2;
+    }
 
     const dx = clientX - centerX;
     const dy = clientY - centerY;
     const distance = Math.hypot(dx, dy);
-    const maxRadius = isCompact ? 34 : 42;
+    const maxRadius = isCompact ? 34 : 44;
+    const maxFollowRadius = maxRadius + 14;
 
     // Déplacement visuel bridé au rayon maximum du socle
     let clampedX = dx;
@@ -213,11 +240,26 @@ export function TouchOverlay({
       clampedY = (dy / distance) * maxRadius;
     }
 
+    // Suivi dynamique de socle (Smooth Follow style Fortnite / COD Mobile) :
+    // Quand le pouce se déplace loin, le socle glisse doucement vers le doigt
+    // pour garantir une réversibilité immédiate sans latence de retour
+    if (isFloating && distance > maxFollowRadius) {
+      const excess = distance - maxFollowRadius;
+      const nx = dx / distance;
+      const ny = dy / distance;
+      const newOrigin = {
+        x: floatingOriginRef.current.x + nx * excess,
+        y: floatingOriginRef.current.y + ny * excess
+      };
+      floatingOriginRef.current = newOrigin;
+      setFloatingOrigin(newOrigin);
+    }
+
     setStickPos({ x: clampedX, y: clampedY });
     setIsStickActive(true);
 
     // Détection de zone morte et mapping 8 directions Neo Geo RetroPad
-    const deadzone = maxRadius * 0.28;
+    const deadzone = maxRadius * 0.25;
     if (distance < deadzone) {
       setActiveDirections({ up: false, down: false, left: false, right: false });
       triggerInput(RETROPAD.UP, false, true);
@@ -240,12 +282,14 @@ export function TouchOverlay({
     triggerInput(RETROPAD.DOWN, down, true);
     triggerInput(RETROPAD.LEFT, left, true);
     triggerInput(RETROPAD.RIGHT, right, true);
-  }, [isEditMode, isStylusActive, triggerInput]);
+  }, [isEditMode, isStylusActive, isFloatingMode, triggerInput]);
 
   const handleStickRelease = useCallback(() => {
     setStickPos({ x: 0, y: 0 });
     setIsStickActive(false);
     activeTouchIdRef.current = null;
+    floatingOriginRef.current = null;
+    setFloatingOrigin(null);
     setActiveDirections({ up: false, down: false, left: false, right: false });
     triggerInput(RETROPAD.UP, false, true);
     triggerInput(RETROPAD.DOWN, false, true);
@@ -261,6 +305,7 @@ export function TouchOverlay({
       if (activeTouchIdRef.current === null) return;
       for (let i = 0; i < e.touches.length; i++) {
         if (e.touches[i].identifier === activeTouchIdRef.current) {
+          if (e.cancelable) e.preventDefault();
           handleStickMove(e.touches[i].clientX, e.touches[i].clientY, isCompactStickRef.current);
           break;
         }
@@ -448,31 +493,49 @@ export function TouchOverlay({
   );
 
   // Rendu du Joystick Analogique Virtuel Arcade 360°
-  const renderAnalogStick = (isCompact = false) => {
-    isCompactStickRef.current = isCompact;
-    const baseSize = isCompact ? 'w-36 h-36' : 'w-42 h-42';
+  const renderAnalogStick = (isCompact = false, isFloatingInstance = false) => {
+    if (!isFloatingInstance) {
+      isCompactStickRef.current = isCompact;
+    }
+    const baseSize = isCompact ? 'w-36 h-36' : 'w-40 h-40';
     const stickSize = isCompact ? 'w-14 h-14' : 'w-16 h-16';
 
     const onStickTouchStart = (e) => {
       if (isEditMode || isStylusActive) return;
       e.preventDefault();
       const touch = e.touches[0];
-      activeTouchIdRef.current = touch.identifier;
-      handleStickMove(touch.clientX, touch.clientY, isCompact);
+      if (isFloatingMode) {
+        startFloatingStick(touch.clientX, touch.clientY, touch.identifier, isCompact);
+      } else {
+        activeTouchIdRef.current = touch.identifier;
+        handleStickMove(touch.clientX, touch.clientY, isCompact);
+      }
     };
 
     const onStickMouseDown = (e) => {
       if (isEditMode || isStylusActive) return;
-      activeTouchIdRef.current = 'mouse';
-      handleStickMove(e.clientX, e.clientY, isCompact);
+      if (isFloatingMode) {
+        startFloatingStick(e.clientX, e.clientY, 'mouse', isCompact);
+      } else {
+        activeTouchIdRef.current = 'mouse';
+        handleStickMove(e.clientX, e.clientY, isCompact);
+      }
     };
+
+    const isCurrentActive = isFloatingInstance ? isStickActive : (!isFloatingMode && isStickActive);
+    const currentStickPos = isFloatingInstance ? stickPos : (!isFloatingMode ? stickPos : { x: 0, y: 0 });
+    const currentDirs = isFloatingInstance ? activeDirections : (!isFloatingMode ? activeDirections : { up: false, down: false, left: false, right: false });
 
     return (
       <div
-        ref={joystickRef}
-        onTouchStart={onStickTouchStart}
-        onMouseDown={onStickMouseDown}
-        className={`relative ${baseSize} rounded-full border-2 border-cyan-500/40 bg-gradient-to-b from-neutral-900/95 via-neutral-950/95 to-black/95 shadow-2xl backdrop-blur-md select-none touch-none flex items-center justify-center`}
+        ref={isFloatingInstance ? null : joystickRef}
+        onTouchStart={isFloatingInstance ? undefined : onStickTouchStart}
+        onMouseDown={isFloatingInstance ? undefined : onStickMouseDown}
+        className={`relative ${baseSize} rounded-full border-2 transition-all duration-100 ${
+          isFloatingInstance
+            ? 'border-cyan-400 bg-gradient-to-b from-neutral-900/98 via-neutral-950/98 to-black/98 shadow-[0_0_35px_rgba(6,182,212,0.45)] ring-2 ring-cyan-500/30'
+            : 'border-cyan-500/40 bg-gradient-to-b from-neutral-900/95 via-neutral-950/95 to-black/95 shadow-2xl'
+        } backdrop-blur-md select-none touch-none flex items-center justify-center`}
       >
         {/* Anneau de guidage concentrique */}
         <div className="absolute inset-2 rounded-full border border-neutral-700/40 pointer-events-none" />
@@ -480,16 +543,16 @@ export function TouchOverlay({
 
         {/* Indicateurs directionnels cardinaux lumineux */}
         <div className={`absolute top-1.5 left-1/2 -translate-x-1/2 text-[10px] font-bold transition-all pointer-events-none ${
-          activeDirections.up ? 'text-cyan-300 scale-125 drop-shadow-[0_0_8px_rgba(6,182,212,0.9)]' : 'text-neutral-600'
+          currentDirs.up ? 'text-cyan-300 scale-125 drop-shadow-[0_0_8px_rgba(6,182,212,0.9)]' : 'text-neutral-600'
         }`}>▲</div>
         <div className={`absolute bottom-1.5 left-1/2 -translate-x-1/2 text-[10px] font-bold transition-all pointer-events-none ${
-          activeDirections.down ? 'text-cyan-300 scale-125 drop-shadow-[0_0_8px_rgba(6,182,212,0.9)]' : 'text-neutral-600'
+          currentDirs.down ? 'text-cyan-300 scale-125 drop-shadow-[0_0_8px_rgba(6,182,212,0.9)]' : 'text-neutral-600'
         }`}>▼</div>
         <div className={`absolute left-1.5 top-1/2 -translate-y-1/2 text-[10px] font-bold transition-all pointer-events-none ${
-          activeDirections.left ? 'text-cyan-300 scale-125 drop-shadow-[0_0_8px_rgba(6,182,212,0.9)]' : 'text-neutral-600'
+          currentDirs.left ? 'text-cyan-300 scale-125 drop-shadow-[0_0_8px_rgba(6,182,212,0.9)]' : 'text-neutral-600'
         }`}>◀</div>
         <div className={`absolute right-1.5 top-1/2 -translate-y-1/2 text-[10px] font-bold transition-all pointer-events-none ${
-          activeDirections.right ? 'text-cyan-300 scale-125 drop-shadow-[0_0_8px_rgba(6,182,212,0.9)]' : 'text-neutral-600'
+          currentDirs.right ? 'text-cyan-300 scale-125 drop-shadow-[0_0_8px_rgba(6,182,212,0.9)]' : 'text-neutral-600'
         }`}>▶</div>
 
         {/* Zone morte centrale */}
@@ -498,10 +561,10 @@ export function TouchOverlay({
         {/* Tête de stick analogique 3D déplaçable avec ressort */}
         <div
           style={{
-            transform: `translate(calc(-50% + ${stickPos.x}px), calc(-50% + ${stickPos.y}px))`
+            transform: `translate(calc(-50% + ${currentStickPos.x}px), calc(-50% + ${currentStickPos.y}px))`
           }}
           className={`absolute top-1/2 left-1/2 ${stickSize} rounded-full border-2 border-cyan-400/90 shadow-xl pointer-events-none flex items-center justify-center ${
-            isStickActive 
+            isCurrentActive 
               ? 'bg-gradient-to-b from-neutral-700 via-neutral-800 to-neutral-950 shadow-cyan-400/40 scale-105 transition-none' 
               : 'bg-gradient-to-b from-neutral-800 via-neutral-900 to-black shadow-black/80 transition-transform duration-150 ease-out'
           }`}
@@ -510,7 +573,7 @@ export function TouchOverlay({
           <div className="w-8 h-8 rounded-full bg-gradient-to-b from-neutral-900 to-neutral-950 border border-neutral-600/60 shadow-inner flex items-center justify-center">
             {/* LED centrale néon */}
             <div className={`w-2.5 h-2.5 rounded-full transition-all ${
-              isStickActive ? 'bg-cyan-300 shadow-[0_0_10px_rgba(6,182,212,1)] scale-110' : 'bg-cyan-600/70'
+              isCurrentActive ? 'bg-cyan-300 shadow-[0_0_10px_rgba(6,182,212,1)] scale-110' : 'bg-cyan-600/70'
             }`} />
           </div>
         </div>
@@ -728,16 +791,52 @@ export function TouchOverlay({
             </div>
           )}
 
-          {/* Joystick analogique tactile 360° gauche */}
-          <div className="flex items-center justify-center">
-            {renderAnalogStick(true)}
+          {/* Joystick analogique tactile 360° gauche avec zone réceptive dynamique */}
+          <div className="relative w-1/2 h-full flex items-center justify-center">
+            {isFloatingMode && !isStylusActive && (
+              <div
+                className="absolute inset-0 z-20 pointer-events-auto touch-none select-none"
+                onTouchStart={(e) => {
+                  if (activeTouchIdRef.current !== null || isStylusActive) return;
+                  e.preventDefault();
+                  const touch = e.changedTouches[0];
+                  if (touch) {
+                    startFloatingStick(touch.clientX, touch.clientY, touch.identifier, true);
+                  }
+                }}
+                onMouseDown={(e) => {
+                  if (activeTouchIdRef.current !== null || isStylusActive) return;
+                  startFloatingStick(e.clientX, e.clientY, 'mouse', true);
+                }}
+              />
+            )}
+            <div className={`transition-opacity duration-150 ${isFloatingMode && isStickActive ? 'opacity-20 scale-95' : 'opacity-100'}`}>
+              {renderAnalogStick(true, false)}
+            </div>
           </div>
 
           {/* Boutons arcade droite */}
-          <div className="flex items-center justify-center">
+          <div className="w-1/2 h-full flex items-center justify-center">
             {renderActionButtons(true)}
           </div>
         </div>
+
+        {/* Joystick Flottant Dynamique actif sous le pouce en mode Portrait Pad */}
+        {isFloatingMode && isStickActive && floatingOrigin && (
+          <div
+            style={{
+              position: 'fixed',
+              left: `${floatingOrigin.x}px`,
+              top: `${floatingOrigin.y}px`,
+              transform: 'translate(-50%, -50%)',
+              zIndex: 70,
+              pointerEvents: 'none'
+            }}
+            className="select-none touch-none animate-in fade-in zoom-in-90 duration-75"
+          >
+            {renderAnalogStick(true, true)}
+          </div>
+        )}
       </div>
     );
   }
@@ -776,6 +875,25 @@ export function TouchOverlay({
         )}
       </div>
 
+      {/* ZONE TACTILE GAUCHE PLEIN ÉCRAN (JOYSTICK FLOTTANT DYNAMIQUE FORTNITE) */}
+      {isFloatingMode && !isEditMode && (
+        <div
+          className="absolute top-16 bottom-0 left-0 w-1/2 pointer-events-auto touch-none select-none z-10"
+          onTouchStart={(e) => {
+            if (activeTouchIdRef.current !== null) return;
+            e.preventDefault();
+            const touch = e.changedTouches[0];
+            if (touch) {
+              startFloatingStick(touch.clientX, touch.clientY, touch.identifier, false);
+            }
+          }}
+          onMouseDown={(e) => {
+            if (activeTouchIdRef.current !== null) return;
+            startFloatingStick(e.clientX, e.clientY, 'mouse', false);
+          }}
+        />
+      )}
+
       {/* --- D-PAD / VIRTUAL JOYSTICK GAUCHE --- */}
       <div
         style={{
@@ -783,13 +901,17 @@ export function TouchOverlay({
           top: `${layout.dpad.y}%`,
           transform: `translate(-50%, -50%) scale(${scaleFactor})`
         }}
-        className={`absolute pointer-events-auto rounded-full ${
-          isEditMode ? 'ring-2 ring-dashed ring-amber-400 cursor-move' : ''
+        className={`absolute rounded-full transition-all duration-150 ${
+          isEditMode ? 'ring-2 ring-dashed ring-amber-400 cursor-move pointer-events-auto z-40' : ''
+        } ${
+          isFloatingMode 
+            ? (isStickActive ? 'opacity-15 scale-90 pointer-events-none' : 'opacity-60 pointer-events-none') 
+            : 'pointer-events-auto z-20'
         }`}
         onMouseDown={(e) => isEditMode && handleStartDrag('dpad', e.clientX, e.clientY)}
         onTouchStart={(e) => isEditMode && handleStartDrag('dpad', e.touches[0].clientX, e.touches[0].clientY)}
       >
-        {renderAnalogStick(false)}
+        {renderAnalogStick(false, false)}
       </div>
 
       {/* --- CLUSTER DE TOUCHES MOBILE (A, B, X, Y) --- */}
@@ -799,7 +921,7 @@ export function TouchOverlay({
           top: `${layout.buttons.y}%`,
           transform: `translate(-50%, -50%) scale(${scaleFactor})`
         }}
-        className={`absolute pointer-events-auto rounded-full ${
+        className={`absolute pointer-events-auto z-30 rounded-full ${
           isEditMode ? 'ring-2 ring-dashed ring-amber-400 cursor-move' : ''
         }`}
         onMouseDown={(e) => isEditMode && handleStartDrag('buttons', e.clientX, e.clientY)}
@@ -815,7 +937,7 @@ export function TouchOverlay({
           top: `${layout.l1?.y ?? 22}%`,
           transform: `translate(-50%, -50%) scale(${scaleFactor})`
         }}
-        className={`absolute pointer-events-auto ${
+        className={`absolute pointer-events-auto z-30 ${
           isEditMode ? 'ring-2 ring-dashed ring-amber-400 cursor-move rounded-xl p-1' : ''
         }`}
         onMouseDown={(e) => isEditMode && handleStartDrag('l1', e.clientX, e.clientY)}
@@ -843,7 +965,7 @@ export function TouchOverlay({
           top: `${layout.r1?.y ?? 22}%`,
           transform: `translate(-50%, -50%) scale(${scaleFactor})`
         }}
-        className={`absolute pointer-events-auto ${
+        className={`absolute pointer-events-auto z-30 ${
           isEditMode ? 'ring-2 ring-dashed ring-amber-400 cursor-move rounded-xl p-1' : ''
         }`}
         onMouseDown={(e) => isEditMode && handleStartDrag('r1', e.clientX, e.clientY)}
@@ -871,7 +993,7 @@ export function TouchOverlay({
           top: `${layout.coins?.y ?? 90}%`,
           transform: `translate(-50%, -50%) scale(${scaleFactor})`
         }}
-        className={`absolute pointer-events-auto flex items-center gap-4 ${
+        className={`absolute pointer-events-auto z-30 flex items-center gap-4 ${
           isEditMode ? 'ring-2 ring-dashed ring-amber-400 cursor-move rounded-xl p-1.5' : ''
         }`}
         onMouseDown={(e) => isEditMode && handleStartDrag('coins', e.clientX, e.clientY)}
@@ -905,6 +1027,23 @@ export function TouchOverlay({
           START (1)
         </button>
       </div>
+
+      {/* Joystick Flottant Dynamique actif sous le doigt en mode Overlay (Style Fortnite) */}
+      {isFloatingMode && isStickActive && floatingOrigin && (
+        <div
+          style={{
+            position: 'fixed',
+            left: `${floatingOrigin.x}px`,
+            top: `${floatingOrigin.y}px`,
+            transform: `translate(-50%, -50%) scale(${scaleFactor})`,
+            zIndex: 70,
+            pointerEvents: 'none'
+          }}
+          className="select-none touch-none animate-in fade-in zoom-in-90 duration-75"
+        >
+          {renderAnalogStick(false, true)}
+        </div>
+      )}
     </div>
   );
 }

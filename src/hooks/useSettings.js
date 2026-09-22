@@ -62,6 +62,7 @@ export const DEFAULT_SETTINGS = {
     opacity: 75,
     scale: 100, // 80, 100, 120
     portraitMode: 'pad-bottom', // 'pad-bottom' | 'overlay'
+    joystickMode: 'floating', // 'floating' (Fortnite style dynamique) | 'fixed' (Classique fixe)
     autoHideOnGamepad: true
   }
 };
