@@ -13,20 +13,28 @@ import { db } from '../config/firebase';
 
 const RTC_CONFIG = {
   iceServers: [
-    // STUN publics rapides
+    // STUN publics redondants haute disponibilité
     { urls: 'stun:stun.l.google.com:19302' },
+    { urls: 'stun:stun1.l.google.com:19302' },
+    { urls: 'stun:stun2.l.google.com:19302' },
     { urls: 'stun:global.stun.twilio.com:3478' },
+    { urls: 'stun:openrelay.metered.ca:80' },
 
-    // TURN OpenRelay (UDP & TCP/TLS) - Contourne les Box Wi-Fi résidentielles (NAT Symétriques)
+    // TURN OpenRelay (UDP & TCP/TLS) - Franchit les Box Wi-Fi résidentielles distantes et NAT 4G/CGNAT
     {
       urls: [
         'turn:openrelay.metered.ca:80',
         'turn:openrelay.metered.ca:443',
-        'turn:openrelay.metered.ca:443?transport=tcp',
-        'turns:openrelay.metered.ca:443?transport=tcp'
+        'turn:openrelay.metered.ca:443?transport=tcp'
       ],
-      username: 'openrelay',
-      credential: 'openrelay'
+      username: 'openrelayproject',
+      credential: 'openrelayproject'
+    },
+    // TURNS (TLS port 443 pour contourner les pare-feux stricts et filtrages 4G/Box)
+    {
+      urls: 'turns:openrelay.metered.ca:443?transport=tcp',
+      username: 'openrelayproject',
+      credential: 'openrelayproject'
     }
   ],
   iceCandidatePoolSize: 10,

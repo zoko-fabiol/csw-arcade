@@ -15,20 +15,28 @@ import {
 
 const RTC_CONFIG = {
   iceServers: [
-    // STUN publics rapides
+    // STUN publics redondants haute disponibilité
     { urls: 'stun:stun.l.google.com:19302' },
+    { urls: 'stun:stun1.l.google.com:19302' },
+    { urls: 'stun:stun2.l.google.com:19302' },
     { urls: 'stun:global.stun.twilio.com:3478' },
+    { urls: 'stun:openrelay.metered.ca:80' },
 
-    // TURN OpenRelay (UDP & TCP/TLS) - Contourne les Box Wi-Fi résidentielles (NAT Symétriques)
+    // TURN OpenRelay (UDP & TCP/TLS) - Franchit les Box Wi-Fi résidentielles distantes et NAT 4G/CGNAT
     {
       urls: [
         'turn:openrelay.metered.ca:80',
         'turn:openrelay.metered.ca:443',
-        'turn:openrelay.metered.ca:443?transport=tcp',
-        'turns:openrelay.metered.ca:443?transport=tcp'
+        'turn:openrelay.metered.ca:443?transport=tcp'
       ],
-      username: 'openrelay',
-      credential: 'openrelay'
+      username: 'openrelayproject',
+      credential: 'openrelayproject'
+    },
+    // TURNS (TLS port 443 pour contourner les pare-feux stricts et filtrages 4G/Box)
+    {
+      urls: 'turns:openrelay.metered.ca:443?transport=tcp',
+      username: 'openrelayproject',
+      credential: 'openrelayproject'
     }
   ],
   iceCandidatePoolSize: 10,
@@ -1087,16 +1095,34 @@ class NetplayService {
         this.ntfyWs = null;
       };
 
-      // Écoute de secours Firestore en cas de blocage ou quota 429 sur ntfy.sh
+      // Écoute de secours Firestore en temps réel (multi-champs, sans écrasement)
       if (db) {
         try {
           const sigRef = doc(db, 'netplay_signals', topic);
           const unsubFs = onSnapshot(sigRef, (snap) => {
             if (!snap.exists()) return;
             const d = snap.data();
-            if (d?.lastSignal) {
-              this.handleSignalingMessage(d.lastSignal, topic, isHost);
+            if (!d) return;
+
+            if (!this._processedFirestoreSignals) {
+              this._processedFirestoreSignals = new Set();
             }
+
+            const checkAndHandle = (sig) => {
+              if (sig && sig.time && !this._processedFirestoreSignals.has(sig.time)) {
+                this._processedFirestoreSignals.add(sig.time);
+                if (sig.sender !== this.mySessionId) {
+                  this.handleSignalingMessage(sig, topic, isHost);
+                }
+              }
+            };
+
+            checkAndHandle(d.guestJoined);
+            checkAndHandle(d.roomSync);
+            checkAndHandle(d.offer);
+            checkAndHandle(d.answer);
+            checkAndHandle(d.lastCandidates);
+            checkAndHandle(d.lastSignal);
           });
           this.webrtcUnsubs.push(unsubFs);
         } catch(e) {}
@@ -1175,7 +1201,7 @@ class NetplayService {
 
     if (msg.type === 'WEBRTC_ANSWER' && isHost) {
       console.log('[Netplay P2P] Réponse WebRTC reçue !');
-      if (this.pc && !this.pc.currentRemoteDescription) {
+      if (this.pc && (this.pc.signalingState === 'have-local-offer' || !this.pc.currentRemoteDescription)) {
         this.pc.setRemoteDescription(new RTCSessionDescription(msg.answer))
           .then(() => {
             while (this.pendingNtfyCandidates && this.pendingNtfyCandidates.length > 0) {
@@ -1273,13 +1299,31 @@ class NetplayService {
     try {
       if (!db) return;
       const sigRef = doc(db, 'netplay_signals', topic);
-      await setDoc(sigRef, {
-        lastSignal: {
-          sender: this.mySessionId,
-          time: Date.now(),
-          ...data
-        }
-      }, { merge: true });
+      const signalPayload = {
+        sender: this.mySessionId,
+        time: Date.now(),
+        ...data
+      };
+
+      const updatePayload = {
+        lastUpdated: Date.now()
+      };
+
+      if (data.type === 'GUEST_JOINED') {
+        updatePayload.guestJoined = signalPayload;
+      } else if (data.type === 'ROOM_SYNC') {
+        updatePayload.roomSync = signalPayload;
+      } else if (data.type === 'WEBRTC_OFFER') {
+        updatePayload.offer = signalPayload;
+      } else if (data.type === 'WEBRTC_ANSWER') {
+        updatePayload.answer = signalPayload;
+      } else if (data.type === 'ICE_CANDIDATE_BATCH' || data.type === 'ICE_CANDIDATE') {
+        updatePayload.lastCandidates = signalPayload;
+      } else {
+        updatePayload.lastSignal = signalPayload;
+      }
+
+      await setDoc(sigRef, updatePayload, { merge: true });
     } catch(e) {}
   }
 
@@ -1349,10 +1393,26 @@ class NetplayService {
       const offer = await pc.createOffer();
       await pc.setLocalDescription(offer);
 
-      // Trickle ICE immédiat : Envoi direct de l'offre SDP sans attendre la collecte complète des candidats
+      // Temporisation de 450ms pour que les candidats TURN OpenRelay soient inclus dans l'offre SDP
+      await new Promise(resolve => {
+        if (pc.iceGatheringState === 'complete') return resolve();
+        const onState = () => {
+          if (pc.iceGatheringState === 'complete') {
+            pc.removeEventListener('icegatheringstatechange', onState);
+            resolve();
+          }
+        };
+        pc.addEventListener('icegatheringstatechange', onState);
+        setTimeout(() => {
+          pc.removeEventListener('icegatheringstatechange', onState);
+          resolve();
+        }, 450);
+      });
+
+      const finalOffer = pc.localDescription || offer;
       this.sendNtfySignal(topic, {
         type: 'WEBRTC_OFFER',
-        offer: { type: offer.type, sdp: offer.sdp }
+        offer: { type: finalOffer.type, sdp: finalOffer.sdp }
       });
     } catch(err) {
       console.warn('[Netplay WebRTC] Erreur initialisation Hôte Ntfy:', err);
@@ -1446,10 +1506,26 @@ class NetplayService {
       const answer = await pc.createAnswer();
       await pc.setLocalDescription(answer);
 
-      // Trickle ICE immédiat : Envoi direct de la réponse SDP sans temporisation artificielle
+      // Temporisation de 450ms pour inclure les candidats TURN OpenRelay dans la réponse SDP
+      await new Promise(resolve => {
+        if (pc.iceGatheringState === 'complete') return resolve();
+        const onState = () => {
+          if (pc.iceGatheringState === 'complete') {
+            pc.removeEventListener('icegatheringstatechange', onState);
+            resolve();
+          }
+        };
+        pc.addEventListener('icegatheringstatechange', onState);
+        setTimeout(() => {
+          pc.removeEventListener('icegatheringstatechange', onState);
+          resolve();
+        }, 450);
+      });
+
+      const finalAnswer = pc.localDescription || answer;
       this.sendNtfySignal(topic, {
         type: 'WEBRTC_ANSWER',
-        answer: { type: answer.type, sdp: answer.sdp }
+        answer: { type: finalAnswer.type, sdp: finalAnswer.sdp }
       });
     } catch(err) {
       console.warn('[Netplay WebRTC] Erreur initialisation Invité Ntfy:', err);
