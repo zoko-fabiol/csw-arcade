@@ -1116,12 +1116,15 @@
       const initialVol = activeSettings.audio?.muted ? 0 : ((activeSettings.audio?.volume ?? 85) / 100);
 
       // Optimisation basse consommation & faible latence pour Canvas GPU mobile
+      let _gameCanvas = null;
+      window._getGameCanvas = () => _gameCanvas;
       const _origGetContext = HTMLCanvasElement.prototype.getContext;
       HTMLCanvasElement.prototype.getContext = function(type, attributes) {
         if (type === 'webgl' || type === 'webgl2' || type === 'experimental-webgl') {
+          _gameCanvas = this;
           attributes = Object.assign({}, attributes, {
-            powerPreference: 'low-power',
-            desynchronized: true,
+            powerPreference: 'default',
+            desynchronized: false,
             alpha: false,
             antialias: false,
             preserveDrawingBuffer: true
@@ -2268,9 +2271,24 @@
 
     // API Universelle de Streaming P2P (Canvas 60 FPS + WebAudio Destination)
     window.captureGameStream = function() {
-      const canvas = document.querySelector('#game canvas') || document.querySelector('canvas');
-      if (!canvas) return null;
-      const stream = canvas.captureStream ? canvas.captureStream(60) : (canvas.mozCaptureStream ? canvas.mozCaptureStream(60) : null);
+      const activeCanvas = (typeof window._getGameCanvas === 'function' ? window._getGameCanvas() : null)
+        || document.querySelector('#game canvas')
+        || Array.from(document.querySelectorAll('canvas')).find(c => c.width >= 200 && c.height >= 150)
+        || document.querySelector('canvas');
+
+      if (!activeCanvas) {
+        console.warn('[Player Stream] Aucun canvas de jeu trouvé.');
+        return null;
+      }
+
+      // Vérifier que le canvas a une dimension réelle de jeu
+      if (activeCanvas.width < 100 || activeCanvas.height < 100) {
+        console.log('[Player Stream] Canvas en cours d\'initialisation (' + activeCanvas.width + 'x' + activeCanvas.height + '), attente...');
+        return null;
+      }
+
+      console.log('[Player Stream] Capture du canvas FBNeo actif :', activeCanvas.width + 'x' + activeCanvas.height);
+      const stream = activeCanvas.captureStream ? activeCanvas.captureStream(60) : (activeCanvas.mozCaptureStream ? activeCanvas.mozCaptureStream(60) : null);
       if (!stream) return null;
 
       // S'assurer que la piste vidéo est bien active et force une émission initiale

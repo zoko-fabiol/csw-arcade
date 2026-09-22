@@ -555,8 +555,20 @@ class NetplayService {
         break;
       }
 
+      case 'GUEST_JOINED': {
+        console.log('[Netplay] Joueur invité connecté :', data?.playerName, 'PeerID:', data?.peerId);
+        if (data?.peerId) {
+          this.remotePeerId = data.peerId;
+        }
+        break;
+      }
+
       case 'REQUEST_VIDEO_STREAM': {
-        console.log('[Netplay PeerJS] Demande de flux vidéo reçue de l\'invité !');
+        console.log('[Netplay PeerJS] Demande de flux vidéo reçue de l\'invité ! PeerID:', data?.peerId);
+        if (data?.peerId) {
+          this.remotePeerId = data.peerId;
+        }
+        this.emit('video_stream_requested');
         if (this.localVideoStream) {
           this.startVideoStream(this.localVideoStream);
         }
@@ -698,7 +710,8 @@ class NetplayService {
         conn.send({
           type: 'GUEST_JOINED',
           playerName: this.playerName || 'Joueur 2',
-          sessionId: this.mySessionId
+          sessionId: this.mySessionId,
+          peerId: this.peer?.id
         });
       }
     });
@@ -2188,11 +2201,23 @@ class NetplayService {
     }
     const targetStream = stream || this.localVideoStream;
     if (!this.peer || !this.remotePeerId || !targetStream) {
-      console.warn('[Netplay PeerJS] Impossible de lancer le stream : peer, remotePeerId ou stream manquant');
+      console.warn('[Netplay PeerJS] Impossible de lancer le stream : peer, remotePeerId ou stream manquant', {
+        hasPeer: !!this.peer,
+        remotePeerId: this.remotePeerId,
+        hasStream: !!targetStream
+      });
       return;
     }
-    console.log('[Netplay PeerJS] Lancement de l\'appel vidéo WebRTC P2P vers l\'invité :', this.remotePeerId);
+
+    const videoTracks = targetStream.getVideoTracks();
+    console.log('[Netplay PeerJS] Lancement de l\'appel vidéo WebRTC P2P vers l\'invité :', this.remotePeerId, 'Pistes vidéo:', videoTracks.length);
+
     try {
+      if (this.currentMediaCall) {
+        try { this.currentMediaCall.close(); } catch(e) {}
+        this.currentMediaCall = null;
+      }
+
       const call = this.peer.call(this.remotePeerId, targetStream);
       this.currentMediaCall = call;
       call.on('error', (err) => console.warn('[Netplay PeerJS] Erreur media call:', err));
@@ -2204,7 +2229,11 @@ class NetplayService {
   // Demander à l'hôte d'envoyer son flux vidéo
   requestVideoStream() {
     console.log('[Netplay] Envoi de la demande de flux vidéo vers l\'hôte...');
-    const req = { type: 'REQUEST_VIDEO_STREAM', timestamp: Date.now() };
+    const req = { 
+      type: 'REQUEST_VIDEO_STREAM', 
+      peerId: this.peer?.id,
+      timestamp: Date.now() 
+    };
     if (this.peerConn && this.peerConn.open) {
       try { this.peerConn.send(req); } catch(e) {}
     }

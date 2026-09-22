@@ -187,11 +187,38 @@ export function TouchOverlay({
     }
   }, [onInput, isEditMode, isStylusActive, triggerHaptic]);
 
-  // D-Pad tactile fluide 8 directions
-  const dpadRef = useRef(null);
-  const handleDpadTouch = useCallback((clientX, clientY, isEnd = false) => {
-    if (isEditMode || isStylusActive) return;
-    if (isEnd) {
+  // Joystick analogique tactile 360° avec centrage par ressort et 8 directions Neo Geo
+  const joystickRef = useRef(null);
+  const [stickPos, setStickPos] = useState({ x: 0, y: 0 });
+  const [isStickActive, setIsStickActive] = useState(false);
+  const activeTouchIdRef = useRef(null);
+  const isCompactStickRef = useRef(false);
+
+  const handleStickMove = useCallback((clientX, clientY, isCompact = false) => {
+    if (isEditMode || isStylusActive || !joystickRef.current) return;
+    const rect = joystickRef.current.getBoundingClientRect();
+    const centerX = rect.left + rect.width / 2;
+    const centerY = rect.top + rect.height / 2;
+
+    const dx = clientX - centerX;
+    const dy = clientY - centerY;
+    const distance = Math.hypot(dx, dy);
+    const maxRadius = isCompact ? 34 : 42;
+
+    // Déplacement visuel bridé au rayon maximum du socle
+    let clampedX = dx;
+    let clampedY = dy;
+    if (distance > maxRadius) {
+      clampedX = (dx / distance) * maxRadius;
+      clampedY = (dy / distance) * maxRadius;
+    }
+
+    setStickPos({ x: clampedX, y: clampedY });
+    setIsStickActive(true);
+
+    // Détection de zone morte et mapping 8 directions Neo Geo RetroPad
+    const deadzone = maxRadius * 0.28;
+    if (distance < deadzone) {
       setActiveDirections({ up: false, down: false, left: false, right: false });
       triggerInput(RETROPAD.UP, false);
       triggerInput(RETROPAD.DOWN, false);
@@ -200,26 +227,85 @@ export function TouchOverlay({
       return;
     }
 
-    if (!dpadRef.current) return;
-    const rect = dpadRef.current.getBoundingClientRect();
-    const centerX = rect.left + rect.width / 2;
-    const centerY = rect.top + rect.height / 2;
-
-    const dx = clientX - centerX;
-    const dy = clientY - centerY;
-    const deadzone = rect.width * 0.15;
-
-    const up = dy < -deadzone;
-    const down = dy > deadzone;
-    const left = dx < -deadzone;
-    const right = dx > deadzone;
+    // Calcul précis des 8 directions avec angle trigonométrique (-180° à +180°)
+    const angle = Math.atan2(dy, dx) * (180 / Math.PI);
+    const up = angle > -157.5 && angle < -22.5;
+    const down = angle > 22.5 && angle < 157.5;
+    const left = angle > 112.5 || angle < -112.5;
+    const right = angle > -67.5 && angle < 67.5;
 
     setActiveDirections({ up, down, left, right });
     triggerInput(RETROPAD.UP, up);
     triggerInput(RETROPAD.DOWN, down);
     triggerInput(RETROPAD.LEFT, left);
     triggerInput(RETROPAD.RIGHT, right);
-  }, [isEditMode, triggerInput]);
+  }, [isEditMode, isStylusActive, triggerInput]);
+
+  const handleStickRelease = useCallback(() => {
+    setStickPos({ x: 0, y: 0 });
+    setIsStickActive(false);
+    activeTouchIdRef.current = null;
+    setActiveDirections({ up: false, down: false, left: false, right: false });
+    triggerInput(RETROPAD.UP, false);
+    triggerInput(RETROPAD.DOWN, false);
+    triggerInput(RETROPAD.LEFT, false);
+    triggerInput(RETROPAD.RIGHT, false);
+  }, [triggerInput]);
+
+  // Suivi continu de l'analogue même si le doigt sort légèrement du cercle
+  useEffect(() => {
+    if (!isStickActive) return;
+
+    const handleWindowTouchMove = (e) => {
+      if (activeTouchIdRef.current === null) return;
+      for (let i = 0; i < e.touches.length; i++) {
+        if (e.touches[i].identifier === activeTouchIdRef.current) {
+          handleStickMove(e.touches[i].clientX, e.touches[i].clientY, isCompactStickRef.current);
+          break;
+        }
+      }
+    };
+
+    const handleWindowTouchEnd = (e) => {
+      if (activeTouchIdRef.current === null) return;
+      let stillActive = false;
+      for (let i = 0; i < e.touches.length; i++) {
+        if (e.touches[i].identifier === activeTouchIdRef.current) {
+          stillActive = true;
+          break;
+        }
+      }
+      if (!stillActive) {
+        handleStickRelease();
+      }
+    };
+
+    const handleWindowMouseMove = (e) => {
+      if (activeTouchIdRef.current === 'mouse') {
+        handleStickMove(e.clientX, e.clientY, isCompactStickRef.current);
+      }
+    };
+
+    const handleWindowMouseUp = () => {
+      if (activeTouchIdRef.current === 'mouse') {
+        handleStickRelease();
+      }
+    };
+
+    window.addEventListener('touchmove', handleWindowTouchMove, { passive: false });
+    window.addEventListener('touchend', handleWindowTouchEnd);
+    window.addEventListener('touchcancel', handleWindowTouchEnd);
+    window.addEventListener('mousemove', handleWindowMouseMove);
+    window.addEventListener('mouseup', handleWindowMouseUp);
+
+    return () => {
+      window.removeEventListener('touchmove', handleWindowTouchMove);
+      window.removeEventListener('touchend', handleWindowTouchEnd);
+      window.removeEventListener('touchcancel', handleWindowTouchEnd);
+      window.removeEventListener('mousemove', handleWindowMouseMove);
+      window.removeEventListener('mouseup', handleWindowMouseUp);
+    };
+  }, [isStickActive, handleStickMove, handleStickRelease]);
 
   // Drag & drop en mode édition (uniquement en mode overlay)
   const handleStartDrag = (target, clientX, clientY) => {
@@ -360,36 +446,76 @@ export function TouchOverlay({
     </div>
   );
 
-  // Rendu du D-Pad 8 directions
-  const renderDpad = (isCompact = false) => (
-    <div
-      ref={dpadRef}
-      className={`${isCompact ? 'w-36 h-36' : 'w-40 h-40'} rounded-full flex items-center justify-center border border-cyan-500/30 bg-neutral-900/80 backdrop-blur-sm shadow-xl select-none`}
-      onTouchStart={(e) => {
-        e.preventDefault();
-        handleDpadTouch(e.touches[0].clientX, e.touches[0].clientY);
-      }}
-      onTouchMove={(e) => handleDpadTouch(e.touches[0].clientX, e.touches[0].clientY)}
-      onTouchEnd={() => handleDpadTouch(0, 0, true)}
-      onTouchCancel={() => handleDpadTouch(0, 0, true)}
-    >
-      <div className={`relative ${isCompact ? 'w-28 h-28' : 'w-32 h-32'} flex items-center justify-center`}>
-        <div className={`absolute top-0 w-9 h-9 rounded-t-xl flex items-center justify-center font-bold text-xs border ${
-          activeDirections.up ? 'bg-cyan-500 text-black border-cyan-400 scale-95' : 'bg-neutral-800/80 text-neutral-300 border-neutral-700'
+  // Rendu du Joystick Analogique Virtuel Arcade 360°
+  const renderAnalogStick = (isCompact = false) => {
+    isCompactStickRef.current = isCompact;
+    const baseSize = isCompact ? 'w-36 h-36' : 'w-42 h-42';
+    const stickSize = isCompact ? 'w-14 h-14' : 'w-16 h-16';
+
+    const onStickTouchStart = (e) => {
+      if (isEditMode || isStylusActive) return;
+      e.preventDefault();
+      const touch = e.touches[0];
+      activeTouchIdRef.current = touch.identifier;
+      handleStickMove(touch.clientX, touch.clientY, isCompact);
+    };
+
+    const onStickMouseDown = (e) => {
+      if (isEditMode || isStylusActive) return;
+      activeTouchIdRef.current = 'mouse';
+      handleStickMove(e.clientX, e.clientY, isCompact);
+    };
+
+    return (
+      <div
+        ref={joystickRef}
+        onTouchStart={onStickTouchStart}
+        onMouseDown={onStickMouseDown}
+        className={`relative ${baseSize} rounded-full border-2 border-cyan-500/40 bg-gradient-to-b from-neutral-900/95 via-neutral-950/95 to-black/95 shadow-2xl backdrop-blur-md select-none touch-none flex items-center justify-center`}
+      >
+        {/* Anneau de guidage concentrique */}
+        <div className="absolute inset-2 rounded-full border border-neutral-700/40 pointer-events-none" />
+        <div className="absolute inset-5 rounded-full border border-dashed border-cyan-500/20 pointer-events-none" />
+
+        {/* Indicateurs directionnels cardinaux lumineux */}
+        <div className={`absolute top-1.5 left-1/2 -translate-x-1/2 text-[10px] font-bold transition-all pointer-events-none ${
+          activeDirections.up ? 'text-cyan-300 scale-125 drop-shadow-[0_0_8px_rgba(6,182,212,0.9)]' : 'text-neutral-600'
         }`}>▲</div>
-        <div className={`absolute bottom-0 w-9 h-9 rounded-b-xl flex items-center justify-center font-bold text-xs border ${
-          activeDirections.down ? 'bg-cyan-500 text-black border-cyan-400 scale-95' : 'bg-neutral-800/80 text-neutral-300 border-neutral-700'
+        <div className={`absolute bottom-1.5 left-1/2 -translate-x-1/2 text-[10px] font-bold transition-all pointer-events-none ${
+          activeDirections.down ? 'text-cyan-300 scale-125 drop-shadow-[0_0_8px_rgba(6,182,212,0.9)]' : 'text-neutral-600'
         }`}>▼</div>
-        <div className={`absolute left-0 w-9 h-9 rounded-l-xl flex items-center justify-center font-bold text-xs border ${
-          activeDirections.left ? 'bg-cyan-500 text-black border-cyan-400 scale-95' : 'bg-neutral-800/80 text-neutral-300 border-neutral-700'
+        <div className={`absolute left-1.5 top-1/2 -translate-y-1/2 text-[10px] font-bold transition-all pointer-events-none ${
+          activeDirections.left ? 'text-cyan-300 scale-125 drop-shadow-[0_0_8px_rgba(6,182,212,0.9)]' : 'text-neutral-600'
         }`}>◀</div>
-        <div className={`absolute right-0 w-9 h-9 rounded-r-xl flex items-center justify-center font-bold text-xs border ${
-          activeDirections.right ? 'bg-cyan-500 text-black border-cyan-400 scale-95' : 'bg-neutral-800/80 text-neutral-300 border-neutral-700'
+        <div className={`absolute right-1.5 top-1/2 -translate-y-1/2 text-[10px] font-bold transition-all pointer-events-none ${
+          activeDirections.right ? 'text-cyan-300 scale-125 drop-shadow-[0_0_8px_rgba(6,182,212,0.9)]' : 'text-neutral-600'
         }`}>▶</div>
-        <div className="w-7 h-7 rounded-full bg-neutral-900 border border-neutral-700 shadow-inner" />
+
+        {/* Zone morte centrale */}
+        <div className="w-8 h-8 rounded-full border border-neutral-800/80 bg-neutral-950/50 pointer-events-none" />
+
+        {/* Tête de stick analogique 3D déplaçable avec ressort */}
+        <div
+          style={{
+            transform: `translate(calc(-50% + ${stickPos.x}px), calc(-50% + ${stickPos.y}px))`
+          }}
+          className={`absolute top-1/2 left-1/2 ${stickSize} rounded-full border-2 border-cyan-400/90 shadow-xl pointer-events-none flex items-center justify-center ${
+            isStickActive 
+              ? 'bg-gradient-to-b from-neutral-700 via-neutral-800 to-neutral-950 shadow-cyan-400/40 scale-105 transition-none' 
+              : 'bg-gradient-to-b from-neutral-800 via-neutral-900 to-black shadow-black/80 transition-transform duration-150 ease-out'
+          }`}
+        >
+          {/* Grip concave texturé */}
+          <div className="w-8 h-8 rounded-full bg-gradient-to-b from-neutral-900 to-neutral-950 border border-neutral-600/60 shadow-inner flex items-center justify-center">
+            {/* LED centrale néon */}
+            <div className={`w-2.5 h-2.5 rounded-full transition-all ${
+              isStickActive ? 'bg-cyan-300 shadow-[0_0_10px_rgba(6,182,212,1)] scale-110' : 'bg-cyan-600/70'
+            }`} />
+          </div>
+        </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   // 1. DISPOSITION A : MANETTE DÉDIÉE BAS D'ÉCRAN (MODE PORTRAIT ARCADE PAD)
   if (isPortraitPad) {
@@ -597,13 +723,13 @@ export function TouchOverlay({
         >
           {isStylusActive && (
             <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-2 py-0.5 bg-cyan-400 text-black text-[9px] font-bold rounded-full pointer-events-none uppercase tracking-wider flex items-center gap-1 shadow-md whitespace-nowrap">
-              <Move className="w-2.5 h-2.5" /> Glisser pour ajuster D-Pad & Boutons
+              <Move className="w-2.5 h-2.5" /> Glisser pour ajuster Joystick & Boutons
             </div>
           )}
 
-          {/* D-Pad gauche */}
+          {/* Joystick analogique tactile 360° gauche */}
           <div className="flex items-center justify-center">
-            {renderDpad(true)}
+            {renderAnalogStick(true)}
           </div>
 
           {/* Boutons arcade droite */}
@@ -662,7 +788,7 @@ export function TouchOverlay({
         onMouseDown={(e) => isEditMode && handleStartDrag('dpad', e.clientX, e.clientY)}
         onTouchStart={(e) => isEditMode && handleStartDrag('dpad', e.touches[0].clientX, e.touches[0].clientY)}
       >
-        {renderDpad(false)}
+        {renderAnalogStick(false)}
       </div>
 
       {/* --- CLUSTER DE TOUCHES MOBILE (A, B, X, Y) --- */}

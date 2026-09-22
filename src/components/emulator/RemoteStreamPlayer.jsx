@@ -17,6 +17,7 @@ export function RemoteStreamPlayer({
   // Démarrer muet par sécurité pour satisfaire la politique d'autoplay des navigateurs mobiles
   const [isMuted, setIsMuted] = useState(true);
   const [audioBlockedNotice, setAudioBlockedNotice] = useState(false);
+  const [hasVideoData, setHasVideoData] = useState(false);
   const [streamConnected, setStreamConnected] = useState(false);
   const [fps, setFps] = useState(60);
   const [ping, setPing] = useState(netplayService.ping || 15);
@@ -50,14 +51,29 @@ export function RemoteStreamPlayer({
   // Lancement garanti du flux vidéo sans blocage autoplay
   const attachAndPlayStream = useCallback(async (stream) => {
     if (!videoRef.current || !stream) return;
-    console.log('[RemoteStreamPlayer] Attachement du MediaStream au lecteur vidéo...');
+    console.log('[RemoteStreamPlayer] Attachement du MediaStream au lecteur vidéo...', stream.getTracks());
     videoRef.current.srcObject = stream;
     setStreamConnected(true);
+
+    const vTrack = stream.getVideoTracks()[0];
+    if (vTrack) {
+      if (!vTrack.muted) {
+        setHasVideoData(true);
+      }
+      vTrack.onunmute = () => {
+        console.log('[RemoteStreamPlayer] ✓ Piste vidéo WebRTC active (unmute) !');
+        setHasVideoData(true);
+        videoRef.current?.play().catch(() => {});
+      };
+    }
 
     try {
       // 1. Tenter la lecture
       await videoRef.current.play();
-      console.log('[RemoteStreamPlayer] ✓ Lecture vidéo 60 FPS démarrée !');
+      console.log('[RemoteStreamPlayer] ✓ Lecture vidéo 60 FPS démarrée ! Dimensions:', videoRef.current.videoWidth, 'x', videoRef.current.videoHeight);
+      if (videoRef.current.videoWidth > 0) {
+        setHasVideoData(true);
+      }
     } catch (err) {
       console.warn('[RemoteStreamPlayer] Lecture directe bloquée par le navigateur (autoplay policy), bascule en muet :', err.message);
       // 2. Fallback muet garanti pour démarrer le flux visuel immédiatement
@@ -68,6 +84,9 @@ export function RemoteStreamPlayer({
         try {
           await videoRef.current.play();
           console.log('[RemoteStreamPlayer] ✓ Lecture vidéo démarrée en mode muet sécurisé.');
+          if (videoRef.current.videoWidth > 0) {
+            setHasVideoData(true);
+          }
         } catch(e) {
           console.warn('[RemoteStreamPlayer] Erreur critique play() :', e);
         }
@@ -103,12 +122,14 @@ export function RemoteStreamPlayer({
 
     const unsubPing = netplayService.on('ping', (p) => setPing(p));
 
-    // Demande proactive du flux vidéo si l'hôte a déjà démarré
+    // Demande proactive répétée du flux vidéo jusqu'à ce que des frames réelles soient décodées
     netplayService.requestVideoStream();
     const reqInterval = setInterval(() => {
-      if (!videoRef.current?.srcObject) {
+      const isVideoActive = videoRef.current?.srcObject && (videoRef.current?.videoWidth || 0) > 0;
+      if (!isVideoActive) {
         netplayService.requestVideoStream();
       } else {
+        setHasVideoData(true);
         clearInterval(reqInterval);
       }
     }, 1200);
@@ -329,15 +350,18 @@ export function RemoteStreamPlayer({
               autoPlay
               playsInline
               muted={isMuted}
+              onLoadedMetadata={() => { if (videoRef.current?.videoWidth > 0) setHasVideoData(true); }}
+              onPlaying={() => { if (videoRef.current?.videoWidth > 0) setHasVideoData(true); }}
+              onResize={() => { if (videoRef.current?.videoWidth > 0) setHasVideoData(true); }}
               className="w-full h-full object-contain pointer-events-none"
               style={{ imageRendering: 'pixelated' }}
             />
 
-            {!streamConnected && (
+            {!hasVideoData && (
               <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/90 z-20">
                 <div className="w-10 h-10 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin" />
-                <span className="text-xs text-neutral-400 font-mono">
-                  Connexion au flux vidéo direct de l'Hôte...
+                <span className="text-xs text-neutral-400 font-mono text-center px-4">
+                  {streamConnected ? "Réception et décodage du flux vidéo 60 FPS..." : "Connexion au flux vidéo direct de l'Hôte..."}
                 </span>
               </div>
             )}
@@ -362,15 +386,18 @@ export function RemoteStreamPlayer({
             autoPlay
             playsInline
             muted={isMuted}
+            onLoadedMetadata={() => { if (videoRef.current?.videoWidth > 0) setHasVideoData(true); }}
+            onPlaying={() => { if (videoRef.current?.videoWidth > 0) setHasVideoData(true); }}
+            onResize={() => { if (videoRef.current?.videoWidth > 0) setHasVideoData(true); }}
             className="w-full h-full object-contain pointer-events-none"
             style={{ imageRendering: 'pixelated' }}
           />
 
-          {!streamConnected && (
+          {!hasVideoData && (
             <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/90 z-20">
               <div className="w-10 h-10 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin" />
-              <span className="text-xs text-neutral-400 font-mono">
-                Connexion au flux vidéo direct de l'Hôte...
+              <span className="text-xs text-neutral-400 font-mono text-center px-4">
+                {streamConnected ? "Réception et décodage du flux vidéo 60 FPS..." : "Connexion au flux vidéo direct de l'Hôte..."}
               </span>
             </div>
           )}

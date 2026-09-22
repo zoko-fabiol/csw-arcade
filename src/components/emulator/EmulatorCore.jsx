@@ -340,20 +340,39 @@ export function EmulatorCore({
   // Capture et diffusion vidéo 60 FPS continue pour le mode Remote Play Stream
   useEffect(() => {
     if (!isStreamingHost || !isHost || mode !== 'netplay') return;
-    let attempts = 0;
-    const interval = setInterval(() => {
-      attempts++;
+
+    const tryBroadcastStream = () => {
       if (iframeRef.current?.contentWindow?.captureGameStream) {
         const stream = iframeRef.current.contentWindow.captureGameStream();
         if (stream) {
-          console.log('[EmulatorCore] Stream 60 FPS capturé avec succès (tentative ' + attempts + ')');
+          console.log('[EmulatorCore] Stream 60 FPS capturé avec succès, diffusion vers l\'invité...');
           netplayService.startVideoStream(stream);
-          clearInterval(interval);
+          return true;
         }
       }
-      if (attempts >= 30) clearInterval(interval);
+      return false;
+    };
+
+    const unsubReq = netplayService.on('video_stream_requested', () => {
+      console.log('[EmulatorCore] Demande de flux vidéo reçue de l\'invité, rafraîchissement immédiat...');
+      tryBroadcastStream();
+    });
+
+    let attempts = 0;
+    const interval = setInterval(() => {
+      attempts++;
+      const success = tryBroadcastStream();
+      // On continue au moins 4 fois pour s'assurer que le canvas a sa taille finale après le chargement ROM
+      if (success && attempts >= 4) {
+        clearInterval(interval);
+      }
+      if (attempts >= 40) clearInterval(interval);
     }, 1000);
-    return () => clearInterval(interval);
+
+    return () => {
+      unsubReq();
+      clearInterval(interval);
+    };
   }, [isStreamingHost, isHost, mode]);
 
   // Screen Wake Lock API et veille zéro-consommation en arrière-plan
