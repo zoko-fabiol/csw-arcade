@@ -30,8 +30,10 @@ export function SettingsModal({
   updateSystemSetting, 
   updateGamepadSetting,
   updateTouchSetting,
+  resetToDefaults,
   resetSettings 
 }) {
+  const handleReset = resetToDefaults || resetSettings;
   const [activeTab, setActiveTab] = useState('controls');
   const [controlSubTab, setControlSubTab] = useState('touch');
   const [activePlayer, setActivePlayer] = useState('p1');
@@ -821,7 +823,7 @@ export function SettingsModal({
         {/* Footer Actions */}
         <div className="p-4 border-t border-neutral-800 bg-neutral-950/80 flex items-center justify-between">
           <button
-            onClick={resetToDefaults}
+            onClick={handleReset}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-neutral-400 hover:text-rose-400 hover:bg-neutral-800 transition-colors text-xs"
           >
             <RotateCcw className="w-3.5 h-3.5" />
