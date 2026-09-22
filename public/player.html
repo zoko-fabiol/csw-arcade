@@ -1992,8 +1992,15 @@
         }
 
         handleIncomingBinary(buffer) {
-          if (!buffer || buffer.byteLength < 1) return;
-          const view = new DataView(buffer);
+          if (!buffer) return;
+          const view = (buffer instanceof DataView) 
+            ? buffer 
+            : (buffer instanceof ArrayBuffer 
+                ? new DataView(buffer) 
+                : (ArrayBuffer.isView(buffer) 
+                    ? new DataView(buffer.buffer, buffer.byteOffset, buffer.byteLength) 
+                    : null));
+          if (!view || view.byteLength < 1) return;
           const magic = view.getUint8(0);
 
           if (magic === 0x5A && view.byteLength >= 15) {

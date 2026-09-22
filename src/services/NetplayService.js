@@ -676,7 +676,13 @@ class NetplayService {
 
       // Détection binaire ultra-rapide (NetplaySyncEngine / Entités Delta)
       if (data instanceof ArrayBuffer || (data && data.byteLength !== undefined)) {
-        const rawBuf = data instanceof ArrayBuffer ? data : data.buffer;
+        const rawBuf = (data instanceof ArrayBuffer) 
+          ? data 
+          : (data && data.buffer 
+              ? (data.byteOffset === 0 && data.byteLength === data.buffer.byteLength 
+                  ? data.buffer 
+                  : data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength)) 
+              : data);
         this.emit('binary_data', rawBuf);
         if (typeof this.onDataReceived === 'function') {
           try { this.onDataReceived(rawBuf); } catch(e) {}

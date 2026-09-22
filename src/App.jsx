@@ -243,6 +243,7 @@ export default function App() {
           onExit={handleExitGame}
           onOpenSettings={() => setIsSettingsOpen(true)}
           isHost={netplaySession.isHost}
+          playerIndex={netplaySession.playerIndex}
         />
       )}
     </div>

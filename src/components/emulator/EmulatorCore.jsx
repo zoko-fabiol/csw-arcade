@@ -101,7 +101,7 @@ export function EmulatorCore({
   }, []);
 
   const handleTouchInput = (buttonId, isPressed) => {
-    const myIdx = netplayService.myPlayerIndex >= 0 ? netplayService.myPlayerIndex : (isHost ? 0 : 1);
+    const myIdx = netplayService.myPlayerIndex >= 0 ? netplayService.myPlayerIndex : (playerIndex !== undefined ? playerIndex : (isHost ? 0 : 1));
     if (iframeRef.current?.contentWindow) {
       iframeRef.current.contentWindow.postMessage({
         type: 'TOUCH_INPUT',
@@ -262,6 +262,13 @@ export function EmulatorCore({
       // Barrière de synchronisation : notification que le core FBNeo est prêt dans l'iframe
       if (event.data.type === 'CORE_READY_BARRIER' && mode === 'netplay') {
         console.log('[EmulatorCore] Core FBNeo prêt et verrouillé à la Frame 0. Notification à la barrière Netplay...');
+        const pIdx = netplayService.myPlayerIndex >= 0 ? netplayService.myPlayerIndex : (playerIndex !== undefined ? playerIndex : (isHost ? 0 : 1));
+        if (iframeRef.current?.contentWindow) {
+          iframeRef.current.contentWindow.postMessage({
+            type: 'SET_PLAYER_INDEX',
+            playerIndex: pIdx
+          }, '*');
+        }
         netplayService.notifyCoreReady();
       }
 
@@ -281,7 +288,7 @@ export function EmulatorCore({
 
       // Quand un joueur local joue au clavier ou à la manette dans l'iframe, diffuser l'input à l'autre joueur
       if (event.data.type === 'LOCAL_INPUT' && mode === 'netplay') {
-        const myIdx = typeof event.data.playerIndex === 'number' ? event.data.playerIndex : (netplayService.myPlayerIndex >= 0 ? netplayService.myPlayerIndex : (isHost ? 0 : 1));
+        const myIdx = typeof event.data.playerIndex === 'number' ? event.data.playerIndex : (netplayService.myPlayerIndex >= 0 ? netplayService.myPlayerIndex : (playerIndex !== undefined ? playerIndex : (isHost ? 0 : 1)));
         netplayService.sendInput(event.data.buttonId, event.data.isPressed, myIdx);
       }
 
@@ -430,13 +437,13 @@ export function EmulatorCore({
   // Synchronisation de l'index du joueur avec l'iframe
   useEffect(() => {
     if (iframeRef.current?.contentWindow && mode === 'netplay') {
-      const pIdx = netplayService.myPlayerIndex >= 0 ? netplayService.myPlayerIndex : (isHost ? 0 : 1);
+      const pIdx = netplayService.myPlayerIndex >= 0 ? netplayService.myPlayerIndex : (playerIndex !== undefined ? playerIndex : (isHost ? 0 : 1));
       iframeRef.current.contentWindow.postMessage({
         type: 'SET_PLAYER_INDEX',
         playerIndex: pIdx
       }, '*');
     }
-  }, [mode, isHost, netplayRoom]);
+  }, [mode, isHost, netplayRoom, playerIndex]);
 
   // 5. Transfert transparent des touches du clavier vers le player de l'iframe
   useEffect(() => {
@@ -478,7 +485,7 @@ export function EmulatorCore({
   }, []);
 
   const isScanlinesActive = settings?.video?.scanlines ?? true;
-  const myPlayerSlot = netplayService.myPlayerIndex >= 0 ? netplayService.myPlayerIndex : (isHost ? 0 : 1);
+  const myPlayerSlot = netplayService.myPlayerIndex >= 0 ? netplayService.myPlayerIndex : (playerIndex !== undefined ? playerIndex : (isHost ? 0 : 1));
   const settingsParam = encodeURIComponent(JSON.stringify(settings || {}));
   const playerUrl = `./player.html?game=${encodeURIComponent(game.filename)}&settings=${settingsParam}&playerIndex=${myPlayerSlot}&netplay=${mode === 'netplay' ? 1 : 0}`;
 
