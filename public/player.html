@@ -518,13 +518,24 @@
       const p2 = controls?.p2 || {};
 
       if (isNetplay) {
-        // En mode Netplay : mapper les touches uniquement vers le port assigné (J1 = 0, J2 = 1)
+        // En mode Netplay : mapper les touches vers le port assigné (J1 = 0, J2 = 1)
         const mySlot = assignedPlayerIndex > 0 ? assignedPlayerIndex : 0;
+        // Permettre l'usage des contrôles P1 (WASD/J/K/5/1) OU P2 (Flèches/Pavé num/6/2)
         for (const [action, btnId] of Object.entries(ACTION_TO_RETROPAD)) {
           if (p1[action]) {
             keyToInputMap[p1[action]] = { player: mySlot, buttonId: btnId };
           }
+          if (p2[action]) {
+            keyToInputMap[p2[action]] = { player: mySlot, buttonId: btnId };
+          }
         }
+        // Touches universelles arcade pour Coin et Start quel que soit le clavier
+        keyToInputMap['Digit5'] = { player: mySlot, buttonId: 2 }; // Coin
+        keyToInputMap['Digit6'] = { player: mySlot, buttonId: 2 }; // Coin
+        keyToInputMap['KeyC'] = { player: mySlot, buttonId: 2 };   // Coin
+        keyToInputMap['Digit1'] = { player: mySlot, buttonId: 3 }; // Start
+        keyToInputMap['Digit2'] = { player: mySlot, buttonId: 3 }; // Start
+        keyToInputMap['Enter'] = { player: mySlot, buttonId: 3 };  // Start
         return;
       }
 
@@ -549,20 +560,25 @@
         const val = isPressed ? 1 : 0;
         if (gm.functions && typeof gm.functions.simulateInput === 'function') {
           gm.functions.simulateInput(player, buttonId, val);
-          // Si c'est une pièce (button 2 = COIN), simuler aussi sur slot 0 pour garantir l'incrément du monnayeur arcade partagé
-          if (buttonId === 2 && player !== 0) {
+          // Si c'est une pièce (button 2 = COIN), simuler sur slot 0 ET slot 1 pour incrémenter le monnayeur arcade partagé
+          if (buttonId === 2) {
             gm.functions.simulateInput(0, buttonId, val);
+            if (player !== 1) gm.functions.simulateInput(1, buttonId, val);
           }
         } else if (typeof gm.simulateInput === 'function') {
           gm.simulateInput(player, buttonId, val);
-          if (buttonId === 2 && player !== 0) {
+          if (buttonId === 2) {
             gm.simulateInput(0, buttonId, val);
+            if (player !== 1) gm.simulateInput(1, buttonId, val);
           }
         }
       }
 
       if (isNetplay && window.__csw_rollback_engine) {
         window.__csw_rollback_engine.setPlayerButton(player, buttonId, isPressed);
+        if (buttonId === 2) {
+          window.__csw_rollback_engine.setPlayerButton(0, buttonId, isPressed);
+        }
       }
     }
 

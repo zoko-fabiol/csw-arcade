@@ -626,8 +626,7 @@ class NetplayService {
         peer.on('open', (myId) => {
           console.log(`[Netplay PeerJS] Invité connecté au broker (ID: ${myId}), liaison vers l'Hôte : ${hostPeerId}`);
           const conn = peer.connect(hostPeerId, {
-            reliable: true,
-            serialization: 'json'
+            reliable: true
           });
           this.peerConn = conn;
           this.setupPeerDataConnection(conn, false);
@@ -692,6 +691,34 @@ class NetplayService {
 
       if (typeof data === 'string') {
         try { data = JSON.parse(data); } catch(e) {}
+      }
+
+      // Décodage des paquets Rollback universels JSON (0x5A et 0xCB)
+      if (data.type === 'ROLLBACK_FRAME_DATA') {
+        const buf = new ArrayBuffer(15);
+        const view = new DataView(buf);
+        view.setUint8(0, 0x5A);
+        view.setUint16(1, data.seq || 0, false);
+        view.setUint32(3, data.frame || 0, false);
+        view.setUint16(7, data.curMask || 0, false);
+        view.setUint16(9, data.h1 || 0, false);
+        view.setUint16(11, data.h2 || 0, false);
+        view.setUint16(13, data.h3 || 0, false);
+        this.emit('binary_data', buf);
+        if (typeof this.onDataReceived === 'function') {
+          try { this.onDataReceived(buf); } catch(e) {}
+        }
+        return;
+      }
+
+      if (data.type === 'ROLLBACK_CHECKSUM') {
+        const buf = new ArrayBuffer(9);
+        const view = new DataView(buf);
+        view.setUint8(0, 0xCB);
+        view.setUint32(1, data.frame || 0, false);
+        view.setUint32(5, data.checksum || 0, false);
+        this.emit('binary_data', buf);
+        return;
       }
 
       // 1. Handshake : L'Hôte détecte l'invité et l'enregistre
@@ -2127,12 +2154,48 @@ class NetplayService {
     }
 
     const doSend = () => {
+      // 0. Priorité DataChannel matériel WebRTC si direct
+      if (this.peerConn?.dataChannel && this.peerConn.dataChannel.readyState === 'open') {
+        try {
+          this.peerConn.dataChannel.send(buffer);
+          return;
+        } catch(e) {}
+      }
+
+      // 1. PeerJS P2P avec encodage universel garanti
       if (this.peerConn && this.peerConn.open) {
         try {
+          if (buffer && buffer.byteLength >= 15) {
+            const v = (buffer instanceof DataView) ? buffer : new DataView(buffer instanceof ArrayBuffer ? buffer : buffer.buffer, buffer.byteOffset || 0, buffer.byteLength);
+            if (v.getUint8(0) === 0x5A) {
+              this.peerConn.send({
+                type: 'ROLLBACK_FRAME_DATA',
+                seq: v.getUint16(1, false),
+                frame: v.getUint32(3, false),
+                curMask: v.getUint16(7, false),
+                h1: v.getUint16(9, false),
+                h2: v.getUint16(11, false),
+                h3: v.getUint16(13, false)
+              });
+              return;
+            }
+          }
+          if (buffer && buffer.byteLength === 9) {
+            const v = (buffer instanceof DataView) ? buffer : new DataView(buffer instanceof ArrayBuffer ? buffer : buffer.buffer, buffer.byteOffset || 0, buffer.byteLength);
+            if (v.getUint8(0) === 0xCB) {
+              this.peerConn.send({
+                type: 'ROLLBACK_CHECKSUM',
+                frame: v.getUint32(1, false),
+                checksum: v.getUint32(5, false)
+              });
+              return;
+            }
+          }
           this.peerConn.send(buffer);
           return;
         } catch(e) {}
       }
+
       const targetChannel = (this.fastInputChannel && this.fastInputChannel.readyState === 'open')
         ? this.fastInputChannel
         : (this.reliableChannel && this.reliableChannel.readyState === 'open' ? this.reliableChannel : null);

@@ -110,6 +110,9 @@ export function EmulatorCore({
         isPressed
       }, '*');
     }
+    if (mode === 'netplay') {
+      netplayService.sendInput(buttonId, isPressed, myIdx);
+    }
   };
 
   // Quitter le jeu et nettoyer la session netplay

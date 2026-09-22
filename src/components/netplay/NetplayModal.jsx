@@ -120,8 +120,8 @@ export function NetplayModal({
           onLaunchGame(gameToLaunch, { 
             isNetplay: true, 
             isHost: false, 
-            role: netplayService.myRole, 
-            playerIndex: netplayService.myPlayerIndex 
+            role: netplayService.myRole || 'p2', 
+            playerIndex: netplayService.myPlayerIndex >= 0 ? netplayService.myPlayerIndex : 1 
           });
           onClose();
         }
