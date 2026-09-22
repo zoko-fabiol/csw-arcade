@@ -563,15 +563,17 @@ class NetplayService {
         break;
       }
 
+      case 'REQUEST_STREAM_REFRESH':
       case 'REQUEST_VIDEO_STREAM': {
         const now = Date.now();
-        if (this._lastVideoStreamReqTime && (now - this._lastVideoStreamReqTime < 3000)) {
+        const isForced = data?.forced || data?.type === 'REQUEST_STREAM_REFRESH';
+        if (!isForced && this._lastVideoStreamReqTime && (now - this._lastVideoStreamReqTime < 3000)) {
           console.log('[Netplay PeerJS] Demande de flux vidéo récente (< 3s), temporisation ICE...');
           break;
         }
         this._lastVideoStreamReqTime = now;
 
-        console.log('[Netplay PeerJS] Demande de flux vidéo reçue de l\'invité ! PeerID:', data?.peerId);
+        console.log('[Netplay PeerJS] Demande de flux vidéo reçue de l\'invité ! PeerID:', data?.peerId, 'forced:', isForced);
         if (data?.peerId) {
           this.remotePeerId = data.peerId;
         }
@@ -2443,6 +2445,24 @@ class NetplayService {
       this.startBarrierTimer = null;
     }
     this.emit('left_room');
+  }
+
+  // Demande de transmission ou réactualisation 1-clic du flux WebRTC 60 FPS
+  requestVideoStream(forced = false) {
+    const payload = {
+      type: forced ? 'REQUEST_STREAM_REFRESH' : 'REQUEST_VIDEO_STREAM',
+      sender: this.mySessionId,
+      peerId: this.peer?.id,
+      forced
+    };
+
+    if (this.peerConn && this.peerConn.open) {
+      try {
+        this.peerConn.send(payload);
+      } catch(e) {}
+    }
+
+    this.sendInput(forced ? 'request_stream_refresh' : 'request_video_stream', payload);
   }
 
   // Récupérer la liste des salons actifs (Vercel API, LAN ou Cloud)

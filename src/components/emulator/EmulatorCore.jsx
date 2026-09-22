@@ -38,7 +38,8 @@ export function EmulatorCore({
   netplayRoom = null,
   isHost = true,
   playerIndex = 0,
-  isStreamingHost = false
+  isStreamingHost = false,
+  isSettingsOpen = false
 }) {
   const iframeRef = useRef(null);
   const containerRef = useRef(null);
@@ -551,8 +552,25 @@ export function EmulatorCore({
 
   const isScanlinesActive = settings?.video?.scanlines ?? true;
   const myPlayerSlot = netplayService.myPlayerIndex >= 0 ? netplayService.myPlayerIndex : (playerIndex !== undefined ? playerIndex : (isHost ? 0 : 1));
-  const settingsParam = encodeURIComponent(JSON.stringify(settings || {}));
-  const playerUrl = `./player.html?game=${encodeURIComponent(game.filename)}&settings=${settingsParam}&playerIndex=${myPlayerSlot}&netplay=${(mode === 'netplay' && !isStreamingHost) ? 1 : 0}`;
+  
+  // URL figée au démarrage du jeu pour éviter tout rechargement d'iframe ou redémarrage du runtime WebAssembly
+  const initialSettingsRef = useRef(settings);
+  const playerUrlRef = useRef(null);
+  if (!playerUrlRef.current) {
+    const settingsParam = encodeURIComponent(JSON.stringify(initialSettingsRef.current || {}));
+    playerUrlRef.current = `./player.html?game=${encodeURIComponent(game.filename)}&settings=${settingsParam}&playerIndex=${myPlayerSlot}&netplay=${(mode === 'netplay' && !isStreamingHost) ? 1 : 0}`;
+  }
+  const playerUrl = playerUrlRef.current;
+
+  // Mise en pause / reprise automatique lorsque les Paramètres sont ouverts/fermés
+  useEffect(() => {
+    if (iframeRef.current?.contentWindow) {
+      iframeRef.current.contentWindow.postMessage({
+        type: 'SET_PAUSE',
+        paused: isSettingsOpen
+      }, '*');
+    }
+  }, [isSettingsOpen]);
 
   return (
     <div 
@@ -705,6 +723,14 @@ export function EmulatorCore({
                 style={{ opacity: Math.max(0.1, (settings?.video?.intensity ?? 40) / 100) }}
               />
             )}
+            {isSettingsOpen && (
+              <div className="absolute inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center pointer-events-none z-20 animate-in fade-in select-none">
+                <div className="px-4 py-2 rounded-xl bg-neutral-900/90 border border-cyan-500/50 text-cyan-300 font-mono text-xs font-bold shadow-2xl flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
+                  <span>JEU EN PAUSE • CONFIGURATION</span>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Manette tactile dédiée en bas sans recouvrir le jeu */}
@@ -743,6 +769,14 @@ export function EmulatorCore({
                 className="absolute inset-0 crt-scanlines pointer-events-none z-10" 
                 style={{ opacity: Math.max(0.1, (settings?.video?.intensity ?? 40) / 100) }}
               />
+            )}
+            {isSettingsOpen && (
+              <div className="absolute inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center pointer-events-none z-20 animate-in fade-in select-none">
+                <div className="px-4 py-2 rounded-xl bg-neutral-900/90 border border-cyan-500/50 text-cyan-300 font-mono text-xs font-bold shadow-2xl flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
+                  <span>JEU EN PAUSE • CONFIGURATION</span>
+                </div>
+              </div>
             )}
           </div>
 

@@ -627,7 +627,7 @@ export function NetplayModal({
                   <Play className="w-4 h-4 fill-current" />
                   <span>
                     {(activeRoom?.players || []).length >= 2
-                      ? 'Lancer la Partie (J1 + J2 prêts) 🚀'
+                      ? 'Lancer la Partie (J1 + J2 prêts)'
                       : 'En attente du Joueur 2 (1/2)...'}
                   </span>
                 </button>

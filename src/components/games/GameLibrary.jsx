@@ -10,7 +10,16 @@ import {
   Check, 
   HardDrive,
   X,
-  Dices
+  Dices,
+  Gamepad2,
+  Zap,
+  Swords,
+  Crosshair,
+  Rocket,
+  Trophy,
+  Flame,
+  Puzzle,
+  Footprints
 } from 'lucide-react';
 import { GameCard } from './GameCard';
 import { GameListItem } from './GameListItem';
@@ -19,15 +28,15 @@ import { romStorage } from '../../services/romStorage';
 const VIEW_MODE_STORAGE_KEY = 'csw_arcade_view_mode';
 
 const GENRE_PILLS = [
-  { id: 'Tous les Jeux', label: 'Tous', icon: '🎮' },
-  { id: 'Disponibles', label: 'Prêts', icon: '⚡' },
-  { id: 'Versus Fighting', label: 'VS Fighting', icon: '🥊' },
-  { id: 'Run and Gun', label: 'Run & Gun', icon: '🔫' },
-  { id: "Shoot 'em up", label: 'Shmup', icon: '🚀' },
-  { id: 'Sports / Arcade', label: 'Sports', icon: '⚽' },
-  { id: "Beat 'em up", label: "Beat'em up", icon: '👊' },
-  { id: 'Puzzle / Maze', label: 'Puzzle', icon: '🧩' },
-  { id: 'Platformer / Action', label: 'Plateforme', icon: '🏃' }
+  { id: 'Tous les Jeux', label: 'Tous', icon: Gamepad2, color: 'text-cyan-400' },
+  { id: 'Disponibles', label: 'Prêts', icon: Zap, color: 'text-amber-400' },
+  { id: 'Versus Fighting', label: 'VS Fighting', icon: Swords, color: 'text-rose-400' },
+  { id: 'Run and Gun', label: 'Run & Gun', icon: Crosshair, color: 'text-orange-400' },
+  { id: "Shoot 'em up", label: 'Shmup', icon: Rocket, color: 'text-purple-400' },
+  { id: 'Sports / Arcade', label: 'Sports', icon: Trophy, color: 'text-emerald-400' },
+  { id: "Beat 'em up", label: "Beat'em up", icon: Flame, color: 'text-red-400' },
+  { id: 'Puzzle / Maze', label: 'Puzzle', icon: Puzzle, color: 'text-sky-400' },
+  { id: 'Platformer / Action', label: 'Plateforme', icon: Footprints, color: 'text-teal-400' }
 ];
 
 export function GameLibrary({
@@ -241,6 +250,7 @@ export function GameLibrary({
       <div className="px-3 sm:px-5 py-2 bg-neutral-950 border-b border-neutral-800/60 flex items-center gap-1.5 sm:gap-2 overflow-x-auto no-scrollbar shrink-0 select-none">
         {GENRE_PILLS.map((pill) => {
           const isSelected = selectedGenre === pill.id || (pill.id === 'Tous les Jeux' && (!selectedGenre || selectedGenre === 'Tous'));
+          const Icon = pill.icon;
           return (
             <button
               key={pill.id}
@@ -255,7 +265,7 @@ export function GameLibrary({
                   : 'bg-neutral-900/90 text-neutral-400 hover:text-neutral-200 hover:bg-neutral-800 border border-neutral-800 active:scale-95'
               }`}
             >
-              <span className="text-[11px]">{pill.icon}</span>
+              <Icon className={`w-3.5 h-3.5 shrink-0 ${isSelected ? 'text-black' : pill.color}`} />
               <span>{pill.label}</span>
             </button>
           );

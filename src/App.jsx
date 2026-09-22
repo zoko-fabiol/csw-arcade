@@ -247,6 +247,7 @@ export default function App() {
             settings={settings}
             onExit={handleExitGame}
             onOpenSettings={() => setIsSettingsOpen(true)}
+            isSettingsOpen={isSettingsOpen}
           />
         ) : (
           <EmulatorCore
@@ -258,6 +259,7 @@ export default function App() {
             isHost={netplaySession.isHost}
             playerIndex={netplaySession.playerIndex}
             isStreamingHost={gameMode === 'netplay' && netplaySession.isHost && netplaySession.playMode === 'stream'}
+            isSettingsOpen={isSettingsOpen}
           />
         )
       )}

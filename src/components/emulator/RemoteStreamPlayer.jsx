@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { ArrowLeft, Maximize2, Minimize2, Volume2, VolumeX, Wifi, Zap } from 'lucide-react';
+import { ArrowLeft, Maximize2, Minimize2, Volume2, VolumeX, Wifi, Zap, RefreshCw, Check } from 'lucide-react';
 import { netplayService } from '../../services/NetplayService';
 import { TouchOverlay } from './TouchOverlay';
 
@@ -32,6 +32,31 @@ export function RemoteStreamPlayer({
     typeof window !== 'undefined' && window.innerHeight > window.innerWidth ? 'portrait' : 'landscape'
   );
   const [showQuitConfirm, setShowQuitConfirm] = useState(false);
+  const [isReconnecting, setIsReconnecting] = useState(false);
+  const [reconnectNotice, setReconnectNotice] = useState(null);
+
+  // Réactualisation manuelle en 1-clic du flux WebRTC (en cas de perte réseau ou écran noir)
+  const handleRefreshStream = useCallback(() => {
+    setIsReconnecting(true);
+    setReconnectNotice('Réactualisation du flux vidéo WebRTC...');
+    console.log('[RemoteStreamPlayer] Réactualisation 1-clic du flux demandée...');
+
+    // Demander à l'hôte de renvoyer le flux vidéo immédiatement sans quitter le salon
+    netplayService.requestVideoStream(true);
+
+    // Re-forcer la lecture sur l'élément vidéo
+    if (videoRef.current) {
+      if (netplayService.remoteStream) {
+        videoRef.current.srcObject = netplayService.remoteStream;
+      }
+      videoRef.current.play().catch(() => {});
+    }
+
+    setTimeout(() => {
+      setIsReconnecting(false);
+      setTimeout(() => setReconnectNotice(null), 2500);
+    }, 1500);
+  }, []);
 
   // Écouteur Échap pour demander confirmation de sortie
   useEffect(() => {
@@ -319,6 +344,20 @@ export function RemoteStreamPlayer({
         </div>
 
         <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+          <button
+            onClick={handleRefreshStream}
+            disabled={isReconnecting}
+            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg border transition-all text-[11px] font-bold ${
+              isReconnecting 
+                ? 'bg-cyan-500/20 text-cyan-300 border-cyan-400' 
+                : 'bg-neutral-900 border-neutral-800 text-neutral-300 hover:text-cyan-300 hover:border-cyan-500/50 active:scale-95'
+            }`}
+            title="Réactualiser le flux vidéo WebRTC (en cas de perte réseau ou écran noir)"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 text-cyan-400 ${isReconnecting ? 'animate-spin' : ''}`} />
+            <span className="hidden sm:inline">RÉACTUALISER</span>
+          </button>
+
           <div className="flex items-center gap-1.5 sm:gap-2 bg-neutral-900/80 px-2 sm:px-2.5 py-1 rounded-lg border border-neutral-800">
             <Wifi className="w-3.5 h-3.5 text-emerald-400" />
             <span className="text-emerald-400 font-bold text-[10px] sm:text-[11px]">{ping} ms</span>
@@ -352,7 +391,16 @@ export function RemoteStreamPlayer({
           className="absolute top-14 left-1/2 -translate-x-1/2 z-40 px-3.5 py-1.5 bg-amber-400 text-black font-bold text-[11px] rounded-full shadow-xl cursor-pointer flex items-center gap-2 animate-bounce"
         >
           <VolumeX className="w-3.5 h-3.5" />
-          <span>Touchez pour activer le son 🔊</span>
+          <span>Touchez pour activer le son</span>
+          <Volume2 className="w-3.5 h-3.5" />
+        </div>
+      )}
+
+      {/* Toast Notification Réactualisation Stream */}
+      {reconnectNotice && (
+        <div className="absolute top-14 left-1/2 -translate-x-1/2 z-40 px-4 py-1.5 bg-cyan-950/95 border border-cyan-400 text-cyan-200 text-xs font-mono font-bold rounded-full shadow-2xl flex items-center gap-2 backdrop-blur-md animate-in fade-in slide-in-from-top-2 pointer-events-none">
+          <RefreshCw className="w-3.5 h-3.5 text-cyan-400 animate-spin" />
+          <span>{reconnectNotice}</span>
         </div>
       )}
 
@@ -384,6 +432,14 @@ export function RemoteStreamPlayer({
                 <span className="text-[10px] text-cyan-400/80 font-mono text-center">
                   {streamConnected ? "La partie va s'afficher dès la synchronisation de l'Hôte" : "Patientez pendant que l'Hôte initialise la partie"}
                 </span>
+                <button
+                  onClick={handleRefreshStream}
+                  disabled={isReconnecting}
+                  className="mt-2 flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-400 text-cyan-300 font-bold text-xs transition-all active:scale-95 shadow-lg shadow-cyan-500/20 pointer-events-auto"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 text-cyan-400 ${isReconnecting ? 'animate-spin' : ''}`} />
+                  <span>Réactualiser la Connexion</span>
+                </button>
               </div>
             )}
           </div>
@@ -424,6 +480,14 @@ export function RemoteStreamPlayer({
               <span className="text-[10px] text-cyan-400/80 font-mono text-center">
                 {streamConnected ? "La partie va s'afficher dès la synchronisation de l'Hôte" : "Patientez pendant que l'Hôte initialise la partie"}
               </span>
+              <button
+                onClick={handleRefreshStream}
+                disabled={isReconnecting}
+                className="mt-2 flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-400 text-cyan-300 font-bold text-xs transition-all active:scale-95 shadow-lg shadow-cyan-500/20 pointer-events-auto"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 text-cyan-400 ${isReconnecting ? 'animate-spin' : ''}`} />
+                <span>Réactualiser la Connexion</span>
+              </button>
             </div>
           )}
 

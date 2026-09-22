@@ -1821,6 +1821,26 @@
             window.__csw_rollback_engine.handleIncomingBinary(event.data.buffer);
           }
         }
+        if (event.data.type === 'SET_PAUSE') {
+          const isPaused = !!event.data.paused;
+          if (window.EJS_emulator) {
+            try {
+              if (isPaused) {
+                if (typeof window.EJS_emulator.pause === 'function') window.EJS_emulator.pause();
+                if (window.EJS_emulator.audioContext && typeof window.EJS_emulator.audioContext.suspend === 'function') {
+                  window.EJS_emulator.audioContext.suspend();
+                }
+                console.log('[Player] Jeu mis en pause (Paramètres ouverts)');
+              } else {
+                if (typeof window.EJS_emulator.play === 'function') window.EJS_emulator.play();
+                if (window.EJS_emulator.audioContext && typeof window.EJS_emulator.audioContext.resume === 'function') {
+                  window.EJS_emulator.audioContext.resume();
+                }
+                console.log('[Player] Jeu repris (Paramètres fermés)');
+              }
+            } catch(e) {}
+          }
+        }
         if (event.data.type === 'APP_VISIBILITY') {
           const isVis = !!event.data.visible;
           if (window.EJS_emulator) {
