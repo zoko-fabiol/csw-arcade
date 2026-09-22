@@ -13,7 +13,9 @@ import {
   Smartphone,
   Vibrate,
   Eye,
-  Compass
+  Compass,
+  Zap,
+  Move
 } from 'lucide-react';
 import { GamepadVisualizer } from './GamepadVisualizer';
 import { useDeviceType } from '../../utils/deviceDetector';
@@ -28,19 +30,19 @@ export function SettingsModal({
   updateSystemSetting, 
   updateGamepadSetting,
   updateTouchSetting,
-  resetToDefaults 
+  resetSettings 
 }) {
-  const { isMobile } = useDeviceType();
-  const [activeTab, setActiveTab] = useState('controls'); // 'controls' | 'video' | 'audio' | 'system'
-  const [controlSubTab, setControlSubTab] = useState(() => isMobile ? 'touch' : 'gamepad'); // 'keyboard' | 'gamepad' | 'touch'
-  const [activePlayer, setActivePlayer] = useState('p1'); // 'p1' | 'p2'
-  const [listeningAction, setListeningAction] = useState(null); // action en cours de remapping
+  const [activeTab, setActiveTab] = useState('controls');
+  const [controlSubTab, setControlSubTab] = useState('touch');
+  const [activePlayer, setActivePlayer] = useState('p1');
+  const [listeningAction, setListeningAction] = useState(null);
   const [connectedGamepad, setConnectedGamepad] = useState(null);
+  const { isMobile } = useDeviceType();
 
   // Détection des manettes connectées
   useEffect(() => {
     const checkGamepads = () => {
-      if (navigator.getGamepads) {
+      if (typeof navigator !== 'undefined' && navigator.getGamepads) {
         const gps = navigator.getGamepads();
         const gp = gps[0] || gps[1];
         if (gp) {
@@ -75,28 +77,27 @@ export function SettingsModal({
         return;
       }
 
+      // Assignation de la touche
       updateKeyBinding(activePlayer, listeningAction, e.code);
       setListeningAction(null);
     };
 
     window.addEventListener('keydown', handleKeyDown);
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [listeningAction, activePlayer, updateKeyBinding]);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [activePlayer, listeningAction, updateKeyBinding]);
 
-  // Fermeture rapide avec la touche Échap si pas en cours de remapping
+  // Fermer avec Escape si pas en écoute de touche
   useEffect(() => {
     if (!isOpen || listeningAction) return;
 
-    const handleEscape = (e) => {
+    const handleKeyDown = (e) => {
       if (e.key === 'Escape') {
         onClose();
       }
     };
 
-    window.addEventListener('keydown', handleEscape);
-    return () => window.removeEventListener('keydown', handleEscape);
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, listeningAction, onClose]);
 
   if (!isOpen) return null;
@@ -106,10 +107,14 @@ export function SettingsModal({
     { key: 'down', label: 'Direction : BAS' },
     { key: 'left', label: 'Direction : GAUCHE' },
     { key: 'right', label: 'Direction : DROITE' },
-    { key: 'a', label: 'Bouton A (Poing Faible)' },
-    { key: 'b', label: 'Bouton B (Pied Faible)' },
-    { key: 'c', label: 'Bouton C (Poing Fort)' },
-    { key: 'd', label: 'Bouton D (Pied Fort)' },
+    { key: 'a', label: 'Touche 1 : Bouton A (Poing Faible / Tir)' },
+    { key: 'b', label: 'Touche 2 : Bouton B (Pied Faible / Saut)' },
+    { key: 'c', label: 'Touche 3 : Bouton C (Poing Fort / Grenade)' },
+    { key: 'd', label: 'Touche 4 : Bouton D (Pied Fort / Spécial)' },
+    { key: 'ab', label: 'Touche 5 : Macro A+B (Roulade / Esquive KOF)' },
+    { key: 'cd', label: 'Touche 6 : Macro C+D (Attaque Projection Blowback)' },
+    { key: 'abc', label: 'Touche 7 : Macro A+B+C (MAX Mode / Super KOF)' },
+    { key: 'turbo', label: 'Touche 8 : Turbo A (Tir Automatique 30Hz Metal Slug)' },
     { key: 'coin', label: 'COIN (Insérer Crédit)' },
     { key: 'start', label: 'START (Lancer Partie)' }
   ];
@@ -395,43 +400,190 @@ export function SettingsModal({
                     </div>
                   </div>
 
-                  {/* 4. Type de Joystick Directionnel */}
+                  {/* 4. Type de Contrôle Directionnel (Croix D-Pad vs Analogue) */}
                   <div className="p-3 bg-neutral-900/90 border border-neutral-800 rounded-xl space-y-2">
-                    <span className="font-bold text-neutral-200 block text-xs">Comportement de l'Analogue Directionnel</span>
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-neutral-200 block text-xs">Type de Contrôle Directionnel</span>
+                      <span className="text-[10px] text-cyan-400 font-mono font-bold">
+                        {(settings.touch?.dpadType ?? 'analog') === 'dpad' ? 'CROIX D-PAD' : 'JOYSTICK'}
+                      </span>
+                    </div>
                     <div className="grid grid-cols-2 gap-2">
                       <button
-                        onClick={() => updateTouchSetting('joystickMode', 'floating')}
+                        onClick={() => updateTouchSetting('dpadType', 'dpad')}
                         className={`py-2 px-2.5 rounded-lg text-[11px] font-bold border text-left transition-all ${
-                          (settings.touch?.joystickMode ?? 'floating') === 'floating'
+                          (settings.touch?.dpadType ?? 'analog') === 'dpad'
+                            ? 'bg-cyan-500/20 border-cyan-500 text-cyan-300 shadow-sm'
+                            : 'bg-neutral-950 border-neutral-800 text-neutral-400 hover:text-white'
+                        }`}
+                      >
+                        <span className="flex items-center gap-1.5 font-bold">
+                          <Move className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+                          <span>Croix D-Pad Classique</span>
+                        </span>
+                        <span className="text-[9px] text-neutral-400 font-normal block mt-0.5">
+                          Croix directionnelle rétro 4/8 directions
+                        </span>
+                      </button>
+
+                      <button
+                        onClick={() => updateTouchSetting('dpadType', 'analog')}
+                        className={`py-2 px-2.5 rounded-lg text-[11px] font-bold border text-left transition-all ${
+                          (settings.touch?.dpadType ?? 'analog') === 'analog'
                             ? 'bg-cyan-500/20 border-cyan-500 text-cyan-300 shadow-sm'
                             : 'bg-neutral-950 border-neutral-800 text-neutral-400 hover:text-white'
                         }`}
                       >
                         <span className="flex items-center gap-1.5 font-bold">
                           <Compass className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
-                          <span>Flottant Dynamique (Fortnite)</span>
+                          <span>Joystick Analogue Virtuel</span>
                         </span>
                         <span className="text-[9px] text-neutral-400 font-normal block mt-0.5">
-                          Suit votre pouce n'importe où sur la zone gauche
+                          Stick rotatif 360° avec centrage
                         </span>
                       </button>
+                    </div>
 
-                      <button
-                        onClick={() => updateTouchSetting('joystickMode', 'fixed')}
-                        className={`py-2 px-2.5 rounded-lg text-[11px] font-bold border text-left transition-all ${
-                          (settings.touch?.joystickMode ?? 'floating') === 'fixed'
-                            ? 'bg-cyan-500/20 border-cyan-500 text-cyan-300 shadow-sm'
-                            : 'bg-neutral-950 border-neutral-800 text-neutral-400 hover:text-white'
-                        }`}
-                      >
-                        <span className="flex items-center gap-1.5 font-bold">
-                          <Gamepad2 className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
-                          <span>Position Fixe</span>
-                        </span>
-                        <span className="text-[9px] text-neutral-400 font-normal block mt-0.5">
-                          Reste ancré à sa place prédéfinie
-                        </span>
-                      </button>
+                    {/* Si Joystick Analogue est sélectionné : Choix Flottant vs Fixe */}
+                    {(settings.touch?.dpadType ?? 'analog') === 'analog' && (
+                      <div className="pt-2 border-t border-neutral-800/80 space-y-1.5">
+                        <span className="text-[10px] text-neutral-400 block font-semibold">Comportement du stick :</span>
+                        <div className="grid grid-cols-2 gap-2">
+                          <button
+                            onClick={() => updateTouchSetting('joystickMode', 'floating')}
+                            className={`py-1.5 px-2 rounded-lg text-[10px] font-bold border text-left transition-all ${
+                              (settings.touch?.joystickMode ?? 'floating') === 'floating'
+                                ? 'bg-cyan-500/20 border-cyan-500 text-cyan-300'
+                                : 'bg-neutral-950 border-neutral-800 text-neutral-400 hover:text-white'
+                            }`}
+                          >
+                            Flottant (Fortnite style)
+                          </button>
+                          <button
+                            onClick={() => updateTouchSetting('joystickMode', 'fixed')}
+                            className={`py-1.5 px-2 rounded-lg text-[10px] font-bold border text-left transition-all ${
+                              (settings.touch?.joystickMode ?? 'floating') === 'fixed'
+                                ? 'bg-cyan-500/20 border-cyan-500 text-cyan-300'
+                                : 'bg-neutral-950 border-neutral-800 text-neutral-400 hover:text-white'
+                            }`}
+                          >
+                            Position Fixe
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 5. Guide & Configuration des Touches Tactiles Neo Geo (8 Touches) */}
+                  <div className="p-3 bg-neutral-900/90 border border-neutral-800 rounded-xl space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Gamepad2 className="w-4 h-4 text-cyan-400 shrink-0" />
+                        <div>
+                          <span className="font-bold text-neutral-200 block text-xs">Rôle des Touches Tactiles (Disposition 8 Touches)</span>
+                          <span className="text-[10px] text-neutral-400">Guide des actions pour les jeux de combat et Metal Slug</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[10px]">
+                      {/* Bouton A */}
+                      <div className="p-2 rounded-lg bg-neutral-950 border border-neutral-800 flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="w-6 h-6 rounded-full bg-emerald-500 text-black font-black flex items-center justify-center text-[10px]">A</span>
+                          <div>
+                            <span className="font-bold text-emerald-300 block">Bouton A (Vert)</span>
+                            <span className="text-neutral-400 text-[9px]">Poing Faible (KOF) • Tir (Metal Slug)</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Bouton B */}
+                      <div className="p-2 rounded-lg bg-neutral-950 border border-neutral-800 flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="w-6 h-6 rounded-full bg-rose-500 text-white font-black flex items-center justify-center text-[10px]">B</span>
+                          <div>
+                            <span className="font-bold text-rose-300 block">Bouton B (Rose)</span>
+                            <span className="text-neutral-400 text-[9px]">Pied Faible (KOF) • Saut (Metal Slug)</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Bouton X / C */}
+                      <div className="p-2 rounded-lg bg-neutral-950 border border-neutral-800 flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="w-6 h-6 rounded-full bg-cyan-400 text-black font-black flex items-center justify-center text-[10px]">X</span>
+                          <div>
+                            <span className="font-bold text-cyan-300 block">Bouton X (Neo Geo C)</span>
+                            <span className="text-neutral-400 text-[9px]">Poing Fort (KOF) • Grenades / Bombes</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Bouton Y / D */}
+                      <div className="p-2 rounded-lg bg-neutral-950 border border-neutral-800 flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="w-6 h-6 rounded-full bg-amber-400 text-black font-black flex items-center justify-center text-[10px]">Y</span>
+                          <div>
+                            <span className="font-bold text-amber-300 block">Bouton Y (Neo Geo D)</span>
+                            <span className="text-neutral-400 text-[9px]">Pied Fort (KOF) • Coup Violent / Spécial</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Touche L1 : Macro A+B */}
+                      <div className="p-2 rounded-lg bg-neutral-950 border border-neutral-800 flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="px-2 py-0.5 rounded bg-neutral-800 border border-cyan-500/50 text-cyan-300 font-bold text-[9px]">L1</span>
+                          <div>
+                            <span className="font-bold text-white block">Touche 5 : Macro A+B (Roulade)</span>
+                            <span className="text-neutral-400 text-[9px]">Esquive / Roulade rapide KOF '98/'2002</span>
+                          </div>
+                        </div>
+                        <input
+                          type="checkbox"
+                          checked={settings.touch?.macroAbEnabled ?? true}
+                          onChange={(e) => updateTouchSetting('macroAbEnabled', e.target.checked)}
+                          className="w-4 h-4 accent-cyan-500 cursor-pointer rounded"
+                        />
+                      </div>
+
+                      {/* Touche R1 : Macro C+D */}
+                      <div className="p-2 rounded-lg bg-neutral-950 border border-neutral-800 flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="px-2 py-0.5 rounded bg-neutral-800 border border-cyan-500/50 text-cyan-300 font-bold text-[9px]">R1</span>
+                          <div>
+                            <span className="font-bold text-white block">Touche 6 : Macro C+D (Projection)</span>
+                            <span className="text-neutral-400 text-[9px]">Attaque lourde Blowback de repoussement</span>
+                          </div>
+                        </div>
+                        <input
+                          type="checkbox"
+                          checked={settings.touch?.macroCdEnabled ?? true}
+                          onChange={(e) => updateTouchSetting('macroCdEnabled', e.target.checked)}
+                          className="w-4 h-4 accent-cyan-500 cursor-pointer rounded"
+                        />
+                      </div>
+
+                      {/* Touche Turbo A */}
+                      <div className="p-2 rounded-lg bg-neutral-950 border border-neutral-800 flex items-center justify-between sm:col-span-2">
+                        <div className="flex items-center gap-2">
+                          <span className="px-2 py-0.5 rounded bg-amber-500/20 border border-amber-500/60 text-amber-300 font-bold text-[9px] flex items-center gap-1">
+                            <Zap className="w-3 h-3 text-amber-400" />
+                            TURBO A
+                          </span>
+                          <div>
+                            <span className="font-bold text-white block">Touche 8 : Turbo 30 Hz (Metal Slug)</span>
+                            <span className="text-neutral-400 text-[9px]">Tir continu ultra-rapide tant que le bouton est maintenu</span>
+                          </div>
+                        </div>
+                        <input
+                          type="checkbox"
+                          checked={settings.touch?.turboEnabled ?? true}
+                          onChange={(e) => updateTouchSetting('turboEnabled', e.target.checked)}
+                          className="w-4 h-4 accent-cyan-500 cursor-pointer rounded"
+                        />
+                      </div>
                     </div>
                   </div>
 

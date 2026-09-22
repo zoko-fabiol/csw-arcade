@@ -13,6 +13,10 @@ export const DEFAULT_SETTINGS = {
       b: 'KeyK',
       c: 'KeyU',
       d: 'KeyI',
+      ab: 'KeyO',      // Macro A+B (Roulade / Esquive KOF)
+      cd: 'KeyP',      // Macro C+D (Attaque de Projection Blowback)
+      abc: 'KeyL',     // Macro A+B+C (MAX Mode / Super KOF)
+      turbo: 'KeyH',   // Turbo A (Tir Automatique Metal Slug)
       coin: 'Digit5',
       start: 'Digit1'
     },
@@ -25,6 +29,10 @@ export const DEFAULT_SETTINGS = {
       b: 'Numpad5',
       c: 'Numpad7',
       d: 'Numpad8',
+      ab: 'Numpad9',
+      cd: 'Numpad6',
+      abc: 'Numpad1',
+      turbo: 'Numpad0',
       coin: 'Digit6',
       start: 'Digit2'
     }
@@ -35,10 +43,14 @@ export const DEFAULT_SETTINGS = {
     dpadMode: 'both', // 'both' | 'dpad' | 'analog'
     controllerType: 'auto', // 'auto' | 'xbox' | 'playstation' | 'switch'
     buttons: {
-      a: 0,     // Bouton A (Croix / A)
-      b: 1,     // Bouton B (Rond / B)
-      c: 2,     // Bouton C (Carré / X)
-      d: 3,     // Bouton D (Triangle / Y)
+      a: 0,     // Bouton A (Croix / A) - Neo Geo A
+      b: 1,     // Bouton B (Rond / B) - Neo Geo B
+      c: 2,     // Bouton C (Carré / X) - Neo Geo C
+      d: 3,     // Bouton D (Triangle / Y) - Neo Geo D
+      lb: 4,    // L1 / LB - Macro A+B (Roulade / Esquive)
+      rb: 5,    // R1 / RB - Macro C+D (Projection Blowback)
+      lt: 6,    // L2 / LT - Macro A+B+C (Max Mode)
+      rt: 7,    // R2 / RT - Turbo A (Tir Rapide Metal Slug)
       coin: 8,  // Select / Share
       start: 9  // Start / Options
     }
@@ -62,7 +74,11 @@ export const DEFAULT_SETTINGS = {
     opacity: 75,
     scale: 100, // 80, 100, 120
     portraitMode: 'pad-bottom', // 'pad-bottom' | 'overlay'
+    dpadType: 'analog', // 'analog' (Joystick) | 'dpad' (Croix directionnelle classique)
     joystickMode: 'floating', // 'floating' (Fortnite style dynamique) | 'fixed' (Classique fixe)
+    turboEnabled: true, // Affiche le bouton Turbo A pour Metal Slug
+    macroAbEnabled: true, // Active le bouton L1 en macro A+B (Roulade)
+    macroCdEnabled: true, // Active le bouton R1 en macro C+D (Projection)
     autoHideOnGamepad: true
   }
 };

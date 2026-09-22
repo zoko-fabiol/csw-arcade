@@ -8,10 +8,14 @@ export const CONTROLLER_TYPES = {
 };
 
 const NEO_GEO_ACTIONS = [
-  { id: 'a', label: 'Neo Geo A (Poing Faible)', badge: 'A', color: 'emerald' },
-  { id: 'b', label: 'Neo Geo B (Pied Faible)', badge: 'B', color: 'rose' },
-  { id: 'c', label: 'Neo Geo C (Poing Fort)', badge: 'C', color: 'cyan' },
-  { id: 'd', label: 'Neo Geo D (Pied Fort)', badge: 'D', color: 'amber' },
+  { id: 'a', label: 'Touche 1 : Neo Geo A (Poing Faible / Tir)', badge: 'A', color: 'emerald' },
+  { id: 'b', label: 'Touche 2 : Neo Geo B (Pied Faible / Saut)', badge: 'B', color: 'rose' },
+  { id: 'c', label: 'Touche 3 : Neo Geo C (Poing Fort / Grenade)', badge: 'C', color: 'cyan' },
+  { id: 'd', label: 'Touche 4 : Neo Geo D (Pied Fort / Spécial)', badge: 'D', color: 'amber' },
+  { id: 'lb', label: 'Touche 5 : Macro A+B (Roulade / Esquive)', badge: 'A+B', color: 'blue' },
+  { id: 'rb', label: 'Touche 6 : Macro C+D (Attaque Projection Blowback)', badge: 'C+D', color: 'orange' },
+  { id: 'lt', label: 'Touche 7 : Macro A+B+C (MAX Mode KOF)', badge: 'MAX', color: 'red' },
+  { id: 'rt', label: 'Touche 8 : Turbo A (Tir Automatique Metal Slug)', badge: 'TURBO', color: 'yellow' },
   { id: 'coin', label: 'COIN (Insérer Crédit)', badge: 'COIN', color: 'yellow' },
   { id: 'start', label: 'START (Lancer Partie)', badge: 'START', color: 'purple' }
 ];

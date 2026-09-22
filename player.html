@@ -502,6 +502,10 @@
       b: 8,
       c: 1,
       d: 9,
+      ab: 100,      // Macro A+B (Roulade / Esquive)
+      cd: 101,      // Macro C+D (Attaque de Projection Blowback)
+      abc: 102,     // Macro A+B+C (MAX Mode / Explosion KOF)
+      turbo: 103,   // Turbo A (Tir Automatique Metal Slug 30 Hz)
       coin: 2,
       start: 3,
       up: 4,
@@ -554,7 +558,49 @@
 
     rebuildKeyMap(activeSettings.controls);
 
+    // Gestionnaire de pulsation Turbo pour les jeux de tir (Metal Slug, Pulstar, Blazing Star)
+    const turboIntervals = {};
+    function handleTurboInput(player, baseBtnId, isPressed) {
+      const key = `${player}_${baseBtnId}`;
+      if (turboIntervals[key]) {
+        clearInterval(turboIntervals[key]);
+        delete turboIntervals[key];
+      }
+      if (isPressed) {
+        let state = true;
+        dispatchDirectInput(player, baseBtnId, true);
+        turboIntervals[key] = setInterval(() => {
+          state = !state;
+          dispatchDirectInput(player, baseBtnId, state);
+        }, 33); // Pulsation 30 Hz ultra-rapide
+      } else {
+        dispatchDirectInput(player, baseBtnId, false);
+      }
+    }
+
     function dispatchDirectInput(player, buttonId, isPressed) {
+      // Résolution des Macros 8 touches Neo Geo
+      if (buttonId === 100) { // Macro A + B (Roulade / Esquive)
+        dispatchDirectInput(player, 0, isPressed);
+        dispatchDirectInput(player, 8, isPressed);
+        return;
+      }
+      if (buttonId === 101) { // Macro C + D (Attaque de Projection Blowback)
+        dispatchDirectInput(player, 1, isPressed);
+        dispatchDirectInput(player, 9, isPressed);
+        return;
+      }
+      if (buttonId === 102) { // Macro A + B + C (MAX Mode / Super KOF)
+        dispatchDirectInput(player, 0, isPressed);
+        dispatchDirectInput(player, 8, isPressed);
+        dispatchDirectInput(player, 1, isPressed);
+        return;
+      }
+      if (buttonId === 103) { // Turbo A (Tir Automatique Metal Slug)
+        handleTurboInput(player, 0, isPressed);
+        return;
+      }
+
       const gm = window.EJS_emulator?.gameManager;
       if (gm) {
         const val = isPressed ? 1 : 0;
@@ -674,12 +720,16 @@
           checkBtn(6, left);
           checkBtn(7, right);
 
-          // Boutons Neo Geo configurés ou standards
+          // Boutons Neo Geo configurés ou standards (Disposition Arcade 8 Touches)
           const custom = activeSettings.gamepad?.buttons || {};
           const btnAIdx = custom.a ?? 0;
           const btnBIdx = custom.b ?? 1;
           const btnCIdx = custom.c ?? 2;
           const btnDIdx = custom.d ?? 3;
+          const lbIdx = custom.lb ?? 4;  // L1 / LB (Macro A+B : Roulade / Esquive)
+          const rbIdx = custom.rb ?? 5;  // R1 / RB (Macro C+D : Attaque Lourde Blowback)
+          const ltIdx = custom.lt ?? 6;  // L2 / LT (Macro A+B+C : MAX Mode KOF)
+          const rtIdx = custom.rt ?? 7;  // R2 / RT (Turbo A : Tir Automatique Metal Slug)
           const coinIdx = custom.coin ?? 8;
           const startIdx = custom.start ?? 9;
 
@@ -687,6 +737,10 @@
           checkBtn(8, !!buttons[btnBIdx]?.pressed); // Bouton B (RetroPad A: 8)
           checkBtn(1, !!buttons[btnCIdx]?.pressed); // Bouton C (RetroPad Y: 1)
           checkBtn(9, !!buttons[btnDIdx]?.pressed); // Bouton D (RetroPad X: 9)
+          checkBtn(100, !!buttons[lbIdx]?.pressed); // L1: Macro A+B (Roulade)
+          checkBtn(101, !!buttons[rbIdx]?.pressed); // R1: Macro C+D (Projection)
+          checkBtn(102, !!buttons[ltIdx]?.pressed); // L2: Macro A+B+C (MAX Mode)
+          checkBtn(103, !!buttons[rtIdx]?.pressed); // R2: Turbo A (Metal Slug)
           checkBtn(2, !!buttons[coinIdx]?.pressed || !!buttons[8]?.pressed); // Coin (Select)
           checkBtn(3, !!buttons[startIdx]?.pressed || !!buttons[9]?.pressed); // Start
         };

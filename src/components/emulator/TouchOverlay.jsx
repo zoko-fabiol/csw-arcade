@@ -1,20 +1,24 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Move, Check, RotateCcw, Gamepad2, Pencil, ArrowDown, ArrowUp } from 'lucide-react';
+import { Move, Check, RotateCcw, Gamepad2, Pencil, ArrowDown, ArrowUp, Zap } from 'lucide-react';
 
-// RetroPad IDs pour Neo Geo
+// RetroPad IDs & Macros pour Neo Geo
 const RETROPAD = {
-  B: 0,      // Neo Geo A (Bouton A mobile)
-  A: 8,      // Neo Geo B (Bouton B mobile)
-  Y: 1,      // Neo Geo C (Bouton X mobile)
-  X: 9,      // Neo Geo D (Bouton Y mobile)
-  SELECT: 2, // Coin / Crédit
-  START: 3,  // Start
+  B: 0,           // Neo Geo A (Bouton A mobile / Poing Faible / Tir)
+  A: 8,           // Neo Geo B (Bouton B mobile / Pied Faible / Saut)
+  Y: 1,           // Neo Geo C (Bouton X mobile / Poing Fort / Grenade)
+  X: 9,           // Neo Geo D (Bouton Y mobile / Pied Fort / Spécial)
+  SELECT: 2,      // Coin / Crédit
+  START: 3,       // Start
   UP: 4,
   DOWN: 5,
   LEFT: 6,
   RIGHT: 7,
-  L: 10,     // L1
-  R: 11      // R1
+  L: 10,          // L1 standard
+  R: 11,          // R1 standard
+  MACRO_AB: 100,  // Macro A+B (Roulade / Esquive KOF)
+  MACRO_CD: 101,  // Macro C+D (Attaque de Projection Blowback)
+  MACRO_ABC: 102, // Macro A+B+C (MAX Mode / Super KOF)
+  TURBO_A: 103    // Turbo A (Tir Automatique 30Hz Metal Slug)
 };
 
 // Positions initiales ergonomiques (en pourcentage de l'écran en mode Overlay)
@@ -23,6 +27,7 @@ const DEFAULT_TOUCH_LAYOUT = {
   buttons: { x: 82, y: 72 },    // Droite bas (A, B, X, Y)
   l1: { x: 14, y: 22 },         // En haut à gauche
   r1: { x: 86, y: 22 },         // En haut à droite
+  turbo: { x: 50, y: 76 },      // Centre intermédiaire
   coins: { x: 50, y: 90 },      // Centre bas
   scale: 100,
   opacity: 75
@@ -187,6 +192,13 @@ export function TouchOverlay({
     }
   }, [onInput, isEditMode, isStylusActive, triggerHaptic]);
 
+  // Options tactiles avancées Neo Geo
+  const dpadType = settings?.touch?.dpadType ?? 'analog'; // 'analog' | 'dpad'
+  const isDpadMode = dpadType === 'dpad';
+  const turboEnabled = settings?.touch?.turboEnabled ?? true;
+  const macroAbEnabled = settings?.touch?.macroAbEnabled ?? true;
+  const macroCdEnabled = settings?.touch?.macroCdEnabled ?? true;
+
   // Joystick analogique tactile 360° avec centrage par ressort et 8 directions Neo Geo
   const isFloatingMode = (settings?.touch?.joystickMode ?? 'floating') === 'floating';
   const joystickRef = useRef(null);
@@ -297,45 +309,108 @@ export function TouchOverlay({
     triggerInput(RETROPAD.RIGHT, false, true);
   }, [triggerInput]);
 
-  // Suivi continu de l'analogue même si le doigt sort légèrement du cercle
+  // D-Pad classique rétro (Croix directionnelle MVS/AES)
+  const dpadRef = useRef(null);
+  const [isDpadActive, setIsDpadActive] = useState(false);
+  const dpadTouchIdRef = useRef(null);
+
+  const handleDpadMove = useCallback((clientX, clientY) => {
+    if (isEditMode || isStylusActive || !dpadRef.current) return;
+    const rect = dpadRef.current.getBoundingClientRect();
+    const centerX = rect.left + rect.width / 2;
+    const centerY = rect.top + rect.height / 2;
+    const dx = clientX - centerX;
+    const dy = clientY - centerY;
+    const distance = Math.hypot(dx, dy);
+
+    // Zone morte au centre de la croix
+    if (distance < 12) {
+      setActiveDirections({ up: false, down: false, left: false, right: false });
+      triggerInput(RETROPAD.UP, false, true);
+      triggerInput(RETROPAD.DOWN, false, true);
+      triggerInput(RETROPAD.LEFT, false, true);
+      triggerInput(RETROPAD.RIGHT, false, true);
+      return;
+    }
+
+    const angle = Math.atan2(dy, dx) * (180 / Math.PI);
+    const up = angle > -157.5 && angle < -22.5;
+    const down = angle > 22.5 && angle < 157.5;
+    const left = angle > 112.5 || angle < -112.5;
+    const right = angle > -67.5 && angle < 67.5;
+
+    setActiveDirections({ up, down, left, right });
+    // Strictement sans vibration (skipHaptic: true)
+    triggerInput(RETROPAD.UP, up, true);
+    triggerInput(RETROPAD.DOWN, down, true);
+    triggerInput(RETROPAD.LEFT, left, true);
+    triggerInput(RETROPAD.RIGHT, right, true);
+  }, [isEditMode, isStylusActive, triggerInput]);
+
+  const handleDpadRelease = useCallback(() => {
+    setIsDpadActive(false);
+    dpadTouchIdRef.current = null;
+    setActiveDirections({ up: false, down: false, left: false, right: false });
+    triggerInput(RETROPAD.UP, false, true);
+    triggerInput(RETROPAD.DOWN, false, true);
+    triggerInput(RETROPAD.LEFT, false, true);
+    triggerInput(RETROPAD.RIGHT, false, true);
+  }, [triggerInput]);
+
+  // Suivi continu des contrôles directionnels (Joystick et D-Pad)
   useEffect(() => {
-    if (!isStickActive) return;
+    if (!isStickActive && !isDpadActive) return;
 
     const handleWindowTouchMove = (e) => {
-      if (activeTouchIdRef.current === null) return;
       for (let i = 0; i < e.touches.length; i++) {
-        if (e.touches[i].identifier === activeTouchIdRef.current) {
+        const touch = e.touches[i];
+        if (isStickActive && touch.identifier === activeTouchIdRef.current) {
           if (e.cancelable) e.preventDefault();
-          handleStickMove(e.touches[i].clientX, e.touches[i].clientY, isCompactStickRef.current);
-          break;
+          handleStickMove(touch.clientX, touch.clientY, isCompactStickRef.current);
+        }
+        if (isDpadActive && touch.identifier === dpadTouchIdRef.current) {
+          if (e.cancelable) e.preventDefault();
+          handleDpadMove(touch.clientX, touch.clientY);
         }
       }
     };
 
     const handleWindowTouchEnd = (e) => {
-      if (activeTouchIdRef.current === null) return;
-      let stillActive = false;
-      for (let i = 0; i < e.touches.length; i++) {
-        if (e.touches[i].identifier === activeTouchIdRef.current) {
-          stillActive = true;
-          break;
+      if (isStickActive && activeTouchIdRef.current !== null) {
+        let stillActive = false;
+        for (let i = 0; i < e.touches.length; i++) {
+          if (e.touches[i].identifier === activeTouchIdRef.current) {
+            stillActive = true;
+            break;
+          }
         }
+        if (!stillActive) handleStickRelease();
       }
-      if (!stillActive) {
-        handleStickRelease();
+
+      if (isDpadActive && dpadTouchIdRef.current !== null) {
+        let stillActive = false;
+        for (let i = 0; i < e.touches.length; i++) {
+          if (e.touches[i].identifier === dpadTouchIdRef.current) {
+            stillActive = true;
+            break;
+          }
+        }
+        if (!stillActive) handleDpadRelease();
       }
     };
 
     const handleWindowMouseMove = (e) => {
-      if (activeTouchIdRef.current === 'mouse') {
+      if (isStickActive && activeTouchIdRef.current === 'mouse') {
         handleStickMove(e.clientX, e.clientY, isCompactStickRef.current);
+      }
+      if (isDpadActive && dpadTouchIdRef.current === 'mouse') {
+        handleDpadMove(e.clientX, e.clientY);
       }
     };
 
     const handleWindowMouseUp = () => {
-      if (activeTouchIdRef.current === 'mouse') {
-        handleStickRelease();
-      }
+      if (isStickActive && activeTouchIdRef.current === 'mouse') handleStickRelease();
+      if (isDpadActive && dpadTouchIdRef.current === 'mouse') handleDpadRelease();
     };
 
     window.addEventListener('touchmove', handleWindowTouchMove, { passive: false });
@@ -351,7 +426,7 @@ export function TouchOverlay({
       window.removeEventListener('mousemove', handleWindowMouseMove);
       window.removeEventListener('mouseup', handleWindowMouseUp);
     };
-  }, [isStickActive, handleStickMove, handleStickRelease]);
+  }, [isStickActive, isDpadActive, handleStickMove, handleStickRelease, handleDpadMove, handleDpadRelease]);
 
   // Drag & drop en mode édition (uniquement en mode overlay)
   const handleStartDrag = (target, clientX, clientY) => {
@@ -581,6 +656,78 @@ export function TouchOverlay({
     );
   };
 
+  // Rendu de la Croix Directionnelle Rétro (D-Pad Neo Geo CD / Arcade)
+  const renderClassicDpad = (isCompact = false) => {
+    const sizeClass = isCompact ? 'w-36 h-36' : 'w-40 h-40';
+
+    const onDpadTouchStart = (e) => {
+      if (isEditMode || isStylusActive) return;
+      e.preventDefault();
+      const touch = e.touches[0];
+      dpadTouchIdRef.current = touch.identifier;
+      setIsDpadActive(true);
+      handleDpadMove(touch.clientX, touch.clientY);
+    };
+
+    const onDpadMouseDown = (e) => {
+      if (isEditMode || isStylusActive) return;
+      dpadTouchIdRef.current = 'mouse';
+      setIsDpadActive(true);
+      handleDpadMove(e.clientX, e.clientY);
+    };
+
+    return (
+      <div
+        ref={dpadRef}
+        onTouchStart={onDpadTouchStart}
+        onMouseDown={onDpadMouseDown}
+        className={`relative ${sizeClass} select-none touch-none flex items-center justify-center`}
+      >
+        {/* Socle circulaire encastré */}
+        <div className="absolute inset-1 rounded-full bg-gradient-to-b from-neutral-950/90 via-neutral-900/90 to-black/95 border border-neutral-800 shadow-2xl pointer-events-none" />
+
+        {/* Croix - Branche Horizontale (Gauche / Droite) */}
+        <div className="absolute w-[88%] h-[34%] bg-gradient-to-b from-neutral-800 via-neutral-900 to-black rounded-lg border-2 border-neutral-700/80 shadow-md pointer-events-none flex items-center justify-between px-2">
+          {/* Aile Gauche */}
+          <div className={`w-7 h-7 flex items-center justify-center rounded transition-colors ${
+            activeDirections.left ? 'bg-cyan-500/40 text-cyan-300 drop-shadow-[0_0_8px_rgba(6,182,212,0.9)]' : 'text-neutral-500'
+          }`}>
+            <span className="font-bold text-sm">◀</span>
+          </div>
+          {/* Aile Droite */}
+          <div className={`w-7 h-7 flex items-center justify-center rounded transition-colors ${
+            activeDirections.right ? 'bg-cyan-500/40 text-cyan-300 drop-shadow-[0_0_8px_rgba(6,182,212,0.9)]' : 'text-neutral-500'
+          }`}>
+            <span className="font-bold text-sm">▶</span>
+          </div>
+        </div>
+
+        {/* Croix - Branche Verticale (Haut / Bas) */}
+        <div className="absolute h-[88%] w-[34%] bg-gradient-to-b from-neutral-800 via-neutral-900 to-black rounded-lg border-2 border-neutral-700/80 shadow-md pointer-events-none flex flex-col items-center justify-between py-2">
+          {/* Aile Haut */}
+          <div className={`w-7 h-7 flex items-center justify-center rounded transition-colors ${
+            activeDirections.up ? 'bg-cyan-500/40 text-cyan-300 drop-shadow-[0_0_8px_rgba(6,182,212,0.9)]' : 'text-neutral-500'
+          }`}>
+            <span className="font-bold text-sm">▲</span>
+          </div>
+          {/* Aile Bas */}
+          <div className={`w-7 h-7 flex items-center justify-center rounded transition-colors ${
+            activeDirections.down ? 'bg-cyan-500/40 text-cyan-300 drop-shadow-[0_0_8px_rgba(6,182,212,0.9)]' : 'text-neutral-500'
+          }`}>
+            <span className="font-bold text-sm">▼</span>
+          </div>
+        </div>
+
+        {/* Pivot Central Incurvé (Empreinte ergonomique) */}
+        <div className="relative w-8 h-8 rounded-full bg-gradient-to-b from-neutral-900 to-black border border-neutral-700/60 shadow-inner flex items-center justify-center pointer-events-none z-10">
+          <div className={`w-2 h-2 rounded-full transition-all ${
+            isDpadActive ? 'bg-cyan-400 shadow-[0_0_8px_rgba(6,182,212,1)]' : 'bg-neutral-700'
+          }`} />
+        </div>
+      </div>
+    );
+  };
+
   // 1. DISPOSITION A : MANETTE DÉDIÉE BAS D'ÉCRAN (MODE PORTRAIT ARCADE PAD)
   if (isPortraitPad) {
     return (
@@ -699,17 +846,19 @@ export function TouchOverlay({
 
           <div className="flex items-center justify-between px-2 pt-1">
             <button
-              onTouchStart={(e) => { e.preventDefault(); triggerInput(RETROPAD.L, true); }}
-              onTouchEnd={(e) => { e.preventDefault(); triggerInput(RETROPAD.L, false); }}
-              onMouseDown={() => triggerInput(RETROPAD.L, true)}
-              onMouseUp={() => triggerInput(RETROPAD.L, false)}
-              className={`px-3.5 py-1.5 rounded-lg border text-xs font-bold transition-all ${
-                activeButtons[RETROPAD.L]
-                  ? 'bg-white text-black border-white scale-95'
+              onTouchStart={(e) => { e.preventDefault(); triggerInput(macroAbEnabled ? RETROPAD.MACRO_AB : RETROPAD.L, true); }}
+              onTouchEnd={(e) => { e.preventDefault(); triggerInput(macroAbEnabled ? RETROPAD.MACRO_AB : RETROPAD.L, false); }}
+              onMouseDown={() => triggerInput(macroAbEnabled ? RETROPAD.MACRO_AB : RETROPAD.L, true)}
+              onMouseUp={() => triggerInput(macroAbEnabled ? RETROPAD.MACRO_AB : RETROPAD.L, false)}
+              className={`px-3 py-1 rounded-lg border text-xs font-bold transition-all flex flex-col items-center justify-center ${
+                (activeButtons[RETROPAD.MACRO_AB] || activeButtons[RETROPAD.L])
+                  ? 'bg-white text-black border-white scale-95 shadow-md shadow-white/50'
                   : 'bg-neutral-900/90 text-neutral-300 border-neutral-700 active:scale-95'
               }`}
+              title={macroAbEnabled ? 'Macro L1 (A+B : Roulade / Esquive KOF)' : 'L1'}
             >
-              L1
+              <span className="leading-none">L1</span>
+              {macroAbEnabled && <span className="text-[7px] text-amber-400 font-mono tracking-tighter opacity-90 font-semibold">A+B</span>}
             </button>
 
             <div className="flex items-center gap-1.5">
@@ -726,6 +875,25 @@ export function TouchOverlay({
               >
                 COIN (5)
               </button>
+
+              {/* BOUTON TURBO A (Metal Slug) */}
+              {turboEnabled && (
+                <button
+                  onTouchStart={(e) => { e.preventDefault(); triggerInput(RETROPAD.TURBO_A, true); }}
+                  onTouchEnd={(e) => { e.preventDefault(); triggerInput(RETROPAD.TURBO_A, false); }}
+                  onMouseDown={() => triggerInput(RETROPAD.TURBO_A, true)}
+                  onMouseUp={() => triggerInput(RETROPAD.TURBO_A, false)}
+                  className={`px-2 py-1 rounded-lg border text-[10px] font-mono font-bold uppercase transition-transform flex items-center gap-1 ${
+                    activeButtons[RETROPAD.TURBO_A]
+                      ? 'bg-red-500 text-white border-red-400 scale-95 shadow-md shadow-red-500/50'
+                      : 'bg-red-950/80 text-red-300 border-red-500/50 hover:bg-red-900 active:scale-95'
+                  }`}
+                  title="Tir Automatique Turbo A 30Hz (Metal Slug)"
+                >
+                  <Zap className="w-3 h-3 text-amber-400 animate-pulse" />
+                  <span>TURBO</span>
+                </button>
+              )}
 
               {/* LE PETIT STYLET POUR CONFIGURER LA HAUTEUR VERTICALE DES TOUCHES */}
               <button
@@ -759,17 +927,19 @@ export function TouchOverlay({
             </div>
 
             <button
-              onTouchStart={(e) => { e.preventDefault(); triggerInput(RETROPAD.R, true); }}
-              onTouchEnd={(e) => { e.preventDefault(); triggerInput(RETROPAD.R, false); }}
-              onMouseDown={() => triggerInput(RETROPAD.R, true)}
-              onMouseUp={() => triggerInput(RETROPAD.R, false)}
-              className={`px-3.5 py-1.5 rounded-lg border text-xs font-bold transition-all ${
-                activeButtons[RETROPAD.R]
-                  ? 'bg-white text-black border-white scale-95'
+              onTouchStart={(e) => { e.preventDefault(); triggerInput(macroCdEnabled ? RETROPAD.MACRO_CD : RETROPAD.R, true); }}
+              onTouchEnd={(e) => { e.preventDefault(); triggerInput(macroCdEnabled ? RETROPAD.MACRO_CD : RETROPAD.R, false); }}
+              onMouseDown={() => triggerInput(macroCdEnabled ? RETROPAD.MACRO_CD : RETROPAD.R, true)}
+              onMouseUp={() => triggerInput(macroCdEnabled ? RETROPAD.MACRO_CD : RETROPAD.R, false)}
+              className={`px-3 py-1 rounded-lg border text-xs font-bold transition-all flex flex-col items-center justify-center ${
+                (activeButtons[RETROPAD.MACRO_CD] || activeButtons[RETROPAD.R])
+                  ? 'bg-white text-black border-white scale-95 shadow-md shadow-white/50'
                   : 'bg-neutral-900/90 text-neutral-300 border-neutral-700 active:scale-95'
               }`}
+              title={macroCdEnabled ? 'Macro R1 (C+D : Blowback KOF)' : 'R1'}
             >
-              R1
+              <span className="leading-none">R1</span>
+              {macroCdEnabled && <span className="text-[7px] text-rose-400 font-mono tracking-tighter opacity-90 font-semibold">C+D</span>}
             </button>
           </div>
         </div>
@@ -787,32 +957,38 @@ export function TouchOverlay({
         >
           {isStylusActive && (
             <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-2 py-0.5 bg-cyan-400 text-black text-[9px] font-bold rounded-full pointer-events-none uppercase tracking-wider flex items-center gap-1 shadow-md whitespace-nowrap">
-              <Move className="w-2.5 h-2.5" /> Glisser pour ajuster Joystick & Boutons
+              <Move className="w-2.5 h-2.5" /> Glisser pour ajuster {isDpadMode ? 'D-Pad' : 'Joystick'} & Boutons
             </div>
           )}
 
-          {/* Joystick analogique tactile 360° gauche avec zone réceptive dynamique */}
+          {/* Contrôle directionnel gauche : D-Pad rétro OU Joystick analogique 360° */}
           <div className="relative w-1/2 h-full flex items-center justify-center">
-            {isFloatingMode && !isStylusActive && (
-              <div
-                className="absolute inset-0 z-20 pointer-events-auto touch-none select-none"
-                onTouchStart={(e) => {
-                  if (activeTouchIdRef.current !== null || isStylusActive) return;
-                  e.preventDefault();
-                  const touch = e.changedTouches[0];
-                  if (touch) {
-                    startFloatingStick(touch.clientX, touch.clientY, touch.identifier, true);
-                  }
-                }}
-                onMouseDown={(e) => {
-                  if (activeTouchIdRef.current !== null || isStylusActive) return;
-                  startFloatingStick(e.clientX, e.clientY, 'mouse', true);
-                }}
-              />
+            {isDpadMode ? (
+              renderClassicDpad(true)
+            ) : (
+              <>
+                {isFloatingMode && !isStylusActive && (
+                  <div
+                    className="absolute inset-0 z-20 pointer-events-auto touch-none select-none"
+                    onTouchStart={(e) => {
+                      if (activeTouchIdRef.current !== null || isStylusActive) return;
+                      e.preventDefault();
+                      const touch = e.changedTouches[0];
+                      if (touch) {
+                        startFloatingStick(touch.clientX, touch.clientY, touch.identifier, true);
+                      }
+                    }}
+                    onMouseDown={(e) => {
+                      if (activeTouchIdRef.current !== null || isStylusActive) return;
+                      startFloatingStick(e.clientX, e.clientY, 'mouse', true);
+                    }}
+                  />
+                )}
+                <div className={`transition-opacity duration-150 ${isFloatingMode && isStickActive ? 'opacity-20 scale-95' : 'opacity-100'}`}>
+                  {renderAnalogStick(true, false)}
+                </div>
+              </>
             )}
-            <div className={`transition-opacity duration-150 ${isFloatingMode && isStickActive ? 'opacity-20 scale-95' : 'opacity-100'}`}>
-              {renderAnalogStick(true, false)}
-            </div>
           </div>
 
           {/* Boutons arcade droite */}
@@ -821,8 +997,8 @@ export function TouchOverlay({
           </div>
         </div>
 
-        {/* Joystick Flottant Dynamique actif sous le pouce en mode Portrait Pad */}
-        {isFloatingMode && isStickActive && floatingOrigin && (
+        {/* Joystick Flottant Dynamique actif sous le pouce en mode Portrait Pad (mode analogique uniquement) */}
+        {!isDpadMode && isFloatingMode && isStickActive && floatingOrigin && (
           <div
             style={{
               position: 'fixed',
@@ -875,8 +1051,8 @@ export function TouchOverlay({
         )}
       </div>
 
-      {/* ZONE TACTILE GAUCHE PLEIN ÉCRAN (JOYSTICK FLOTTANT DYNAMIQUE FORTNITE) */}
-      {isFloatingMode && !isEditMode && (
+      {/* ZONE TACTILE GAUCHE PLEIN ÉCRAN (JOYSTICK FLOTTANT DYNAMIQUE FORTNITE) - UNIQUEMENT EN MODE ANALOGIQUE */}
+      {!isDpadMode && isFloatingMode && !isEditMode && (
         <div
           className="absolute top-16 bottom-0 left-0 w-1/2 pointer-events-auto touch-none select-none z-10"
           onTouchStart={(e) => {
@@ -904,14 +1080,16 @@ export function TouchOverlay({
         className={`absolute rounded-full transition-all duration-150 ${
           isEditMode ? 'ring-2 ring-dashed ring-amber-400 cursor-move pointer-events-auto z-40' : ''
         } ${
-          isFloatingMode 
-            ? (isStickActive ? 'opacity-15 scale-90 pointer-events-none' : 'opacity-60 pointer-events-none') 
-            : 'pointer-events-auto z-20'
+          isDpadMode
+            ? 'pointer-events-auto z-20'
+            : isFloatingMode 
+              ? (isStickActive ? 'opacity-15 scale-90 pointer-events-none' : 'opacity-60 pointer-events-none') 
+              : 'pointer-events-auto z-20'
         }`}
         onMouseDown={(e) => isEditMode && handleStartDrag('dpad', e.clientX, e.clientY)}
         onTouchStart={(e) => isEditMode && handleStartDrag('dpad', e.touches[0].clientX, e.touches[0].clientY)}
       >
-        {renderAnalogStick(false, false)}
+        {isDpadMode ? renderClassicDpad(false) : renderAnalogStick(false, false)}
       </div>
 
       {/* --- CLUSTER DE TOUCHES MOBILE (A, B, X, Y) --- */}
@@ -930,7 +1108,7 @@ export function TouchOverlay({
         {renderActionButtons(false)}
       </div>
 
-      {/* --- TOUCHE L1 AUTONOME --- */}
+      {/* --- TOUCHE L1 AUTONOME (MACRO A+B ROULADE) --- */}
       <div
         style={{
           left: `${layout.l1?.x ?? 14}%`,
@@ -944,21 +1122,23 @@ export function TouchOverlay({
         onTouchStart={(e) => isEditMode && handleStartDrag('l1', e.touches[0].clientX, e.touches[0].clientY)}
       >
         <button
-          onTouchStart={(e) => { e.preventDefault(); triggerInput(RETROPAD.L, true); }}
-          onTouchEnd={(e) => { e.preventDefault(); triggerInput(RETROPAD.L, false); }}
-          onMouseDown={() => triggerInput(RETROPAD.L, true)}
-          onMouseUp={() => triggerInput(RETROPAD.L, false)}
-          className={`px-5 py-2.5 rounded-xl border-2 font-bold text-xs tracking-wider shadow-xl transition-all ${
-            activeButtons[RETROPAD.L]
+          onTouchStart={(e) => { e.preventDefault(); triggerInput(macroAbEnabled ? RETROPAD.MACRO_AB : RETROPAD.L, true); }}
+          onTouchEnd={(e) => { e.preventDefault(); triggerInput(macroAbEnabled ? RETROPAD.MACRO_AB : RETROPAD.L, false); }}
+          onMouseDown={() => triggerInput(macroAbEnabled ? RETROPAD.MACRO_AB : RETROPAD.L, true)}
+          onMouseUp={() => triggerInput(macroAbEnabled ? RETROPAD.MACRO_AB : RETROPAD.L, false)}
+          className={`px-4 py-2 rounded-xl border-2 font-bold text-xs tracking-wider shadow-xl transition-all flex flex-col items-center justify-center ${
+            (activeButtons[RETROPAD.MACRO_AB] || activeButtons[RETROPAD.L])
               ? 'bg-white text-black border-white scale-95 shadow-white/40'
               : 'bg-neutral-900/90 text-neutral-200 border-neutral-600 active:scale-95 hover:border-cyan-400'
           }`}
+          title={macroAbEnabled ? 'Macro L1 (A+B : Roulade / Esquive KOF)' : 'L1'}
         >
-          L1
+          <span className="leading-none">L1</span>
+          {macroAbEnabled && <span className="text-[8px] text-amber-400 font-mono tracking-tighter opacity-90 font-semibold">ESQUIVE A+B</span>}
         </button>
       </div>
 
-      {/* --- TOUCHE R1 AUTONOME --- */}
+      {/* --- TOUCHE R1 AUTONOME (MACRO C+D BLOWBACK) --- */}
       <div
         style={{
           left: `${layout.r1?.x ?? 86}%`,
@@ -972,19 +1152,53 @@ export function TouchOverlay({
         onTouchStart={(e) => isEditMode && handleStartDrag('r1', e.touches[0].clientX, e.touches[0].clientY)}
       >
         <button
-          onTouchStart={(e) => { e.preventDefault(); triggerInput(RETROPAD.R, true); }}
-          onTouchEnd={(e) => { e.preventDefault(); triggerInput(RETROPAD.R, false); }}
-          onMouseDown={() => triggerInput(RETROPAD.R, true)}
-          onMouseUp={() => triggerInput(RETROPAD.R, false)}
-          className={`px-5 py-2.5 rounded-xl border-2 font-bold text-xs tracking-wider shadow-xl transition-all ${
-            activeButtons[RETROPAD.R]
+          onTouchStart={(e) => { e.preventDefault(); triggerInput(macroCdEnabled ? RETROPAD.MACRO_CD : RETROPAD.R, true); }}
+          onTouchEnd={(e) => { e.preventDefault(); triggerInput(macroCdEnabled ? RETROPAD.MACRO_CD : RETROPAD.R, false); }}
+          onMouseDown={() => triggerInput(macroCdEnabled ? RETROPAD.MACRO_CD : RETROPAD.R, true)}
+          onMouseUp={() => triggerInput(macroCdEnabled ? RETROPAD.MACRO_CD : RETROPAD.R, false)}
+          className={`px-4 py-2 rounded-xl border-2 font-bold text-xs tracking-wider shadow-xl transition-all flex flex-col items-center justify-center ${
+            (activeButtons[RETROPAD.MACRO_CD] || activeButtons[RETROPAD.R])
               ? 'bg-white text-black border-white scale-95 shadow-white/40'
               : 'bg-neutral-900/90 text-neutral-200 border-neutral-600 active:scale-95 hover:border-cyan-400'
           }`}
+          title={macroCdEnabled ? 'Macro R1 (C+D : Blowback KOF)' : 'R1'}
         >
-          R1
+          <span className="leading-none">R1</span>
+          {macroCdEnabled && <span className="text-[8px] text-rose-400 font-mono tracking-tighter opacity-90 font-semibold">CHOC C+D</span>}
         </button>
       </div>
+
+      {/* --- TOUCHE TURBO A DÉDIÉE (METAL SLUG 30Hz) --- */}
+      {turboEnabled && (
+        <div
+          style={{
+            left: `${layout.turbo?.x ?? 50}%`,
+            top: `${layout.turbo?.y ?? 76}%`,
+            transform: `translate(-50%, -50%) scale(${scaleFactor})`
+          }}
+          className={`absolute pointer-events-auto z-30 ${
+            isEditMode ? 'ring-2 ring-dashed ring-amber-400 cursor-move rounded-xl p-1' : ''
+          }`}
+          onMouseDown={(e) => isEditMode && handleStartDrag('turbo', e.clientX, e.clientY)}
+          onTouchStart={(e) => isEditMode && handleStartDrag('turbo', e.touches[0].clientX, e.touches[0].clientY)}
+        >
+          <button
+            onTouchStart={(e) => { e.preventDefault(); triggerInput(RETROPAD.TURBO_A, true); }}
+            onTouchEnd={(e) => { e.preventDefault(); triggerInput(RETROPAD.TURBO_A, false); }}
+            onMouseDown={() => triggerInput(RETROPAD.TURBO_A, true)}
+            onMouseUp={() => triggerInput(RETROPAD.TURBO_A, false)}
+            className={`px-3 py-1.5 rounded-xl border-2 font-bold text-xs tracking-wider shadow-xl transition-all flex items-center gap-1 ${
+              activeButtons[RETROPAD.TURBO_A]
+                ? 'bg-red-500 text-white border-red-400 scale-95 shadow-red-500/50'
+                : 'bg-red-950/85 text-red-200 border-red-500/50 active:scale-95 hover:border-red-400'
+            }`}
+            title="Tir Automatique Turbo A 30Hz (Metal Slug)"
+          >
+            <Zap className="w-3.5 h-3.5 text-amber-400 animate-pulse" />
+            <span>TURBO A</span>
+          </button>
+        </div>
+      )}
 
       {/* --- TOUCHES COIN & START AU CENTRE --- */}
       <div
@@ -1028,8 +1242,8 @@ export function TouchOverlay({
         </button>
       </div>
 
-      {/* Joystick Flottant Dynamique actif sous le doigt en mode Overlay (Style Fortnite) */}
-      {isFloatingMode && isStickActive && floatingOrigin && (
+      {/* Joystick Flottant Dynamique actif sous le doigt en mode Overlay (Style Fortnite - mode analogique uniquement) */}
+      {!isDpadMode && isFloatingMode && isStickActive && floatingOrigin && (
         <div
           style={{
             position: 'fixed',
