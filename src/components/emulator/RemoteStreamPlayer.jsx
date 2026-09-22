@@ -55,25 +55,27 @@ export function RemoteStreamPlayer({
     videoRef.current.srcObject = stream;
     setStreamConnected(true);
 
-    const vTrack = stream.getVideoTracks()[0];
-    if (vTrack) {
-      if (!vTrack.muted) {
+    const checkVideoReady = () => {
+      if (videoRef.current && videoRef.current.videoWidth > 0 && videoRef.current.videoHeight > 0) {
+        console.log('[RemoteStreamPlayer] ✓ Flux vidéo validé avec dimensions réelles :', videoRef.current.videoWidth, 'x', videoRef.current.videoHeight);
         setHasVideoData(true);
       }
+    };
+
+    const vTrack = stream.getVideoTracks()[0];
+    if (vTrack) {
       vTrack.onunmute = () => {
         console.log('[RemoteStreamPlayer] ✓ Piste vidéo WebRTC active (unmute) !');
-        setHasVideoData(true);
         videoRef.current?.play().catch(() => {});
+        setTimeout(checkVideoReady, 100);
       };
     }
 
     try {
       // 1. Tenter la lecture
       await videoRef.current.play();
-      console.log('[RemoteStreamPlayer] ✓ Lecture vidéo 60 FPS démarrée ! Dimensions:', videoRef.current.videoWidth, 'x', videoRef.current.videoHeight);
-      if (videoRef.current.videoWidth > 0) {
-        setHasVideoData(true);
-      }
+      console.log('[RemoteStreamPlayer] ✓ Lecture vidéo démarrée ! Dimensions:', videoRef.current.videoWidth, 'x', videoRef.current.videoHeight);
+      checkVideoReady();
     } catch (err) {
       console.warn('[RemoteStreamPlayer] Lecture directe bloquée par le navigateur (autoplay policy), bascule en muet :', err.message);
       // 2. Fallback muet garanti pour démarrer le flux visuel immédiatement
@@ -84,9 +86,7 @@ export function RemoteStreamPlayer({
         try {
           await videoRef.current.play();
           console.log('[RemoteStreamPlayer] ✓ Lecture vidéo démarrée en mode muet sécurisé.');
-          if (videoRef.current.videoWidth > 0) {
-            setHasVideoData(true);
-          }
+          checkVideoReady();
         } catch(e) {
           console.warn('[RemoteStreamPlayer] Erreur critique play() :', e);
         }
@@ -122,7 +122,7 @@ export function RemoteStreamPlayer({
 
     const unsubPing = netplayService.on('ping', (p) => setPing(p));
 
-    // Demande proactive répétée du flux vidéo jusqu'à ce que des frames réelles soient décodées
+    // Demande proactive du flux vidéo avec intervalle de 3s (laisse le temps à la négociation ICE)
     netplayService.requestVideoStream();
     const reqInterval = setInterval(() => {
       const isVideoActive = videoRef.current?.srcObject && (videoRef.current?.videoWidth || 0) > 0;
@@ -132,7 +132,7 @@ export function RemoteStreamPlayer({
         setHasVideoData(true);
         clearInterval(reqInterval);
       }
-    }, 1200);
+    }, 3000);
 
     return () => {
       unsubStream();
@@ -350,18 +350,22 @@ export function RemoteStreamPlayer({
               autoPlay
               playsInline
               muted={isMuted}
-              onLoadedMetadata={() => { if (videoRef.current?.videoWidth > 0) setHasVideoData(true); }}
-              onPlaying={() => { if (videoRef.current?.videoWidth > 0) setHasVideoData(true); }}
-              onResize={() => { if (videoRef.current?.videoWidth > 0) setHasVideoData(true); }}
+              onLoadedMetadata={() => { if ((videoRef.current?.videoWidth || 0) > 0) setHasVideoData(true); }}
+              onPlaying={() => { if ((videoRef.current?.videoWidth || 0) > 0) setHasVideoData(true); }}
+              onResize={() => { if ((videoRef.current?.videoWidth || 0) > 0) setHasVideoData(true); }}
+              onTimeUpdate={() => { if ((videoRef.current?.videoWidth || 0) > 0 && !hasVideoData) setHasVideoData(true); }}
               className="w-full h-full object-contain pointer-events-none"
               style={{ imageRendering: 'pixelated' }}
             />
 
             {!hasVideoData && (
-              <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/90 z-20">
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-black/95 z-20 px-4">
                 <div className="w-10 h-10 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin" />
-                <span className="text-xs text-neutral-400 font-mono text-center px-4">
-                  {streamConnected ? "Réception et décodage du flux vidéo 60 FPS..." : "Connexion au flux vidéo direct de l'Hôte..."}
+                <span className="text-xs text-neutral-300 font-mono text-center">
+                  {streamConnected ? "Signal WebRTC reçu • Décodage des images du jeu..." : "Connexion au flux vidéo direct de l'Hôte..."}
+                </span>
+                <span className="text-[10px] text-cyan-400/80 font-mono text-center">
+                  {streamConnected ? "La partie va s'afficher dès la synchronisation de l'Hôte" : "Patientez pendant que l'Hôte initialise la partie"}
                 </span>
               </div>
             )}
@@ -386,18 +390,22 @@ export function RemoteStreamPlayer({
             autoPlay
             playsInline
             muted={isMuted}
-            onLoadedMetadata={() => { if (videoRef.current?.videoWidth > 0) setHasVideoData(true); }}
-            onPlaying={() => { if (videoRef.current?.videoWidth > 0) setHasVideoData(true); }}
-            onResize={() => { if (videoRef.current?.videoWidth > 0) setHasVideoData(true); }}
+            onLoadedMetadata={() => { if ((videoRef.current?.videoWidth || 0) > 0) setHasVideoData(true); }}
+            onPlaying={() => { if ((videoRef.current?.videoWidth || 0) > 0) setHasVideoData(true); }}
+            onResize={() => { if ((videoRef.current?.videoWidth || 0) > 0) setHasVideoData(true); }}
+            onTimeUpdate={() => { if ((videoRef.current?.videoWidth || 0) > 0 && !hasVideoData) setHasVideoData(true); }}
             className="w-full h-full object-contain pointer-events-none"
             style={{ imageRendering: 'pixelated' }}
           />
 
           {!hasVideoData && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/90 z-20">
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-black/95 z-20 px-4">
               <div className="w-10 h-10 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin" />
-              <span className="text-xs text-neutral-400 font-mono text-center px-4">
-                {streamConnected ? "Réception et décodage du flux vidéo 60 FPS..." : "Connexion au flux vidéo direct de l'Hôte..."}
+              <span className="text-xs text-neutral-300 font-mono text-center">
+                {streamConnected ? "Signal WebRTC reçu • Décodage des images du jeu..." : "Connexion au flux vidéo direct de l'Hôte..."}
+              </span>
+              <span className="text-[10px] text-cyan-400/80 font-mono text-center">
+                {streamConnected ? "La partie va s'afficher dès la synchronisation de l'Hôte" : "Patientez pendant que l'Hôte initialise la partie"}
               </span>
             </div>
           )}

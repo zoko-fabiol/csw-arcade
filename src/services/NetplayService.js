@@ -564,6 +564,13 @@ class NetplayService {
       }
 
       case 'REQUEST_VIDEO_STREAM': {
+        const now = Date.now();
+        if (this._lastVideoStreamReqTime && (now - this._lastVideoStreamReqTime < 3000)) {
+          console.log('[Netplay PeerJS] Demande de flux vidéo récente (< 3s), temporisation ICE...');
+          break;
+        }
+        this._lastVideoStreamReqTime = now;
+
         console.log('[Netplay PeerJS] Demande de flux vidéo reçue de l\'invité ! PeerID:', data?.peerId);
         if (data?.peerId) {
           this.remotePeerId = data.peerId;
@@ -2210,17 +2217,58 @@ class NetplayService {
     }
 
     const videoTracks = targetStream.getVideoTracks();
-    console.log('[Netplay PeerJS] Lancement de l\'appel vidéo WebRTC P2P vers l\'invité :', this.remotePeerId, 'Pistes vidéo:', videoTracks.length);
+    console.log('[Netplay PeerJS] Traitement flux vidéo WebRTC P2P vers :', this.remotePeerId, 'Pistes vidéo:', videoTracks.length);
 
     try {
+      // 1. Si un appel est déjà actif et connecté, mettre à jour la piste vidéo à chaud sans coupure (replaceTrack)
+      if (this.currentMediaCall && this.currentMediaCall.peerConnection) {
+        const pc = this.currentMediaCall.peerConnection;
+        const state = pc.connectionState || pc.iceConnectionState;
+        if (state === 'connected' || state === 'completed') {
+          console.log('[Netplay PeerJS] Appel média déjà connecté ! Remplacement de piste à chaud (0 ms coupure)...');
+          const senders = pc.getSenders ? pc.getSenders() : [];
+          const videoSender = senders.find(s => s.track && s.track.kind === 'video');
+          const newVideoTrack = videoTracks[0];
+          if (videoSender && newVideoTrack) {
+            videoSender.replaceTrack(newVideoTrack).catch(e => console.warn('[Netplay PeerJS] replaceTrack non critique:', e));
+            return;
+          }
+        } else if (state === 'connecting' || state === 'checking') {
+          console.log('[Netplay PeerJS] Négociation ICE déjà en cours (' + state + '), temporisation sans interruption.');
+          return;
+        }
+      }
+
+      // 2. Anti-spam / Debounce : Ne pas détruire un appel récent (< 3.5s) pour laisser le temps à ICE
+      const now = Date.now();
+      if (this._lastMediaCallTime && (now - this._lastMediaCallTime < 3500)) {
+        console.log('[Netplay PeerJS] Appel média initié très récemment (< 3.5s), attente de l\'établissement ICE.');
+        return;
+      }
+      this._lastMediaCallTime = now;
+
       if (this.currentMediaCall) {
         try { this.currentMediaCall.close(); } catch(e) {}
         this.currentMediaCall = null;
       }
 
+      console.log('[Netplay PeerJS] Lancement initial de l\'appel vidéo WebRTC P2P vers l\'invité :', this.remotePeerId);
       const call = this.peer.call(this.remotePeerId, targetStream);
       this.currentMediaCall = call;
-      call.on('error', (err) => console.warn('[Netplay PeerJS] Erreur media call:', err));
+
+      call.on('error', (err) => {
+        console.warn('[Netplay PeerJS] Erreur media call:', err);
+        if (this.currentMediaCall === call) {
+          this.currentMediaCall = null;
+        }
+      });
+
+      call.on('close', () => {
+        console.log('[Netplay PeerJS] Media call clôturé.');
+        if (this.currentMediaCall === call) {
+          this.currentMediaCall = null;
+        }
+      });
     } catch(e) {
       console.warn('[Netplay PeerJS] Erreur startVideoStream:', e);
     }

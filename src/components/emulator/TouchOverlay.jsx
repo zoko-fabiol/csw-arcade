@@ -176,13 +176,13 @@ export function TouchOverlay({
     }
   }, [settings?.touch?.vibration]);
 
-  const triggerInput = useCallback((btnId, isPressed) => {
+  const triggerInput = useCallback((btnId, isPressed, skipHaptic = false) => {
     if (isEditMode || isStylusActive) return;
     if (typeof onInput === 'function') {
       onInput(btnId, isPressed);
     }
     setActiveButtons(prev => ({ ...prev, [btnId]: isPressed }));
-    if (isPressed) {
+    if (isPressed && !skipHaptic) {
       triggerHaptic();
     }
   }, [onInput, isEditMode, isStylusActive, triggerHaptic]);
@@ -220,10 +220,10 @@ export function TouchOverlay({
     const deadzone = maxRadius * 0.28;
     if (distance < deadzone) {
       setActiveDirections({ up: false, down: false, left: false, right: false });
-      triggerInput(RETROPAD.UP, false);
-      triggerInput(RETROPAD.DOWN, false);
-      triggerInput(RETROPAD.LEFT, false);
-      triggerInput(RETROPAD.RIGHT, false);
+      triggerInput(RETROPAD.UP, false, true);
+      triggerInput(RETROPAD.DOWN, false, true);
+      triggerInput(RETROPAD.LEFT, false, true);
+      triggerInput(RETROPAD.RIGHT, false, true);
       return;
     }
 
@@ -235,10 +235,11 @@ export function TouchOverlay({
     const right = angle > -67.5 && angle < 67.5;
 
     setActiveDirections({ up, down, left, right });
-    triggerInput(RETROPAD.UP, up);
-    triggerInput(RETROPAD.DOWN, down);
-    triggerInput(RETROPAD.LEFT, left);
-    triggerInput(RETROPAD.RIGHT, right);
+    // Zéro vibration sur l'analogue : skipHaptic = true
+    triggerInput(RETROPAD.UP, up, true);
+    triggerInput(RETROPAD.DOWN, down, true);
+    triggerInput(RETROPAD.LEFT, left, true);
+    triggerInput(RETROPAD.RIGHT, right, true);
   }, [isEditMode, isStylusActive, triggerInput]);
 
   const handleStickRelease = useCallback(() => {
@@ -246,10 +247,10 @@ export function TouchOverlay({
     setIsStickActive(false);
     activeTouchIdRef.current = null;
     setActiveDirections({ up: false, down: false, left: false, right: false });
-    triggerInput(RETROPAD.UP, false);
-    triggerInput(RETROPAD.DOWN, false);
-    triggerInput(RETROPAD.LEFT, false);
-    triggerInput(RETROPAD.RIGHT, false);
+    triggerInput(RETROPAD.UP, false, true);
+    triggerInput(RETROPAD.DOWN, false, true);
+    triggerInput(RETROPAD.LEFT, false, true);
+    triggerInput(RETROPAD.RIGHT, false, true);
   }, [triggerInput]);
 
   // Suivi continu de l'analogue même si le doigt sort légèrement du cercle

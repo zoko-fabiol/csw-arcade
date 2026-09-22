@@ -341,6 +341,8 @@ export function EmulatorCore({
   useEffect(() => {
     if (!isStreamingHost || !isHost || mode !== 'netplay') return;
 
+    let hasStreamed = false;
+
     const tryBroadcastStream = () => {
       if (iframeRef.current?.contentWindow?.captureGameStream) {
         const stream = iframeRef.current.contentWindow.captureGameStream();
@@ -354,7 +356,7 @@ export function EmulatorCore({
     };
 
     const unsubReq = netplayService.on('video_stream_requested', () => {
-      console.log('[EmulatorCore] Demande de flux vidéo reçue de l\'invité, rafraîchissement immédiat...');
+      console.log('[EmulatorCore] Demande de flux vidéo reçue de l\'invité...');
       tryBroadcastStream();
     });
 
@@ -362,12 +364,12 @@ export function EmulatorCore({
     const interval = setInterval(() => {
       attempts++;
       const success = tryBroadcastStream();
-      // On continue au moins 4 fois pour s'assurer que le canvas a sa taille finale après le chargement ROM
-      if (success && attempts >= 4) {
+      if (success) {
+        hasStreamed = true;
         clearInterval(interval);
       }
-      if (attempts >= 40) clearInterval(interval);
-    }, 1000);
+      if (attempts >= 25) clearInterval(interval);
+    }, 1500);
 
     return () => {
       unsubReq();
