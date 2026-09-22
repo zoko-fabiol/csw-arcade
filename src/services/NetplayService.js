@@ -15,16 +15,11 @@ import {
 
 const RTC_CONFIG = {
   iceServers: [
-    // 1. STUN Google & Cloudflare (Découverte IP / Port)
+    // STUN publics rapides
     { urls: 'stun:stun.l.google.com:19302' },
-    { urls: 'stun:stun1.l.google.com:19302' },
-    { urls: 'stun:stun2.l.google.com:19302' },
-    { urls: 'stun:stun3.l.google.com:19302' },
-    { urls: 'stun:stun4.l.google.com:19302' },
-    { urls: 'stun:stun.cloudflare.com:3478' },
-    { urls: 'stun:openrelay.metered.ca:80' },
+    { urls: 'stun:global.stun.twilio.com:3478' },
 
-    // 2. TURN Relais OpenRelay (Metered) - Contourne les Box Wi-Fi résidentielles (NAT Symétriques)
+    // TURN OpenRelay (UDP & TCP/TLS) - Contourne les Box Wi-Fi résidentielles (NAT Symétriques)
     {
       urls: [
         'turn:openrelay.metered.ca:80',
@@ -32,12 +27,12 @@ const RTC_CONFIG = {
         'turn:openrelay.metered.ca:443?transport=tcp',
         'turns:openrelay.metered.ca:443?transport=tcp'
       ],
-      username: 'openrelayproject',
-      credential: 'openrelayproject'
+      username: 'openrelay',
+      credential: 'openrelay'
     }
   ],
   iceCandidatePoolSize: 10,
-  iceTransportPolicy: 'all'
+  iceTransportPolicy: 'all' // Permet le P2P direct quand c'est possible, bascule sur TURN si nécessaire
 };
 
 class NetplayService {
@@ -714,7 +709,26 @@ class NetplayService {
   }
 
   setupPeerDataConnection(conn, isHost) {
+    const attachIceListener = () => {
+      const pc = conn.peerConnection || conn._peerConnection;
+      if (pc && !pc._hasIceListener) {
+        pc._hasIceListener = true;
+        pc.addEventListener('iceconnectionstatechange', () => {
+          const iceState = pc.iceConnectionState;
+          console.log(`[Netplay PeerJS] iceConnectionState: ${iceState}`);
+          this.emit('ice_state_change', iceState);
+          if (iceState === 'connected' || iceState === 'completed') {
+            this.isP2PConnected = true;
+          } else if (iceState === 'failed') {
+            this.emit('ice_failed');
+          }
+        });
+      }
+    };
+    attachIceListener();
+
     conn.on('open', () => {
+      attachIceListener();
       console.log(`[Netplay PeerJS] ✓✓ CANAL DIRECT P2P OUVERT ! Latence zéro active (isHost=${isHost}).`);
       this.isP2PConnected = true;
       this.emit('p2p_connected', { label: 'peerjs-webrtc' });
@@ -1164,6 +1178,19 @@ class NetplayService {
       this.reliableChannel = reliableDc;
       this.setupDataChannel(reliableDc);
 
+      pc.oniceconnectionstatechange = () => {
+        const iceState = pc.iceConnectionState;
+        console.log('[Netplay WebRTC Hôte Ntfy] iceConnectionState:', iceState);
+        this.emit('ice_state_change', iceState);
+        if (iceState === 'connected' || iceState === 'completed') {
+          this.isP2PConnected = true;
+          this.emit('p2p_connected');
+        } else if (iceState === 'failed') {
+          this.isP2PConnected = false;
+          this.emit('ice_failed');
+        }
+      };
+
       pc.onconnectionstatechange = () => {
         console.log('[Netplay WebRTC Hôte Ntfy] ConnectionState:', pc.connectionState);
         if (pc.connectionState === 'connected') {
@@ -1178,19 +1205,10 @@ class NetplayService {
       const offer = await pc.createOffer();
       await pc.setLocalDescription(offer);
 
-      // Attente compacte Vanilla ICE pour intégrer un maximum de candidats locaux et STUN
-      await new Promise((resolve) => {
-        if (pc.iceGatheringState === 'complete') return resolve();
-        const check = () => {
-          if (pc.iceGatheringState === 'complete') resolve();
-        };
-        pc.onicegatheringstatechange = check;
-        setTimeout(resolve, 1000);
-      });
-
+      // Trickle ICE immédiat : Envoi direct de l'offre SDP sans attendre la collecte complète des candidats
       this.sendNtfySignal(topic, {
         type: 'WEBRTC_OFFER',
-        offer: { type: pc.localDescription?.type || offer.type, sdp: pc.localDescription?.sdp || offer.sdp }
+        offer: { type: offer.type, sdp: offer.sdp }
       });
     } catch(err) {
       console.warn('[Netplay WebRTC] Erreur initialisation Hôte Ntfy:', err);
@@ -1227,6 +1245,19 @@ class NetplayService {
         this.setupDataChannel(dc);
       };
 
+      pc.oniceconnectionstatechange = () => {
+        const iceState = pc.iceConnectionState;
+        console.log('[Netplay WebRTC Invité Ntfy] iceConnectionState:', iceState);
+        this.emit('ice_state_change', iceState);
+        if (iceState === 'connected' || iceState === 'completed') {
+          this.isP2PConnected = true;
+          this.emit('p2p_connected');
+        } else if (iceState === 'failed') {
+          this.isP2PConnected = false;
+          this.emit('ice_failed');
+        }
+      };
+
       pc.onconnectionstatechange = () => {
         console.log('[Netplay WebRTC Invité Ntfy] ConnectionState:', pc.connectionState);
         if (pc.connectionState === 'connected') {
@@ -1240,22 +1271,21 @@ class NetplayService {
 
       await pc.setRemoteDescription(new RTCSessionDescription(offer));
 
+      // Dépilage immédiat des candidats Trickle ICE déjà en file d'attente
+      if (this.pendingNtfyCandidates && this.pendingNtfyCandidates.length > 0) {
+        while (this.pendingNtfyCandidates.length > 0) {
+          const cand = this.pendingNtfyCandidates.shift();
+          try { await pc.addIceCandidate(new RTCIceCandidate(cand)); } catch(e) {}
+        }
+      }
+
       const answer = await pc.createAnswer();
       await pc.setLocalDescription(answer);
 
-      // Attente compacte Vanilla ICE pour intégrer les candidats dans la réponse
-      await new Promise((resolve) => {
-        if (pc.iceGatheringState === 'complete') return resolve();
-        const check = () => {
-          if (pc.iceGatheringState === 'complete') resolve();
-        };
-        pc.onicegatheringstatechange = check;
-        setTimeout(resolve, 1000);
-      });
-
+      // Trickle ICE immédiat : Envoi direct de la réponse SDP sans temporisation artificielle
       this.sendNtfySignal(topic, {
         type: 'WEBRTC_ANSWER',
-        answer: { type: pc.localDescription?.type || answer.type, sdp: pc.localDescription?.sdp || answer.sdp }
+        answer: { type: answer.type, sdp: answer.sdp }
       });
     } catch(err) {
       console.warn('[Netplay WebRTC] Erreur initialisation Invité Ntfy:', err);
@@ -1417,6 +1447,19 @@ class NetplayService {
         }
       };
 
+      pc.oniceconnectionstatechange = () => {
+        const iceState = pc.iceConnectionState;
+        console.log('[Netplay WebRTC Hôte] iceConnectionState:', iceState);
+        this.emit('ice_state_change', iceState);
+        if (iceState === 'connected' || iceState === 'completed') {
+          this.isP2PConnected = true;
+          this.emit('p2p_connected');
+        } else if (iceState === 'failed') {
+          this.isP2PConnected = false;
+          this.emit('ice_failed');
+        }
+      };
+
       pc.onconnectionstatechange = () => {
         console.log('[Netplay WebRTC Hôte] ConnectionState:', pc.connectionState);
         if (pc.connectionState === 'connected') {
@@ -1499,6 +1542,19 @@ class NetplayService {
       pc.onicecandidate = (event) => {
         if (event.candidate) {
           addDoc(calleeCandidatesCol, event.candidate.toJSON()).catch(() => {});
+        }
+      };
+
+      pc.oniceconnectionstatechange = () => {
+        const iceState = pc.iceConnectionState;
+        console.log('[Netplay WebRTC Invité] iceConnectionState:', iceState);
+        this.emit('ice_state_change', iceState);
+        if (iceState === 'connected' || iceState === 'completed') {
+          this.isP2PConnected = true;
+          this.emit('p2p_connected');
+        } else if (iceState === 'failed') {
+          this.isP2PConnected = false;
+          this.emit('ice_failed');
         }
       };
 
@@ -1827,26 +1883,44 @@ class NetplayService {
     // Attente bloquante du véritable handshake HOST_WELCOME avec l'Hôte
     return new Promise((resolve, reject) => {
       let settled = false;
+      let timer = null;
+      let retryTimer = null;
+      let retryCount = 0;
+
+      const triggerConnect = () => {
+        console.log(`[Netplay Cloud] Tentative P2P / Relais TURN vers le salon ${cleanCode}...`);
+        try {
+          this.setupPeerConnection(cleanCode, false, playerName);
+          this.setupNtfySignaling(cleanCode, false, playerName);
+        } catch(e) {}
+      };
 
       // Délai étendu à 20 secondes pour permettre la traversée des Box Wi-Fi et relais TURN
-      const timer = setTimeout(() => {
-        if (!settled) {
-          settled = true;
-          cleanup();
-          reject(new Error(`Délai dépassé (20s). Impossible de joindre l'hôte du salon ${cleanCode}. Vérifiez que le code est exact et que l'hôte a bien son salon ouvert.`));
-        }
-      }, 20000);
+      const armTimeout = () => {
+        if (timer) clearTimeout(timer);
+        timer = setTimeout(() => {
+          if (!settled) {
+            settled = true;
+            cleanup();
+            reject(new Error(`Délai dépassé (20s). Impossible de joindre l'hôte du salon ${cleanCode}. Vérifiez que le code est exact et que l'hôte a bien son salon ouvert.`));
+          }
+        }, 20000);
+      };
 
       // Relance automatique de signalisation à mi-parcours (7s) si toujours en attente
-      const retryTimer = setTimeout(() => {
-        if (!settled && !this.isP2PConnected) {
-          console.log(`[Netplay Cloud] Négociation P2P/TURN en cours... Relance du signal pour ${cleanCode}`);
-          try {
-            this.setupPeerConnection(cleanCode, false, playerName);
-            this.setupNtfySignaling(cleanCode, false, playerName);
-          } catch(e) {}
-        }
-      }, 7000);
+      const armRetry = () => {
+        if (retryTimer) clearTimeout(retryTimer);
+        retryTimer = setTimeout(() => {
+          if (!settled && !this.isP2PConnected) {
+            console.log(`[Netplay Cloud] Négociation P2P/TURN en cours... Relance automatique du signal pour ${cleanCode}`);
+            retryCount++;
+            triggerConnect();
+          }
+        }, 7000);
+      };
+
+      armTimeout();
+      armRetry();
 
       const onSuccess = (data) => {
         if (!settled) {
@@ -1865,19 +1939,52 @@ class NetplayService {
         }
       };
 
+      // Surveillance active de l'état ICE :
+      // 1. Si iceConnectionState passe à 'connected' ou 'completed', annuler immédiatement le timeout
+      // 2. Si l'état passe à 'failed', déclencher directement le Retry/Fallback au lieu d'attendre 20s
+      const onIceState = (iceState) => {
+        console.log(`[Netplay ICE Monitor] iceConnectionState: ${iceState}`);
+        if (iceState === 'connected' || iceState === 'completed') {
+          console.log(`[Netplay ICE Monitor] Tunnel ICE établi (${iceState}), annulation immédiate des timers de timeout.`);
+          if (timer) {
+            clearTimeout(timer);
+            timer = null;
+          }
+          if (retryTimer) {
+            clearTimeout(retryTimer);
+            retryTimer = null;
+          }
+        } else if (iceState === 'failed') {
+          console.warn(`[Netplay ICE Monitor] État 'failed' détecté ! Déclenchement direct du Retry/Fallback au lieu d'attendre 20s.`);
+          if (retryCount < 2) {
+            retryCount++;
+            if (retryTimer) clearTimeout(retryTimer);
+            triggerConnect();
+            armRetry();
+          } else {
+            console.warn(`[Netplay ICE Monitor] Échecs répétés après retries.`);
+            onError(`Échec de la négociation ICE avec le salon ${cleanCode}. La traversée NAT directe et le relais TURN ont échoué.`);
+          }
+        }
+      };
+
+      const onIceFailed = () => onIceState('failed');
+
       const cleanup = () => {
-        clearTimeout(timer);
-        clearTimeout(retryTimer);
+        if (timer) clearTimeout(timer);
+        if (retryTimer) clearTimeout(retryTimer);
         this.off('joined_success', onSuccess);
         this.off('error', onError);
+        this.off('ice_state_change', onIceState);
+        this.off('ice_failed', onIceFailed);
       };
 
       this.on('joined_success', onSuccess);
       this.on('error', onError);
+      this.on('ice_state_change', onIceState);
+      this.on('ice_failed', onIceFailed);
 
-      console.log(`[Netplay Cloud] Tentative de connexion P2P / Relais TURN vers le salon ${cleanCode}...`);
-      this.setupPeerConnection(cleanCode, false, playerName);
-      this.setupNtfySignaling(cleanCode, false, playerName);
+      triggerConnect();
     });
   }
 
