@@ -38,7 +38,9 @@ const RTC_CONFIG = {
     }
   ],
   iceCandidatePoolSize: 10,
-  iceTransportPolicy: 'all' // Permet le P2P direct quand c'est possible, bascule sur TURN si nécessaire
+  iceTransportPolicy: 'all', // Permet le P2P direct quand c'est possible, bascule sur TURN si nécessaire
+  bundlePolicy: 'max-bundle',
+  rtcpMuxPolicy: 'require'
 };
 
 /**

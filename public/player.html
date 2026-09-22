@@ -1875,6 +1875,31 @@
             window.__csw_rollback_engine.handleIncomingBinary(event.data.buffer);
           }
         }
+        if (event.data.type === 'REQUEST_KEYFRAME') {
+          if (typeof window.requestGameStreamKeyframe === 'function') {
+            window.requestGameStreamKeyframe();
+          }
+        }
+        if (event.data.type === 'SET_PAUSE') {
+          const isPaused = !!event.data.paused;
+          if (window.EJS_emulator) {
+            try {
+              if (isPaused) {
+                if (typeof window.EJS_emulator.pause === 'function') window.EJS_emulator.pause();
+                if (window.EJS_emulator.audioContext && typeof window.EJS_emulator.audioContext.suspend === 'function') {
+                  window.EJS_emulator.audioContext.suspend();
+                }
+                console.log('[Player] Jeu mis en pause (Paramètres ouverts)');
+              } else {
+                if (typeof window.EJS_emulator.play === 'function') window.EJS_emulator.play();
+                if (window.EJS_emulator.audioContext && typeof window.EJS_emulator.audioContext.resume === 'function') {
+                  window.EJS_emulator.audioContext.resume();
+                }
+                console.log('[Player] Jeu repris (Paramètres fermés)');
+              }
+            } catch(e) {}
+          }
+        }
         if (event.data.type === 'APP_VISIBILITY') {
           const isVis = !!event.data.visible;
           if (window.EJS_emulator) {
@@ -2325,6 +2350,15 @@
 
     // API Universelle de Streaming P2P (Canvas 60 FPS + WebAudio Destination)
     window.captureGameStream = function() {
+      // 1. Réutiliser le stream actif s'il est déjà créé et ses pistes toujours "live"
+      if (window._csw_active_stream && window._csw_active_stream.getVideoTracks().some(t => t.readyState === 'live')) {
+        const vTrack = window._csw_active_stream.getVideoTracks().find(t => t.readyState === 'live');
+        if (vTrack && typeof vTrack.requestFrame === 'function') {
+          try { vTrack.requestFrame(); } catch(e) {}
+        }
+        return window._csw_active_stream;
+      }
+
       const activeCanvas = (typeof window._getGameCanvas === 'function' ? window._getGameCanvas() : null)
         || document.querySelector('#game canvas')
         || Array.from(document.querySelectorAll('canvas')).find(c => c.width >= 200 && c.height >= 150)
@@ -2370,7 +2404,28 @@
         console.warn('[Player] Erreur capture audio stream:', e);
       }
 
+      window._csw_active_stream = stream;
+
+      // Battement périodique de keyframes (1.5s) pour alimenter immédiatement tout décodeur distant
+      if (!window._csw_keyframe_interval) {
+        window._csw_keyframe_interval = setInterval(() => {
+          window.requestGameStreamKeyframe();
+        }, 1500);
+      }
+
       return stream;
+    };
+
+    window.requestGameStreamKeyframe = function() {
+      try {
+        if (window._csw_active_stream) {
+          window._csw_active_stream.getVideoTracks().forEach(t => {
+            if (t.readyState === 'live' && typeof t.requestFrame === 'function') {
+              t.requestFrame();
+            }
+          });
+        }
+      } catch(e) {}
     };
 
     // Déclencher le préchargement

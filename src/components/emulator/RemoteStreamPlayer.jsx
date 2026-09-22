@@ -88,7 +88,7 @@ export function RemoteStreamPlayer({
   // Lancement garanti du flux vidéo sans blocage autoplay
   const attachAndPlayStream = useCallback(async (stream) => {
     if (!videoRef.current || !stream) return;
-    console.log('[RemoteStreamPlayer] Attachement du MediaStream au lecteur vidéo...', stream.getTracks());
+    console.log('[RemoteStreamPlayer] Attachement du MediaStream au lecteur vidéo...', stream.getTracks().map(t => `${t.kind}:${t.readyState}`));
     videoRef.current.srcObject = stream;
     setStreamConnected(true);
 
@@ -99,14 +99,23 @@ export function RemoteStreamPlayer({
       }
     };
 
-    const vTrack = stream.getVideoTracks()[0];
-    if (vTrack) {
-      vTrack.onunmute = () => {
-        console.log('[RemoteStreamPlayer] ✓ Piste vidéo WebRTC active (unmute) !');
-        videoRef.current?.play().catch(() => {});
-        setTimeout(checkVideoReady, 100);
-      };
-    }
+    const attachTrackEvents = (track) => {
+      if (track.kind === 'video') {
+        track.onunmute = () => {
+          console.log('[RemoteStreamPlayer] ✓ Piste vidéo WebRTC active (unmute) !');
+          videoRef.current?.play().catch(() => {});
+          setTimeout(checkVideoReady, 50);
+        };
+      }
+    };
+
+    stream.getTracks().forEach(attachTrackEvents);
+    stream.onaddtrack = (event) => {
+      console.log('[RemoteStreamPlayer] Nouvelle piste ajoutée au MediaStream :', event.track.kind);
+      attachTrackEvents(event.track);
+      videoRef.current?.play().catch(() => {});
+      setTimeout(checkVideoReady, 50);
+    };
 
     try {
       // 1. Tenter la lecture
@@ -177,6 +186,19 @@ export function RemoteStreamPlayer({
       clearInterval(reqInterval);
     };
   }, [attachAndPlayStream]);
+
+  // Surveillance active du décodage effectif des frames vidéo (200ms)
+  useEffect(() => {
+    if (hasVideoData) return;
+    const interval = setInterval(() => {
+      if (videoRef.current && videoRef.current.videoWidth > 0 && videoRef.current.videoHeight > 0) {
+        console.log('[RemoteStreamPlayer] ✓ Décodage vidéo confirmé par polling rapide :', videoRef.current.videoWidth, 'x', videoRef.current.videoHeight);
+        setHasVideoData(true);
+        clearInterval(interval);
+      }
+    }, 200);
+    return () => clearInterval(interval);
+  }, [hasVideoData]);
 
   // Mesure du FPS réel
   useEffect(() => {

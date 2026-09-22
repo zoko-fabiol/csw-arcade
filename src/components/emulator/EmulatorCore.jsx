@@ -365,6 +365,11 @@ export function EmulatorCore({
 
     const unsubReq = netplayService.on('video_stream_requested', () => {
       console.log('[EmulatorCore] Demande de flux vidéo reçue de l\'invité...');
+      if (iframeRef.current?.contentWindow) {
+        try {
+          iframeRef.current.contentWindow.postMessage({ type: 'REQUEST_KEYFRAME' }, '*');
+        } catch(e) {}
+      }
       tryBroadcastStream();
     });
 
