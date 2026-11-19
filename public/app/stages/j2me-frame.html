@@ -266,15 +266,40 @@
       pointer-events: none;
     }
 
-    @media (max-width: 720px) {
+    @media (max-width: 768px) {
+      .j2me-hint,
+      .j2me-brand,
+      .j2me-controls label {
+        display: none;
+      }
+      .j2me-toolbar {
+        padding: 4px 8px;
+        justify-content: center;
+      }
       .j2me-stage {
         flex-direction: column;
-        gap: 10px;
+        gap: 8px;
+        padding: 6px;
+      }
+      .phone-bezel {
+        padding: 6px;
+        border-radius: 12px;
+      }
+      .phone-speaker {
+        display: none;
       }
       .nokia-keypad {
         width: 100%;
-        max-width: 320px;
+        max-width: 340px;
         padding: 8px;
+        gap: 6px;
+      }
+      .keypad-title {
+        display: none;
+      }
+      .key {
+        height: 32px;
+        font-size: 11px;
       }
     }
   </style>
@@ -305,13 +330,17 @@
         <option value="Siemens">Siemens</option>
       </select>
 
+      <button type="button" id="toggle-midi-btn" class="j2me-btn" title="Couper le synthé MIDI WebAssembly accélère les jeux Java sur mobile">
+        ⚡ MIDI : Auto
+      </button>
+
       <button type="button" id="toggle-kbd-btn" class="j2me-btn active" title="Afficher/Masquer le pavé Nokia">
         📱 Pavé Nokia
       </button>
     </div>
 
     <div class="j2me-hint">
-      Clavier : <kbd>Flèches</kbd> D-Pad · <kbd>Entrée</kbd>/<kbd>Espace</kbd> OK · <kbd>Q</kbd>/<kbd>F1</kbd> Soft G · <kbd>W</kbd>/<kbd>F2</kbd> Soft D · <kbd>0-9</kbd> Pavé
+      Clavier &amp; Manette : <kbd>Flèches</kbd>/<kbd>Stick</kbd> · <kbd>Entrée</kbd>/<kbd>A</kbd> OK · <kbd>Q</kbd>/<kbd>Y</kbd> Soft G · <kbd>W</kbd>/<kbd>B</kbd> Soft D · <kbd>0-9</kbd>
     </div>
   </div>
 
@@ -402,11 +431,29 @@
     const resSelect = document.getElementById("res-select");
     const phoneSelect = document.getElementById("phone-select");
     const toggleKbdBtn = document.getElementById("toggle-kbd-btn");
+    const toggleMidiBtn = document.getElementById("toggle-midi-btn");
     const nokiaKeypad = document.getElementById("nokia-keypad");
 
     let scaleSet = false;
     let cheerpjReadyPromise = null;
     let currentGameKey = "default";
+    let customExternalPadActive = false;
+    const isTouchViewport = window.matchMedia && window.matchMedia("(max-width: 768px)").matches;
+    let fastMidiOff = false;
+    try {
+      const savedMidi = sessionStorage.getItem("csw_j2me_midi");
+      fastMidiOff = savedMidi !== null ? savedMidi === "off" : isTouchViewport;
+    } catch { /* ignore */ }
+    if (toggleMidiBtn) {
+      toggleMidiBtn.textContent = fastMidiOff ? "⚡ Rapide (MIDI OFF)" : "🔊 MIDI ON";
+      toggleMidiBtn.classList.toggle("active", fastMidiOff);
+      toggleMidiBtn.addEventListener("click", () => {
+        try {
+          sessionStorage.setItem("csw_j2me_midi", fastMidiOff ? "on" : "off");
+        } catch { /* ignore */ }
+        location.reload();
+      });
+    }
 
     function postStatus(status, message) {
       window.parent.postMessage({ type: "STAGE_STATUS", status, message }, window.location.origin);
@@ -580,17 +627,38 @@
     async function ensureCheerpJInitialized() {
       if (!cheerpjReadyPromise) {
         cheerpjReadyPromise = (async () => {
-          setLoadingText("Initialisation audio & CheerpJ…", "Démarrage de la JVM WebAssembly FreeJ2ME…");
-          try {
-            window.libmidi = new LibMidi(createUnlockingAudioContext());
-            await window.libmidi.init();
-            if (window.libmidi.midiPlayer) {
-              window.libmidi.midiPlayer.addEventListener("end-of-media", (e) => {
-                window.evtQueue.queueEvent({ kind: "player-eom", player: e.target });
-              });
+          setLoadingText("Initialisation moteur Java CheerpJ…", "Démarrage de la JVM WebAssembly FreeJ2ME…");
+          const noopMidiStub = {
+            midiPlayer: {
+              duration: 0,
+              volume: 0,
+              setSequence: async () => 0,
+              play: () => {},
+              loop: () => {},
+              stop: () => {},
+              shortEvent: () => {},
+              getPosition: async () => 0,
+              seek: () => {},
+              addEventListener: () => {},
+            },
+          };
+          if (!fastMidiOff) {
+            try {
+              window.libmidi = new LibMidi(createUnlockingAudioContext());
+              await window.libmidi.init();
+              if (window.libmidi.midiPlayer) {
+                window.libmidi.midiPlayer.addEventListener("end-of-media", (e) => {
+                  window.evtQueue.queueEvent({ kind: "player-eom", player: e.target });
+                });
+              } else {
+                window.libmidi = noopMidiStub;
+              }
+            } catch (err) {
+              console.warn("[J2ME] LibMidi non disponible, bascule en mode silencieux sécurisé :", err);
+              window.libmidi = noopMidiStub;
             }
-          } catch (err) {
-            console.warn("[J2ME] LibMidi non disponible, poursuite sans synthé MIDI :", err);
+          } else {
+            window.libmidi = noopMidiStub;
           }
           window.libmedia = new LibMedia();
 
@@ -672,7 +740,10 @@
       return cheerpjReadyPromise;
     }
 
+    let hasBootedJar = false;
     async function bootJarBlob(msg) {
+      if (hasBootedJar) return;
+      hasBootedJar = true;
       const fileBlob = msg.fileBlob;
       const fileName = msg.filename || (fileBlob && fileBlob.name) || "game.jar";
       const gameName = msg.gameName || fileName.replace(/\.jar$/i, "");
@@ -720,7 +791,9 @@
         settings.width = "320";
         settings.height = "240";
         settings.phone = savedPhone || "Nokia";
-        settings.sound = "on";
+        settings.sound = fastMidiOff ? "off" : "on";
+        settings.queuedPaint = "off";
+        settings.textureDisableFilter = "on";
 
         const analysisResult = await AnalyserUtil.analyseFile(jarFile, fileName);
         if (analysisResult && analysisResult.screenWidth !== -1) {
@@ -764,6 +837,38 @@
 
         await launcherUtil.initApp(jarFile, loader, jsettings, jappProps, jsysProps);
 
+        // Lire les éventuels records RMS existants AVANT de démarrer le thread principal CheerpJ (ne jamais appeler Java File() pendant main())
+        try {
+          const rmsDir = await new File(`/files/${appId}/rms`);
+          if (await rmsDir.exists()) {
+            const files = await rmsDir.list();
+            if (files && files.length) {
+              let bestDetected = 0;
+              for (const fname of files) {
+                const blob = await cjFileBlob(`/files/${appId}/rms/${fname}`);
+                if (!blob) continue;
+                const buf = new Uint8Array(await blob.arrayBuffer());
+                const txt = new TextDecoder("latin1").decode(buf);
+                const matches = txt.match(/\b[1-9][0-9]{2,6}\b/g) || [];
+                for (const m of matches) {
+                  const n = Number(m);
+                  if (n >= 100 && n <= 9999999 && n > bestDetected) bestDetected = n;
+                }
+              }
+              if (bestDetected > 0) {
+                window.parent.postMessage(
+                  { type: "RAM_TELEMETRY_TICK", score: bestDetected, liveScore: bestDetected, lives: null, mode: "j2me_rms" },
+                  window.location.origin
+                );
+                window.parent.postMessage(
+                  { type: "RAM_AUTO_SCORE", score: bestDetected, reason: "j2me_rms", mode: "j2me_rms" },
+                  window.location.origin
+                );
+              }
+            }
+          }
+        } catch { /* ignore */ }
+
         setLoadingText(`Démarrage de ${gameName}…`, `Écran ${settings.width}×${settings.height} (${settings.phone})`);
         FreeJ2ME.main(["app", appId]).catch((err) => {
           console.error("[FreeJ2ME Crash]", err);
@@ -780,6 +885,56 @@
 
     setupInputListeners();
 
+    // Support natif Manette physique (Xbox, PS4/PS5, Switch, Bluetooth) à 60Hz pour tous les jeux Java/Gameloft !
+    const gpPrevState = new Map();
+    const GP_BTN_MAP = {
+      0: "Enter",     // A / Cross -> OK / Fire
+      1: "KeyW",      // B / Circle -> Softkey Droite / Retour
+      2: "Digit5",    // X / Square -> Action 5
+      3: "KeyQ",      // Y / Triangle -> Softkey Gauche / Menu
+      4: "Digit1",    // LB -> 1
+      5: "Digit3",    // RB -> 3
+      6: "Digit7",    // LT -> 7
+      7: "Digit9",    // RT -> 9
+      8: "KeyE",      // Select -> Retour / Clear
+      9: "Enter",     // Start -> OK / Pause
+      12: "ArrowUp",
+      13: "ArrowDown",
+      14: "ArrowLeft",
+      15: "ArrowRight",
+    };
+
+    function pollGamepads() {
+      const pads = navigator.getGamepads ? navigator.getGamepads() : [];
+      const pad = Array.from(pads).find((p) => p && p.connected);
+      if (pad) {
+        const nextMap = new Map();
+        Object.entries(GP_BTN_MAP).forEach(([idxStr, code]) => {
+          const btn = pad.buttons[Number(idxStr)];
+          if (btn && btn.pressed) nextMap.set(code, true);
+        });
+        const axX = pad.axes[0] || 0;
+        const axY = pad.axes[1] || 0;
+        if (axX < -0.4) nextMap.set("ArrowLeft", true);
+        if (axX > 0.4) nextMap.set("ArrowRight", true);
+        if (axY < -0.4) nextMap.set("ArrowUp", true);
+        if (axY > 0.4) nextMap.set("ArrowDown", true);
+
+        const allKeys = new Set([...gpPrevState.keys(), ...nextMap.keys()]);
+        allKeys.forEach((code) => {
+          const wasDown = Boolean(gpPrevState.get(code));
+          const isDown = Boolean(nextMap.get(code));
+          if (wasDown !== isDown) {
+            triggerVirtualKey(isDown, code);
+            if (isDown) gpPrevState.set(code, true);
+            else gpPrevState.delete(code);
+          }
+        });
+      }
+      requestAnimationFrame(pollGamepads);
+    }
+    requestAnimationFrame(pollGamepads);
+
     window.addEventListener("message", (event) => {
       if (event.origin !== window.location.origin) return;
       const msg = event.data;
@@ -788,6 +943,18 @@
         bootJarBlob(msg);
       } else if (msg.type === "UPDATE_DISPLAY") {
         display.classList.toggle("smooth-filter", msg.filter === "smooth");
+      } else if (msg.type === "J2ME_KEY" && msg.code) {
+        triggerVirtualKey(Boolean(msg.pressed), msg.code);
+      } else if (msg.type === "SET_CUSTOM_TOUCH_PAD") {
+        customExternalPadActive = Boolean(msg.enabled);
+        if (customExternalPadActive) {
+          nokiaKeypad.classList.add("hidden");
+          toggleKbdBtn.classList.remove("active");
+          toggleKbdBtn.style.display = "none";
+        } else {
+          toggleKbdBtn.style.display = "";
+        }
+        autoscale();
       }
     });
 

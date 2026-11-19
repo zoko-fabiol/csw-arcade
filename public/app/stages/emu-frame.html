@@ -75,6 +75,11 @@
     body.crt-on #crt-overlay {
       opacity: 1;
     }
+    body.csw-touch-pad .ejs_virtualGamepad_parent,
+    body.csw-touch-pad .ejs_virtualGamepad_button {
+      display: none !important;
+      pointer-events: none !important;
+    }
     #credits-hud {
       display: none;
     }
@@ -146,34 +151,57 @@
       }
     }
 
-    function buildControllersConfig(controls) {
+    let currentCoreName = 'fbneo';
+
+    function buildControllersConfig(controls, coreName = currentCoreName) {
       if (!controls) return null;
       const p1 = controls.p1 || {};
       const p2 = controls.p2 || {};
+      const isArcade = ['fbneo', 'arcade', 'mame2003_plus'].includes(String(coreName || '').toLowerCase());
       return {
         0: {
+          0: { value: getKeyCode(p1.a, 74), value2: 'BUTTON_2' }, // B / Cross / Neo Geo A
+          1: { value: getKeyCode(p1.c, 85), value2: 'BUTTON_4' }, // Y / Square / Neo Geo C
+          2: isArcade ? { value: 0, value2: '' } : { value: 16, value2: 'SELECT' },
+          3: { value: getKeyCode(p1.start, 49), value2: 'START' },
           4: { value: getKeyCode(p1.up, 87), value2: 'DPAD_UP' },
           5: { value: getKeyCode(p1.down, 83), value2: 'DPAD_DOWN' },
           6: { value: getKeyCode(p1.left, 65), value2: 'DPAD_LEFT' },
           7: { value: getKeyCode(p1.right, 68), value2: 'DPAD_RIGHT' },
-          0: { value: getKeyCode(p1.a, 74), value2: 'BUTTON_2' },
-          8: { value: getKeyCode(p1.b, 75), value2: 'BUTTON_1' },
-          1: { value: getKeyCode(p1.c, 85), value2: 'BUTTON_4' },
-          9: { value: getKeyCode(p1.d, 73), value2: 'BUTTON_3' },
-          2: { value: 0, value2: '' },
-          3: { value: getKeyCode(p1.start, 49), value2: 'START' },
+          8: { value: getKeyCode(p1.b, 75), value2: 'BUTTON_1' }, // A / Circle / Neo Geo B
+          9: { value: getKeyCode(p1.d, 73), value2: 'BUTTON_3' }, // X / Triangle / Neo Geo D
+          10: { value: 81, value2: 'LEFT_TOP_SHOULDER' }, // Q / L1
+          11: { value: 69, value2: 'RIGHT_TOP_SHOULDER' }, // E / R1
+          12: { value: 90, value2: 'LEFT_BOTTOM_SHOULDER' }, // Z / L2
+          13: { value: 67, value2: 'RIGHT_BOTTOM_SHOULDER' }, // C / R2
+          16: { value: 39, value2: 'LEFT_STICK_X:+1' },
+          17: { value: 37, value2: 'LEFT_STICK_X:-1' },
+          18: { value: 40, value2: 'LEFT_STICK_Y:+1' },
+          19: { value: 38, value2: 'LEFT_STICK_Y:-1' },
+          20: { value: 0, value2: 'RIGHT_STICK_X:+1' },
+          21: { value: 0, value2: 'RIGHT_STICK_X:-1' },
+          22: { value: 0, value2: 'RIGHT_STICK_Y:+1' },
+          23: { value: 0, value2: 'RIGHT_STICK_Y:-1' },
         },
         1: {
+          0: { value: getKeyCode(p2.a, 100), value2: 'BUTTON_2' },
+          1: { value: getKeyCode(p2.c, 103), value2: 'BUTTON_4' },
+          2: isArcade ? { value: 0, value2: '' } : { value: 109, value2: 'SELECT' },
+          3: { value: getKeyCode(p2.start, 50), value2: 'START' },
           4: { value: getKeyCode(p2.up, 38), value2: 'DPAD_UP' },
           5: { value: getKeyCode(p2.down, 40), value2: 'DPAD_DOWN' },
           6: { value: getKeyCode(p2.left, 37), value2: 'DPAD_LEFT' },
           7: { value: getKeyCode(p2.right, 39), value2: 'DPAD_RIGHT' },
-          0: { value: getKeyCode(p2.a, 100), value2: 'BUTTON_2' },
           8: { value: getKeyCode(p2.b, 101), value2: 'BUTTON_1' },
-          1: { value: getKeyCode(p2.c, 103), value2: 'BUTTON_4' },
           9: { value: getKeyCode(p2.d, 104), value2: 'BUTTON_3' },
-          2: { value: 0, value2: '' },
-          3: { value: getKeyCode(p2.start, 50), value2: 'START' },
+          10: { value: 105, value2: 'LEFT_TOP_SHOULDER' },
+          11: { value: 107, value2: 'RIGHT_TOP_SHOULDER' },
+          12: { value: 0, value2: 'LEFT_BOTTOM_SHOULDER' },
+          13: { value: 0, value2: 'RIGHT_BOTTOM_SHOULDER' },
+          16: { value: 0, value2: 'LEFT_STICK_X:+1' },
+          17: { value: 0, value2: 'LEFT_STICK_X:-1' },
+          18: { value: 0, value2: 'LEFT_STICK_Y:+1' },
+          19: { value: 0, value2: 'LEFT_STICK_Y:-1' },
         },
         2: {},
         3: {},
@@ -459,6 +487,390 @@
       }
     });
 
+    // =========================================================================
+    // MOTEUR UNIVERSEL DE TÉLÉMÉTRIE RAM (Scores Auto + Détection Perte / Game Over / Victoire)
+    // Fonctionne sur Arcade, Sega Mega Drive, PlayStation, Nintendo (NES/SNES/N64/GBA)
+    // =========================================================================
+    const RAM_GAME_PROFILES = [
+      {
+        match: /sonic.*2/i,
+        cores: ['segamd', 'genesis_plus_gx', 'picodrive'],
+        read(ram) {
+          if (ram.length < 0xFF00) return null;
+          const dv = new DataView(ram.buffer, ram.byteOffset, ram.byteLength);
+          return {
+            lives: ram[0xFE12],
+            rings: dv.getUint16(0xFE20, false),
+            score: dv.getUint32(0xFE26, false) * 10,
+          };
+        },
+      },
+      {
+        match: /sonic/i,
+        cores: ['segamd', 'genesis_plus_gx', 'picodrive'],
+        read(ram) {
+          if (ram.length < 0xFF00) return null;
+          const dv = new DataView(ram.buffer, ram.byteOffset, ram.byteLength);
+          return {
+            lives: ram[0xFE12],
+            rings: dv.getUint16(0xFE20, false),
+            score: dv.getUint32(0xFE26, false) * 10,
+          };
+        },
+      },
+      {
+        match: /streets.*rage.*2|bare.*knuckle.*2/i,
+        cores: ['segamd', 'genesis_plus_gx', 'picodrive'],
+        read(ram) {
+          if (ram.length < 0xF000) return null;
+          const dv = new DataView(ram.buffer, ram.byteOffset, ram.byteLength);
+          return {
+            lives: ram[0xEF4A],
+            score: dv.getUint32(0xEF4C, false),
+          };
+        },
+      },
+      {
+        match: /super.*mario.*world/i,
+        cores: ['snes', 'snes9x'],
+        read(ram) {
+          if (ram.length < 0x1000) return null;
+          const s = ram[0x0F34] | (ram[0x0F35] << 8) | (ram[0x0F36] << 16);
+          return {
+            lives: ram[0x0DBE] + 1,
+            score: s * 10,
+          };
+        },
+      },
+      {
+        match: /super.*mario.*bros/i,
+        cores: ['nes', 'fceumm', 'nestopia'],
+        read(ram) {
+          if (ram.length < 0x0800) return null;
+          let sc = 0;
+          for (let i = 0; i < 6; i++) {
+            const d = ram[0x07DD + i];
+            if (d > 9) return null;
+            sc = sc * 10 + d;
+          }
+          return {
+            lives: ram[0x075A] === 0xFF ? 0 : ram[0x075A] + 1,
+            score: sc * 10,
+          };
+        },
+      },
+      {
+        match: /tekken.*3/i,
+        cores: ['psx', 'ps1', 'pcsx_rearmed'],
+        read(ram) {
+          if (ram.length < 0x0B0000) return null;
+          const dv = new DataView(ram.buffer, ram.byteOffset, ram.byteLength);
+          const p1Rounds = ram[0x0A96B4];
+          const p2Rounds = ram[0x0AAFA0];
+          const rawScore = dv.getUint32(0x0A96A8, true);
+          return {
+            lives: Math.max(0, 2 - Math.min(2, p2Rounds)),
+            p1Rounds,
+            p2Rounds,
+            score: rawScore < 50000000 ? rawScore : 0,
+          };
+        },
+      },
+      {
+        match: /crash.*bandicoot/i,
+        cores: ['psx', 'ps1', 'pcsx_rearmed'],
+        read(ram) {
+          if (ram.length < 0x070000) return null;
+          const dv = new DataView(ram.buffer, ram.byteOffset, ram.byteLength);
+          const lives = dv.getUint16(0x061904, true) >> 8;
+          const wumpa = dv.getUint16(0x0618EC, true) >> 8;
+          return {
+            lives: lives <= 99 ? lives : null,
+            score: wumpa <= 99 ? wumpa * 100 : 0,
+          };
+        },
+      },
+    ];
+
+    const cswRamTelemetry = {
+      timer: null,
+      profile: null,
+      core: 'fbneo',
+      gameTitle: '',
+      peakScore: 0,
+      lastSavedScore: 0,
+      lastScore: 0,
+      lastLives: null,
+      lastP1Rounds: 0,
+      lastP2Rounds: 0,
+      lastLossSignalMs: 0,
+      lastWinSignalMs: 0,
+      hadActivePlay: false,
+      // Scanner heuristique universel pour tout jeu sans profil fixe
+      prevSnapshot: null,
+      scoreCandidates: new Map(), // offset -> { hits, val, type }
+      lockedScoreAddr: null, // { offset, type }
+      livesCandidates: new Map(), // offset -> { initial, val, drops }
+      lockedLivesAddr: null,
+    };
+
+    function getSystemRamView() {
+      try {
+        const mod = getWasmModule();
+        if (!mod || !mod.HEAPU8) return null;
+        if (typeof mod._retro_get_memory_data === 'function' && typeof mod._retro_get_memory_size === 'function') {
+          const ptr = mod._retro_get_memory_data(2); // RETRO_MEMORY_SYSTEM_RAM
+          const size = mod._retro_get_memory_size(2);
+          if (ptr > 0 && size >= 512 && ptr + size <= mod.HEAPU8.length) {
+            return mod.HEAPU8.subarray(ptr, ptr + size);
+          }
+        }
+        // Fallback savestate RAM pour les cœurs arcade (FBNeo / MAME) qui n'exposent pas memory_data(2)
+        const state = window.EJS_emulator?.gameManager?.getState?.();
+        if (state && state.length > 4096) {
+          return state instanceof Uint8Array ? state : new Uint8Array(state);
+        }
+      } catch {}
+      return null;
+    }
+
+    function readBcd3(buf, off) {
+      if (off + 3 > buf.length) return -1;
+      const b0 = buf[off], b1 = buf[off + 1], b2 = buf[off + 2];
+      const h0 = b0 >> 4, l0 = b0 & 0xF;
+      const h1 = b1 >> 4, l1 = b1 & 0xF;
+      const h2 = b2 >> 4, l2 = b2 & 0xF;
+      if (h0 > 9 || l0 > 9 || h1 > 9 || l1 > 9 || h2 > 9 || l2 > 9) return -1;
+      return (h0 * 10 + l0) * 10000 + (h1 * 10 + l1) * 100 + (h2 * 10 + l2);
+    }
+
+    function readHeuristicValue(ram, addr) {
+      if (!addr || addr.offset + 4 > ram.length) return 0;
+      const dv = new DataView(ram.buffer, ram.byteOffset, ram.byteLength);
+      if (addr.type === 'bcd3') {
+        const v = readBcd3(ram, addr.offset);
+        return v >= 0 ? v : 0;
+      }
+      if (addr.type === 'u32be') return dv.getUint32(addr.offset, false);
+      if (addr.type === 'u32le') return dv.getUint32(addr.offset, true);
+      if (addr.type === 'u16le') return dv.getUint16(addr.offset, true);
+      return 0;
+    }
+
+    function runHeuristicRamScan(ram) {
+      // Limiter le scan heuristique aux premiers 131072 octets de RAM système pour rester < 2ms/tick
+      const scanLen = Math.min(ram.length, 131072);
+      const prev = cswRamTelemetry.prevSnapshot;
+      if (!prev || prev.length !== scanLen) {
+        cswRamTelemetry.prevSnapshot = new Uint8Array(ram.subarray(0, scanLen));
+        return { score: cswRamTelemetry.lastScore, lives: cswRamTelemetry.lastLives };
+      }
+
+      // 1. Si l'adresse de score est déjà verrouillée, la lire directement
+      let detectedScore = cswRamTelemetry.lastScore;
+      if (cswRamTelemetry.lockedScoreAddr) {
+        const v = readHeuristicValue(ram, cswRamTelemetry.lockedScoreAddr);
+        if (v < 99999999) {
+          detectedScore = v;
+        }
+      } else {
+        // Découvrir les compteurs qui augmentent par paliers typiques de score (+10..+20000) sans bouger à chaque frame
+        const dvCur = new DataView(ram.buffer, ram.byteOffset, scanLen);
+        const dvPrev = new DataView(prev.buffer, prev.byteOffset, scanLen);
+        for (let off = 0; off < scanLen - 4; off += 2) {
+          // Test BCD 3 octets (très courant en Arcade / Neo Geo / Capcom / Konami / Sega)
+          const bcdCur = readBcd3(ram, off);
+          const bcdPrev = readBcd3(prev, off);
+          if (bcdCur > bcdPrev && bcdPrev >= 0 && bcdCur <= 999999) {
+            const diff = bcdCur - bcdPrev;
+            if (diff >= 5 && diff <= 25000 && (diff % 5 === 0 || diff % 10 === 0)) {
+              const key = `bcd3_${off}`;
+              const rec = cswRamTelemetry.scoreCandidates.get(key) || { offset: off, type: 'bcd3', hits: 0, val: 0 };
+              rec.hits += 1;
+              rec.val = bcdCur;
+              cswRamTelemetry.scoreCandidates.set(key, rec);
+              if (rec.hits >= 2) {
+                cswRamTelemetry.lockedScoreAddr = { offset: off, type: 'bcd3' };
+                detectedScore = bcdCur;
+                break;
+              }
+            }
+          }
+          // Test u32 little-endian / big-endian (PS1, SNES, Mega Drive, GBA)
+          if (off % 4 === 0) {
+            const leCur = dvCur.getUint32(off, true);
+            const lePrev = dvPrev.getUint32(off, true);
+            if (leCur > lePrev && leCur <= 9999999) {
+              const diff = leCur - lePrev;
+              if (diff >= 10 && diff <= 25000 && diff % 10 === 0) {
+                const key = `u32le_${off}`;
+                const rec = cswRamTelemetry.scoreCandidates.get(key) || { offset: off, type: 'u32le', hits: 0, val: 0 };
+                rec.hits += 1;
+                rec.val = leCur;
+                cswRamTelemetry.scoreCandidates.set(key, rec);
+                if (rec.hits >= 2) {
+                  cswRamTelemetry.lockedScoreAddr = { offset: off, type: 'u32le' };
+                  detectedScore = leCur;
+                  break;
+                }
+              }
+            }
+          }
+        }
+      }
+
+      // 2. Suivi heuristique d'un compteur de vies (octets entre 1..9 qui descendent de -1 lors d'une mort)
+      let detectedLives = cswRamTelemetry.lastLives;
+      if (cswRamTelemetry.lockedLivesAddr !== null) {
+        const lv = ram[cswRamTelemetry.lockedLivesAddr];
+        if (lv <= 15) detectedLives = lv;
+      } else if (cswRamTelemetry.hadActivePlay) {
+        for (let off = 0; off < Math.min(scanLen, 65536); off++) {
+          const cur = ram[off];
+          const old = prev[off];
+          if (old >= 2 && old <= 6 && cur === old - 1) {
+            const rec = cswRamTelemetry.livesCandidates.get(off) || { initial: old, drops: 0 };
+            rec.drops += 1;
+            cswRamTelemetry.livesCandidates.set(off, rec);
+            if (rec.drops >= 2) {
+              cswRamTelemetry.lockedLivesAddr = off;
+              detectedLives = cur;
+              break;
+            }
+          }
+        }
+      }
+
+      cswRamTelemetry.prevSnapshot.set(ram.subarray(0, scanLen));
+      return { score: detectedScore, lives: detectedLives };
+    }
+
+    function emitRamAutoScore(score, reason) {
+      const clean = Math.floor(Number(score) || 0);
+      if (clean <= 0) return;
+      if (reason === 'milestone' && clean <= cswRamTelemetry.lastSavedScore) return;
+      cswRamTelemetry.lastSavedScore = Math.max(cswRamTelemetry.lastSavedScore, clean);
+      notifyParent('RAM_AUTO_SCORE', {
+        score: clean,
+        reason, // 'game_over' | 'victory' | 'milestone' | 'session_end'
+        mode: cswRamTelemetry.profile ? 'profile' : 'heuristic',
+      });
+    }
+
+    function emitRamLossCreditSignal(reason) {
+      const now = Date.now();
+      // Anti-rebond 5 secondes pour ne décompter qu'un seul crédit par partie perdue
+      if (now - cswRamTelemetry.lastLossSignalMs < 5000) return;
+      cswRamTelemetry.lastLossSignalMs = now;
+      if (cswRamTelemetry.peakScore > 0) {
+        emitRamAutoScore(cswRamTelemetry.peakScore, 'game_over');
+      }
+      notifyParent('RAM_LOSS_CONSUME_CREDIT', {
+        reason,
+        score: cswRamTelemetry.peakScore,
+      });
+      // Réinitialiser peakScore pour la prochaine partie qui va recommencer
+      cswRamTelemetry.peakScore = 0;
+      cswRamTelemetry.lastSavedScore = 0;
+    }
+
+    function tickRamTelemetry() {
+      const ram = getSystemRamView();
+      if (!ram) return;
+
+      let score = 0;
+      let lives = null;
+      let p1Rounds = null;
+      let p2Rounds = null;
+
+      if (cswRamTelemetry.profile) {
+        const res = cswRamTelemetry.profile.read(ram);
+        if (res) {
+          score = Number(res.score || 0);
+          lives = typeof res.lives === 'number' ? res.lives : null;
+          p1Rounds = typeof res.p1Rounds === 'number' ? res.p1Rounds : null;
+          p2Rounds = typeof res.p2Rounds === 'number' ? res.p2Rounds : null;
+        }
+      } else {
+        const res = runHeuristicRamScan(ram);
+        score = Number(res.score || 0);
+        lives = typeof res.lives === 'number' ? res.lives : null;
+      }
+
+      if (score > 0 && score < 99999999) {
+        cswRamTelemetry.hadActivePlay = true;
+        if (score > cswRamTelemetry.peakScore) {
+          cswRamTelemetry.peakScore = score;
+        }
+      }
+
+      // 1. Détection de VICTOIRE (ex: 2 rounds gagnés en jeu de combat ou gros palier de score)
+      if (p1Rounds !== null && p1Rounds >= 2 && cswRamTelemetry.lastP1Rounds < 2) {
+        const now = Date.now();
+        if (now - cswRamTelemetry.lastWinSignalMs > 5000) {
+          cswRamTelemetry.lastWinSignalMs = now;
+          const winScore = Math.max(cswRamTelemetry.peakScore, 15000);
+          cswRamTelemetry.peakScore = winScore;
+          emitRamAutoScore(winScore, 'victory');
+        }
+      }
+
+      // 2. Détection de DÉFAITE / GAME OVER via les vies ou rounds perdus dans la RAM
+      if (p2Rounds !== null && p2Rounds >= 2 && cswRamTelemetry.lastP2Rounds < 2) {
+        emitRamLossCreditSignal('match_lost_ram');
+      } else if (lives !== null && cswRamTelemetry.lastLives !== null) {
+        if (cswRamTelemetry.lastLives > 0 && lives === 0 && cswRamTelemetry.hadActivePlay) {
+          emitRamLossCreditSignal('lives_zero_ram');
+        }
+      }
+
+      // 3. Détection universelle de Game Over -> Recommencer (le score RAM retombe brutalement de >50 à 0)
+      if (cswRamTelemetry.hadActivePlay && cswRamTelemetry.peakScore >= 50 && cswRamTelemetry.lastScore >= 50 && score === 0) {
+        emitRamLossCreditSignal('score_reset_restart_ram');
+      }
+
+      // 4. Sauvegarde automatique continue dès qu'un nouveau palier de score RAM significatif est atteint
+      if (cswRamTelemetry.peakScore >= 100 && cswRamTelemetry.peakScore > cswRamTelemetry.lastSavedScore) {
+        emitRamAutoScore(cswRamTelemetry.peakScore, 'milestone');
+      }
+
+      cswRamTelemetry.lastScore = score;
+      if (lives !== null) cswRamTelemetry.lastLives = lives;
+      if (p1Rounds !== null) cswRamTelemetry.lastP1Rounds = p1Rounds;
+      if (p2Rounds !== null) cswRamTelemetry.lastP2Rounds = p2Rounds;
+
+      notifyParent('RAM_TELEMETRY_TICK', {
+        score: Math.max(score, cswRamTelemetry.peakScore),
+        liveScore: score,
+        lives,
+        mode: cswRamTelemetry.profile ? 'profile' : 'heuristic',
+      });
+    }
+
+    function startRamTelemetry(gameTitle, core) {
+      if (cswRamTelemetry.timer) clearInterval(cswRamTelemetry.timer);
+      const lowerCore = String(core || '').toLowerCase();
+      const lowerTitle = String(gameTitle || '').toLowerCase();
+      cswRamTelemetry.core = lowerCore;
+      cswRamTelemetry.gameTitle = gameTitle || '';
+      cswRamTelemetry.profile =
+        RAM_GAME_PROFILES.find((p) => p.cores.includes(lowerCore) && p.match.test(lowerTitle)) || null;
+      cswRamTelemetry.peakScore = 0;
+      cswRamTelemetry.lastSavedScore = 0;
+      cswRamTelemetry.lastScore = 0;
+      cswRamTelemetry.lastLives = null;
+      cswRamTelemetry.lastP1Rounds = 0;
+      cswRamTelemetry.lastP2Rounds = 0;
+      cswRamTelemetry.hadActivePlay = false;
+      cswRamTelemetry.prevSnapshot = null;
+      cswRamTelemetry.scoreCandidates.clear();
+      cswRamTelemetry.lockedScoreAddr = null;
+      cswRamTelemetry.livesCandidates.clear();
+      cswRamTelemetry.lockedLivesAddr = null;
+
+      cswRamTelemetry.timer = setInterval(tickRamTelemetry, 550);
+    }
+
     window.addEventListener('message', (event) => {
       if (event.origin !== window.location.origin || !event.data) return;
       const msg = event.data;
@@ -517,9 +929,35 @@
         return;
       }
 
+      if (msg.type === 'FLUSH_RAM_SCORE') {
+        if (cswRamTelemetry.peakScore > 0) {
+          emitRamAutoScore(cswRamTelemetry.peakScore, msg.reason || 'session_end');
+        }
+        return;
+      }
+
       if (msg.type === 'FORCE_SYNC_CREDITS') {
         try { window.focus(); } catch {}
         forceSyncCreditsToRam();
+        return;
+      }
+
+      if (msg.type === 'SET_CUSTOM_TOUCH_PAD') {
+        document.body.classList.toggle('csw-touch-pad', Boolean(msg.enabled));
+        return;
+      }
+
+      if (msg.type === 'VIRTUAL_PAD_BTN') {
+        const myPort = netplayPlayerIndex === 1 ? 1 : 0;
+        const btnIdx = Number(msg.buttonIdx);
+        const pressed = Boolean(msg.pressed);
+        if (!simulateEmuInput(myPort, btnIdx, pressed)) {
+          const kc = window.EJS_emulator?.controls?.[myPort]?.[btnIdx]?.value;
+          if (kc) dispatchSyntheticKey(kc, pressed ? 'keydown' : 'keyup');
+        }
+        if (isNetplaySession) {
+          notifyParent('NETPLAY_LOCAL_BTN', { buttonIdx: btnIdx, pressed });
+        }
         return;
       }
 
@@ -537,6 +975,7 @@
 
       if (msg.type === 'BOOT_EMU' && !started) {
         started = true;
+        currentCoreName = msg.core || 'fbneo';
         isNetplaySession = Boolean(msg.isNetplay);
         netplayPlayerIndex = Number(msg.playerIndex ?? 0);
         applyDisplay(msg);
@@ -670,6 +1109,7 @@
             }
             try { window.focus(); } catch {}
             notifyParent('STAGE_STATUS', { status: 'playing', message: 'Émulateur démarré.' });
+            startRamTelemetry(msg.gameName || targetFilename, msg.core);
 
             // La synchronisation des crédits en RAM est déclenchée à la demande par la touche 5 (ou le bouton Sync Crédits (5))
             if (isNetplaySession && netplayPlayerIndex === 0) {

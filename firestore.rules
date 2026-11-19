@@ -1,0 +1,39 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Salons Fightcade 2 (Messages communautaires & présence en ligne)
+    match /fc_lobbies/{gameId}/messages/{msgId} {
+      allow read, write: if true;
+    }
+    match /fc_lobbies/{gameId}/users/{uid} {
+      allow read, write: if true;
+    }
+
+    // Défis P2P 15s & signaling WebRTC
+    match /fc_challenges/{challengeId} {
+      allow read, write: if true;
+      match /{subCol}/{docId} {
+        allow read, write: if true;
+      }
+    }
+
+    // Profils joueurs, portefeuilles, synchronisation multi-appareils & stats automatiques RAM
+    match /users/{uid} {
+      allow read, write: if true;
+      match /gameStats/{gameId} {
+        allow read, write: if true;
+      }
+      match /sync/{docId} {
+        allow read, write: if true;
+      }
+    }
+    match /wallets/{uid} {
+      allow read, write: if true;
+    }
+
+    // Classements automatiques des meilleurs scores par jeu
+    match /game_scores/{gameId}/entries/{uid} {
+      allow read, write: if true;
+    }
+  }
+}

@@ -59,6 +59,207 @@ export function setupNetplayHub(server) {
     }
   });
 
+  // Relais temps réel local / LAN pour les salons Fightcade 2 (chat & présence) — garantit le fonctionnement même sans règles Firestore publiées
+  const fcLobbies = new Map(); // gameId -> { messages: [], users: Map<uid, userObj> }
+  const getFcLobby = (gameId) => {
+    const key = String(gameId || 'global-lobby');
+    if (!fcLobbies.has(key)) {
+      fcLobbies.set(key, { messages: [], users: new Map() });
+    }
+    return fcLobbies.get(key);
+  };
+
+  server.middlewares.use('/api/fc-lobby', (req, res) => {
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    if (req.method === 'OPTIONS') {
+      res.statusCode = 204;
+      return res.end();
+    }
+
+    const url = new URL(req.url, 'http://localhost:3003');
+    const gameId = url.searchParams.get('gameId') || 'global-lobby';
+
+    if (req.method === 'GET') {
+      const lobby = getFcLobby(gameId);
+      const now = Date.now();
+      const users = [];
+      for (const [uid, u] of lobby.users.entries()) {
+        if (now - (u.lastSeen || 0) < 60000) {
+          users.push(u);
+        } else {
+          lobby.users.delete(uid);
+        }
+      }
+      res.statusCode = 200;
+      return res.end(JSON.stringify({ ok: true, messages: lobby.messages.slice(-80), users }));
+    }
+
+    if (req.method === 'POST') {
+      let body = '';
+      req.on('data', (chunk) => { body += chunk; });
+      req.on('end', () => {
+        try {
+          const payload = body ? JSON.parse(body) : {};
+          const targetId = payload.gameId || gameId;
+          const lobby = getFcLobby(targetId);
+
+          if (payload.action === 'message' && payload.message) {
+            const msg = {
+              id: payload.message.id || `m_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+              ...payload.message,
+              createdAtMs: payload.message.createdAtMs || Date.now(),
+            };
+            if (!lobby.messages.some((m) => m.id === msg.id)) {
+              lobby.messages.push(msg);
+              if (lobby.messages.length > 120) lobby.messages = lobby.messages.slice(-80);
+            }
+          } else if (payload.action === 'presence' && payload.user?.uid) {
+            lobby.users.set(payload.user.uid, {
+              ...payload.user,
+              lastSeen: Date.now(),
+            });
+          } else if (payload.action === 'leave' && payload.uid) {
+            lobby.users.delete(payload.uid);
+          }
+
+          res.statusCode = 200;
+          return res.end(JSON.stringify({ ok: true }));
+        } catch (err) {
+          res.statusCode = 400;
+          return res.end(JSON.stringify({ ok: false, error: err.message }));
+        }
+      });
+      return;
+    }
+
+    res.statusCode = 405;
+    res.end(JSON.stringify({ ok: false }));
+  });
+
+  // Relais de Synchronisation Parfaite du Compte Multi-Appareils (Crédits, Salons actifs, Reprise de partie / Savestate Cloud)
+  const accountSyncStore = new Map(); // uid -> { coins, coinsUpdatedAtMs, activeChannels, selectedChannelId, activeSession, stateBlob, updatedAtMs }
+  const getAccountRecord = (uid) => {
+    const key = String(uid || '');
+    if (!accountSyncStore.has(key)) {
+      accountSyncStore.set(key, {
+        uid: key,
+        coins: null,
+        coinsUpdatedAtMs: 0,
+        activeChannels: null,
+        channelsUpdatedAtMs: 0,
+        selectedChannelId: null,
+        activeSession: null,
+        statePayload: null, // { gameId, encoding: 'gzip' | 'raw', dataBase64, savedAtMs }
+        updatedAtMs: 0,
+      });
+    }
+    return accountSyncStore.get(key);
+  };
+
+  server.middlewares.use('/api/account-sync', (req, res) => {
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    if (req.method === 'OPTIONS') {
+      res.statusCode = 204;
+      return res.end();
+    }
+
+    const url = new URL(req.url, 'http://localhost:3003');
+    const uid = url.searchParams.get('uid');
+    const includeState = url.searchParams.get('includeState') === '1';
+
+    if (req.method === 'GET') {
+      if (!uid) {
+        res.statusCode = 400;
+        return res.end(JSON.stringify({ ok: false, error: 'Missing uid' }));
+      }
+      const rec = getAccountRecord(uid);
+      res.statusCode = 200;
+      return res.end(
+        JSON.stringify({
+          ok: true,
+          uid: rec.uid,
+          coins: rec.coins,
+          coinsUpdatedAtMs: rec.coinsUpdatedAtMs,
+          activeChannels: rec.activeChannels,
+          channelsUpdatedAtMs: rec.channelsUpdatedAtMs,
+          selectedChannelId: rec.selectedChannelId,
+          activeSession: rec.activeSession,
+          hasSavestate: Boolean(rec.statePayload && rec.statePayload.dataBase64),
+          savestateMeta: rec.statePayload
+            ? {
+                gameId: rec.statePayload.gameId,
+                encoding: rec.statePayload.encoding,
+                savedAtMs: rec.statePayload.savedAtMs,
+                size: rec.statePayload.dataBase64?.length || 0,
+              }
+            : null,
+          statePayload: includeState ? rec.statePayload : null,
+          updatedAtMs: rec.updatedAtMs,
+        })
+      );
+    }
+
+    if (req.method === 'POST') {
+      const chunks = [];
+      req.on('data', (chunk) => chunks.push(chunk));
+      req.on('end', () => {
+        try {
+          const rawBody = Buffer.concat(chunks).toString('utf8');
+          const payload = rawBody ? JSON.parse(rawBody) : {};
+          const targetUid = payload.uid || uid;
+          if (!targetUid) {
+            res.statusCode = 400;
+            return res.end(JSON.stringify({ ok: false, error: 'Missing uid' }));
+          }
+          const rec = getAccountRecord(targetUid);
+          const now = Date.now();
+
+          if (typeof payload.coins === 'number' && (payload.coinsUpdatedAtMs || now) >= rec.coinsUpdatedAtMs) {
+            rec.coins = Math.max(0, Math.min(99, Math.floor(payload.coins)));
+            rec.coinsUpdatedAtMs = payload.coinsUpdatedAtMs || now;
+          }
+          if (Array.isArray(payload.activeChannels) && (payload.channelsUpdatedAtMs || now) >= rec.channelsUpdatedAtMs) {
+            rec.activeChannels = payload.activeChannels.slice(0, 3);
+            rec.channelsUpdatedAtMs = payload.channelsUpdatedAtMs || now;
+          }
+          if (payload.selectedChannelId !== undefined) {
+            rec.selectedChannelId = payload.selectedChannelId;
+          }
+          if (payload.activeSession !== undefined) {
+            rec.activeSession = payload.activeSession
+              ? { ...payload.activeSession, updatedAtMs: now }
+              : null;
+          }
+          if (payload.statePayload && payload.statePayload.dataBase64) {
+            rec.statePayload = {
+              gameId: payload.statePayload.gameId,
+              encoding: payload.statePayload.encoding || 'raw',
+              dataBase64: payload.statePayload.dataBase64,
+              savedAtMs: now,
+            };
+          }
+          rec.updatedAtMs = now;
+
+          res.statusCode = 200;
+          return res.end(JSON.stringify({ ok: true, updatedAtMs: now }));
+        } catch (err) {
+          res.statusCode = 400;
+          return res.end(JSON.stringify({ ok: false, error: err.message }));
+        }
+      });
+      return;
+    }
+
+    res.statusCode = 405;
+    res.end(JSON.stringify({ ok: false }));
+  });
+
   // Attach WebSocket server to httpServer avec support de payload de 64 Mo pour les savestates à froid
   const wss = new WebSocketServer({ noServer: true, maxPayload: 64 * 1024 * 1024 });
 

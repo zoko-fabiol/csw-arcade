@@ -141,11 +141,11 @@ export function SettingsModal({
 
   return (
     <div 
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-md p-2 sm:p-4 font-mono select-none cursor-pointer"
+      className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center bg-black/80 backdrop-blur-md p-0 sm:p-4 font-mono select-none cursor-pointer"
       onClick={onClose}
     >
       <div 
-        className="relative w-full max-w-3xl bg-neutral-900 border border-neutral-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh] cursor-default"
+        className="relative w-full max-w-3xl bg-neutral-900 border-t sm:border border-neutral-800 rounded-t-2xl sm:rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[94dvh] pb-safe cursor-default"
         onClick={(e) => e.stopPropagation()}
       >
         

@@ -11,6 +11,11 @@
     user-select: none;
     touch-action: manipulation;
   }
+
+  input, textarea, select {
+    -webkit-user-select: text;
+    user-select: text;
+  }
 }
 
 /* Safe Areas pour encoches (Notch / Dynamic Island / Barre de navigation Android) */
@@ -26,12 +31,21 @@
 .pl-safe { padding-left: env(safe-area-inset-left, 0px); }
 .pr-safe { padding-right: env(safe-area-inset-right, 0px); }
 
+/* Carrousels tactiles fluides sans barre de défilement */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
 /* Effets Visuels Rétro NeoRAGEx */
 .crt-scanlines {
   background: linear-gradient(
-    rgba(18, 16, 16, 0) 50%, 
+    rgba(18, 16, 16, 0) 50%,
     rgba(0, 0, 0, 0.45) 50%
-  ), 
+  ),
   linear-gradient(
     90deg,
     rgba(255, 0, 0, 0.05),
