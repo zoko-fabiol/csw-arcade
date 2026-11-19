@@ -39,6 +39,7 @@
 
     #game canvas {
       image-rendering: pixelated;
+      max-width: 100% !important; max-height: 100% !important; object-fit: contain;
     }
 
     #loading-overlay {
@@ -122,9 +123,11 @@
       top: -9999px !important;
       transform: scale(0) !important;
     }
+    #game-wrapper:fullscreen{width:100vw;height:100vh;background:black}#game-wrapper:fullscreen #game{width:100%;height:100%}body.csw-smooth #game canvas{image-rendering:auto}#csw-screen-tools{position:fixed;top:12px;right:12px;z-index:10020;display:flex;gap:6px}#csw-screen-tools button{background:#111c37dd;color:#fff;border:1px solid #62c8ed;padding:8px 12px;border-radius:9px;cursor:pointer;font:600 12px system-ui}
   </style>
 </head>
 <body>
+  <div id="csw-screen-tools"><button id="csw-fullscreen" title="Fullscreen">⛶ Full screen</button><button id="csw-smooth" title="Toggle graphics scaling">✨ Smooth: OFF</button></div>
   <div id="game-wrapper">
     <div id="loading-overlay">
       <div class="neo-spinner"></div>
@@ -358,6 +361,7 @@
 };
 
     // Parsing des paramètres passés par CSW-Arcade
+    document.getElementById('csw-fullscreen').onclick=()=>{const el=document.getElementById('game-wrapper');if(document.fullscreenElement)document.exitFullscreen();else el.requestFullscreen?.()};document.getElementById('csw-smooth').onclick=e=>{document.body.classList.toggle('csw-smooth');e.target.textContent='✨ Smooth: '+(document.body.classList.contains('csw-smooth')?'ON':'OFF')};
     const params = new URLSearchParams(window.location.search);
     const rawGame = params.get('game') || 'androdunos.zip';
     let assignedPlayerIndex = parseInt(params.get('playerIndex') ?? '0', 10);
@@ -375,6 +379,18 @@
       }
     } catch(e) {
       console.warn('[Player] Échec parsing settings:', e);
+    }
+
+    // ===== MODE STREAM EXTERNE (Streamlabs / OBS / enregistreur d'écran sur le même appareil) =====
+    // Laisse le maximum de CPU/GPU à l'encodeur du stream : le jeu tourne toujours à 100 %
+    // de vitesse logique, seul le coût d'affichage et d'audio est réduit.
+    const LOW_POWER = !!activeSettings.performance?.streamMode;
+    if (LOW_POWER) {
+      // 1 pixel CSS = 1 pixel rendu : divise par 4 à 9 le travail GPU sur les écrans haute densité.
+      // Le jeu fait 320x224, l'agrandissement par le navigateur ne coûte presque rien.
+      try { Object.defineProperty(window, 'devicePixelRatio', { get: () => 1, configurable: true }); } catch(e) {}
+      document.documentElement.classList.add('csw-low-power');
+      console.log('[Player] Mode Stream externe actif : rendu allégé, saut d\'image, audio 22 kHz');
     }
 
     // Dictionnaire exhaustif de conversion KeyboardEvent.code -> numeric keyCode
@@ -480,11 +496,19 @@
         modeVal = isAes ? 'AES USA' : 'MVS USA';
       }
 
-      return {
+      const opts = {
         'fbneo-neogeo-mode': modeVal,
         'fbneo-cpu-speed-adjust': '100',
         'fbneo-diagnostic-input': 'Hold Start'
       };
+      if (LOW_POWER) {
+        // Affiche 1 image sur 2 (30 i/s visibles) mais émule les 60 : le personnage garde sa vitesse
+        opts['fbneo-frameskip'] = '1';
+        opts['fbneo-frameskip-type'] = 'Fixed';
+        opts['fbneo-frameskip-interval'] = '1';
+        opts['fbneo-samplerate'] = '22050';
+      }
+      return opts;
     }
 
     // --- PILOTE D'INPUTS DIRECT & UNIVERSEL CSW-ARCADE ---
@@ -822,14 +846,67 @@
         }
       }
 
-      // 4. Système & BIOS (MVS vs AES / Région)
-      if (settings.system && window.EJS_emulator?.gameManager?.setVariable) {
-        const coreOptions = buildCoreOptions(settings.system);
-        for (const [key, val] of Object.entries(coreOptions)) {
-          try {
-            window.EJS_emulator.gameManager.setVariable(key, val);
-          } catch(e) {}
+      // 5. Texture & Shaders Haute Qualité (ScaleHQ, CRT, Cathodique 3D)
+      if (settings.video) {
+        applyLiveShader(settings.video.shader);
+      }
+    }
+
+    function applyShellPrefsToArcade(shellPrefs) {
+      if (!shellPrefs) return;
+      const merged = {
+        ...activeSettings,
+        audio: {
+          ...(activeSettings.audio || {}),
+          volume: typeof shellPrefs.volume === 'number' ? shellPrefs.volume : (activeSettings.audio?.volume ?? 80),
+          muted: Boolean(shellPrefs.muted),
+        },
+        video: {
+          ...(activeSettings.video || {}),
+          filter: shellPrefs.videoFilter === 'smooth' ? 'smooth' : 'pixelated',
+          aspectRatio: shellPrefs.screenRatio === 'stretch' ? '16:9' : '4:3',
+        },
+      };
+      applyLiveSettings(merged);
+    }
+
+    try {
+      const shellRaw = localStorage.getItem('csw_shell_prefs_v1');
+      if (shellRaw) applyShellPrefsToArcade(JSON.parse(shellRaw));
+    } catch {}
+
+    window.addEventListener('storage', (e) => {
+      if (e.key === 'csw_shell_prefs_v1' && e.newValue) {
+        try {
+          applyShellPrefsToArcade(JSON.parse(e.newValue));
+        } catch {}
+      }
+    });
+
+    window.addEventListener('message', (e) => {
+      if (e.origin !== window.location.origin || !e.data) return;
+      if (e.data.type === 'CSW_SHELL_SETTINGS') {
+        applyShellPrefsToArcade(e.data);
+      }
+    });
+
+    // Application dynamique des Shaders / Textures graphiques
+    function applyLiveShader(shaderKey) {
+      if (LOW_POWER) {
+        // En mode stream, désactivation stricte pour réserver 100% du GPU à Streamlabs
+        if (window.EJS_emulator && typeof window.EJS_emulator.enableShader === 'function') {
+          try { window.EJS_emulator.enableShader('disabled'); } catch(e) {}
         }
+        return;
+      }
+      const emu = window.EJS_emulator;
+      if (!emu || typeof emu.enableShader !== 'function') return;
+      const target = (shaderKey && shaderKey !== 'none' && shaderKey !== 'disabled') ? shaderKey : 'disabled';
+      try {
+        emu.enableShader(target);
+        console.log('[Player] Texture / Shader appliqué:', target);
+      } catch(e) {
+        console.warn('[Player] Impossible d\'appliquer le shader:', e);
       }
     }
 
@@ -1177,11 +1254,12 @@
         if (type === 'webgl' || type === 'webgl2' || type === 'experimental-webgl') {
           _gameCanvas = this;
           attributes = Object.assign({}, attributes, {
-            powerPreference: 'default',
+            powerPreference: LOW_POWER ? 'low-power' : 'default',
             desynchronized: false,
             alpha: false,
             antialias: false,
-            preserveDrawingBuffer: true
+            // preserveDrawingBuffer force une copie complète à chaque image : inutile en mode stream externe
+            preserveDrawingBuffer: !LOW_POWER
           });
         }
         return _origGetContext.call(this, type, attributes);
@@ -1463,6 +1541,7 @@
 
         // Application immédiate de la résolution, de l'aspect ratio et des filtres
         applyDirectVideoStyles(activeSettings.video);
+        applyLiveShader(activeSettings.video?.shader);
 
         // Application du volume initial
         if (activeSettings.audio && window.EJS_emulator) {
@@ -1760,6 +1839,11 @@
         if (!event.data) return;
         if (event.data.type === 'UPDATE_SETTINGS' && event.data.settings) {
           applyLiveSettings(event.data.settings);
+        }
+        if (event.data.type === 'SET_PERF_PROFILE' && event.data.profile) {
+          if (event.data.profile.id === 'eco') {
+            applyLiveShader('disabled');
+          }
         }
         if (event.data.type === 'START_SIMULATION_NOW') {
           console.log('[Player] ✓ Top départ simultané reçu ! Déblocage de la Frame 0 à l\'instant précis...');
@@ -2375,8 +2459,9 @@
         return null;
       }
 
-      console.log('[Player Stream] Capture du canvas FBNeo actif :', activeCanvas.width + 'x' + activeCanvas.height);
-      const stream = activeCanvas.captureStream ? activeCanvas.captureStream(60) : (activeCanvas.mozCaptureStream ? activeCanvas.mozCaptureStream(60) : null);
+      const captureFps = window._csw_stream_fps || 30;
+      console.log('[Player Stream] Capture du canvas FBNeo actif :', activeCanvas.width + 'x' + activeCanvas.height, '@', captureFps, 'fps');
+      const stream = activeCanvas.captureStream ? activeCanvas.captureStream(captureFps) : (activeCanvas.mozCaptureStream ? activeCanvas.mozCaptureStream(captureFps) : null);
       if (!stream) return null;
 
       // S'assurer que la piste vidéo est bien active et force une émission initiale

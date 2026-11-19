@@ -10,6 +10,7 @@
     "dev": "vite",
     "build": "vite build",
     "build:web": "vite build",
+    "build:hostinger": "node scripts/build-hostinger.cjs",
     "build:electron": "vite build && electron-builder --win",
     "preview": "vite preview"
   },

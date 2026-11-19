@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CSW Stage — MS-DOS (js-dos)</title>
+  <link rel="stylesheet" href="https://v8.js-dos.com/latest/js-dos.css" />
+  <style>
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      width: 100%;
+      height: 100%;
+      background: #02040a;
+      color: #e2e8f0;
+      font-family: system-ui, -apple-system, sans-serif;
+      overflow: hidden;
+    }
+    #dos {
+      width: 100%;
+      height: 100%;
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    #dos > .jsdos-ribbon { position: absolute; }
+    #dos canvas {
+      max-width: 100%;
+      max-height: 100%;
+      image-rendering: pixelated;
+    }
+    body.smooth #dos canvas { image-rendering: auto; }
+    #boot-msg {
+      position: fixed;
+      inset: 0;
+      display: grid;
+      place-content: center;
+      text-align: center;
+      padding: 24px;
+      background: radial-gradient(circle at center, #141029, #02040a 75%);
+      color: #cbd5e1;
+      z-index: 20;
+    }
+    #boot-msg[hidden] { display: none; }
+  </style>
+</head>
+<body>
+  <div id="boot-msg"><strong>Chargement de DOSBox (js-dos v8)…</strong></div>
+  <div id="dos"></div>
+  <script>
+    let launched = false;
+
+    function notifyParent(type, payload = {}) {
+      if (window.parent && window.parent !== window) {
+        window.parent.postMessage({ type, ...payload }, window.location.origin);
+      }
+    }
+
+    function loadJsDos() {
+      return new Promise((resolve, reject) => {
+        if (window.Dos) return resolve();
+        const s = document.createElement('script');
+        s.src = 'https://v8.js-dos.com/latest/js-dos.js';
+        s.onload = () => (window.Dos ? resolve() : reject(new Error('js-dos non initialisé')));
+        s.onerror = () => reject(new Error('Impossible de charger js-dos (connexion requise).'));
+        document.head.append(s);
+      });
+    }
+
+    window.addEventListener('message', async (event) => {
+      if (event.origin !== window.location.origin || !event.data) return;
+      const msg = event.data;
+
+      if (msg.type === 'UPDATE_DISPLAY') {
+        if (msg.filter) document.body.classList.toggle('smooth', msg.filter === 'smooth');
+        return;
+      }
+
+      if (msg.type === 'BOOT_DOS' && !launched) {
+        launched = true;
+        if (msg.filter) document.body.classList.toggle('smooth', msg.filter === 'smooth');
+        const bootEl = document.getElementById('boot-msg');
+
+        try {
+          await loadJsDos();
+          const container = document.getElementById('dos');
+          const opts = {
+            onEvent: (ev) => {
+              if (ev === 'ci-ready') {
+                bootEl.hidden = true;
+                notifyParent('STAGE_STATUS', { status: 'playing', message: 'Environnement MS-DOS prêt.' });
+              } else if (ev === 'error') {
+                notifyParent('STAGE_STATUS', { status: 'error', message: 'Erreur signalée par DOSBox.' });
+              }
+            },
+          };
+
+          if (msg.mode === 'demo') {
+            opts.url = 'https://v8.js-dos.com/bundles/digger.jsdos';
+          } else if (msg.mode === 'bundle' && msg.bundleBlob) {
+            opts.url = URL.createObjectURL(msg.bundleBlob);
+          } else {
+            opts.dosboxConf = msg.dosboxConf;
+            opts.initFs = msg.initFs;
+          }
+
+          window.Dos(container, opts);
+          setTimeout(() => { bootEl.hidden = true; }, 2200);
+        } catch (err) {
+          bootEl.replaceChildren();
+          const strong = document.createElement('strong');
+          strong.textContent = 'Erreur de démarrage DOS';
+          const small = document.createElement('small');
+          small.textContent = err.message;
+          bootEl.append(strong, document.createElement('br'), small);
+          notifyParent('STAGE_STATUS', { status: 'error', message: err.message });
+        }
+      }
+    });
+
+    notifyParent('STAGE_FRAME_READY');
+  </script>
+</body>
+</html>

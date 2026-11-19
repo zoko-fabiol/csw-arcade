@@ -112,6 +112,19 @@ class NetplayService {
 
     // Initialisation immédiate du lobby global
     this.initLobbyDiscovery();
+
+    // Nettoyage automatique du salon si l'onglet est fermé
+    if (typeof window !== 'undefined') {
+      window.addEventListener('pagehide', () => {
+        if (this.currentRoom?.code && this.isHost) {
+          this.leaveRoom();
+        }
+      });
+    }
+  }
+
+  isInputsOnlyMode() {
+    return (this.currentRoom?.playMode || 'rollback') === 'rollback';
   }
 
   setNetworkSimulator(sim) {
@@ -1381,8 +1394,8 @@ class NetplayService {
       this.reliableChannel = reliableDc;
       this.setupDataChannel(reliableDc);
 
-      // Attacher le flux vidéo du jeu ou injecter un flux préliminaire
-      // pour que l'offre initiale SDP contienne immédiatement les sections m=video complètes (avec SSRC et MSID)
+      // Attacher le flux vidéo du jeu ou injecter un flux préliminaire uniquement en mode Stream Vidéo
+      if (!this.isInputsOnlyMode()) {
       try {
         if (this.localVideoStream) {
           console.log('[Netplay WebRTC Hôte] Pistes vidéo du jeu attachées directement à this.pc');
@@ -1426,11 +1439,14 @@ class NetplayService {
               c.mimeType.toLowerCase() !== 'video/vp8' && 
               c.mimeType.toLowerCase() !== 'video/h264'
             );
-            try { vTcvr.setCodecPreferences([...preferred, ...others]); } catch(e) {}
+            try { vTcvr.setCodecPreferences([...preferred.filter(c => c.mimeType.toLowerCase() === 'video/h264'), ...preferred.filter(c => c.mimeType.toLowerCase() !== 'video/h264'), ...others]); /* H.264 d'abord : encodage matériel = moins de chauffe */ } catch(e) {}
           }
         }
       } catch(e) {
         console.warn('[Netplay WebRTC Hôte] Configuration transceivers:', e);
+      }
+      } else {
+        console.log('[Netplay WebRTC Hôte Ntfy] Mode Pur Rollback (Inputs uniquement) : aucune piste vidéo attachée.');
       }
 
       pc.oniceconnectionstatechange = () => {
@@ -1758,7 +1774,8 @@ class NetplayService {
       this.reliableChannel = reliableDc;
       this.setupDataChannel(reliableDc);
 
-      // Attacher le flux vidéo du jeu ou injecter un flux préliminaire
+      // Attacher le flux vidéo du jeu ou injecter un flux préliminaire uniquement en mode Stream Vidéo
+      if (!this.isInputsOnlyMode()) {
       try {
         if (this.localVideoStream) {
           console.log('[Netplay WebRTC Hôte Firestore] Pistes vidéo attachées directement à this.pc');
@@ -1801,11 +1818,14 @@ class NetplayService {
               c.mimeType.toLowerCase() !== 'video/vp8' && 
               c.mimeType.toLowerCase() !== 'video/h264'
             );
-            try { vTcvr.setCodecPreferences([...preferred, ...others]); } catch(e) {}
+            try { vTcvr.setCodecPreferences([...preferred.filter(c => c.mimeType.toLowerCase() === 'video/h264'), ...preferred.filter(c => c.mimeType.toLowerCase() !== 'video/h264'), ...others]); /* H.264 d'abord : encodage matériel = moins de chauffe */ } catch(e) {}
           }
         }
       } catch(e) {
         console.warn('[Netplay WebRTC Hôte Firestore] Configuration transceivers:', e);
+      }
+      } else {
+        console.log('[Netplay WebRTC Hôte Firestore] Mode Pur Rollback (Inputs uniquement) : aucune piste vidéo attachée.');
       }
 
       const callerCandidatesCol = collection(roomRef, 'callerCandidates');
@@ -2019,7 +2039,7 @@ class NetplayService {
   }
 
   // Créer un salon (l'utilisateur devient J1 / Hôte)
-  async createRoom({ gameId, gameTitle, maxPlayers = 2, hostName = 'Hôte', networkMode = 'local', playMode = 'stream' }) {
+  async createRoom({ gameId, gameTitle, maxPlayers = 2, hostName = 'Hôte', networkMode = 'local', playMode = 'rollback' }) {
     await this.connect();
 
     // Nettoyage immédiat de tout salon ouvert précédemment par cet hôte
@@ -2766,6 +2786,10 @@ class NetplayService {
 
   // Lancement du flux vidéo P2P vers l'invité (Mode Remote Play Stream 60 FPS)
   async startVideoStream(stream) {
+    if (this.isInputsOnlyMode()) {
+      console.log('[Netplay] Mode Pur Rollback actif : captureStream vidéo ignoré.');
+      return;
+    }
     if (stream) {
       this.localVideoStream = stream;
     }
@@ -2885,6 +2909,39 @@ class NetplayService {
         console.warn('[Netplay PeerJS] Erreur startVideoStream:', e);
       }
     }
+
+    // Plafonds anti-surchauffe (débit / fps) sur l'encodeur vidéo
+    setTimeout(() => this.applyStreamProfile(), 1000);
+  }
+
+  /**
+   * Applique les limites d'encodage du profil de performance actif à tous les
+   * senders vidéo (RTCPeerConnection directe + PeerJS).
+   * @param {{fps:number,maxBitrate:number}} [streamProfile]
+   */
+  applyStreamProfile(streamProfile) {
+    if (streamProfile) this._streamProfile = streamProfile;
+    const prof = this._streamProfile;
+    if (!prof) return;
+
+    const pcs = [this.pc, this.currentMediaCall?.peerConnection].filter(
+      (pc) => pc && pc.signalingState !== 'closed' && typeof pc.getSenders === 'function'
+    );
+    pcs.forEach((pc) => {
+      pc.getSenders().forEach((sender) => {
+        if (sender.track?.kind !== 'video' || typeof sender.getParameters !== 'function') return;
+        try {
+          const params = sender.getParameters();
+          if (!params.encodings || params.encodings.length === 0) params.encodings = [{}];
+          params.encodings.forEach((enc) => {
+            enc.maxBitrate = prof.maxBitrate;
+            enc.maxFramerate = prof.fps;
+          });
+          params.degradationPreference = 'maintain-framerate';
+          sender.setParameters(params).catch(() => {});
+        } catch { /* navigateur sans support */ }
+      });
+    });
   }
 
   // Renégociation SDP à chaud pour diffuser les pistes vidéo/audio à l'invité
@@ -3142,6 +3199,8 @@ class NetplayService {
           currentPlayers: r.currentPlayers || (r.players ? r.players.length : 1),
           players: r.players || [],
           networkMode: r.networkMode || 'online',
+          playMode: r.playMode || 'rollback',
+          hostName: r.hostName || r.players?.[0]?.name || 'Hôte',
           createdAt: r.createdAt || now
         });
       }

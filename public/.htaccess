@@ -1,0 +1,76 @@
+# ====================================================================
+# Configuration Apache / LiteSpeed pour CSW-Arcade sur Hostinger
+# ====================================================================
+
+# 1. Activation de la réécriture d'URL
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteBase /
+
+  # Router les requêtes API vers les scripts PHP si présents
+  RewriteRule ^api/rom-proxy/?$ api/rom-proxy.php [L,QSA]
+  RewriteRule ^api/netplay/rooms/?$ api/netplay/rooms.php [L,QSA]
+
+  # Laisser passer directement les fichiers et répertoires physiques existants
+  RewriteCond %{REQUEST_FILENAME} -f [OR]
+  RewriteCond %{REQUEST_FILENAME} -d
+  RewriteRule ^ - [L]
+
+  # Préserver arcade-app.html, player.html et les tests
+  RewriteRule ^arcade-app\.html$ - [L]
+  RewriteRule ^player\.html$ - [L]
+  RewriteRule ^exe\.html$ - [L]
+  RewriteRule ^test-remote-play-local\.html$ - [L]
+  RewriteRule ^test-rollback-benchmark\.html$ - [L]
+  RewriteRule ^test_emu\.html$ - [L]
+
+  # Redirection SPA : toutes les autres routes mènent à index.html
+  RewriteRule ^ index.html [L]
+</IfModule>
+
+# 2. Types MIME corrects pour WebAssembly, ROMs et Manifests
+<IfModule mod_mime.c>
+  AddType application/wasm .wasm
+  AddType application/json .json
+  AddType application/manifest+json .webmanifest
+  AddType application/manifest+json manifest.json
+  AddType application/zip .zip
+  AddType application/octet-stream .bin .dat .rom
+</IfModule>
+
+# 3. En-têtes HTTP & CORS
+<IfModule mod_headers.c>
+  Header set X-Content-Type-Options "nosniff"
+  Header set X-Frame-Options "SAMEORIGIN"
+
+  # Autoriser l'accès CORS pour les ROMs, le BIOS et les binaires
+  <FilesMatch "\.(zip|wasm|data|json|bin|rom)$">
+    Header set Access-Control-Allow-Origin "*"
+    Header set Access-Control-Allow-Methods "GET, HEAD, OPTIONS"
+    Header set Access-Control-Expose-Headers "Content-Length, Content-Type"
+  </FilesMatch>
+
+  # Désactiver le cache pour le Service Worker pour garantir les mises à jour
+  <Files "sw.js">
+    Header set Cache-Control "no-cache, no-store, must-revalidate"
+    Header set Pragma "no-cache"
+    Header set Expires 0
+  </Files>
+</IfModule>
+
+# 4. Compression Gzip / Deflate
+<IfModule mod_deflate.c>
+  AddOutputFilterByType DEFLATE text/html text/plain text/xml text/css text/javascript application/javascript application/json application/wasm
+</IfModule>
+
+# 5. Caching des ressources statiques
+<IfModule mod_expires.c>
+  ExpiresActive On
+  ExpiresByType image/png "access plus 1 month"
+  ExpiresByType image/jpeg "access plus 1 month"
+  ExpiresByType image/svg+xml "access plus 1 month"
+  ExpiresByType text/css "access plus 1 week"
+  ExpiresByType application/javascript "access plus 1 week"
+  ExpiresByType application/wasm "access plus 1 month"
+  ExpiresByType application/zip "access plus 1 month"
+</IfModule>

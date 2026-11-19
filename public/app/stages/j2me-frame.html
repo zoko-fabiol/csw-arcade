@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CSW Stage — Émulateur Java J2ME</title>
+  <style>
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      width: 100%;
+      height: 100%;
+      background: #05070e;
+      color: #f1f5f9;
+      font-family: system-ui, -apple-system, sans-serif;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .j2me-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 8px 14px;
+      background: #0d1322;
+      border-bottom: 1px solid rgba(245, 158, 11, 0.3);
+      font-size: 12px;
+      flex-wrap: wrap;
+    }
+    .j2me-info {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .j2me-pill {
+      padding: 3px 8px;
+      border-radius: 999px;
+      background: rgba(245, 158, 11, 0.16);
+      border: 1px solid rgba(245, 158, 11, 0.4);
+      color: #fcd34d;
+      font-weight: 700;
+      font-family: ui-monospace, monospace;
+    }
+    .j2me-btn {
+      padding: 6px 12px;
+      border-radius: 8px;
+      border: 1px solid rgba(245, 158, 11, 0.45);
+      background: #f59e0b;
+      color: #1a1003;
+      font-weight: 700;
+      cursor: pointer;
+      text-decoration: none;
+      font-size: 12px;
+    }
+    .j2me-frame {
+      flex: 1;
+      width: 100%;
+      border: 0;
+      background: #000;
+    }
+  </style>
+</head>
+<body>
+  <div class="j2me-bar">
+    <div class="j2me-info">
+      <span class="j2me-pill" id="j2me-name">J2ME</span>
+      <span style="color:#94a3b8;">Clavier : Flèches + Entrée (OK) · Q / W (Softkeys) · 0–9 (Pavé) · Échap (Options)</span>
+    </div>
+    <a id="j2me-download-link" class="j2me-btn" download="game.jar" href="#">Télécharger le .jar</a>
+  </div>
+  <iframe
+    id="j2me-web-frame"
+    class="j2me-frame"
+    title="FreeJ2ME Web"
+    allow="autoplay; fullscreen"
+  ></iframe>
+  <script>
+    let started = false;
+    function notifyParent(type, payload = {}) {
+      if (window.parent && window.parent !== window) {
+        window.parent.postMessage({ type, ...payload }, window.location.origin);
+      }
+    }
+
+    window.addEventListener('message', (event) => {
+      if (event.origin !== window.location.origin || !event.data) return;
+      const msg = event.data;
+      if (msg.type === 'BOOT_J2ME' && !started) {
+        started = true;
+        const nameEl = document.getElementById('j2me-name');
+        const dlLink = document.getElementById('j2me-download-link');
+        const frame = document.getElementById('j2me-web-frame');
+
+        if (nameEl) nameEl.textContent = msg.gameName || 'Java J2ME';
+        if (msg.fileBlob && dlLink) {
+          const blobUrl = URL.createObjectURL(msg.fileBlob);
+          dlLink.href = blobUrl;
+          dlLink.download = msg.filename || 'game.jar';
+        }
+
+        frame.src = 'https://zb3.github.io/freej2me-web/web/';
+        frame.addEventListener('load', () => {
+          notifyParent('STAGE_STATUS', {
+            status: 'playing',
+            message: 'FreeJ2ME prêt — sélectionnez le .jar téléchargé pour démarrer.',
+          });
+        });
+      }
+    });
+
+    notifyParent('STAGE_FRAME_READY');
+  </script>
+</body>
+</html>

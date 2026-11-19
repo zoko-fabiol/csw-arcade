@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CSW Stage — Émulateur</title>
+  <style>
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      width: 100%;
+      height: 100%;
+      background: #03050a;
+      color: #e2e8f0;
+      font-family: system-ui, -apple-system, sans-serif;
+      overflow: hidden;
+    }
+    #game {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    #game canvas {
+      max-width: 100% !important;
+      max-height: 100% !important;
+      object-fit: contain;
+      image-rendering: pixelated;
+    }
+    body.smooth #game canvas {
+      image-rendering: auto !important;
+    }
+    body.stretch #game canvas {
+      width: 100% !important;
+      height: 100% !important;
+      max-width: none !important;
+      max-height: none !important;
+      object-fit: fill !important;
+    }
+    #boot-msg {
+      position: fixed;
+      inset: 0;
+      display: grid;
+      place-content: center;
+      text-align: center;
+      padding: 24px;
+      background: radial-gradient(circle at center, #0e172a, #03050a 75%);
+      font-size: 14px;
+      color: #94a3b8;
+      z-index: 20;
+    }
+    #boot-msg strong {
+      display: block;
+      margin-bottom: 8px;
+      color: #f8fafc;
+      font-size: 16px;
+    }
+    #boot-msg[hidden] { display: none; }
+    #crt-overlay {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 15;
+      background: repeating-linear-gradient(
+        to bottom,
+        rgba(0, 0, 0, 0) 0px,
+        rgba(0, 0, 0, 0) 2px,
+        rgba(0, 0, 0, 0.28) 3px,
+        rgba(0, 0, 0, 0.28) 4px
+      );
+      opacity: 0;
+      transition: opacity 0.2s ease;
+    }
+    body.crt-on #crt-overlay {
+      opacity: 1;
+    }
+  </style>
+</head>
+<body>
+  <div id="crt-overlay" aria-hidden="true"></div>
+  <div id="boot-msg"><strong>Initialisation du moteur…</strong><span>En attente des paramètres de lancement.</span></div>
+  <div id="game"></div>
+  <script>
+    const CDN_DATA = 'https://cdn.emulatorjs.org/stable/data/';
+    let started = false;
+
+    const CODE_TO_KEYCODE = {
+      KeyA: 65, KeyB: 66, KeyC: 67, KeyD: 68, KeyE: 69, KeyF: 70, KeyG: 71, KeyH: 72,
+      KeyI: 73, KeyJ: 74, KeyK: 75, KeyL: 76, KeyM: 77, KeyN: 78, KeyO: 79, KeyP: 80,
+      KeyQ: 81, KeyR: 82, KeyS: 83, KeyT: 84, KeyU: 85, KeyV: 86, KeyW: 87, KeyX: 88,
+      KeyY: 89, KeyZ: 90,
+      Digit0: 48, Digit1: 49, Digit2: 50, Digit3: 51, Digit4: 52,
+      Digit5: 53, Digit6: 54, Digit7: 55, Digit8: 56, Digit9: 57,
+      Numpad0: 96, Numpad1: 97, Numpad2: 98, Numpad3: 99, Numpad4: 100,
+      Numpad5: 101, Numpad6: 102, Numpad7: 103, Numpad8: 104, Numpad9: 105,
+      ArrowUp: 38, ArrowDown: 40, ArrowLeft: 37, ArrowRight: 39,
+      Space: 32, Enter: 13, ShiftLeft: 16, ShiftRight: 16, ControlLeft: 17, ControlRight: 17,
+    };
+
+    function getKeyCode(code, fallback) {
+      if (typeof code === 'number') return code;
+      if (typeof code === 'string' && CODE_TO_KEYCODE[code]) return CODE_TO_KEYCODE[code];
+      return fallback;
+    }
+
+    function readHardwareSettings() {
+      try {
+        const raw = localStorage.getItem('csw_arcade_settings_v1');
+        return raw ? JSON.parse(raw) : {};
+      } catch {
+        return {};
+      }
+    }
+
+    function buildControllersConfig(controls) {
+      if (!controls) return null;
+      const p1 = controls.p1 || {};
+      const p2 = controls.p2 || {};
+      return {
+        0: {
+          4: { value: getKeyCode(p1.up, 87), value2: 'DPAD_UP' },
+          5: { value: getKeyCode(p1.down, 83), value2: 'DPAD_DOWN' },
+          6: { value: getKeyCode(p1.left, 65), value2: 'DPAD_LEFT' },
+          7: { value: getKeyCode(p1.right, 68), value2: 'DPAD_RIGHT' },
+          0: { value: getKeyCode(p1.a, 74), value2: 'BUTTON_2' },
+          8: { value: getKeyCode(p1.b, 75), value2: 'BUTTON_1' },
+          1: { value: getKeyCode(p1.c, 85), value2: 'BUTTON_4' },
+          9: { value: getKeyCode(p1.d, 73), value2: 'BUTTON_3' },
+          2: { value: getKeyCode(p1.coin, 53), value2: 'SELECT' },
+          3: { value: getKeyCode(p1.start, 49), value2: 'START' },
+        },
+        1: {
+          4: { value: getKeyCode(p2.up, 38), value2: 'DPAD_UP' },
+          5: { value: getKeyCode(p2.down, 40), value2: 'DPAD_DOWN' },
+          6: { value: getKeyCode(p2.left, 37), value2: 'DPAD_LEFT' },
+          7: { value: getKeyCode(p2.right, 39), value2: 'DPAD_RIGHT' },
+          0: { value: getKeyCode(p2.a, 100), value2: 'BUTTON_2' },
+          8: { value: getKeyCode(p2.b, 101), value2: 'BUTTON_1' },
+          1: { value: getKeyCode(p2.c, 103), value2: 'BUTTON_4' },
+          9: { value: getKeyCode(p2.d, 104), value2: 'BUTTON_3' },
+          2: { value: getKeyCode(p2.coin, 54), value2: 'SELECT' },
+          3: { value: getKeyCode(p2.start, 50), value2: 'START' },
+        },
+        2: {},
+        3: {},
+      };
+    }
+
+    function applyHardwareSettings(hw) {
+      if (!hw) return;
+      if (hw.video) {
+        if (hw.video.filter) document.body.classList.toggle('smooth', hw.video.filter === 'smooth');
+        if (hw.video.aspectRatio) document.body.classList.toggle('stretch', hw.video.aspectRatio === '16:9');
+        const crtOn = Boolean(hw.video.scanlines || hw.video.crt || hw.video.crtEnabled);
+        document.body.classList.toggle('crt-on', crtOn);
+      }
+      if (hw.audio && window.EJS_emulator) {
+        const isMuted = Boolean(hw.audio.muted);
+        const vol = isMuted ? 0 : Math.max(0, Math.min(1, (hw.audio.volume ?? 80) / 100));
+        try {
+          window.EJS_emulator.muted = isMuted;
+          if (typeof window.EJS_emulator.setVolume === 'function') {
+            window.EJS_emulator.setVolume(vol);
+          }
+        } catch {}
+      }
+      if (hw.controls && window.EJS_emulator) {
+        const cfg = buildControllersConfig(hw.controls);
+        if (cfg) {
+          window.EJS_emulator.controls = cfg;
+          window.EJS_emulator.defaultControllers = cfg;
+          if (typeof window.EJS_emulator.setupKeys === 'function') {
+            try { window.EJS_emulator.setupKeys(); } catch {}
+          }
+        }
+      }
+      if (hw.touch && typeof hw.touch.opacity === 'number') {
+        const pad = document.querySelector('.ejs_virtualGamepad_parent');
+        if (pad) pad.style.opacity = String(Math.max(0.15, Math.min(1, hw.touch.opacity / 100)));
+      }
+    }
+
+    window.addEventListener('storage', (e) => {
+      if (e.key === 'csw_arcade_settings_v1' && e.newValue) {
+        try { applyHardwareSettings(JSON.parse(e.newValue)); } catch {}
+      }
+    });
+
+    function applyDisplay({ filter, ratio, volume, muted }) {
+      if (filter) document.body.classList.toggle('smooth', filter === 'smooth');
+      if (ratio) document.body.classList.toggle('stretch', ratio === 'stretch');
+      const effectiveVol = muted ? 0 : (typeof volume === 'number' ? Math.max(0, Math.min(1, volume / 100)) : null);
+      if (effectiveVol !== null && window.EJS_emulator) {
+        try {
+          window.EJS_emulator.muted = Boolean(muted);
+          if (typeof window.EJS_emulator.setVolume === 'function') {
+            window.EJS_emulator.setVolume(effectiveVol);
+          }
+        } catch {}
+      }
+    }
+
+    function notifyParent(type, payload = {}) {
+      if (window.parent && window.parent !== window) {
+        window.parent.postMessage({ type, ...payload }, window.location.origin);
+      }
+    }
+
+    window.addEventListener('message', (event) => {
+      if (event.origin !== window.location.origin || !event.data) return;
+      const msg = event.data;
+
+      if (msg.type === 'UPDATE_DISPLAY') {
+        applyDisplay(msg);
+        return;
+      }
+
+      if (msg.type === 'PRESS_BUTTON') {
+        const idx = msg.button === 'coin' ? 2 : 3;
+        const fallback = msg.button === 'coin' ? 53 : 49;
+        const kc = window.EJS_emulator?.controls?.[0]?.[idx]?.value || fallback;
+        try { window.focus(); } catch {}
+        const fire = (type) => {
+          const ev = new KeyboardEvent(type, { keyCode: kc, which: kc, bubbles: true, cancelable: true });
+          Object.defineProperty(ev, 'keyCode', { get: () => kc });
+          Object.defineProperty(ev, 'which', { get: () => kc });
+          window.dispatchEvent(ev);
+          document.dispatchEvent(ev);
+        };
+        fire('keydown');
+        setTimeout(() => fire('keyup'), 120);
+        return;
+      }
+
+      if (msg.type === 'BOOT_EMU' && !started) {
+        started = true;
+        applyDisplay(msg);
+
+        const bootEl = document.getElementById('boot-msg');
+        bootEl.querySelector('strong').textContent = `Chargement : ${msg.gameName || 'ROM'}`;
+        bootEl.querySelector('span').textContent = `Moteur ${msg.core} (EmulatorJS)…`;
+
+        let gameUrl = msg.gameUrl;
+        if (msg.fileBlob) {
+          gameUrl = URL.createObjectURL(msg.fileBlob);
+        }
+
+        const hw = readHardwareSettings();
+        const ctrlCfg = buildControllersConfig(hw.controls);
+
+        window.EJS_player = '#game';
+        window.EJS_core = msg.core;
+        window.EJS_gameName = msg.gameName || 'CSW Game';
+        window.EJS_gameUrl = gameUrl;
+        window.EJS_biosUrl = '';
+        window.EJS_pathtodata = msg.localData ? '../../emulatorjs/' : CDN_DATA;
+        window.EJS_startOnLoaded = true;
+        window.EJS_color = msg.accent || '#3b82f6';
+        if (ctrlCfg) window.EJS_defaultControls = ctrlCfg;
+        const effectiveMuted = msg.muted ?? hw.audio?.muted ?? false;
+        const effectiveVol = typeof msg.volume === 'number' ? msg.volume : (hw.audio?.volume ?? 80);
+        window.EJS_volume = effectiveMuted ? 0 : effectiveVol / 100;
+        applyHardwareSettings(hw);
+        window.EJS_onGameStart = () => {
+          bootEl.hidden = true;
+          applyHardwareSettings(readHardwareSettings());
+          try { window.focus(); } catch {}
+          notifyParent('STAGE_STATUS', { status: 'playing', message: 'Émulateur démarré.' });
+        };
+
+        const script = document.createElement('script');
+        script.src = `${window.EJS_pathtodata}loader.js`;
+        script.onload = () => {
+          setTimeout(() => { bootEl.hidden = true; }, 1800);
+          notifyParent('STAGE_STATUS', { status: 'loaded', message: `Moteur ${msg.core} initialisé.` });
+        };
+        script.onerror = () => {
+          bootEl.querySelector('strong').textContent = 'Impossible de charger le moteur';
+          bootEl.querySelector('span').textContent = 'Vérifiez votre connexion Internet ou l’accès au CDN EmulatorJS.';
+          notifyParent('STAGE_STATUS', { status: 'error', message: 'Échec chargement EmulatorJS.' });
+        };
+        document.head.append(script);
+      }
+    });
+
+    notifyParent('STAGE_FRAME_READY');
+  </script>
+</body>
+</html>

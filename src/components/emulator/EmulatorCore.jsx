@@ -28,6 +28,9 @@ import { useDeviceType } from '../../utils/deviceDetector';
 import { netplayService } from '../../services/NetplayService';
 import { RollbackManager } from '../../services/RollbackManager';
 import { NetplayDebugOverlay } from './NetplayDebugOverlay';
+import PerfOverlay from '../PerfOverlay';
+import { thermalGovernor } from '../../services/ThermalGovernor';
+import { resolveProfile } from '../../utils/performanceProfile';
 
 export function EmulatorCore({ 
   game, 
@@ -288,7 +291,7 @@ export function EmulatorCore({
         console.log('[EmulatorCore] EJS_GAME_STARTED reçu de l\'iframe player');
         if (isStreamingHost && isHost && mode === 'netplay') {
           setTimeout(() => {
-            const stream = iframeRef.current?.contentWindow?.captureGameStream?.();
+            try { iframeRef.current.contentWindow._csw_stream_fps = thermalGovernor.profile.stream.fps; } catch { /* noop */ } const stream = iframeRef.current?.contentWindow?.captureGameStream?.();
             if (stream) {
               console.log('[EmulatorCore] Capture vidéo 60 FPS prête ! Diffusion WebRTC P2P vers l\'invité...');
               netplayService.startVideoStream(stream);
@@ -353,7 +356,7 @@ export function EmulatorCore({
 
     const tryBroadcastStream = () => {
       if (iframeRef.current?.contentWindow?.captureGameStream) {
-        const stream = iframeRef.current.contentWindow.captureGameStream();
+        try { iframeRef.current.contentWindow._csw_stream_fps = thermalGovernor.profile.stream.fps; } catch { /* noop */ } const stream = iframeRef.current.contentWindow.captureGameStream();
         if (stream) {
           console.log('[EmulatorCore] Stream 60 FPS capturé avec succès, diffusion vers l\'invité...');
           netplayService.startVideoStream(stream);
@@ -555,7 +558,56 @@ export function EmulatorCore({
     };
   }, []);
 
-  const isScanlinesActive = settings?.video?.scanlines ?? true;
+  // Profil de performance actif (piloté par le garde-fou thermique)
+  const perfMode = settings?.performance?.streamMode ? 'eco' : (settings?.performance?.profile ?? 'auto');
+  const thermalGuard = settings?.performance?.thermalGuard ?? true;
+  const [perfProfile, setPerfProfile] = useState(() => resolveProfile(perfMode));
+  const [thermalNotice, setThermalNotice] = useState(null);
+
+  useEffect(() => {
+    const ceiling = resolveProfile(perfMode);
+    const applyProfile = (profile, reason) => {
+      setPerfProfile(profile);
+      const win = iframeRef.current?.contentWindow;
+      if (win) {
+        try { win._csw_stream_fps = profile.stream.fps; } catch { /* cross-origin */ }
+        win.postMessage({ type: 'SET_PERF_PROFILE', profile }, '*');
+      }
+      netplayService.applyStreamProfile?.(profile.stream);
+      if (reason && reason !== 'démarrage' && profile.id !== ceiling.id) {
+        setThermalNotice(`Mode ${profile.label} activé (${reason}) pour éviter la surchauffe`);
+        setTimeout(() => setThermalNotice(null), 4000);
+      }
+    };
+
+    const unsub = thermalGovernor.subscribe(applyProfile);
+    if (thermalGuard) {
+      thermalGovernor.start(ceiling.id);
+    } else {
+      applyProfile(ceiling, 'démarrage');
+    }
+
+    // Mesure de l'intervalle entre images (sans setState)
+    let rafId;
+    let last = performance.now();
+    const loop = (now) => {
+      const dt = now - last;
+      last = now;
+      // Ignorer les gros trous (onglet caché, pause)
+      if (dt < 250 && !document.hidden) thermalGovernor.reportFrame(dt);
+      rafId = requestAnimationFrame(loop);
+    };
+    if (thermalGuard) rafId = requestAnimationFrame(loop);
+
+    return () => {
+      unsub();
+      cancelAnimationFrame(rafId);
+      thermalGovernor.stop();
+    };
+  }, [perfMode, thermalGuard]);
+
+  const isCrtShader = settings?.video?.shader === 'crt-easymode.glslp' || settings?.video?.shader === 'crt-geom.glslp';
+  const isScanlinesActive = (settings?.video?.scanlines ?? true) && perfProfile.scanlines && !isCrtShader;
   const myPlayerSlot = netplayService.myPlayerIndex >= 0 ? netplayService.myPlayerIndex : (playerIndex !== undefined ? playerIndex : (isHost ? 0 : 1));
   
   // URL figée au démarrage du jeu pour éviter tout rechargement d'iframe ou redémarrage du runtime WebAssembly
@@ -696,6 +748,13 @@ export function EmulatorCore({
           </button>
         </div>
       </div>
+
+      <PerfOverlay visible={!!settings?.performance?.showOverlay} />
+      {thermalNotice && (
+        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-[80] bg-amber-950/95 border border-amber-400/70 text-amber-200 px-4 py-1.5 rounded-full text-xs font-sans pointer-events-none">
+          {thermalNotice}
+        </div>
+      )}
 
       {/* Toast Notification de Synchronisation */}
       {syncNotification && (

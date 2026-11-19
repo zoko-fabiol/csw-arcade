@@ -34,7 +34,7 @@ export default function App() {
     isHost: true,
     playerIndex: 0,
     role: 'p1',
-    playMode: 'stream'
+    playMode: 'rollback'
   });
 
   // Audit des ROMs locales
@@ -54,6 +54,7 @@ export default function App() {
     updateSystemSetting,
     updateGamepadSetting,
     updateTouchSetting,
+    updatePerformanceSetting,
     resetToDefaults
   } = useSettings();
 
@@ -89,7 +90,7 @@ export default function App() {
       isHost: options.isHost ?? true,
       playerIndex: options.playerIndex ?? 0,
       role: options.role ?? 'p1',
-      playMode: options.playMode || 'stream'
+      playMode: options.playMode || 'rollback'
     });
     setActiveGame(game);
     setGameMode('netplay');
@@ -99,7 +100,7 @@ export default function App() {
   const handleExitGame = () => {
     if (gameMode === 'netplay') {
       netplayService.leaveRoom();
-      setNetplaySession({ isHost: true, playerIndex: 0, role: 'p1', playMode: 'stream' });
+      setNetplaySession({ isHost: true, playerIndex: 0, role: 'p1', playMode: 'rollback' });
     }
     setActiveGame(null);
     setGameMode(null);
@@ -235,6 +236,7 @@ export default function App() {
         updateSystemSetting={updateSystemSetting}
         updateGamepadSetting={updateGamepadSetting}
         updateTouchSetting={updateTouchSetting}
+        updatePerformanceSetting={updatePerformanceSetting}
         resetToDefaults={resetToDefaults}
       />
 

@@ -34,7 +34,8 @@ export function NetplayModal({
   const [ping, setPing] = useState(0);
   const [isP2P, setIsP2P] = useState(false);
   const [showQrModal, setShowQrModal] = useState(false);
-  const [playMode, setPlayMode] = useState('stream'); // 'stream' | 'rollback'
+  const [playMode, setPlayMode] = useState('rollback'); // 'rollback' | 'stream'
+  const [lobbyGameFilter, setLobbyGameFilter] = useState('all');
 
   // Synchronisation dynamique quand l'utilisateur clique sur le bouton 2P/4P LAN d'un jeu
   useEffect(() => {
@@ -123,7 +124,7 @@ export function NetplayModal({
             isHost: false, 
             role: netplayService.myRole || 'p2', 
             playerIndex: netplayService.myPlayerIndex >= 0 ? netplayService.myPlayerIndex : 1,
-            playMode: data.playMode || activeRoom?.playMode || 'stream'
+            playMode: data.playMode || activeRoom?.playMode || 'rollback'
           });
           onClose();
         }
@@ -667,7 +668,7 @@ export function NetplayModal({
                 }`}
               >
                 <Gamepad2 className="w-4 h-4" />
-                <span>Rejoindre un Salon</span>
+                <span>Lobby Public ({availableRooms.length})</span>
               </button>
             </div>
 
@@ -903,44 +904,67 @@ export function NetplayModal({
                     />
                   </div>
 
-                  {/* Salons ouverts détectés (Local Wi-Fi et En Ligne Cloud) */}
+                  {/* Lobby Public par jeu (Local Wi-Fi et En Ligne Cloud) */}
                   <div>
-                    <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center justify-between gap-2 mb-2 flex-wrap">
                       <span className="text-[11px] uppercase font-bold text-neutral-400 flex items-center gap-1.5">
                         {networkMode === 'local' ? <Wifi className="w-3.5 h-3.5 text-cyan-400" /> : <Globe className="w-3.5 h-3.5 text-rose-400" />}
-                        Salons ouverts ({networkMode === 'local' ? 'Local' : 'En Ligne'}) :
+                        Lobby Public ({availableRooms.length}) :
                       </span>
-                      <button
-                        onClick={loadRooms}
-                        className="p-1 rounded text-neutral-400 hover:text-white transition-colors"
-                        title="Actualiser la liste"
-                      >
-                        <RefreshCw className={`w-3.5 h-3.5 ${isLoadingRooms ? 'animate-spin' : ''}`} />
-                      </button>
+                      <div className="flex items-center gap-1.5">
+                        <select
+                          value={lobbyGameFilter}
+                          onChange={(e) => setLobbyGameFilter(e.target.value)}
+                          className="px-2 py-1 rounded bg-neutral-950 border border-neutral-800 text-[11px] text-neutral-200 focus:outline-none focus:border-cyan-500"
+                          aria-label="Filtrer les salons par jeu"
+                        >
+                          <option value="all">Tous les jeux ({availableRooms.length})</option>
+                          {[...new Map(availableRooms.filter(r => r.gameId).map(r => [r.gameId, r.gameTitle || r.gameId])).entries()].map(([gId, gTitle]) => (
+                            <option key={gId} value={gId}>{gTitle}</option>
+                          ))}
+                        </select>
+                        <button
+                          onClick={loadRooms}
+                          className="p-1 rounded text-neutral-400 hover:text-white transition-colors"
+                          title="Actualiser la liste"
+                        >
+                          <RefreshCw className={`w-3.5 h-3.5 ${isLoadingRooms ? 'animate-spin' : ''}`} />
+                        </button>
+                      </div>
                     </div>
 
-                    {availableRooms.length === 0 ? (
+                    {availableRooms.filter(r => lobbyGameFilter === 'all' || r.gameId === lobbyGameFilter).length === 0 ? (
                       <div className="p-4 rounded-xl bg-neutral-950/60 border border-neutral-800 text-center text-xs text-neutral-500">
                         Aucun salon ouvert détecté pour le moment.
                       </div>
                     ) : (
                       <div className="space-y-2">
                         {[...availableRooms]
+                          .filter(r => lobbyGameFilter === 'all' || r.gameId === lobbyGameFilter)
                           .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
                           .map(r => {
                           const isRoomOnline = r.networkMode === 'online' || isCloudHost;
                           const count = r.currentPlayers || (r.players ? r.players.length : 1);
                           const maxP = r.maxPlayers || 2;
+                          const isFull = count >= maxP;
+                          const isRollback = (r.playMode || 'rollback') === 'rollback';
                           return (
                             <div
                               key={r.code}
-                              className="p-3 rounded-xl bg-neutral-950 border border-neutral-800 hover:border-cyan-500/50 flex items-center justify-between transition-colors"
+                              className="p-3 rounded-xl bg-neutral-950 border border-neutral-800 hover:border-cyan-500/50 flex items-center justify-between gap-2 transition-colors"
                             >
-                              <div>
-                                <div className="flex items-center gap-2">
-                                  <span className="font-bold text-white text-xs">{r.gameTitle}</span>
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <span className="font-bold text-white text-xs truncate">{r.gameTitle}</span>
                                   <span className="text-[10px] font-bold text-cyan-400 px-1.5 py-0.2 rounded bg-cyan-950 border border-cyan-800">
                                     {r.code}
+                                  </span>
+                                  <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${
+                                    isRollback
+                                      ? 'text-emerald-300 bg-emerald-950/60 border-emerald-800'
+                                      : 'text-amber-300 bg-amber-950/60 border-amber-800'
+                                  }`}>
+                                    {isRollback ? 'Pur Rollback' : 'Stream'}
                                   </span>
                                   <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border flex items-center gap-1 ${
                                     isRoomOnline 
@@ -952,15 +976,20 @@ export function NetplayModal({
                                   </span>
                                 </div>
                                 <span className="text-[10px] text-neutral-400">
-                                  Joueurs : {count} / {maxP}
+                                  Hôte : {r.hostName || r.players?.[0]?.name || 'Joueur'} · Joueurs : {count}/{maxP} {isFull ? '(Complet)' : '· En attente'}
                                 </span>
                               </div>
 
                               <button
                                 onClick={() => handleJoinRoom(r.code)}
-                                className="px-3 py-1.5 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-black text-xs font-bold transition-colors shadow-sm"
+                                disabled={isFull}
+                                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors shadow-sm shrink-0 ${
+                                  isFull
+                                    ? 'bg-neutral-800 text-neutral-500 cursor-not-allowed'
+                                    : 'bg-cyan-500 hover:bg-cyan-400 text-black'
+                                }`}
                               >
-                                Rejoindre
+                                {isFull ? 'Complet' : 'Défier'}
                               </button>
                             </div>
                           );

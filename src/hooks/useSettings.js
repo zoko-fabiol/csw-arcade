@@ -59,7 +59,8 @@ export const DEFAULT_SETTINGS = {
     scanlines: true,
     aspectRatio: '4:3', // '4:3' | '16:9' | 'pixel-perfect'
     filter: 'pixelated', // 'pixelated' | 'smooth'
-    intensity: 40 // 0 to 100
+    intensity: 40, // 0 to 100
+    shader: 'none' // 'none' | '2xScaleHQ.glslp' | '4xScaleHQ.glslp' | 'crt-easymode.glslp' | 'crt-geom.glslp'
   },
   audio: {
     volume: 85,
@@ -80,6 +81,12 @@ export const DEFAULT_SETTINGS = {
     macroAbEnabled: true, // Active le bouton L1 en macro A+B (Roulade)
     macroCdEnabled: true, // Active le bouton R1 en macro C+D (Projection)
     autoHideOnGamepad: true
+  },
+  performance: {
+    profile: 'auto', // 'auto' | 'eco' | 'balanced' | 'performance'
+    thermalGuard: true, // Rétrogradation automatique anti-surchauffe
+    showOverlay: false, // Overlay FPS / temps image
+    streamMode: false // Mode Stream externe (Streamlabs/OBS sur le même appareil)
   }
 };
 
@@ -103,7 +110,8 @@ export function useSettings() {
           video: { ...DEFAULT_SETTINGS.video, ...(parsed.video || {}) },
           audio: { ...DEFAULT_SETTINGS.audio, ...(parsed.audio || {}) },
           system: { ...DEFAULT_SETTINGS.system, ...(parsed.system || {}) },
-          touch: { ...DEFAULT_SETTINGS.touch, ...(parsed.touch || {}) }
+          touch: { ...DEFAULT_SETTINGS.touch, ...(parsed.touch || {}) },
+          performance: { ...DEFAULT_SETTINGS.performance, ...(parsed.performance || {}) }
         };
       }
     } catch (e) {
@@ -206,6 +214,19 @@ export function useSettings() {
   }, []);
 
   /**
+   * Met à jour les options de performance / anti-surchauffe
+   */
+  const updatePerformanceSetting = useCallback((key, value) => {
+    setSettings((prev) => ({
+      ...prev,
+      performance: {
+        ...prev.performance,
+        [key]: value
+      }
+    }));
+  }, []);
+
+  /**
    * Réinitialise l'ensemble des paramètres d'usine NeoRAGEx
    */
   const resetToDefaults = useCallback(() => {
@@ -220,6 +241,7 @@ export function useSettings() {
     updateSystemSetting,
     updateGamepadSetting,
     updateTouchSetting,
+    updatePerformanceSetting,
     resetToDefaults
   };
 }

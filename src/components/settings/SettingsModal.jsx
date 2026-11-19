@@ -15,10 +15,15 @@ import {
   Eye,
   Compass,
   Zap,
-  Move
+  Move,
+  Sparkles,
+  ShieldAlert,
+  Layers,
+  Lock
 } from 'lucide-react';
 import { GamepadVisualizer } from './GamepadVisualizer';
 import { useDeviceType } from '../../utils/deviceDetector';
+import { SHADER_PRESETS, resolveProfile } from '../../utils/performanceProfile';
 
 export function SettingsModal({ 
   isOpen, 
@@ -30,6 +35,7 @@ export function SettingsModal({
   updateSystemSetting, 
   updateGamepadSetting,
   updateTouchSetting,
+  updatePerformanceSetting,
   resetToDefaults,
   resetSettings 
 }) {
@@ -40,6 +46,9 @@ export function SettingsModal({
   const [listeningAction, setListeningAction] = useState(null);
   const [connectedGamepad, setConnectedGamepad] = useState(null);
   const { isMobile } = useDeviceType();
+  const currentProfile = resolveProfile(settings?.performance?.profile ?? 'auto');
+  const isStreamMode = !!settings?.performance?.streamMode;
+  const currentShaderId = settings?.video?.shader || 'none';
 
   // Détection des manettes connectées
   useEffect(() => {
@@ -663,6 +672,23 @@ export function SettingsModal({
           {/* ================= ONGLET 2 : AFFICHAGE & CRT ================= */}
           {activeTab === 'video' && (
             <div className="space-y-4">
+              {/* Mode Stream externe (Streamlabs / OBS sur le même appareil) */}
+              <div className="p-4 bg-neutral-950 border border-amber-500/40 rounded-xl flex items-center justify-between gap-3">
+                <div>
+                  <h4 className="font-bold text-amber-300 text-xs">Mode Stream (Streamlabs, OBS, enregistreur d'écran)</h4>
+                  <p className="text-[11px] text-neutral-400 mt-0.5">
+                    À activer si tu streames depuis le même téléphone. Allège l'affichage (30 i/s visibles, résolution réduite, son 22 kHz)
+                    pour laisser la puissance à l'application de stream. Le jeu garde sa vitesse normale. S'applique au prochain lancement du jeu.
+                  </p>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={!!settings.performance?.streamMode}
+                  onChange={(e) => updatePerformanceSetting?.('streamMode', e.target.checked)}
+                  className="w-5 h-5 accent-amber-500 cursor-pointer shrink-0"
+                />
+              </div>
+
               {/* Scanlines CRT Toggle */}
               <div className="p-4 bg-neutral-950 border border-neutral-800 rounded-xl flex items-center justify-between">
                 <div>
@@ -677,6 +703,81 @@ export function SettingsModal({
                   onChange={(e) => updateVideoSetting('scanlines', e.target.checked)}
                   className="w-5 h-5 accent-cyan-500 cursor-pointer"
                 />
+              </div>
+
+              {/* Textures & Rendu Visuel Haute Définition (Shaders) */}
+              <div className="p-4 bg-neutral-950 border border-neutral-800 rounded-xl space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 text-cyan-400" />
+                    <h4 className="font-bold text-white text-xs">Textures & Rendu Visuel Haute Définition</h4>
+                  </div>
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-neutral-900 border border-neutral-800 text-cyan-400">
+                    Profil : {currentProfile.label}
+                  </span>
+                </div>
+                <p className="text-[11px] text-neutral-400">
+                  Améliorez la qualité graphique : lissage HD des sprites, émulation de borne d'arcade rétro ou vitre 3D cathodique incurvée ultra-réaliste. Les textures avancées nécessitent un processeur/GPU puissant.
+                </p>
+
+                {isStreamMode && (
+                  <div className="p-2.5 rounded-lg bg-amber-950/60 border border-amber-500/50 flex items-center gap-2 text-amber-300 text-[11px]">
+                    <ShieldAlert className="w-4 h-4 shrink-0 text-amber-400" />
+                    <span>Mode Stream actif : textures lourdes désactivées pour laisser 100% du GPU à Streamlabs.</span>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                  {SHADER_PRESETS.map((preset) => {
+                    const isSelected = currentShaderId === preset.id;
+                    const isLockedByStream = isStreamMode && preset.id !== 'none';
+                    const isDemanding = preset.tier > currentProfile.maxShaderTier;
+
+                    return (
+                      <button
+                        key={preset.id}
+                        disabled={isLockedByStream}
+                        onClick={() => updateVideoSetting('shader', preset.id)}
+                        className={`p-3 rounded-xl border text-left transition-all flex flex-col justify-between relative group ${
+                          isLockedByStream
+                            ? 'opacity-40 cursor-not-allowed bg-neutral-900/50 border-neutral-800'
+                            : isSelected
+                            ? 'bg-cyan-500/15 border-cyan-400 text-white shadow-lg shadow-cyan-500/10'
+                            : 'bg-neutral-900/80 border-neutral-800 text-neutral-300 hover:border-neutral-700 hover:bg-neutral-900'
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-2 mb-1">
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-bold text-xs text-white">{preset.label}</span>
+                            {isSelected && <Check className="w-3.5 h-3.5 text-cyan-400 shrink-0" />}
+                          </div>
+                          <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider shrink-0 ${
+                            preset.tier === 1 
+                              ? 'bg-emerald-950/80 text-emerald-400 border border-emerald-500/30' 
+                              : preset.tier === 2 
+                              ? 'bg-cyan-950/80 text-cyan-300 border border-cyan-500/30' 
+                              : 'bg-purple-950/80 text-purple-300 border border-purple-500/30'
+                          }`}>
+                            {preset.badge}
+                          </span>
+                        </div>
+
+                        <p className="text-[10px] text-neutral-400 leading-snug mb-2">
+                          {preset.desc}
+                        </p>
+
+                        <div className="flex items-center justify-between text-[9px] font-mono text-neutral-500 pt-1 border-t border-neutral-800/80">
+                          <span>Impact GPU: <b className={preset.tier === 1 ? 'text-emerald-400' : preset.tier === 2 ? 'text-amber-400' : 'text-rose-400'}>{preset.cost}</b></span>
+                          {isDemanding && !isLockedByStream && (
+                            <span className="text-amber-400 font-sans font-bold flex items-center gap-1">
+                              ⚠ Appareil puissant requis
+                            </span>
+                          )}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
 
               {/* Ratio d'Aspect */}
