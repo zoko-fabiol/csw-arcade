@@ -75,15 +75,48 @@
     body.crt-on #crt-overlay {
       opacity: 1;
     }
+    #credits-hud {
+      display: none;
+    }
+    #insert-coin-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 30;
+      display: grid;
+      place-content: center;
+      text-align: center;
+      background: rgba(3, 5, 10, 0.88);
+      backdrop-filter: blur(6px);
+      padding: 24px;
+    }
+    #insert-coin-overlay[hidden] { display: none; }
+    #insert-coin-overlay strong {
+      font-size: 20px;
+      color: #fbbf24;
+      letter-spacing: 0.08em;
+      margin-bottom: 8px;
+    }
   </style>
 </head>
 <body>
   <div id="crt-overlay" aria-hidden="true"></div>
+  <div id="credits-hud">CRÉDITS : --/99</div>
+  <div id="insert-coin-overlay" hidden>
+    <strong>INSERT COIN TO CONTINUE (0/99)</strong>
+    <span style="color:#cbd5e1;font-size:13px;">Solde épuisé. Achetez des coins dans le Quick Menu (Tab) ou le salon pour reprendre.</span>
+  </div>
   <div id="boot-msg"><strong>Initialisation du moteur…</strong><span>En attente des paramètres de lancement.</span></div>
   <div id="game"></div>
   <script>
     const CDN_DATA = 'https://cdn.emulatorjs.org/stable/data/';
     let started = false;
+    let isNetplaySession = false;
+    let netplayPlayerIndex = 0;
+
+    window.captureStageStream = (fps = 30) => {
+      const c = document.querySelector('#game canvas');
+      return c?.captureStream ? c.captureStream(fps) : null;
+    };
 
     const CODE_TO_KEYCODE = {
       KeyA: 65, KeyB: 66, KeyC: 67, KeyD: 68, KeyE: 69, KeyF: 70, KeyG: 71, KeyH: 72,
@@ -127,7 +160,7 @@
           8: { value: getKeyCode(p1.b, 75), value2: 'BUTTON_1' },
           1: { value: getKeyCode(p1.c, 85), value2: 'BUTTON_4' },
           9: { value: getKeyCode(p1.d, 73), value2: 'BUTTON_3' },
-          2: { value: getKeyCode(p1.coin, 53), value2: 'SELECT' },
+          2: { value: 0, value2: '' },
           3: { value: getKeyCode(p1.start, 49), value2: 'START' },
         },
         1: {
@@ -139,7 +172,7 @@
           8: { value: getKeyCode(p2.b, 101), value2: 'BUTTON_1' },
           1: { value: getKeyCode(p2.c, 103), value2: 'BUTTON_4' },
           9: { value: getKeyCode(p2.d, 104), value2: 'BUTTON_3' },
-          2: { value: getKeyCode(p2.coin, 54), value2: 'SELECT' },
+          2: { value: 0, value2: '' },
           3: { value: getKeyCode(p2.start, 50), value2: 'START' },
         },
         2: {},
@@ -207,80 +240,466 @@
       }
     }
 
+    const BUTTON_INDEX_ORDER = [4, 5, 6, 7, 0, 8, 1, 9, 2, 3];
+    let targetWalletCoins = 5;
+    let romCreditsInGame = 0;
+    let isSyncingCredits = false;
+    let lastSyncedRamCoins = -1;
+    let liveCreditAddrs = [];
+    let ramCalibrated = false;
+    let ramWatcherTimer = null;
+
+    function toBcd(n) {
+      const c = Math.max(0, Math.min(99, Math.floor(Number(n) || 0)));
+      return ((Math.floor(c / 10) & 0x0f) << 4) | (c % 10);
+    }
+
+    function fromBcd(byte) {
+      const hi = (byte >> 4) & 0x0f;
+      const lo = byte & 0x0f;
+      if (hi > 9 || lo > 9) return -1;
+      return hi * 10 + lo;
+    }
+
+    function getWasmHeap() {
+      return window.EJS_emulator?.gameManager?.Module?.HEAPU8 || window.EJS_emulator?.Module?.HEAPU8 || null;
+    }
+
+    function readRamCredits() {
+      const heap = getWasmHeap();
+      if (!heap || !liveCreditAddrs.length) return -1;
+      for (let i = 0; i < liveCreditAddrs.length; i++) {
+        const val = fromBcd(heap[liveCreditAddrs[i]]);
+        if (val >= 0 && val <= 99) return val;
+      }
+      return -1;
+    }
+
+    function writeCreditsToRam(coinsCount) {
+      const c = Math.max(0, Math.min(99, Math.floor(Number(coinsCount) || 0)));
+      const heap = getWasmHeap();
+      if (!heap || !liveCreditAddrs.length) return false;
+      const bcdVal = toBcd(c);
+      for (let i = 0; i < liveCreditAddrs.length; i++) {
+        heap[liveCreditAddrs[i]] = bcdVal;
+      }
+      lastSyncedRamCoins = c;
+      romCreditsInGame = c;
+      return true;
+    }
+
+    function startRamCreditWatcher() {
+      if (ramWatcherTimer) clearInterval(ramWatcherTimer);
+      ramWatcherTimer = setInterval(() => {
+        if (isSyncingCredits) return;
+        const decoded = readRamCredits();
+        if (decoded >= 0 && decoded <= 99 && decoded < romCreditsInGame && romCreditsInGame - decoded <= 2) {
+          romCreditsInGame = decoded;
+          lastSyncedRamCoins = decoded;
+          targetWalletCoins = decoded;
+          notifyParent('SYNC_WALLET_FROM_RAM', { coins: decoded });
+        }
+      }, 150);
+    }
+
+    // Forcer la synchronisation exacte des crédits du portefeuille dans la RAM de la ROM (déclenché par la touche 5)
+    async function forceSyncCreditsToRam() {
+      if (isSyncingCredits) return;
+      const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+      const currentRam = readRamCredits();
+      if (currentRam >= 0) {
+        romCreditsInGame = currentRam;
+      } else if (romCreditsInGame >= targetWalletCoins) {
+        // Si l'utilisateur appuie sur 5 alors que la synchro précédente avait tourné pendant le BIOS, réinitialiser le compteur
+        romCreditsInGame = 0;
+        ramCalibrated = false;
+        liveCreditAddrs = [];
+      }
+
+      if (targetWalletCoins <= 0) return;
+      if (ramCalibrated && currentRam === targetWalletCoins) return;
+
+      isSyncingCredits = true;
+      let candidates = null;
+
+      try {
+        while (romCreditsInGame < targetWalletCoins) {
+          const nextCredit = romCreditsInGame + 1;
+          pulseEmuButton(0, 2, 55);
+          await sleep(115);
+          romCreditsInGame = nextCredit;
+
+          // Calibrer l'adresse RAM exacte sur les 3 premières impulsions
+          if (!ramCalibrated && nextCredit >= 1 && nextCredit <= 3) {
+            const heap = getWasmHeap();
+            if (heap) {
+              const bcdExpected = toBcd(nextCredit);
+              if (nextCredit === 1) {
+                candidates = [];
+                for (let i = 0; i < heap.length; i++) {
+                  if (heap[i] === bcdExpected) candidates.push(i);
+                }
+              } else if (candidates && candidates.length) {
+                candidates = candidates.filter((addr) => heap[addr] === bcdExpected);
+              }
+              if (nextCredit === 3 && candidates && candidates.length >= 1 && candidates.length <= 256) {
+                liveCreditAddrs = candidates;
+                ramCalibrated = true;
+                startRamCreditWatcher();
+                console.log('[CSW RAM Linker] Adresse RAM crédits détectée (' + candidates.length + ' octets)');
+                if (targetWalletCoins > 3) {
+                  // Écrire (targetWalletCoins - 1) en BCD puis envoyer 1 impulsion matérielle pour forcer le rafraîchissement écran du BIOS Neo Geo
+                  writeCreditsToRam(targetWalletCoins - 1);
+                  await sleep(40);
+                  pulseEmuButton(0, 2, 55);
+                  await sleep(115);
+                  writeCreditsToRam(targetWalletCoins);
+                  romCreditsInGame = targetWalletCoins;
+                  break;
+                }
+              }
+            }
+          } else if (ramCalibrated && targetWalletCoins > romCreditsInGame) {
+            writeCreditsToRam(targetWalletCoins - 1);
+            await sleep(40);
+            pulseEmuButton(0, 2, 55);
+            await sleep(115);
+            writeCreditsToRam(targetWalletCoins);
+            romCreditsInGame = targetWalletCoins;
+            break;
+          }
+        }
+      } finally {
+        isSyncingCredits = false;
+      }
+    }
+
+    function simulateEmuInput(player, buttonId, isPressed) {
+      const gm = window.EJS_emulator?.gameManager;
+      if (!gm) return false;
+      const val = isPressed ? 1 : 0;
+      const fn = gm.functions?.simulateInput || gm.simulateInput;
+      const ctx = gm.functions?.simulateInput ? gm.functions : gm;
+      if (typeof fn === 'function') {
+        try {
+          fn.call(ctx, player, buttonId, val);
+          return true;
+        } catch {}
+      }
+      return false;
+    }
+
+    function pulseEmuButton(player, buttonId, durationMs = 110) {
+      simulateEmuInput(player, buttonId, true);
+      setTimeout(() => simulateEmuInput(player, buttonId, false), durationMs);
+    }
+
+    function resolveUniversalKey(e) {
+      const code = e.code || '';
+      if (code === 'Digit5' || code === 'Digit6' || code === 'Numpad5' || code === 'Numpad6') return 2; // Bloqué (ne charge plus de crédit)
+      if (code === 'Digit1' || code === 'Digit2' || code === 'Enter' || code === 'Numpad1') return 3; // Start
+      return findLocalButtonIndex(e.keyCode || e.which);
+    }
+
+    function findLocalButtonIndex(keyCode) {
+      const myPort = netplayPlayerIndex === 1 ? 1 : 0;
+      const portMap = window.EJS_emulator?.controls?.[myPort] || buildControllersConfig(readHardwareSettings().controls)?.[0];
+      if (!portMap) return -1;
+      for (const idx of BUTTON_INDEX_ORDER) {
+        if (portMap[idx]?.value === keyCode) return idx;
+      }
+      return -1;
+    }
+
+    function dispatchSyntheticKey(kc, type) {
+      const ev = new KeyboardEvent(type, { keyCode: kc, which: kc, bubbles: true, cancelable: true });
+      Object.defineProperty(ev, 'keyCode', { get: () => kc });
+      Object.defineProperty(ev, 'which', { get: () => kc });
+      ev._cswSynthetic = true;
+      window.dispatchEvent(ev);
+      document.dispatchEvent(ev);
+    }
+
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'Tab') {
+        e.preventDefault();
+        notifyParent('TOGGLE_QUICK_MENU');
+        return;
+      }
+      if (!e._cswSynthetic && !e.repeat) {
+        const myPort = netplayPlayerIndex === 1 ? 1 : 0;
+        const btnIdx = resolveUniversalKey(e);
+        if (btnIdx === 2) {
+          // Touche 5 : force la synchronisation des crédits du portefeuille dans la RAM de la ROM (sans ajouter de coin au portefeuille)
+          e.preventDefault();
+          e.stopImmediatePropagation();
+          forceSyncCreditsToRam();
+          return;
+        }
+        if (btnIdx === 3) {
+          simulateEmuInput(myPort, 3, true);
+        }
+        if (isNetplaySession && btnIdx >= 0) {
+          notifyParent('NETPLAY_LOCAL_BTN', { buttonIdx: btnIdx, pressed: true });
+        }
+      }
+    }, true);
+
+    window.addEventListener('keyup', (e) => {
+      if (!e._cswSynthetic) {
+        const myPort = netplayPlayerIndex === 1 ? 1 : 0;
+        const btnIdx = resolveUniversalKey(e);
+        if (btnIdx === 2 || btnIdx === 3) {
+          simulateEmuInput(myPort, btnIdx, false);
+        }
+        if (isNetplaySession && btnIdx >= 0) {
+          notifyParent('NETPLAY_LOCAL_BTN', { buttonIdx: btnIdx, pressed: false });
+        }
+      }
+    });
+
     window.addEventListener('message', (event) => {
       if (event.origin !== window.location.origin || !event.data) return;
       const msg = event.data;
+
+      if (msg.type === 'UPDATE_COINS') {
+        const hud = document.getElementById('credits-hud');
+        const ov = document.getElementById('insert-coin-overlay');
+        const c = Number(msg.coins ?? 0);
+        targetWalletCoins = c;
+        if (hud) hud.textContent = `CRÉDITS : ${String(c).padStart(2, '0')}/99`;
+        if (ov) ov.hidden = !msg.locked;
+        writeCreditsToRam(c);
+        try {
+          if (msg.locked) window.EJS_emulator?.pause?.();
+          else if (msg.resume) window.EJS_emulator?.play?.();
+        } catch {}
+        return;
+      }
+
+      if (msg.type === 'EXPORT_STATE') {
+        try {
+          const state = window.EJS_emulator?.gameManager?.getState?.();
+          if (state) {
+            const bytes = state instanceof Uint8Array ? state : new Uint8Array(state);
+            let bin = '';
+            for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+            notifyParent('STATE_EXPORTED', { stateBase64: btoa(bin), slot: msg.slot || 'quick' });
+          }
+        } catch {}
+        return;
+      }
+
+      if (msg.type === 'LOAD_STATE' && msg.stateBase64) {
+        try {
+          const bin = atob(msg.stateBase64);
+          const bytes = new Uint8Array(bin.length);
+          for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+          window.EJS_emulator?.gameManager?.loadState?.(bytes);
+        } catch {}
+        return;
+      }
 
       if (msg.type === 'UPDATE_DISPLAY') {
         applyDisplay(msg);
         return;
       }
 
-      if (msg.type === 'PRESS_BUTTON') {
-        const idx = msg.button === 'coin' ? 2 : 3;
-        const fallback = msg.button === 'coin' ? 53 : 49;
-        const kc = window.EJS_emulator?.controls?.[0]?.[idx]?.value || fallback;
+      if (msg.type === 'NETPLAY_REMOTE_BTN') {
+        const remotePort = netplayPlayerIndex === 1 ? 0 : 1;
+        const btnIdx = Number(msg.buttonIdx);
+        const pressed = Boolean(msg.pressed);
+        if (!simulateEmuInput(remotePort, btnIdx, pressed)) {
+          const kc = window.EJS_emulator?.controls?.[remotePort]?.[btnIdx]?.value;
+          if (kc) dispatchSyntheticKey(kc, pressed ? 'keydown' : 'keyup');
+        }
+        return;
+      }
+
+      if (msg.type === 'FORCE_SYNC_CREDITS') {
         try { window.focus(); } catch {}
-        const fire = (type) => {
-          const ev = new KeyboardEvent(type, { keyCode: kc, which: kc, bubbles: true, cancelable: true });
-          Object.defineProperty(ev, 'keyCode', { get: () => kc });
-          Object.defineProperty(ev, 'which', { get: () => kc });
-          window.dispatchEvent(ev);
-          document.dispatchEvent(ev);
-        };
-        fire('keydown');
-        setTimeout(() => fire('keyup'), 120);
+        forceSyncCreditsToRam();
+        return;
+      }
+
+      if (msg.type === 'PRESS_BUTTON') {
+        const myPort = netplayPlayerIndex === 1 ? 1 : 0;
+        const idx = msg.button === 'coin' ? 2 : 3;
+        try { window.focus(); } catch {}
+        pulseEmuButton(myPort, idx, 100);
+        if (isNetplaySession) {
+          notifyParent('NETPLAY_LOCAL_BTN', { buttonIdx: idx, pressed: true });
+          setTimeout(() => notifyParent('NETPLAY_LOCAL_BTN', { buttonIdx: idx, pressed: false }), 100);
+        }
         return;
       }
 
       if (msg.type === 'BOOT_EMU' && !started) {
         started = true;
+        isNetplaySession = Boolean(msg.isNetplay);
+        netplayPlayerIndex = Number(msg.playerIndex ?? 0);
         applyDisplay(msg);
 
         const bootEl = document.getElementById('boot-msg');
         bootEl.querySelector('strong').textContent = `Chargement : ${msg.gameName || 'ROM'}`;
         bootEl.querySelector('span').textContent = `Moteur ${msg.core} (EmulatorJS)…`;
 
-        let gameUrl = msg.gameUrl;
-        if (msg.fileBlob) {
-          gameUrl = URL.createObjectURL(msg.fileBlob);
-        }
+        (async () => {
+          const isFbneo = msg.core === 'fbneo' || msg.core === 'arcade';
+          const rawName = msg.filename || msg.fileBlob?.name || (msg.gameUrl ? msg.gameUrl.split('/').pop().split('?')[0] : '') || 'game.zip';
+          const targetFilename = decodeURIComponent(rawName);
+          const shortKey = targetFilename.replace(/\.[^.]+$/, '').toLowerCase();
 
-        const hw = readHardwareSettings();
-        const ctrlCfg = buildControllersConfig(hw.controls);
+          let romBytes = null;
+          if (msg.fileBlob && typeof msg.fileBlob.arrayBuffer === 'function') {
+            romBytes = new Uint8Array(await msg.fileBlob.arrayBuffer());
+          }
 
-        window.EJS_player = '#game';
-        window.EJS_core = msg.core;
-        window.EJS_gameName = msg.gameName || 'CSW Game';
-        window.EJS_gameUrl = gameUrl;
-        window.EJS_biosUrl = '';
-        window.EJS_pathtodata = msg.localData ? '../../emulatorjs/' : CDN_DATA;
-        window.EJS_startOnLoaded = true;
-        window.EJS_color = msg.accent || '#3b82f6';
-        if (ctrlCfg) window.EJS_defaultControls = ctrlCfg;
-        const effectiveMuted = msg.muted ?? hw.audio?.muted ?? false;
-        const effectiveVol = typeof msg.volume === 'number' ? msg.volume : (hw.audio?.volume ?? 80);
-        window.EJS_volume = effectiveMuted ? 0 : effectiveVol / 100;
-        applyHardwareSettings(hw);
-        window.EJS_onGameStart = () => {
-          bootEl.hidden = true;
-          applyHardwareSettings(readHardwareSettings());
-          try { window.focus(); } catch {}
-          notifyParent('STAGE_STATUS', { status: 'playing', message: 'Émulateur démarré.' });
-        };
+          let neogeoBytes = null;
+          if (isFbneo) {
+            try {
+              const biosRes = await fetch('/roms/neogeo.zip');
+              if (biosRes.ok) {
+                neogeoBytes = new Uint8Array(await biosRes.arrayBuffer());
+              }
+            } catch {}
+          }
 
-        const script = document.createElement('script');
-        script.src = `${window.EJS_pathtodata}loader.js`;
-        script.onload = () => {
-          setTimeout(() => { bootEl.hidden = true; }, 1800);
-          notifyParent('STAGE_STATUS', { status: 'loaded', message: `Moteur ${msg.core} initialisé.` });
-        };
-        script.onerror = () => {
-          bootEl.querySelector('strong').textContent = 'Impossible de charger le moteur';
-          bootEl.querySelector('span').textContent = 'Vérifiez votre connexion Internet ou l’accès au CDN EmulatorJS.';
-          notifyParent('STAGE_STATUS', { status: 'error', message: 'Échec chargement EmulatorJS.' });
-        };
-        document.head.append(script);
+          // Intercepteur fetch + XHR pour servir la ROM avec son vrai nom de fichier (indispensable pour FBNeo et MAME)
+          if (romBytes || neogeoBytes) {
+            const _origFetch = window.fetch;
+            window.fetch = async function(input, init) {
+              const u = (typeof input === 'string' ? input : (input?.url || '')).toLowerCase();
+              if (romBytes && (u.includes(targetFilename.toLowerCase()) || (shortKey && u.endsWith('/' + shortKey + '.zip')))) {
+                const buf = romBytes.buffer.slice(romBytes.byteOffset, romBytes.byteOffset + romBytes.byteLength);
+                return new Response(buf, {
+                  status: 200,
+                  statusText: 'OK',
+                  headers: { 'Content-Type': 'application/octet-stream', 'Content-Length': String(romBytes.byteLength) }
+                });
+              }
+              if (neogeoBytes && u.includes('neogeo.zip')) {
+                const buf = neogeoBytes.buffer.slice(neogeoBytes.byteOffset, neogeoBytes.byteOffset + neogeoBytes.byteLength);
+                return new Response(buf, {
+                  status: 200,
+                  statusText: 'OK',
+                  headers: { 'Content-Type': 'application/zip', 'Content-Length': String(neogeoBytes.byteLength) }
+                });
+              }
+              return _origFetch.apply(window, arguments);
+            };
+
+            const _origXHROpen = XMLHttpRequest.prototype.open;
+            const _origXHRSend = XMLHttpRequest.prototype.send;
+            XMLHttpRequest.prototype.open = function(method, url, ...rest) {
+              this._reqUrl = url ? String(url) : '';
+              return _origXHROpen.apply(this, [method, url, ...rest]);
+            };
+            XMLHttpRequest.prototype.send = function(...args) {
+              const u = (this._reqUrl || '').toLowerCase();
+              const serveBuf = (bytes) => {
+                const buf = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
+                Object.defineProperty(this, 'status', { get: () => 200 });
+                Object.defineProperty(this, 'statusText', { get: () => 'OK' });
+                Object.defineProperty(this, 'response', { get: () => buf });
+                Object.defineProperty(this, 'readyState', { get: () => 4 });
+                this.getResponseHeader = (h) => {
+                  if (!h) return null;
+                  if (h.toLowerCase() === 'content-length') return String(buf.byteLength);
+                  if (h.toLowerCase() === 'content-type') return 'application/octet-stream';
+                  return null;
+                };
+                this.getAllResponseHeaders = () => 'content-type: application/octet-stream\r\ncontent-length: ' + buf.byteLength + '\r\n';
+                setTimeout(() => {
+                  if (typeof this.onreadystatechange === 'function') this.onreadystatechange();
+                  if (typeof this.onload === 'function') this.onload();
+                  this.dispatchEvent(new Event('load'));
+                  this.dispatchEvent(new Event('loadend'));
+                }, 5);
+              };
+              if (romBytes && (u.includes(targetFilename.toLowerCase()) || (shortKey && u.endsWith('/' + shortKey + '.zip')))) {
+                serveBuf(romBytes);
+                return;
+              }
+              if (neogeoBytes && u.includes('neogeo.zip')) {
+                serveBuf(neogeoBytes);
+                return;
+              }
+              return _origXHRSend.apply(this, args);
+            };
+          }
+
+          const hw = readHardwareSettings();
+          let ctrlCfg = buildControllersConfig(hw.controls) || buildControllersConfig({ p1: {}, p2: {} });
+          if (isNetplaySession && netplayPlayerIndex === 1 && ctrlCfg) {
+            ctrlCfg = { 0: ctrlCfg[1], 1: ctrlCfg[0], 2: {}, 3: {} };
+          }
+
+          window.EJS_player = '#game';
+          window.EJS_core = isFbneo ? 'arcade' : msg.core;
+          window.EJS_gameName = isFbneo ? shortKey.toUpperCase() : (msg.gameName || 'CSW Game');
+          window.EJS_gameUrl = romBytes ? targetFilename : (msg.gameUrl || targetFilename);
+          window.EJS_biosUrl = isFbneo ? 'neogeo.zip' : '';
+          if (isFbneo) {
+            window.EJS_gameParentUrl = 'neogeo.zip';
+            window.EJS_dontExtractBIOS = true;
+            window.EJS_pathtodata = '/emulatorjs/';
+            window.EJS_paths = {
+              'fbneo-wasm.data': '/emulatorjs/cores/fbneo-wasm.data',
+              'fbneo-legacy-wasm.data': '/emulatorjs/cores/fbneo-legacy-wasm.data',
+              'fbneo.json': '/emulatorjs/cores/reports/fbneo.json',
+              'version.json': '/emulatorjs/version.json',
+            };
+          } else {
+            window.EJS_pathtodata = msg.localData ? '/emulatorjs/' : CDN_DATA;
+          }
+          window.EJS_startOnLoaded = true;
+          window.EJS_color = msg.accent || '#3b82f6';
+          if (ctrlCfg) window.EJS_defaultControls = ctrlCfg;
+          const effectiveMuted = msg.muted ?? hw.audio?.muted ?? false;
+          const effectiveVol = typeof msg.volume === 'number' ? msg.volume : (hw.audio?.volume ?? 80);
+          window.EJS_volume = effectiveMuted ? 0 : effectiveVol / 100;
+          applyHardwareSettings(hw);
+          window.EJS_onGameStart = () => {
+            bootEl.hidden = true;
+            applyHardwareSettings(readHardwareSettings());
+            if (isNetplaySession && netplayPlayerIndex === 1 && ctrlCfg && window.EJS_emulator) {
+              window.EJS_emulator.controls = ctrlCfg;
+              try { window.EJS_emulator.setupKeys?.(); } catch {}
+            }
+            try { window.focus(); } catch {}
+            notifyParent('STAGE_STATUS', { status: 'playing', message: 'Émulateur démarré.' });
+
+            // La synchronisation des crédits en RAM est déclenchée à la demande par la touche 5 (ou le bouton Sync Crédits (5))
+            if (isNetplaySession && netplayPlayerIndex === 0) {
+              setTimeout(() => {
+                try {
+                  const state = window.EJS_emulator?.gameManager?.getState?.();
+                  if (state) {
+                    const bytes = state instanceof Uint8Array ? state : new Uint8Array(state);
+                    let bin = '';
+                    for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+                    notifyParent('STATE_EXPORTED', { stateBase64: btoa(bin), slot: 'frame0' });
+                  }
+                } catch {}
+              }, 650);
+            }
+          };
+
+          const script = document.createElement('script');
+          script.src = `${window.EJS_pathtodata}loader.js`;
+          script.onload = () => {
+            setTimeout(() => { bootEl.hidden = true; }, 1800);
+            notifyParent('STAGE_STATUS', { status: 'loaded', message: `Moteur ${msg.core} initialisé.` });
+          };
+          script.onerror = () => {
+            bootEl.querySelector('strong').textContent = 'Impossible de charger le moteur';
+            bootEl.querySelector('span').textContent = 'Vérifiez votre connexion Internet ou l’accès au CDN EmulatorJS.';
+            notifyParent('STAGE_STATUS', { status: 'error', message: 'Échec chargement EmulatorJS.' });
+          };
+          document.head.append(script);
+        })();
       }
     });
 

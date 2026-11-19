@@ -74,21 +74,35 @@ export function GameCover({ title, platformLabel, filename, imageUrl, compact = 
     return parts.map((w) => w[0]?.toUpperCase() || '').join('') || 'CSW';
   }, [title]);
 
+  const isJ2me = /java|j2me|gameloft/i.test(String(platformLabel || '')) || /\.jar$/i.test(String(filename || ''));
   const currentSrc = idx < candidates.length ? candidates[idx] : null;
 
   return (
     <div
-      className={`relative overflow-hidden rounded-lg border border-white/10 bg-gradient-to-br from-cyan-950/40 via-neutral-900 to-neutral-950 flex items-center justify-center shrink-0 ${
+      className={`relative overflow-hidden rounded-lg border ${
+        isJ2me
+          ? 'border-amber-500/30 bg-gradient-to-br from-amber-950/60 via-neutral-900 to-neutral-950'
+          : 'border-white/10 bg-gradient-to-br from-cyan-950/40 via-neutral-900 to-neutral-950'
+      } flex items-center justify-center shrink-0 ${
         compact ? 'w-24 aspect-[4/3]' : 'w-full aspect-[16/10]'
       }`}
     >
       {!loaded && (
         <div className="flex flex-col items-center justify-center gap-1 p-2 text-center select-none">
-          <span className={`font-black tracking-wider text-cyan-400 ${compact ? 'text-sm' : 'text-xl'}`}>
+          {isJ2me && !compact && (
+            <span className="px-1.5 py-0.5 rounded bg-amber-500/20 border border-amber-500/40 text-[9px] font-bold uppercase tracking-wider text-amber-300">
+              📱 GAMELOFT · J2ME
+            </span>
+          )}
+          <span
+            className={`font-black tracking-wider ${
+              isJ2me ? 'text-amber-400' : 'text-cyan-400'
+            } ${compact ? 'text-sm' : 'text-xl'}`}
+          >
             {initials}
           </span>
           {platformLabel && (
-            <span className="font-mono text-[9px] uppercase tracking-wider text-neutral-500 truncate max-w-full">
+            <span className="font-mono text-[9px] uppercase tracking-wider text-neutral-400 truncate max-w-full">
               {platformLabel}
             </span>
           )}

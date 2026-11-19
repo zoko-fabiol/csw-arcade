@@ -26,7 +26,49 @@ function romStreamPlugin() {
 
       const handleRomRequest = async (req, res) => {
         try {
+          if (req.method === 'OPTIONS') {
+            res.writeHead(204, {
+              'Access-Control-Allow-Origin': '*',
+              'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS',
+              'Access-Control-Allow-Headers': '*'
+            });
+            return res.end();
+          }
+
           const url = new URL(req.url, 'http://localhost:3003');
+          const customUrl = url.searchParams.get('url');
+
+          // 0. Si une URL directe (?url=https://archive.org/...) est fournie, proxy direct avec suivi de redirection
+          if (customUrl && /^https?:\/\//i.test(customUrl)) {
+            const remoteRes = await fetch(customUrl, {
+              method: req.method === 'HEAD' ? 'HEAD' : 'GET',
+              redirect: 'follow',
+              headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) CSW-Arcade' }
+            });
+            const ct = remoteRes.headers.get('content-type') || 'application/octet-stream';
+            if (!remoteRes.ok || ct.includes('text/html')) {
+              res.writeHead(404, { 'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json' });
+              return res.end(JSON.stringify({ error: 'ROM indisponible', status: remoteRes.status }));
+            }
+            const cl = remoteRes.headers.get('content-length');
+            res.writeHead(200, {
+              'Content-Type': 'application/octet-stream',
+              ...(cl ? { 'Content-Length': cl } : {}),
+              'Access-Control-Allow-Origin': '*',
+              'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS',
+              'Access-Control-Expose-Headers': 'Content-Length, Content-Type',
+              'Cache-Control': 'public, max-age=31536000'
+            });
+            if (req.method === 'HEAD' || !remoteRes.body) return res.end();
+            const reader = remoteRes.body.getReader();
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
+              res.write(Buffer.from(value));
+            }
+            return res.end();
+          }
+
           const rawParam = url.searchParams.get('file') || url.searchParams.get('id') || req.url.replace(/^\//, '');
           const cleanName = path.basename(decodeURIComponent(rawParam)).replace(/\.(zip|bin|dat|rom)$/i, '').toLowerCase();
 
@@ -40,15 +82,6 @@ function romStreamPlugin() {
             if (fs.existsSync(fallbackPath)) {
               filePath = fallbackPath;
             }
-          }
-
-          if (req.method === 'OPTIONS') {
-            res.writeHead(204, {
-              'Access-Control-Allow-Origin': '*',
-              'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS',
-              'Access-Control-Allow-Headers': '*'
-            });
-            return res.end();
           }
 
           // Si la ROM est disponible localement, streaming direct

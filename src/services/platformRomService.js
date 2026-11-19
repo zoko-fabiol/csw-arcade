@@ -4,6 +4,98 @@
 
 const PLATFORM_IDB_NAME = 'csw_platform_roms_db';
 const PLATFORM_IDB_STORE = 'rom_files';
+const DEAD_ROMS_KEY = 'csw_dead_roms_v2';
+try {
+  if (typeof localStorage !== 'undefined') localStorage.removeItem('csw_dead_roms_v1');
+} catch {
+  /* noop */
+}
+
+const deadRomListeners = new Set();
+const verifiedRomIds = new Set();
+let deadRomSet = (() => {
+  try {
+    const raw = typeof localStorage !== 'undefined' ? localStorage.getItem(DEAD_ROMS_KEY) : null;
+    const arr = raw ? JSON.parse(raw) : [];
+    return new Set(Array.isArray(arr) ? arr : []);
+  } catch {
+    return new Set();
+  }
+})();
+
+export function getDeadRomIds() {
+  return new Set(deadRomSet);
+}
+
+export function markRomAsDead(id) {
+  if (!id || deadRomSet.has(id)) return;
+  deadRomSet.add(id);
+  try {
+    localStorage.setItem(DEAD_ROMS_KEY, JSON.stringify([...deadRomSet]));
+  } catch {
+    /* noop */
+  }
+  const snap = new Set(deadRomSet);
+  deadRomListeners.forEach((cb) => {
+    try {
+      cb(snap);
+    } catch {
+      /* noop */
+    }
+  });
+}
+
+export function subscribeDeadRoms(cb) {
+  deadRomListeners.add(cb);
+  cb(new Set(deadRomSet));
+  return () => deadRomListeners.delete(cb);
+}
+
+function isValidRomBuffer(buffer) {
+  if (!buffer || buffer.byteLength < 256) return false;
+  const headBytes = new Uint8Array(buffer, 0, Math.min(96, buffer.byteLength));
+  let headStr = '';
+  for (let i = 0; i < headBytes.length; i++) {
+    headStr += String.fromCharCode(headBytes[i]);
+  }
+  const lower = headStr.trim().toLowerCase();
+  if (
+    lower.startsWith('<!doctype') ||
+    lower.startsWith('<html') ||
+    lower.startsWith('<head') ||
+    lower.startsWith('{"error"') ||
+    lower.includes('item not available') ||
+    lower.includes('rom introuvable')
+  ) {
+    return false;
+  }
+  return true;
+}
+
+export async function probeRomAvailability(entry) {
+  if (!entry?.id) return false;
+  if (deadRomSet.has(entry.id)) return false;
+  if (verifiedRomIds.has(entry.id)) return true;
+  if (!Array.isArray(entry.urls) || entry.urls.length === 0) {
+    markRomAsDead(entry.id);
+    return false;
+  }
+  const proxyUrl = entry.urls.find((u) => u.startsWith('/api/rom-proxy')) || entry.urls[0];
+  try {
+    const res = await fetch(proxyUrl, { method: 'HEAD' });
+    if (res.ok) {
+      verifiedRomIds.add(entry.id);
+      return true;
+    }
+    if (res.status === 404 || res.status === 403 || res.status === 401) {
+      markRomAsDead(entry.id);
+      return false;
+    }
+  } catch {
+    /* network offline or transient: don't blacklist */
+  }
+  return true;
+}
 
 const SYSTEM_SEARCH_HINTS = {
   mame2003_plus: { keywords: 'mame arcade', extensions: ['.zip'] },
@@ -204,11 +296,19 @@ export async function searchOnlineRoms(query, { system = 'nes', limit = 12 } = {
 
 export async function downloadAndCacheRom(entry, { mode = 'retro', core = 'nes', extractExtensions = [], onProgress } = {}) {
   const cached = await getCachedRom(entry.id);
-  if (cached?.data) {
+  if (cached?.data && isValidRomBuffer(cached.data)) {
+    verifiedRomIds.add(entry.id);
     return new File([cached.data], cached.filename || entry.filename, { type: 'application/octet-stream' });
   }
 
   const urls = Array.isArray(entry.urls) ? entry.urls : [];
+  if (urls.length === 0) {
+    markRomAsDead(entry.id);
+    const err = new Error('ROM indisponible (aucune source)');
+    err.isDeadRom = true;
+    throw err;
+  }
+
   let buffer = null;
   let lastErr = null;
 
@@ -216,7 +316,10 @@ export async function downloadAndCacheRom(entry, { mode = 'retro', core = 'nes',
     try {
       const res = await fetch(url);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const ct = (res.headers.get('content-type') || '').toLowerCase();
+      if (ct.includes('text/html')) throw new Error('HTML 404 response');
       const total = Number(res.headers.get('content-length') || 0);
+      let candidateBuf = null;
       if (res.body?.getReader) {
         const reader = res.body.getReader();
         const chunks = [];
@@ -234,19 +337,28 @@ export async function downloadAndCacheRom(entry, { mode = 'retro', core = 'nes',
           merged.set(c, offset);
           offset += c.byteLength;
         }
-        buffer = merged.buffer;
+        candidateBuf = merged.buffer;
       } else {
-        buffer = await res.arrayBuffer();
+        candidateBuf = await res.arrayBuffer();
       }
-      if (buffer && buffer.byteLength > 0) break;
+      if (isValidRomBuffer(candidateBuf)) {
+        buffer = candidateBuf;
+        break;
+      }
+      throw new Error('Fichier ROM invalide ou corrompu');
     } catch (err) {
       lastErr = err;
     }
   }
 
   if (!buffer) {
-    throw lastErr || new Error('Impossible de télécharger cette ROM depuis Archive.org');
+    markRomAsDead(entry.id);
+    const err = lastErr || new Error('Impossible de télécharger cette ROM depuis Archive.org');
+    err.isDeadRom = true;
+    throw err;
   }
+
+  verifiedRomIds.add(entry.id);
 
   let finalFilename = entry.filename || `${entry.id}.bin`;
   let finalBuffer = buffer;

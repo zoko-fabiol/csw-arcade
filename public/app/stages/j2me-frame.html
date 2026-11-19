@@ -1,116 +1,797 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>CSW Stage — Émulateur Java J2ME</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CSW Stage — FreeJ2ME / Gameloft Runtime</title>
+  <script src="https://cjrtnc.leaningtech.com/20260317_2978/loader.js"></script>
   <style>
-    * { box-sizing: border-box; }
+    * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
     html, body {
-      margin: 0;
       width: 100%;
       height: 100%;
-      background: #05070e;
-      color: #f1f5f9;
+      background: #070a10;
+      color: #e2e8f0;
       font-family: system-ui, -apple-system, sans-serif;
+      overflow: hidden;
       display: flex;
       flex-direction: column;
-      overflow: hidden;
     }
-    .j2me-bar {
+
+    /* Barre d'outils J2ME en haut */
+    .j2me-toolbar {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 12px;
-      padding: 8px 14px;
-      background: #0d1322;
-      border-bottom: 1px solid rgba(245, 158, 11, 0.3);
+      gap: 10px;
+      padding: 6px 14px;
+      background: #0c101a;
+      border-bottom: 1px solid rgba(245, 158, 11, 0.28);
       font-size: 12px;
+      flex-shrink: 0;
       flex-wrap: wrap;
     }
-    .j2me-info {
+    .j2me-brand {
       display: flex;
       align-items: center;
-      gap: 10px;
+      gap: 8px;
+      font-weight: 700;
+      color: #fbbf24;
+    }
+    .j2me-icon {
+      width: 22px;
+      height: 22px;
+      border-radius: 5px;
+      background: rgba(245, 158, 11, 0.15);
+      border: 1px solid rgba(245, 158, 11, 0.4);
+      object-fit: contain;
+      display: none;
+    }
+    .j2me-controls {
+      display: flex;
+      align-items: center;
+      gap: 8px;
       flex-wrap: wrap;
     }
-    .j2me-pill {
-      padding: 3px 8px;
-      border-radius: 999px;
-      background: rgba(245, 158, 11, 0.16);
-      border: 1px solid rgba(245, 158, 11, 0.4);
-      color: #fcd34d;
-      font-weight: 700;
-      font-family: ui-monospace, monospace;
+    .j2me-select, .j2me-btn {
+      background: #151c2c;
+      color: #f8fafc;
+      border: 1px solid rgba(245, 158, 11, 0.35);
+      border-radius: 6px;
+      padding: 4px 9px;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s ease;
     }
-    .j2me-btn {
-      padding: 6px 12px;
+    .j2me-select:hover, .j2me-btn:hover {
+      border-color: #f59e0b;
+      background: #1e293b;
+    }
+    .j2me-btn.active {
+      background: rgba(245, 158, 11, 0.22);
+      border-color: #f59e0b;
+      color: #fde68a;
+    }
+    .j2me-hint {
+      color: #94a3b8;
+      font-size: 11px;
+    }
+    .j2me-hint kbd {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 4px;
+      padding: 1px 5px;
+      color: #fbbf24;
+      font-family: monospace;
+      font-size: 10px;
+    }
+
+    /* Zone principale : écran téléphone + pavé Nokia */
+    .j2me-stage {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 24px;
+      padding: 12px;
+      min-height: 0;
+      position: relative;
+      background: radial-gradient(circle at center, #111827 0%, #06090f 100%);
+    }
+
+    /* Coque téléphone autour du canvas */
+    .phone-bezel {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 12px;
+      border-radius: 18px;
+      background: linear-gradient(145deg, #182032, #0d121d);
+      border: 2px solid rgba(245, 158, 11, 0.35);
+      box-shadow: 0 18px 45px rgba(0, 0, 0, 0.75), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+      position: relative;
+    }
+    .phone-speaker {
+      width: 44px;
+      height: 4px;
+      border-radius: 99px;
+      background: #334155;
+      margin-bottom: 8px;
+    }
+    .screen-holder {
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #000;
+      border: 2px solid #020617;
+      border-radius: 6px;
+      overflow: hidden;
+      min-width: 240px;
+      min-height: 240px;
+    }
+    canvas#display {
+      display: none;
+      image-rendering: pixelated;
+      outline: none;
+      background: #000;
+      transform-origin: center center;
+    }
+    canvas#display.smooth-filter {
+      image-rendering: auto;
+    }
+
+    /* État de chargement */
+    .loading-box {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      padding: 28px 24px;
+      text-align: center;
+      max-width: 340px;
+    }
+    .spinner {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      border: 3px solid rgba(245, 158, 11, 0.2);
+      border-top-color: #f59e0b;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .loading-title {
+      font-size: 13px;
+      font-weight: 700;
+      color: #fbbf24;
+    }
+    .loading-sub {
+      font-size: 11px;
+      color: #94a3b8;
+      line-height: 1.4;
+    }
+
+    /* Pavé Nokia J2ME interactif (souris + tactile) */
+    .nokia-keypad {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      padding: 14px;
+      border-radius: 16px;
+      background: linear-gradient(145deg, #131a29, #0b0f19);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.6);
+      width: 215px;
+      flex-shrink: 0;
+    }
+    .nokia-keypad.hidden {
+      display: none;
+    }
+    .keypad-title {
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: #94a3b8;
+      text-align: center;
+    }
+    .soft-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 6px;
+    }
+    .dpad-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 5px;
+      padding: 6px;
+      background: rgba(0, 0, 0, 0.35);
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.06);
+    }
+    .numpad-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 5px;
+    }
+    .key {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 36px;
       border-radius: 8px;
-      border: 1px solid rgba(245, 158, 11, 0.45);
-      background: #f59e0b;
-      color: #1a1003;
+      background: #1e293b;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      color: #f8fafc;
+      font-size: 12px;
       font-weight: 700;
       cursor: pointer;
-      text-decoration: none;
-      font-size: 12px;
+      transition: transform 0.06s ease, background 0.1s ease;
     }
-    .j2me-frame {
-      flex: 1;
-      width: 100%;
-      border: 0;
-      background: #000;
+    .key span.sub {
+      font-size: 8px;
+      color: #94a3b8;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      margin-top: -1px;
+    }
+    .key:hover {
+      background: #283548;
+      border-color: rgba(245, 158, 11, 0.45);
+    }
+    .key.active {
+      background: #f59e0b !important;
+      color: #090d16 !important;
+      border-color: #fbbf24 !important;
+      transform: scale(0.95);
+    }
+    .key.active span.sub {
+      color: #1e293b !important;
+    }
+    .key.key-ok {
+      background: rgba(245, 158, 11, 0.22);
+      border-color: rgba(245, 158, 11, 0.6);
+      color: #fde68a;
+    }
+    .key.key-soft {
+      background: #172554;
+      border-color: rgba(59, 130, 246, 0.45);
+      color: #93c5fd;
+    }
+    .key-spacer {
+      pointer-events: none;
+    }
+
+    @media (max-width: 720px) {
+      .j2me-stage {
+        flex-direction: column;
+        gap: 10px;
+      }
+      .nokia-keypad {
+        width: 100%;
+        max-width: 320px;
+        padding: 8px;
+      }
     }
   </style>
 </head>
 <body>
-  <div class="j2me-bar">
-    <div class="j2me-info">
-      <span class="j2me-pill" id="j2me-name">J2ME</span>
-      <span style="color:#94a3b8;">Clavier : Flèches + Entrée (OK) · Q / W (Softkeys) · 0–9 (Pavé) · Échap (Options)</span>
+  <div class="j2me-toolbar">
+    <div class="j2me-brand">
+      <img id="game-icon" class="j2me-icon" alt="Icon" />
+      <span id="game-title">FreeJ2ME · Nokia / Gameloft</span>
     </div>
-    <a id="j2me-download-link" class="j2me-btn" download="game.jar" href="#">Télécharger le .jar</a>
+
+    <div class="j2me-controls">
+      <label for="res-select" style="color:#94a3b8;font-size:11px;">Écran :</label>
+      <select id="res-select" class="j2me-select" title="Résolution de l'écran J2ME">
+        <option value="auto">Auto (Détection JAR / 320×240)</option>
+        <option value="320x240">320×240 (Paysage Nokia E61/E71/C3)</option>
+        <option value="240x320">240×320 (Portrait Standard S40/S60)</option>
+        <option value="176x208">176×208 (Nokia N70 / S60v2)</option>
+        <option value="128x160">128×160 (Classique S40)</option>
+      </select>
+
+      <label for="phone-select" style="color:#94a3b8;font-size:11px;">Profil :</label>
+      <select id="phone-select" class="j2me-select" title="Profil matériel du téléphone">
+        <option value="Nokia">Nokia</option>
+        <option value="Standard">Standard MIDP</option>
+        <option value="SonyEricsson">Sony Ericsson</option>
+        <option value="Motorola">Motorola</option>
+        <option value="Siemens">Siemens</option>
+      </select>
+
+      <button type="button" id="toggle-kbd-btn" class="j2me-btn active" title="Afficher/Masquer le pavé Nokia">
+        📱 Pavé Nokia
+      </button>
+    </div>
+
+    <div class="j2me-hint">
+      Clavier : <kbd>Flèches</kbd> D-Pad · <kbd>Entrée</kbd>/<kbd>Espace</kbd> OK · <kbd>Q</kbd>/<kbd>F1</kbd> Soft G · <kbd>W</kbd>/<kbd>F2</kbd> Soft D · <kbd>0-9</kbd> Pavé
+    </div>
   </div>
-  <iframe
-    id="j2me-web-frame"
-    class="j2me-frame"
-    title="FreeJ2ME Web"
-    allow="autoplay; fullscreen"
-  ></iframe>
-  <script>
-    let started = false;
-    function notifyParent(type, payload = {}) {
-      if (window.parent && window.parent !== window) {
-        window.parent.postMessage({ type, ...payload }, window.location.origin);
+
+  <div class="j2me-stage">
+    <div class="phone-bezel">
+      <div class="phone-speaker"></div>
+      <div class="screen-holder" id="screen-holder">
+        <div class="loading-box" id="loading">
+          <div class="spinner"></div>
+          <div class="loading-title" id="loading-title">Initialisation du moteur Java J2ME…</div>
+          <div class="loading-sub" id="loading-sub">Chargement de CheerpJ & FreeJ2ME en cours…</div>
+        </div>
+        <canvas id="display" tabindex="0"></canvas>
+      </div>
+    </div>
+
+    <!-- Pavé Nokia interactif -->
+    <div class="nokia-keypad keypad-part" id="nokia-keypad">
+      <div class="keypad-title">Clavier Nokia E71 / S60</div>
+
+      <div class="soft-row">
+        <button type="button" class="key key-soft" data-key="KeyQ" title="Softkey Gauche (Touche Q ou F1)">
+          <span>▬</span><span class="sub">SOFT G (Q)</span>
+        </button>
+        <button type="button" class="key" data-key="KeyE" title="Retour / Effacer (Touche E ou Échap)">
+          <span>C</span><span class="sub">RETOUR (E)</span>
+        </button>
+        <button type="button" class="key key-soft" data-key="KeyW" title="Softkey Droite (Touche W ou F2)">
+          <span>▬</span><span class="sub">SOFT D (W)</span>
+        </button>
+      </div>
+
+      <div class="dpad-grid">
+        <div class="key-spacer"></div>
+        <button type="button" class="key" data-key="ArrowUp">▲</button>
+        <div class="key-spacer"></div>
+        <button type="button" class="key" data-key="ArrowLeft">◄</button>
+        <button type="button" class="key key-ok" data-key="Enter">
+          <span>OK</span><span class="sub">ENTRÉE</span>
+        </button>
+        <button type="button" class="key" data-key="ArrowRight">►</button>
+        <div class="key-spacer"></div>
+        <button type="button" class="key" data-key="ArrowDown">▼</button>
+        <div class="key-spacer"></div>
+      </div>
+
+      <div class="numpad-grid">
+        <button type="button" class="key" data-key="Digit1"><span>1</span><span class="sub">oo</span></button>
+        <button type="button" class="key" data-key="Digit2"><span>2</span><span class="sub">abc ▲</span></button>
+        <button type="button" class="key" data-key="Digit3"><span>3</span><span class="sub">def</span></button>
+        <button type="button" class="key" data-key="Digit4"><span>4</span><span class="sub">ghi ◄</span></button>
+        <button type="button" class="key" data-key="Digit5"><span>5</span><span class="sub">jkl OK</span></button>
+        <button type="button" class="key" data-key="Digit6"><span>6</span><span class="sub">mno ►</span></button>
+        <button type="button" class="key" data-key="Digit7"><span>7</span><span class="sub">pqrs</span></button>
+        <button type="button" class="key" data-key="Digit8"><span>8</span><span class="sub">tuv ▼</span></button>
+        <button type="button" class="key" data-key="Digit9"><span>9</span><span class="sub">wxyz</span></button>
+        <button type="button" class="key" data-key="KeyR"><span>*</span><span class="sub">+</span></button>
+        <button type="button" class="key" data-key="Digit0"><span>0</span><span class="sub">_</span></button>
+        <button type="button" class="key" data-key="KeyT"><span>#</span><span class="sub">⇧</span></button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { LibMedia } from "/freej2me/libmedia/libmedia.js";
+    import { LibMidi, createUnlockingAudioContext } from "/freej2me/libmidi/libmidi.js";
+    import { codeMap, KeyRepeatManager } from "/freej2me/src/key.js";
+    import { EventQueue } from "/freej2me/src/eventqueue.js";
+
+    import canvasFontNatives from "/freej2me/libjs/libcanvasfont.js";
+    import canvasGraphicsNatives from "/freej2me/libjs/libcanvasgraphics.js";
+    import gles2Natives from "/freej2me/libjs/libgles2.js";
+    import jsReferenceNatives from "/freej2me/libjs/libjsreference.js";
+    import mediaBridgeNatives from "/freej2me/libjs/libmediabridge.js";
+    import midiBridgeNatives from "/freej2me/libjs/libmidibridge.js";
+
+    const evtQueue = new EventQueue();
+    const keyRepeatManager = new KeyRepeatManager();
+    window.evtQueue = evtQueue;
+
+    const display = document.getElementById("display");
+    const screenCtx = display.getContext("2d");
+    const loadingBox = document.getElementById("loading");
+    const loadingTitle = document.getElementById("loading-title");
+    const loadingSub = document.getElementById("loading-sub");
+    const gameTitleEl = document.getElementById("game-title");
+    const gameIconEl = document.getElementById("game-icon");
+    const resSelect = document.getElementById("res-select");
+    const phoneSelect = document.getElementById("phone-select");
+    const toggleKbdBtn = document.getElementById("toggle-kbd-btn");
+    const nokiaKeypad = document.getElementById("nokia-keypad");
+
+    let scaleSet = false;
+    let cheerpjReadyPromise = null;
+    let currentGameKey = "default";
+
+    function postStatus(status, message) {
+      window.parent.postMessage({ type: "STAGE_STATUS", status, message }, window.location.origin);
+    }
+
+    function setLoadingText(title, sub) {
+      if (loadingTitle) loadingTitle.textContent = title;
+      if (loadingSub && sub !== undefined) loadingSub.textContent = sub;
+    }
+
+    function autoscale() {
+      if (!scaleSet || !screenCtx.canvas.width || !screenCtx.canvas.height) return;
+      const kbdVisible = !nokiaKeypad.classList.contains("hidden");
+      const kbdOccupiedWidth = kbdVisible && window.innerWidth > 720 ? 250 : 0;
+      const kbdOccupiedHeight = kbdVisible && window.innerWidth <= 720 ? 290 : 0;
+
+      const availW = Math.max(200, window.innerWidth - kbdOccupiedWidth - 64);
+      const availH = Math.max(200, window.innerHeight - kbdOccupiedHeight - 90);
+
+      let scale = Math.min(availW / screenCtx.canvas.width, availH / screenCtx.canvas.height);
+      scale = Math.max(1, Math.min(3.5, Number(scale.toFixed(2))));
+      display.style.zoom = scale;
+    }
+
+    toggleKbdBtn.addEventListener("click", () => {
+      nokiaKeypad.classList.toggle("hidden");
+      toggleKbdBtn.classList.toggle("active", !nokiaKeypad.classList.contains("hidden"));
+      autoscale();
+      display.focus();
+    });
+
+    resSelect.addEventListener("change", () => {
+      try {
+        sessionStorage.setItem(`csw_j2me_res_${currentGameKey}`, resSelect.value);
+      } catch { /* ignore */ }
+      location.reload();
+    });
+
+    phoneSelect.addEventListener("change", () => {
+      try {
+        sessionStorage.setItem(`csw_j2me_phone_${currentGameKey}`, phoneSelect.value);
+      } catch { /* ignore */ }
+      location.reload();
+    });
+
+    function triggerVirtualKey(isDown, keyCode) {
+      if (!keyCode) return;
+      const mappedKey = keyCode === "Space" ? "Enter" : keyCode;
+      const symbol = mappedKey.startsWith("Digit") ? mappedKey.substring(5).charCodeAt(0) : "\x00";
+      keyRepeatManager.post(isDown, mappedKey, { symbol, ctrlKey: false, shiftKey: false });
+    }
+
+    function setupInputListeners() {
+      keyRepeatManager.register((kind, key, args) => {
+        if (kind === "click") return;
+        const mapped = key === "Space" ? "Enter" : key;
+        if (codeMap[mapped]) {
+          evtQueue.queueEvent({
+            kind: kind === "up" ? "keyup" : "keydown",
+            args: [codeMap[mapped], args.symbol, args.ctrlKey, args.shiftKey],
+          });
+        }
+      });
+
+      function handleKeyEvent(e) {
+        if (e.target && (e.target.tagName === "SELECT" || e.target.tagName === "INPUT")) return;
+        const isDown = e.type === "keydown";
+        const code = e.code === "Space" ? "Enter" : e.code;
+        if (codeMap[code]) {
+          keyRepeatManager.post(isDown, code, {
+            symbol: e.key && e.key.length === 1 ? e.key.charCodeAt(0) : "\x00",
+            ctrlKey: e.ctrlKey,
+            shiftKey: e.shiftKey,
+          });
+          e.preventDefault();
+        }
+      }
+
+      window.addEventListener("keydown", handleKeyEvent);
+      window.addEventListener("keyup", handleKeyEvent);
+
+      // Souris et tactile sur le pavé Nokia virtuel
+      const keys = document.querySelectorAll(".nokia-keypad .key");
+      keys.forEach((btn) => {
+        const keyCode = btn.dataset.key;
+        if (!keyCode) return;
+
+        const press = (e) => {
+          e.preventDefault();
+          btn.classList.add("active");
+          triggerVirtualKey(true, keyCode);
+          display.focus();
+        };
+        const release = (e) => {
+          e.preventDefault();
+          if (btn.classList.contains("active")) {
+            btn.classList.remove("active");
+            triggerVirtualKey(false, keyCode);
+          }
+        };
+
+        btn.addEventListener("mousedown", press);
+        btn.addEventListener("mouseup", release);
+        btn.addEventListener("mouseleave", release);
+        btn.addEventListener("touchstart", press, { passive: false });
+        btn.addEventListener("touchend", release, { passive: false });
+        btn.addEventListener("touchcancel", release, { passive: false });
+      });
+
+      // Pointeur souris / tactile directement sur l'écran du téléphone (pour jeux tactiles J2ME)
+      let mouseDown = false;
+      display.addEventListener("mousedown", (e) => {
+        display.focus();
+        const zoom = Number(display.style.zoom || 1);
+        evtQueue.queueEvent({
+          kind: "pointerpressed",
+          x: (e.offsetX / zoom) | 0,
+          y: (e.offsetY / zoom) | 0,
+        });
+        mouseDown = true;
+        e.preventDefault();
+      });
+
+      display.addEventListener("mousemove", (e) => {
+        if (!mouseDown) return;
+        const zoom = Number(display.style.zoom || 1);
+        evtQueue.queueEvent({
+          kind: "pointerdragged",
+          x: (e.offsetX / zoom) | 0,
+          y: (e.offsetY / zoom) | 0,
+        });
+        e.preventDefault();
+      });
+
+      window.addEventListener("mouseup", (e) => {
+        if (!mouseDown) return;
+        mouseDown = false;
+        const rect = display.getBoundingClientRect();
+        const zoom = Number(display.style.zoom || 1);
+        evtQueue.queueEvent({
+          kind: "pointerreleased",
+          x: ((e.clientX - rect.left) / zoom) | 0,
+          y: ((e.clientY - rect.top) / zoom) | 0,
+        });
+      });
+
+      window.addEventListener("resize", autoscale);
+    }
+
+    async function javaToKv(hashMap, kv) {
+      if (!hashMap) return;
+      const es = await hashMap.entrySet();
+      const esi = await es.iterator();
+      while (await esi.hasNext()) {
+        const entry = await esi.next();
+        const key = await entry.getKey();
+        const value = await entry.getValue();
+        kv[key] = value;
       }
     }
 
-    window.addEventListener('message', (event) => {
-      if (event.origin !== window.location.origin || !event.data) return;
-      const msg = event.data;
-      if (msg.type === 'BOOT_J2ME' && !started) {
-        started = true;
-        const nameEl = document.getElementById('j2me-name');
-        const dlLink = document.getElementById('j2me-download-link');
-        const frame = document.getElementById('j2me-web-frame');
+    async function kvToJava(lib, kv) {
+      const HashMap = await lib.java.util.HashMap;
+      const ret = await new HashMap();
+      for (const k of Object.keys(kv)) {
+        await ret.put(k, String(kv[k]));
+      }
+      return ret;
+    }
 
-        if (nameEl) nameEl.textContent = msg.gameName || 'Java J2ME';
-        if (msg.fileBlob && dlLink) {
-          const blobUrl = URL.createObjectURL(msg.fileBlob);
-          dlLink.href = blobUrl;
-          dlLink.download = msg.filename || 'game.jar';
+    async function ensureCheerpJInitialized() {
+      if (!cheerpjReadyPromise) {
+        cheerpjReadyPromise = (async () => {
+          setLoadingText("Initialisation audio & CheerpJ…", "Démarrage de la JVM WebAssembly FreeJ2ME…");
+          try {
+            window.libmidi = new LibMidi(createUnlockingAudioContext());
+            await window.libmidi.init();
+            if (window.libmidi.midiPlayer) {
+              window.libmidi.midiPlayer.addEventListener("end-of-media", (e) => {
+                window.evtQueue.queueEvent({ kind: "player-eom", player: e.target });
+              });
+            }
+          } catch (err) {
+            console.warn("[J2ME] LibMidi non disponible, poursuite sans synthé MIDI :", err);
+          }
+          window.libmedia = new LibMedia();
+
+          await cheerpjInit({
+            enableDebug: false,
+            natives: {
+              ...canvasFontNatives,
+              ...canvasGraphicsNatives,
+              ...gles2Natives,
+              ...jsReferenceNatives,
+              ...mediaBridgeNatives,
+              ...midiBridgeNatives,
+              async Java_pl_zb3_freej2me_bridge_shell_Shell_setTitle(lib, title) {
+                if (title) gameTitleEl.textContent = title;
+              },
+              async Java_pl_zb3_freej2me_bridge_shell_Shell_setIcon(lib, iconBytes) {
+                if (iconBytes && iconBytes.buffer) {
+                  const blob = new Blob([iconBytes.buffer], { type: "image/png" });
+                  gameIconEl.src = URL.createObjectURL(blob);
+                  gameIconEl.style.display = "block";
+                }
+              },
+              async Java_pl_zb3_freej2me_bridge_shell_Shell_getScreenCtx(lib) {
+                return screenCtx;
+              },
+              async Java_pl_zb3_freej2me_bridge_shell_Shell_setCanvasSize(lib, width, height) {
+                if (!scaleSet) {
+                  loadingBox.style.display = "none";
+                  display.style.display = "block";
+                  scaleSet = true;
+                  setTimeout(() => display.focus(), 30);
+                  postStatus("playing", `En jeu (${width}×${height})`);
+                }
+                screenCtx.canvas.width = width;
+                screenCtx.canvas.height = height;
+                autoscale();
+              },
+              async Java_pl_zb3_freej2me_bridge_shell_Shell_waitForAndDispatchEvents(lib, listener) {
+                const KeyEvent = await lib.pl.zb3.freej2me.bridge.shell.KeyEvent;
+                const PointerEvent = await lib.pl.zb3.freej2me.bridge.shell.PointerEvent;
+                const evt = await evtQueue.waitForEvent();
+                if (evt.kind === "keydown") {
+                  await listener.keyPressed(await new KeyEvent(...evt.args));
+                } else if (evt.kind === "keyup") {
+                  await listener.keyReleased(await new KeyEvent(...evt.args));
+                } else if (evt.kind === "pointerpressed") {
+                  await listener.pointerPressed(await new PointerEvent(evt.x, evt.y));
+                } else if (evt.kind === "pointerdragged") {
+                  await listener.pointerDragged(await new PointerEvent(evt.x, evt.y));
+                } else if (evt.kind === "pointerreleased") {
+                  await listener.pointerReleased(await new PointerEvent(evt.x, evt.y));
+                } else if (evt.kind === "player-eom") {
+                  await listener.playerEOM(evt.player);
+                } else if (evt.kind === "player-video-frame") {
+                  await listener.playerVideoFrame(evt.player);
+                }
+              },
+              async Java_pl_zb3_freej2me_bridge_shell_Shell_restart(lib) {
+                location.reload();
+              },
+              async Java_pl_zb3_freej2me_bridge_shell_Shell_exit(lib) {
+                location.reload();
+              },
+              async Java_pl_zb3_freej2me_bridge_shell_Shell_sthop(lib) {},
+              async Java_pl_zb3_freej2me_bridge_shell_Shell_say(lib, sth) {
+                console.log("[FreeJ2ME]", sth);
+              },
+              async Java_pl_zb3_freej2me_bridge_shell_Shell_sayObject(lib, label, obj) {
+                console.log("[FreeJ2ME]", label, obj);
+              },
+            },
+          });
+
+          setLoadingText("Chargement de FreeJ2ME…", "Ouverture de la librairie /app/freej2me/freej2me-web.jar…");
+          const lib = await cheerpjRunLibrary("/app/freej2me/freej2me-web.jar");
+          return lib;
+        })();
+      }
+      return cheerpjReadyPromise;
+    }
+
+    async function bootJarBlob(msg) {
+      const fileBlob = msg.fileBlob;
+      const fileName = msg.filename || (fileBlob && fileBlob.name) || "game.jar";
+      const gameName = msg.gameName || fileName.replace(/\.jar$/i, "");
+
+      currentGameKey = fileName.replace(/[^a-z0-9]/gi, "_").toLowerCase();
+      gameTitleEl.textContent = gameName;
+
+      let savedRes = "auto";
+      let savedPhone = "Nokia";
+      try {
+        savedRes = sessionStorage.getItem(`csw_j2me_res_${currentGameKey}`) || "auto";
+        savedPhone = sessionStorage.getItem(`csw_j2me_phone_${currentGameKey}`) || "Nokia";
+      } catch { /* ignore */ }
+      resSelect.value = savedRes;
+      phoneSelect.value = savedPhone;
+
+      if (!fileBlob) {
+        setLoadingText("Aucun fichier .JAR reçu", "Veuillez sélectionner un jeu Java / Gameloft du catalogue.");
+        postStatus("error", "Fichier .JAR manquant");
+        return;
+      }
+
+      try {
+        postStatus("loading", `Chargement de ${gameName}…`);
+        const fileBuffer = await fileBlob.arrayBuffer();
+        const lib = await ensureCheerpJInitialized();
+
+        setLoadingText(`Installation de ${gameName}…`, "Analyse du manifeste MIDlet et configuration de l'écran…");
+
+        const launcherUtil = await lib.pl.zb3.freej2me.launcher.LauncherUtil;
+        const MIDletLoader = await lib.org.recompile.mobile.MIDletLoader;
+        const AnalyserUtil = await lib.pl.zb3.freej2me.launcher.AnalyserUtil;
+        const Config = await lib.org.recompile.freej2me.Config;
+        const FreeJ2ME = await lib.org.recompile.freej2me.FreeJ2ME;
+        const File = await lib.java.io.File;
+
+        await launcherUtil.resetTmpDir();
+        const jarFile = await new File("/files/_tmp/current.jar");
+        await launcherUtil.copyJar(new Int8Array(fileBuffer), jarFile);
+
+        const settings = {};
+        await javaToKv(Config.DEFAULT_SETTINGS, settings);
+
+        // Par défaut pour la collection 320x240JavaGames (Nokia E61/E71/C3-00)
+        settings.width = "320";
+        settings.height = "240";
+        settings.phone = savedPhone || "Nokia";
+        settings.sound = "on";
+
+        const analysisResult = await AnalyserUtil.analyseFile(jarFile, fileName);
+        if (analysisResult && analysisResult.screenWidth !== -1) {
+          settings.width = String(analysisResult.screenWidth);
+          settings.height = String(analysisResult.screenHeight);
+        }
+        if (analysisResult && analysisResult.phoneType) {
+          settings.phone = analysisResult.phoneType;
+          phoneSelect.value = settings.phone;
         }
 
-        frame.src = 'https://zb3.github.io/freej2me-web/web/';
-        frame.addEventListener('load', () => {
-          notifyParent('STAGE_STATUS', {
-            status: 'playing',
-            message: 'FreeJ2ME prêt — sélectionnez le .jar téléchargé pour démarrer.',
-          });
+        if (savedRes && savedRes !== "auto" && savedRes.includes("x")) {
+          const [w, h] = savedRes.split("x");
+          settings.width = w;
+          settings.height = h;
+        }
+        if (savedPhone) {
+          settings.phone = savedPhone;
+        }
+
+        const loader = await MIDletLoader.getMIDletLoader(jarFile);
+        if (!(await loader.getAppId())) {
+          await launcherUtil.ensureAppId(loader, fileName);
+          loader.name = await loader.getAppId();
+        }
+
+        const appId = await loader.getAppId();
+        const iconBytes = await loader.getIconBytes();
+        if (iconBytes && iconBytes.buffer) {
+          const blob = new Blob([iconBytes.buffer], { type: "image/png" });
+          gameIconEl.src = URL.createObjectURL(blob);
+          gameIconEl.style.display = "block";
+        }
+
+        const appProps = {};
+        await javaToKv(loader.properties, appProps);
+
+        const jsettings = await kvToJava(lib, settings);
+        const jappProps = await kvToJava(lib, appProps);
+        const jsysProps = await kvToJava(lib, {});
+
+        await launcherUtil.initApp(jarFile, loader, jsettings, jappProps, jsysProps);
+
+        setLoadingText(`Démarrage de ${gameName}…`, `Écran ${settings.width}×${settings.height} (${settings.phone})`);
+        FreeJ2ME.main(["app", appId]).catch((err) => {
+          console.error("[FreeJ2ME Crash]", err);
+          if (err && err.printStackTrace) err.printStackTrace();
+          setLoadingText("Erreur d'exécution MIDlet", "Essayez de changer la résolution (320×240 / 240×320) dans la barre du haut.");
+          postStatus("error", "Erreur MIDlet J2ME");
         });
+      } catch (err) {
+        console.error("[J2ME Boot Error]", err);
+        setLoadingText("Impossible de démarrer ce jeu .JAR", err?.message || "Erreur CheerpJ / FreeJ2ME");
+        postStatus("error", "Échec démarrage J2ME");
+      }
+    }
+
+    setupInputListeners();
+
+    window.addEventListener("message", (event) => {
+      if (event.origin !== window.location.origin) return;
+      const msg = event.data;
+      if (!msg || typeof msg !== "object") return;
+      if (msg.type === "BOOT_J2ME") {
+        bootJarBlob(msg);
+      } else if (msg.type === "UPDATE_DISPLAY") {
+        display.classList.toggle("smooth-filter", msg.filter === "smooth");
       }
     });
 
-    notifyParent('STAGE_FRAME_READY');
+    window.parent.postMessage({ type: "STAGE_FRAME_READY", kind: "j2me" }, window.location.origin);
   </script>
 </body>
 </html>

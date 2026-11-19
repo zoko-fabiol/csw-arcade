@@ -87,6 +87,11 @@ export const DEFAULT_SETTINGS = {
     thermalGuard: true, // Rétrogradation automatique anti-surchauffe
     showOverlay: false, // Overlay FPS / temps image
     streamMode: false // Mode Stream externe (Streamlabs/OBS sur le même appareil)
+  },
+  netplay: {
+    inputDelay: 1, // 0 à 3 frames
+    showHud: true,
+    challengeSound: true
   }
 };
 
@@ -227,6 +232,19 @@ export function useSettings() {
   }, []);
 
   /**
+   * Met à jour les options Fightcade 2 / Rollback P2P
+   */
+  const updateNetplaySetting = useCallback((key, value) => {
+    setSettings((prev) => ({
+      ...prev,
+      netplay: {
+        ...(prev.netplay || DEFAULT_SETTINGS.netplay),
+        [key]: value
+      }
+    }));
+  }, []);
+
+  /**
    * Réinitialise l'ensemble des paramètres d'usine NeoRAGEx
    */
   const resetToDefaults = useCallback(() => {
@@ -242,6 +260,7 @@ export function useSettings() {
     updateGamepadSetting,
     updateTouchSetting,
     updatePerformanceSetting,
+    updateNetplaySetting,
     resetToDefaults
   };
 }

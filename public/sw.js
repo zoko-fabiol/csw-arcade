@@ -1,4 +1,4 @@
-const SHELL_CACHE_NAME = 'csw-arcade-shell-v15-arcade969';
+const SHELL_CACHE_NAME = 'csw-arcade-shell-v16-react-fc2';
 const ENGINE_CACHE_NAME = 'csw-arcade-engine-v6';
 
 // Assets essentiels du moteur WebAssembly (FBNeo + EmulatorJS)
@@ -20,32 +20,13 @@ const ENGINE_ASSETS = [
 const SHELL_ASSETS = [
   '/',
   '/index.html',
-  '/arcade-app.html',
   '/player.html',
-  '/app/styles.css',
-  '/app/main.js',
-  '/app/data/catalogs.js',
   '/app/data/arcade-catalog.json',
   '/app/data/extended-catalogs.json',
   '/app/data/java-catalog.json',
-  '/app/services/storage.js',
-  '/app/services/stage.js',
-  '/app/services/rom-downloader.js',
-  '/app/services/zip.js',
-  '/app/components/icons.js',
-  '/app/components/ui.js',
-  '/app/components/shell-layout.js',
-  '/app/views/arcade-consoles.js',
-  '/app/views/playstation.js',
-  '/app/views/sega.js',
-  '/app/views/nintendo.js',
-  '/app/views/java.js',
-  '/app/views/xbox.js',
-  '/app/views/pc.js',
   '/app/stages/emu-frame.html',
   '/app/stages/dos-frame.html',
   '/app/stages/j2me-frame.html',
-  '/catalog.json',
   '/manifest.json',
   '/favicon.png',
   '/roms-manifest.json',

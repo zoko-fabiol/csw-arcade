@@ -19,8 +19,13 @@ import {
   Sparkles,
   ShieldAlert,
   Layers,
-  Lock
+  Lock,
+  Swords,
+  Database,
+  Trash2
 } from 'lucide-react';
+import { getPlayerIdentity, setPlayerDisplayName } from '../../services/firebaseFightcadeService';
+import { formatBytes, getPlatformCacheStats, listCachedRoms, removeCachedRom } from '../../services/platformRomService';
 import { GamepadVisualizer } from './GamepadVisualizer';
 import { useDeviceType } from '../../utils/deviceDetector';
 import { SHADER_PRESETS, resolveProfile } from '../../utils/performanceProfile';
@@ -36,11 +41,15 @@ export function SettingsModal({
   updateGamepadSetting,
   updateTouchSetting,
   updatePerformanceSetting,
+  updateNetplaySetting,
+  onCacheCleared,
   resetToDefaults,
   resetSettings 
 }) {
   const handleReset = resetToDefaults || resetSettings;
   const [activeTab, setActiveTab] = useState('controls');
+  const [playerName, setPlayerName] = useState(() => getPlayerIdentity().name);
+  const [cacheInfo, setCacheInfo] = useState({ count: 0, totalBytes: 0 });
   const [controlSubTab, setControlSubTab] = useState('touch');
   const [activePlayer, setActivePlayer] = useState('p1');
   const [listeningAction, setListeningAction] = useState(null);
@@ -166,12 +175,13 @@ export function SettingsModal({
         </div>
 
         {/* Onglets Principaux Responsive */}
-        <div className="grid grid-cols-4 border-b border-neutral-800 bg-neutral-950 text-[10px] sm:text-xs font-bold text-center">
+        <div className="grid grid-cols-5 border-b border-neutral-800 bg-neutral-950 text-[10px] sm:text-xs font-bold text-center">
           {[
             { id: 'controls', full: 'CONTRÔLES', short: 'CONTRÔLE', icon: Gamepad2 },
             { id: 'video', full: 'AFFICHAGE & CRT', short: 'VIDÉO', icon: Tv },
             { id: 'audio', full: 'AUDIO', short: 'AUDIO', icon: Volume2 },
-            { id: 'system', full: 'SYSTÈME & BIOS', short: 'BIOS', icon: Cpu }
+            { id: 'system', full: 'SYSTÈME & BIOS', short: 'BIOS', icon: Cpu },
+            { id: 'netplay', full: 'FIGHTCADE & CACHE', short: 'FC2', icon: Swords }
           ].map((tab) => {
             const Icon = tab.icon;
             const active = activeTab === tab.id;
@@ -915,6 +925,106 @@ export function SettingsModal({
                       {reg}
                     </button>
                   ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ================= ONGLET 5 : FIGHTCADE 2 & CACHE ================= */}
+          {activeTab === 'netplay' && (
+            <div className="space-y-4">
+              <div className="p-4 bg-neutral-950 border border-neutral-800 rounded-xl space-y-3">
+                <h4 className="font-bold text-white text-xs">Profil Joueur Fightcade 2</h4>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={playerName}
+                    onChange={(e) => {
+                      setPlayerName(e.target.value);
+                      setPlayerDisplayName(e.target.value);
+                    }}
+                    maxLength={24}
+                    placeholder="Votre pseudo dans les salons…"
+                    className="flex-1 px-3 py-2 rounded-lg bg-neutral-900 border border-neutral-700 text-xs text-white focus:outline-none focus:border-cyan-500"
+                  />
+                </div>
+              </div>
+
+              <div className="p-4 bg-neutral-950 border border-neutral-800 rounded-xl space-y-3">
+                <h4 className="font-bold text-white text-xs">WebRTC Rollback P2P</h4>
+                <div className="flex items-center justify-between">
+                  <span className="text-neutral-300">Input Delay par défaut (0–3 frames)</span>
+                  <div className="flex gap-1.5">
+                    {[0, 1, 2, 3].map((d) => (
+                      <button
+                        key={d}
+                        type="button"
+                        onClick={() => updateNetplaySetting?.('inputDelay', d)}
+                        className={`px-2.5 py-1 rounded-lg font-mono text-xs font-bold border ${
+                          (settings?.netplay?.inputDelay ?? 1) === d
+                            ? 'bg-cyan-500/20 border-cyan-400 text-cyan-300'
+                            : 'bg-neutral-900 border-neutral-800 text-neutral-400'
+                        }`}
+                      >
+                        {d}f
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <label className="flex items-center justify-between pt-1 cursor-pointer">
+                  <span className="text-neutral-300">Afficher le HUD réseau (PING | ROLLBACK | P2P)</span>
+                  <input
+                    type="checkbox"
+                    checked={settings?.netplay?.showHud ?? true}
+                    onChange={(e) => updateNetplaySetting?.('showHud', e.target.checked)}
+                    className="w-4 h-4 accent-cyan-400"
+                  />
+                </label>
+
+                <label className="flex items-center justify-between cursor-pointer">
+                  <span className="text-neutral-300">Son d’alerte Fightcade lors d’un défi</span>
+                  <input
+                    type="checkbox"
+                    checked={settings?.netplay?.challengeSound ?? true}
+                    onChange={(e) => updateNetplaySetting?.('challengeSound', e.target.checked)}
+                    className="w-4 h-4 accent-cyan-400"
+                  />
+                </label>
+              </div>
+
+              <div className="p-4 bg-neutral-950 border border-neutral-800 rounded-xl flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2.5">
+                  <Database className="w-4 h-4 text-emerald-400" />
+                  <div>
+                    <div className="font-bold text-white text-xs">Cache ROMs IndexedDB</div>
+                    <div className="text-[11px] font-mono text-neutral-400">
+                      {cacheInfo.count} jeu(x) · {formatBytes(cacheInfo.totalBytes)}
+                    </div>
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => getPlatformCacheStats().then(setCacheInfo)}
+                    className="px-2.5 py-1.5 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-xs text-neutral-300"
+                  >
+                    Actualiser
+                  </button>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      const rows = await listCachedRoms();
+                      for (const r of rows) await removeCachedRom(r.id);
+                      const stats = await getPlatformCacheStats();
+                      setCacheInfo(stats);
+                      onCacheCleared?.();
+                    }}
+                    className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-rose-600/20 hover:bg-rose-600/40 border border-rose-500/40 text-rose-300 text-xs font-bold"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Vider</span>
+                  </button>
                 </div>
               </div>
             </div>

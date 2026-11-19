@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
-  Search, Grid, List, Upload, Globe, Database, Play, Download, Trash2, Menu, X
+  Search, Grid, List, Upload, Globe, Database, Play, Download, Trash2, Menu, X, Swords
 } from 'lucide-react';
 import {
   NINTENDO_CATALOG,
@@ -9,19 +9,49 @@ import {
   RETRO_SYSTEMS,
   SEGA_CATALOG,
 } from '../../data/platformCatalogs';
+import neoGeoGames from '../../data/games.json';
+import fbneoMapping from '../../data/fbneoMapping.json';
 import {
   downloadAndCacheRom,
   formatBytes,
   getCachedRom,
   listCachedRoms,
+  markRomAsDead,
+  probeRomAvailability,
   removeCachedRom,
   searchOnlineRoms,
+  subscribeDeadRoms,
 } from '../../services/platformRomService';
+import { addCoins } from '../../services/walletService';
 import { GameCover } from './GameCover';
 
 const PAGE_SIZE = 48;
 
+const XBOX_CATALOG = [];
+const PC_DOS_CATALOG = [];
+
 const MODE_CONFIG = {
+  all: {
+    title: 'TOUS LES JEUX — GAME MODE',
+    accent: '#00f0ff',
+    cacheMode: null,
+    defaultCore: 'mame2003_plus',
+    accept: '.zip,.chd,.pbp,.bin,.iso,.nes,.sfc,.smc,.gba,.gb,.gbc,.n64,.z64,.md,.sms,.gg,.jar',
+    extractExts: ['.nes', '.sfc', '.smc', '.gba', '.gb', '.gbc', '.n64', '.z64', '.md', '.sms', '.gg', '.jar'],
+    searchPlaceholder: 'Filtrer parmi tous les univers…',
+    onlinePlaceholder: 'Rechercher n’importe quelle ROM sur Archive.org…',
+    filters: [
+      { id: 'all', label: 'Tous les univers' },
+      { id: 'fbneo', label: 'Neo Geo MVS' },
+      { id: 'mame2003_plus', label: 'MAME 2003-Plus' },
+      { id: 'ps1', label: 'PlayStation' },
+      { id: 'segaMD', label: 'Sega Mega Drive' },
+      { id: 'snes', label: 'Super Nintendo' },
+      { id: 'n64', label: 'Nintendo 64' },
+      { id: 'j2me', label: 'Java / Gameloft J2ME' },
+      { id: 'local', label: 'En cache IndexedDB' },
+    ],
+  },
   arcade: {
     title: 'ARCADE & CONSOLES RÉTRO',
     accent: '#00f0ff',
@@ -106,9 +136,81 @@ const MODE_CONFIG = {
       { id: 'local', label: 'En cache IndexedDB' },
     ],
   },
+  xbox: {
+    title: 'UNIVERS XBOX',
+    accent: '#22c55e',
+    cacheMode: 'xbox',
+    defaultCore: 'xbox',
+    accept: '.iso,.xiso,.zip',
+    extractExts: [],
+    searchPlaceholder: 'Filtrer le catalogue Xbox…',
+    onlinePlaceholder: 'Rechercher un jeu Xbox sur Archive.org…',
+    filters: [
+      { id: 'all', label: 'Tout le catalogue' },
+      { id: 'local', label: 'En cache IndexedDB' },
+    ],
+  },
+  pc: {
+    title: 'PC / MS-DOS & LAB',
+    accent: '#a855f7',
+    cacheMode: 'pc',
+    defaultCore: 'dos',
+    accept: '.exe,.com,.bat,.jsdos,.zip',
+    extractExts: [],
+    searchPlaceholder: 'Filtrer les jeux PC / MS-DOS…',
+    onlinePlaceholder: 'Rechercher un jeu MS-DOS sur Archive.org…',
+    filters: [
+      { id: 'all', label: 'Tout le catalogue' },
+      { id: 'local', label: 'En cache IndexedDB' },
+    ],
+  },
 };
 
-export function PlatformCatalogView({ mode, onLaunchStage, onCacheChanged }) {
+function buildMergedArcade(arcJson) {
+  const neoFromJson = Array.isArray(arcJson?.neogeo) ? arcJson.neogeo : [];
+  const seenRom = new Set(neoFromJson.map((g) => String(g.filename || g.id).replace(/\.zip$/i, '').toLowerCase()));
+  const extraNeo = (Array.isArray(neoGeoGames) ? neoGeoGames : [])
+    .filter((g) => {
+      const rawKey = String(g.filename || g.rom || g.id || '').replace(/\.zip$/i, '').toLowerCase();
+      const mapped = fbneoMapping[rawKey] || rawKey;
+      if (!mapped || seenRom.has(mapped)) return false;
+      seenRom.add(mapped);
+      return true;
+    })
+    .map((g) => {
+      const rawKey = String(g.filename || g.rom || g.id || '').replace(/\.zip$/i, '').toLowerCase();
+      const mapped = fbneoMapping[rawKey] || rawKey;
+      const fn = `${mapped}.zip`;
+      const encoded = encodeURIComponent(fn);
+      return {
+        id: `arc-neo-${mapped}`,
+        title: g.title || g.name,
+        platform: 'fbneo',
+        platformLabel: 'Neo Geo MVS',
+        core: 'fbneo',
+        year: g.year || null,
+        genre: g.genre || 'Neo Geo Arcade',
+        players: '1–2J',
+        estimatedSize: g.size || 'Auto',
+        filename: fn,
+        imageUrl: g.coverUrl || null,
+        urls: [
+          `/api/rom-proxy?file=${encoded}`,
+          `https://archive.org/cors/neo-geo-mvs-romset/${encoded}`,
+          `/api/rom-proxy?url=${encodeURIComponent(`https://archive.org/download/neo-geo-mvs-romset/${encoded}`)}`,
+          `https://archive.org/download/neo-geo-mvs-romset/${encoded}`,
+        ],
+        description: g.description || 'ROM Neo Geo MVS — Lancement direct FBNeo.',
+      };
+    });
+  return {
+    neogeo: [...neoFromJson, ...extraNeo],
+    mame: Array.isArray(arcJson?.mame) ? arcJson.mame : [],
+    retro64_32: Array.isArray(arcJson?.retro64_32) ? arcJson.retro64_32 : [],
+  };
+}
+
+export function PlatformCatalogView({ mode, onLaunchStage, onCacheChanged, onJoinChannel, onRequireCoin }) {
   const cfg = MODE_CONFIG[mode] || MODE_CONFIG.arcade;
 
   const [catalog, setCatalog] = useState([]);
@@ -124,6 +226,10 @@ export function PlatformCatalogView({ mode, onLaunchStage, onCacheChanged }) {
   const [downloadProgress, setDownloadProgress] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const [focusedIdx, setFocusedIdx] = useState(0);
+  const [deadRomIds, setDeadRomIds] = useState(() => new Set());
+
+  useEffect(() => subscribeDeadRoms(setDeadRomIds), []);
 
   const refreshCache = async () => {
     const rows = await listCachedRoms(cfg.cacheMode);
@@ -141,17 +247,43 @@ export function PlatformCatalogView({ mode, onLaunchStage, onCacheChanged }) {
 
     let cancelled = false;
     async function loadCatalog() {
-      if (mode === 'arcade') {
+      if (mode === 'all') {
+        const base = [...PLAYSTATION_CATALOG, ...SEGA_CATALOG, ...NINTENDO_CATALOG, ...XBOX_CATALOG, ...PC_DOS_CATALOG];
+        setCatalog(base);
+        try {
+          const [arcRes, extRes, javaRes] = await Promise.all([
+            fetch('./app/data/arcade-catalog.json'),
+            fetch('./app/data/extended-catalogs.json'),
+            fetch('./app/data/java-catalog.json'),
+          ]);
+          const arcJson = arcRes.ok ? await arcRes.json() : {};
+          const extJson = extRes.ok ? await extRes.json() : {};
+          const javaJson = javaRes.ok ? await javaRes.json() : [];
+          const arc = buildMergedArcade(arcJson);
+          if (!cancelled) {
+            setCatalog([
+              ...arc.neogeo,
+              ...arc.mame,
+              ...arc.retro64_32,
+              ...(Array.isArray(extJson.segaMD) ? extJson.segaMD : []),
+              ...base,
+              ...(Array.isArray(javaJson) ? javaJson : []),
+            ]);
+          }
+        } catch {
+          /* keep base */
+        }
+      } else if (mode === 'arcade') {
         const base64_32 = NINTENDO_CATALOG.filter((g) => g.platform === 'n64' || g.platform === 'gba');
         setCatalog(base64_32);
         try {
           const res = await fetch('./app/data/arcade-catalog.json');
           if (res.ok && !cancelled) {
-            const json = await res.json();
+            const arc = buildMergedArcade(await res.json());
             setCatalog([
-              ...(Array.isArray(json.neogeo) ? json.neogeo : []),
-              ...(Array.isArray(json.mame) ? json.mame : []),
-              ...(Array.isArray(json.retro64_32) ? json.retro64_32 : []),
+              ...arc.neogeo,
+              ...arc.mame,
+              ...arc.retro64_32,
               ...base64_32,
             ]);
           }
@@ -176,6 +308,10 @@ export function PlatformCatalogView({ mode, onLaunchStage, onCacheChanged }) {
         }
       } else if (mode === 'nintendo') {
         setCatalog(NINTENDO_CATALOG);
+      } else if (mode === 'xbox') {
+        setCatalog(XBOX_CATALOG);
+      } else if (mode === 'pc') {
+        setCatalog(PC_DOS_CATALOG);
       } else if (mode === 'java') {
         setCatalog([]);
         try {
@@ -197,17 +333,22 @@ export function PlatformCatalogView({ mode, onLaunchStage, onCacheChanged }) {
 
   const cachedIds = useMemo(() => new Set(cachedRoms.map((c) => c.id)), [cachedRoms]);
 
+  const liveCatalog = useMemo(
+    () => catalog.filter((item) => item && Array.isArray(item.urls) && item.urls.length > 0 && !deadRomIds.has(item.id)),
+    [catalog, deadRomIds]
+  );
+
   const filteredCatalog = useMemo(() => {
     if (activeFilter === 'local') return [];
     const q = search.trim().toLowerCase();
-    return catalog.filter((item) => {
+    return liveCatalog.filter((item) => {
       if (activeFilter !== 'all' && item.core !== activeFilter && item.platform !== activeFilter) return false;
       if (!q) return true;
       return `${item.title || ''} ${item.platformLabel || ''} ${item.genre || ''} ${item.filename || ''}`
         .toLowerCase()
         .includes(q);
     });
-  }, [catalog, activeFilter, search]);
+  }, [liveCatalog, activeFilter, search]);
 
   const filteredCached = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -222,6 +363,7 @@ export function PlatformCatalogView({ mode, onLaunchStage, onCacheChanged }) {
     onLaunchStage({
       kind: resolvedCore === 'j2me' || mode === 'java' ? 'j2me' : 'emu',
       title: titleOverride || file.name,
+      filename: file.name,
       badge: `${resolvedCore.toUpperCase()} · ${resolvedCore === 'j2me' ? 'J2ME' : 'EmulatorJS'}`,
       core: resolvedCore,
       fileBlob: file,
@@ -230,6 +372,11 @@ export function PlatformCatalogView({ mode, onLaunchStage, onCacheChanged }) {
   };
 
   const handleLaunchCatalogEntry = async (entry) => {
+    if (onRequireCoin && !onRequireCoin()) return;
+    if (!entry.urls?.length) {
+      setErrorMsg(`Ce titre (${entry.title}) nécessite une image locale : cliquez sur « Importer ROM ».`);
+      return;
+    }
     const core = entry.core || entry.platform || cfg.defaultCore;
     const isArcadeZip = core === 'fbneo' || core === 'mame2003_plus';
     setErrorMsg('');
@@ -252,7 +399,9 @@ export function PlatformCatalogView({ mode, onLaunchStage, onCacheChanged }) {
       await refreshCache();
       launchFile(file, core, entry.title);
     } catch (err) {
-      setErrorMsg(`Échec du téléchargement pour « ${entry.title} » : ${err.message}`);
+      markRomAsDead(entry.id);
+      addCoins(1);
+      setErrorMsg(`ROM indisponible (« ${entry.title} ») : retirée automatiquement de la liste (1 Coin remboursé).`);
     } finally {
       setDownloadingId(null);
       setDownloadProgress('');
@@ -260,6 +409,7 @@ export function PlatformCatalogView({ mode, onLaunchStage, onCacheChanged }) {
   };
 
   const handleLaunchCached = async (item) => {
+    if (onRequireCoin && !onRequireCoin()) return;
     const cached = await getCachedRom(item.id);
     if (!cached?.data) {
       refreshCache();
@@ -313,10 +463,10 @@ export function PlatformCatalogView({ mode, onLaunchStage, onCacheChanged }) {
           {cfg.filters.map((f) => {
             const count =
               f.id === 'all'
-                ? catalog.length
+                ? liveCatalog.length
                 : f.id === 'local'
                   ? cachedRoms.length
-                  : catalog.filter((g) => g.core === f.id || g.platform === f.id).length;
+                  : liveCatalog.filter((g) => g.core === f.id || g.platform === f.id).length;
             const active = activeFilter === f.id;
             return (
               <button
@@ -359,7 +509,7 @@ export function PlatformCatalogView({ mode, onLaunchStage, onCacheChanged }) {
             <div>
               <h2 className="text-sm font-black tracking-wide text-white">{cfg.title}</h2>
               <p className="text-[11px] font-mono text-neutral-400">
-                {catalog.length} jeux · {cachedRoms.length} en cache IndexedDB
+                {liveCatalog.length} jeux vérifiés · {cachedRoms.length} en cache IndexedDB
               </p>
             </div>
           </div>
@@ -500,16 +650,25 @@ export function PlatformCatalogView({ mode, onLaunchStage, onCacheChanged }) {
                 </h3>
               </div>
               <div className={viewMode === 'grid' ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3' : 'space-y-2'}>
-                {filteredCached.map((item) => (
+                {filteredCached.map((item) => {
+                  const matchedEntry = catalog.find((c) => c.id === item.id || c.filename === item.filename);
+                  const displayTitle = matchedEntry?.title || item.title;
+                  return (
                   <article
                     key={item.id}
                     className={`rounded-xl bg-neutral-900/90 border border-emerald-500/30 p-3 flex gap-3 ${
                       viewMode === 'grid' ? 'flex-col' : 'flex-row items-center justify-between'
                     }`}
                   >
-                    <GameCover title={item.title} platformLabel={(item.core || item.platform || mode).toUpperCase()} filename={item.filename} compact={viewMode === 'list'} />
+                    <GameCover
+                      title={displayTitle}
+                      platformLabel={(item.core || item.platform || mode).toUpperCase()}
+                      filename={item.filename}
+                      imageUrl={matchedEntry?.imageUrl || matchedEntry?.coverUrl}
+                      compact={viewMode === 'list'}
+                    />
                     <div className="flex-1 min-w-0 space-y-1">
-                      <div className="font-bold text-sm text-white truncate">{item.title}</div>
+                      <div className="font-bold text-sm text-white truncate">{displayTitle}</div>
                       <div className="text-[11px] font-mono text-neutral-400 truncate">
                         {item.filename} · {formatBytes(item.size)}
                       </div>
@@ -536,7 +695,8 @@ export function PlatformCatalogView({ mode, onLaunchStage, onCacheChanged }) {
                       </button>
                     </div>
                   </article>
-                ))}
+                  );
+                })}
               </div>
             </section>
           )}
@@ -561,20 +721,25 @@ export function PlatformCatalogView({ mode, onLaunchStage, onCacheChanged }) {
                 </div>
               ) : (
                 <div className={viewMode === 'grid' ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3' : 'space-y-2'}>
-                  {visibleItems.map((entry) => {
+                  {visibleItems.map((entry, idx) => {
                     const isCached = cachedIds.has(entry.id);
                     const isBusy = downloadingId === entry.id;
+                    const isFocused = focusedIdx === idx;
                     return (
                       <article
                         key={entry.id}
-                        className={`rounded-xl bg-neutral-900/90 border border-neutral-800 hover:border-cyan-500/50 p-3 flex gap-3 transition-colors ${
-                          viewMode === 'grid' ? 'flex-col' : 'flex-row items-center justify-between'
-                        }`}
+                        onMouseEnter={() => setFocusedIdx(idx)}
+                        className={`rounded-xl bg-neutral-900/90 border p-3 flex gap-3 transition-all ${
+                          isFocused
+                            ? 'border-cyan-400 shadow-lg shadow-cyan-500/15'
+                            : 'border-neutral-800 hover:border-cyan-500/50'
+                        } ${viewMode === 'grid' ? 'flex-col' : 'flex-row items-center justify-between'}`}
                       >
                         <GameCover
                           title={entry.title}
                           platformLabel={entry.platformLabel}
                           filename={entry.filename}
+                          imageUrl={entry.imageUrl || entry.coverUrl}
                           compact={viewMode === 'list'}
                         />
                         <div className="flex-1 min-w-0 space-y-1">
@@ -591,19 +756,32 @@ export function PlatformCatalogView({ mode, onLaunchStage, onCacheChanged }) {
                             <p className="text-[11px] text-neutral-400 line-clamp-2">{entry.description}</p>
                           )}
                         </div>
-                        <button
-                          type="button"
-                          disabled={Boolean(downloadingId)}
-                          onClick={() => handleLaunchCatalogEntry(entry)}
-                          className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 shrink-0 transition-colors ${
-                            isCached
-                              ? 'bg-emerald-500 hover:bg-emerald-400 text-black'
-                              : 'bg-cyan-500 hover:bg-cyan-400 disabled:opacity-50 text-black'
-                          }`}
-                        >
-                          {isCached ? <Play className="w-3.5 h-3.5" /> : <Download className="w-3.5 h-3.5" />}
-                          <span>{isBusy ? downloadProgress : isCached ? 'Lancer' : 'Télécharger & Jouer'}</span>
-                        </button>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <button
+                            type="button"
+                            disabled={Boolean(downloadingId)}
+                            onClick={() => handleLaunchCatalogEntry(entry)}
+                            className={`flex-1 px-3 py-1.5 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition-colors ${
+                              isCached
+                                ? 'bg-emerald-500 hover:bg-emerald-400 text-black'
+                                : 'bg-cyan-500 hover:bg-cyan-400 disabled:opacity-50 text-black'
+                            }`}
+                          >
+                            {isCached ? <Play className="w-3.5 h-3.5" /> : <Download className="w-3.5 h-3.5" />}
+                            <span>{isBusy ? downloadProgress : isCached ? 'Jouer' : 'Jouer Local'}</span>
+                          </button>
+                          {onJoinChannel && (
+                            <button
+                              type="button"
+                              onClick={() => onJoinChannel(entry)}
+                              title="Rejoindre le salon Fightcade 2"
+                              className="px-2.5 py-1.5 rounded-lg bg-purple-500/20 hover:bg-purple-500/35 border border-purple-500/40 text-purple-200 text-xs font-bold flex items-center gap-1 transition-colors"
+                            >
+                              <Swords className="w-3.5 h-3.5" />
+                              <span className="hidden sm:inline">Salon</span>
+                            </button>
+                          )}
+                        </div>
                       </article>
                     );
                   })}
@@ -624,6 +802,17 @@ export function PlatformCatalogView({ mode, onLaunchStage, onCacheChanged }) {
             </section>
           )}
         </div>
+
+        {/* Barre d'actions rapides Game Mode (Clavier / Manette) */}
+        <footer className="px-4 py-1.5 bg-neutral-900/90 border-t border-neutral-800 flex flex-wrap items-center justify-between gap-2 text-[11px] font-mono text-neutral-400 shrink-0">
+          <div className="flex items-center gap-3 flex-wrap">
+            <span><strong className="text-emerald-400">[A / Entrée]</strong> Jouer Local (1 Coin)</span>
+            <span><strong className="text-purple-400">[X]</strong> Rejoindre Salon En Ligne</span>
+            <span><strong className="text-amber-400">[Y]</strong> Acheter / Insérer Coin</span>
+            <span><strong className="text-neutral-300">[Tab]</strong> Quick Menu</span>
+          </div>
+          <span className="hidden sm:inline text-neutral-500">Game Mode · Clavier, Souris &amp; Manette</span>
+        </footer>
       </div>
     </div>
   );
