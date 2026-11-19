@@ -274,20 +274,6 @@ function romManifestPlugin() {
   };
 }
 
-function unifiedShellDevPlugin() {
-  return {
-    name: 'unified-shell-dev',
-    configureServer(server) {
-      server.middlewares.use((req, _res, next) => {
-        if (req.url === '/' || req.url?.startsWith('/?')) {
-          req.url = '/index.html' + (req.url.length > 1 ? req.url.slice(1) : '');
-        }
-        next();
-      });
-    }
-  };
-}
-
 // Détection de l'environnement : Web pur (Vercel / Netlify / PWA) vs Desktop Electron
 // Les plugins Electron ne sont activés QUE pour le build desktop dédié, jamais sur Vercel, Netlify ou Web
 const isElectron = Boolean(
@@ -307,7 +293,6 @@ export default defineConfig({
     nativeLauncherPlugin(),
     netplayPlugin(),
     romManifestPlugin(),
-    unifiedShellDevPlugin(),
     ...(isElectron ? [
       electron([
         {
@@ -350,7 +335,7 @@ export default defineConfig({
   build: {
     rollupOptions: {
       input: {
-        arcadeApp: path.resolve(__dirname, 'arcade-app.html'),
+        main: path.resolve(__dirname, 'index.html'),
         player: path.resolve(__dirname, 'player.html')
       }
     }
