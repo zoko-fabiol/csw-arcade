@@ -92,6 +92,7 @@ export function setupNetplayHub(server) {
 
   // Relais temps réel local / LAN pour les salons Fightcade 2 (chat & présence) — garantit le fonctionnement même sans règles Firestore publiées
   const fcLobbies = new Map(); // gameId -> { messages: [], users: Map<uid, userObj> }
+  const allGlobalUsers = new Map(); // uid -> userObj (présence unifiée partagée sur tous les salons)
   const fcChallenges = new Map(); // challengeId -> challengeObj
 
   // Nettoyage automatique des défis expirés
@@ -224,14 +225,29 @@ export function setupNetplayHub(server) {
     if (req.method === 'GET') {
       const lobby = getFcLobby(gameId);
       const now = Date.now();
-      const users = [];
+      const usersMap = new Map();
+
+      // 1. Utilisateurs du salon courant
       for (const [uid, u] of lobby.users.entries()) {
-        if (now - (u.lastSeen || 0) < 60000) {
-          users.push(u);
+        if (now - (u.lastSeen || 0) < 65000) {
+          usersMap.set(uid, u);
         } else {
           lobby.users.delete(uid);
         }
       }
+
+      // 2. Présence globale unifiée : toujours inclure tous les joueurs connectés sur le site
+      for (const [uid, u] of allGlobalUsers.entries()) {
+        if (now - (u.lastSeen || 0) < 65000) {
+          if (!usersMap.has(uid)) {
+            usersMap.set(uid, u);
+          }
+        } else {
+          allGlobalUsers.delete(uid);
+        }
+      }
+
+      const users = Array.from(usersMap.values());
       res.statusCode = 200;
       return res.end(JSON.stringify({ ok: true, messages: lobby.messages.slice(-80), users }));
     }
@@ -249,19 +265,37 @@ export function setupNetplayHub(server) {
             const msg = {
               id: payload.message.id || `m_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
               ...payload.message,
+              channelId: targetId,
               createdAtMs: payload.message.createdAtMs || Date.now(),
             };
             if (!lobby.messages.some((m) => m.id === msg.id)) {
               lobby.messages.push(msg);
               if (lobby.messages.length > 120) lobby.messages = lobby.messages.slice(-80);
             }
+
+            // Si le message est écrit dans un salon de jeu spécifique, l'annoncer également dans le lobby global
+            if (targetId !== 'global-lobby') {
+              const globalLobby = getFcLobby('global-lobby');
+              const relayedMsg = {
+                ...msg,
+                text: `[#${targetId.replace(/^arc-neo-/, '')}] ${msg.text}`,
+              };
+              if (!globalLobby.messages.some((m) => m.id === msg.id)) {
+                globalLobby.messages.push(relayedMsg);
+                if (globalLobby.messages.length > 120) globalLobby.messages = globalLobby.messages.slice(-80);
+              }
+            }
           } else if (payload.action === 'presence' && payload.user?.uid) {
-            lobby.users.set(payload.user.uid, {
+            const u = {
               ...payload.user,
+              currentLobby: targetId,
               lastSeen: Date.now(),
-            });
+            };
+            lobby.users.set(payload.user.uid, u);
+            allGlobalUsers.set(payload.user.uid, u);
           } else if (payload.action === 'leave' && payload.uid) {
             lobby.users.delete(payload.uid);
+            allGlobalUsers.delete(payload.uid);
           }
 
           res.statusCode = 200;
