@@ -520,21 +520,28 @@ export function PlatformCatalogView({ mode, onLaunchStage, onCacheChanged, onJoi
 
       {/* Contenu Principal */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        {/* En-tête Vue — Ultra-compact sur Mobile, complet sur Desktop */}
-        <div className="px-3 md:px-4 py-2.5 md:py-3 border-b border-neutral-800 bg-neutral-900/40 space-y-2">
-          <div className="flex items-center justify-between gap-2">
-            <div className="min-w-0">
-              <h2 className="text-xs sm:text-sm font-black tracking-wide text-white truncate">{cfg.title}</h2>
-              <p className="text-[10px] sm:text-[11px] font-mono text-neutral-400 truncate">
+        {/* En-tête Vue — Compact, lisible, zéro troncature */}
+        <div className="px-3 md:px-4 py-2 md:py-3 border-b border-white/10 bg-neutral-900/50 backdrop-blur-md space-y-2 shrink-0">
+          <div className="flex items-start md:items-center justify-between gap-2">
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h2 className="text-xs sm:text-sm font-black tracking-wide text-white">{cfg.title}</h2>
+                {mode === 'arcade' && (
+                  <span className="px-1.5 py-0.5 rounded-md bg-cyan-950/80 border border-cyan-500/30 text-[10px] font-mono text-cyan-300 shrink-0">
+                    {RETRO_SYSTEMS.length} cœurs
+                  </span>
+                )}
+              </div>
+              <p className="text-[11px] font-mono text-neutral-300 mt-0.5 tabular-nums">
                 {liveCatalog.length} jeux vérifiés{cachedRoms.length > 0 ? ` · ${cachedRoms.length} en cache` : ''}
               </p>
             </div>
 
-            {/* Actions compactes à droite */}
+            {/* Actions à droite */}
             <div className="flex items-center gap-1.5 shrink-0">
-              {/* Champ recherche local (Desktop uniquement — sur mobile il est fusionné ci-dessous) */}
+              {/* Champ recherche local (Desktop md+) */}
               <div className="relative hidden md:block">
-                <Search className="w-3.5 h-3.5 text-neutral-500 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                <Search className="w-3.5 h-3.5 text-neutral-400 absolute left-2.5 top-1/2 -translate-y-1/2" aria-hidden="true" />
                 <input
                   type="search"
                   value={search}
@@ -543,16 +550,16 @@ export function PlatformCatalogView({ mode, onLaunchStage, onCacheChanged, onJoi
                     setVisibleLimit(PAGE_SIZE);
                   }}
                   placeholder={cfg.searchPlaceholder}
-                  className="pl-8 pr-3 py-1.5 rounded-lg bg-neutral-900 border border-neutral-800 text-xs text-white placeholder:text-neutral-500 focus:outline-none focus:border-cyan-500 w-56"
+                  className="arcade-focus-ring pl-8 pr-3 py-1.5 rounded-xl bg-neutral-900 border border-white/10 text-xs text-white placeholder:text-neutral-400 focus:border-cyan-400 w-56"
                 />
               </div>
 
               <label
-                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-xs font-semibold text-neutral-200 cursor-pointer transition-colors"
+                className="arcade-focus-ring hidden md:flex items-center gap-1.5 px-2.5 py-1.5 min-h-[36px] rounded-xl bg-neutral-800/90 hover:bg-neutral-700 border border-white/10 text-xs font-semibold text-neutral-100 cursor-pointer transition-colors"
                 title="Importer une ROM locale"
               >
-                <Upload className="w-3.5 h-3.5 text-cyan-400" />
-                <span className="hidden sm:inline">Importer ROM</span>
+                <Upload className="w-3.5 h-3.5 text-cyan-400 shrink-0" aria-hidden="true" />
+                <span>Importer ROM</span>
                 <input
                   type="file"
                   accept={cfg.accept}
@@ -565,28 +572,32 @@ export function PlatformCatalogView({ mode, onLaunchStage, onCacheChanged, onJoi
                 />
               </label>
 
-              <div className="flex rounded-lg border border-neutral-800 bg-neutral-900 p-0.5">
+              <div className="flex rounded-xl border border-white/10 bg-neutral-900 p-0.5">
                 <button
                   type="button"
                   onClick={() => setViewMode('grid')}
-                  className={`p-1.5 rounded ${viewMode === 'grid' ? 'bg-cyan-500/20 text-cyan-300' : 'text-neutral-400'}`}
+                  aria-label="Vue grille"
+                  aria-pressed={viewMode === 'grid'}
+                  className={`arcade-focus-ring p-1.5 min-w-[32px] min-h-[32px] rounded-lg flex items-center justify-center transition-colors ${viewMode === 'grid' ? 'bg-cyan-500/20 text-cyan-300' : 'text-neutral-400 hover:text-white'}`}
                   title="Grille"
                 >
-                  <Grid className="w-3.5 h-3.5" />
+                  <Grid className="w-3.5 h-3.5" aria-hidden="true" />
                 </button>
                 <button
                   type="button"
                   onClick={() => setViewMode('list')}
-                  className={`p-1.5 rounded ${viewMode === 'list' ? 'bg-cyan-500/20 text-cyan-300' : 'text-neutral-400'}`}
+                  aria-label="Vue liste"
+                  aria-pressed={viewMode === 'list'}
+                  className={`arcade-focus-ring p-1.5 min-w-[32px] min-h-[32px] rounded-lg flex items-center justify-center transition-colors ${viewMode === 'list' ? 'bg-cyan-500/20 text-cyan-300' : 'text-neutral-400 hover:text-white'}`}
                   title="Liste"
                 >
-                  <List className="w-3.5 h-3.5" />
+                  <List className="w-3.5 h-3.5" aria-hidden="true" />
                 </button>
               </div>
             </div>
           </div>
 
-          {/* Barre de recherche UNIFIÉE Mobile (< md) : évite le doublon Catalogue + Archive.org */}
+          {/* Barre de recherche + Web + Importer ROM UNIFIÉE Mobile (< md) */}
           <form
             onSubmit={(e) => {
               e.preventDefault();
@@ -598,9 +609,9 @@ export function PlatformCatalogView({ mode, onLaunchStage, onCacheChanged, onJoi
           >
             <div className="relative flex-1 min-w-0">
               {mobileOnlineMode ? (
-                <Globe className="w-4 h-4 text-cyan-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <Globe className="w-4 h-4 text-cyan-400 absolute left-2.5 top-1/2 -translate-y-1/2" aria-hidden="true" />
               ) : (
-                <Search className="w-4 h-4 text-neutral-500 absolute left-3 top-1/2 -translate-y-1/2" />
+                <Search className="w-4 h-4 text-neutral-400 absolute left-2.5 top-1/2 -translate-y-1/2" aria-hidden="true" />
               )}
               <input
                 type="search"
@@ -613,38 +624,56 @@ export function PlatformCatalogView({ mode, onLaunchStage, onCacheChanged, onJoi
                     setVisibleLimit(PAGE_SIZE);
                   }
                 }}
-                placeholder={mobileOnlineMode ? 'Chercher sur Archive.org…' : cfg.searchPlaceholder}
-                className="w-full pl-9 pr-3 py-2 rounded-xl bg-neutral-900 border border-neutral-800 text-base text-white placeholder:text-neutral-500 focus:outline-none focus:border-cyan-500"
+                placeholder={mobileOnlineMode ? 'Chercher Archive.org…' : 'Filtrer le catalogue…'}
+                className="arcade-focus-ring w-full pl-8 pr-2.5 py-1.5 min-h-[38px] rounded-xl bg-neutral-900 border border-white/10 text-base text-white placeholder:text-neutral-400 focus:border-cyan-400"
               />
             </div>
             <button
               type="button"
               onClick={() => setMobileOnlineMode((v) => !v)}
               title={mobileOnlineMode ? 'Revenir au filtre local' : 'Basculer sur la recherche Archive.org'}
-              className={`px-2.5 py-2 rounded-xl border text-xs font-bold shrink-0 flex items-center gap-1 transition-colors ${
+              className={`arcade-focus-ring px-2.5 py-1.5 min-h-[38px] rounded-xl border text-xs font-bold shrink-0 flex items-center gap-1 transition-colors ${
                 mobileOnlineMode
-                  ? 'bg-cyan-500/20 border-cyan-400 text-cyan-300'
-                  : 'bg-neutral-900 border-neutral-800 text-neutral-400'
+                  ? 'bg-cyan-500/20 border-cyan-400 text-cyan-200'
+                  : 'bg-neutral-900 border-white/10 text-neutral-300'
               }`}
             >
-              <Globe className="w-3.5 h-3.5" />
+              <Globe className="w-3.5 h-3.5" aria-hidden="true" />
               <span>Web</span>
             </button>
-            {mobileOnlineMode && (
+            {mobileOnlineMode ? (
               <button
                 type="submit"
                 disabled={onlineSearching}
-                className="px-3 py-2 rounded-xl bg-cyan-500 text-black text-xs font-black shrink-0"
+                className="arcade-focus-ring px-3 py-1.5 min-h-[38px] rounded-xl bg-cyan-500 hover:bg-cyan-400 text-black text-xs font-black shrink-0"
               >
                 {onlineSearching ? '…' : 'OK'}
               </button>
+            ) : (
+              <label
+                className="arcade-focus-ring flex items-center gap-1 px-2.5 py-1.5 min-h-[38px] rounded-xl bg-neutral-800/90 hover:bg-neutral-700 border border-white/10 text-xs font-semibold text-neutral-100 cursor-pointer shrink-0"
+                title="Importer une ROM locale"
+              >
+                <Upload className="w-3.5 h-3.5 text-cyan-400 shrink-0" aria-hidden="true" />
+                <span>ROM</span>
+                <input
+                  type="file"
+                  accept={cfg.accept}
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) launchFile(file, null, file.name);
+                    e.target.value = '';
+                  }}
+                />
+              </label>
             )}
           </form>
 
-          {/* Sous-filtres tactiles horizontaux Mobile (< md) — affichés UNIQUEMENT si non redondants */}
-          {mobileSubFilters.length > 0 && (
+          {/* Toutes les Catégories Mobile (< md) avec compteurs — Sans perte d'information */}
+          {dedupedFilters.length > 1 && (
             <div className="flex md:hidden items-center gap-1.5 overflow-x-auto no-scrollbar pb-0.5">
-              {mobileSubFilters.map((f) => {
+              {dedupedFilters.map((f) => {
                 const active = activeFilter === f.id;
                 return (
                   <button
@@ -654,13 +683,13 @@ export function PlatformCatalogView({ mode, onLaunchStage, onCacheChanged, onJoi
                       setActiveFilter(f.id);
                       setVisibleLimit(PAGE_SIZE);
                     }}
-                    className={`px-2.5 py-1 rounded-full text-[11px] font-bold shrink-0 border transition-colors ${
+                    className={`arcade-focus-ring px-3 py-1.5 min-h-[34px] rounded-full text-xs font-bold shrink-0 border transition-colors tabular-nums ${
                       active
-                        ? 'bg-cyan-500/20 border-cyan-400 text-cyan-300'
-                        : 'bg-neutral-900 border-neutral-800 text-neutral-400'
+                        ? 'bg-cyan-500/20 border-cyan-400 text-cyan-200'
+                        : 'bg-neutral-900 border-white/10 text-neutral-300'
                     }`}
                   >
-                    {f.label} <span className="opacity-70 font-mono">({f.count})</span>
+                    {f.label} <span className="opacity-75 font-mono">({f.count})</span>
                   </button>
                 );
               })}
@@ -703,7 +732,7 @@ export function PlatformCatalogView({ mode, onLaunchStage, onCacheChanged, onJoi
               <h3 className="text-xs font-bold uppercase tracking-wider text-cyan-400">
                 Résultats Archive.org ({onlineResults.length})
               </h3>
-              <div className={viewMode === 'grid' ? 'grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2.5 sm:gap-3' : 'space-y-2'}>
+              <div className={viewMode === 'grid' ? 'grid grid-cols-1 min-[520px]:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3' : 'space-y-2.5'}>
                 {onlineResults.map((item) => {
                   const ext = item.filename?.split('.').pop()?.toLowerCase() || '';
                   const guessedCore = RETRO_EXT_CORE_MAP[ext] || cfg.defaultCore;
@@ -711,19 +740,19 @@ export function PlatformCatalogView({ mode, onLaunchStage, onCacheChanged, onJoi
                   return (
                     <article
                       key={item.id}
-                      className={`rounded-xl bg-neutral-900/90 border border-neutral-800 hover:border-cyan-500/50 p-2 sm:p-3 flex gap-2 sm:gap-3 transition-colors ${
-                        viewMode === 'grid' ? 'flex-col' : 'flex-row items-center justify-between'
+                      className={`arcade-surface-elevated rounded-2xl border border-white/10 hover:border-cyan-400/60 p-3 flex gap-3 transition-all ${
+                        viewMode === 'grid' ? 'flex-col' : 'flex-row items-center justify-between flex-wrap sm:flex-nowrap'
                       }`}
                     >
                       <GameCover title={item.title} platformLabel={guessedCore.toUpperCase()} filename={item.filename} compact={viewMode === 'list'} />
-                      <div className="flex-1 min-w-0 space-y-0.5 sm:space-y-1">
-                        <div className="flex items-center justify-between gap-1.5">
-                          <span className="font-bold text-xs sm:text-sm text-white truncate">{item.title}</span>
-                          <span className="hidden sm:inline text-[10px] font-mono px-1.5 py-0.5 rounded bg-cyan-950 text-cyan-300 border border-cyan-800/60 shrink-0">
+                      <div className="flex-1 min-w-0 space-y-1">
+                        <div className="flex items-start justify-between gap-2">
+                          <span className="font-bold text-sm text-white line-clamp-2 leading-snug">{item.title}</span>
+                          <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-cyan-950/90 text-cyan-300 border border-cyan-500/30 shrink-0">
                             {guessedCore.toUpperCase()}
                           </span>
                         </div>
-                        <p className="hidden sm:block text-[11px] text-neutral-400 truncate">
+                        <p className="text-[11px] font-mono text-neutral-300 truncate tabular-nums">
                           {item.filename} · {item.size ? formatBytes(item.size) : 'Auto'}
                         </p>
                       </div>
@@ -731,9 +760,9 @@ export function PlatformCatalogView({ mode, onLaunchStage, onCacheChanged, onJoi
                         type="button"
                         disabled={Boolean(downloadingId)}
                         onClick={() => handleLaunchCatalogEntry({ ...item, core: guessedCore })}
-                        className="px-2.5 py-1.5 rounded-lg bg-cyan-500 hover:bg-cyan-400 disabled:opacity-50 text-black text-xs font-bold flex items-center justify-center gap-1 shrink-0"
+                        className="arcade-focus-ring px-3 py-2 min-h-[40px] rounded-xl bg-cyan-500 hover:bg-cyan-400 disabled:opacity-50 text-black text-xs font-bold flex items-center justify-center gap-1.5 shrink-0 transition-all active:scale-[0.98]"
                       >
-                        <Download className="w-3.5 h-3.5" />
+                        <Download className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
                         <span className="truncate">{isBusy ? downloadProgress : 'Jouer'}</span>
                       </button>
                     </article>
@@ -747,20 +776,20 @@ export function PlatformCatalogView({ mode, onLaunchStage, onCacheChanged, onJoi
           {(activeFilter === 'local' || activeFilter === 'all') && filteredCached.length > 0 && (
             <section className="space-y-2.5">
               <div className="flex items-center gap-2">
-                <Database className="w-4 h-4 text-emerald-400" />
+                <Database className="w-4 h-4 text-emerald-400" aria-hidden="true" />
                 <h3 className="text-xs font-bold uppercase tracking-wider text-emerald-400">
                   Prêts hors-ligne ({filteredCached.length})
                 </h3>
               </div>
-              <div className={viewMode === 'grid' ? 'grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2.5 sm:gap-3' : 'space-y-2'}>
+              <div className={viewMode === 'grid' ? 'grid grid-cols-1 min-[520px]:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3' : 'space-y-2.5'}>
                 {filteredCached.map((item) => {
                   const matchedEntry = catalog.find((c) => c.id === item.id || c.filename === item.filename);
                   const displayTitle = matchedEntry?.title || item.title;
                   return (
                     <article
                       key={item.id}
-                      className={`rounded-xl bg-neutral-900/90 border border-emerald-500/30 p-2 sm:p-3 flex gap-2 sm:gap-3 ${
-                        viewMode === 'grid' ? 'flex-col' : 'flex-row items-center justify-between'
+                      className={`arcade-surface-elevated rounded-2xl border border-emerald-500/30 hover:border-emerald-400/60 p-3 flex gap-3 transition-all ${
+                        viewMode === 'grid' ? 'flex-col' : 'flex-row items-center justify-between flex-wrap sm:flex-nowrap'
                       }`}
                     >
                       <GameCover
@@ -770,19 +799,19 @@ export function PlatformCatalogView({ mode, onLaunchStage, onCacheChanged, onJoi
                         imageUrl={matchedEntry?.imageUrl || matchedEntry?.coverUrl}
                         compact={viewMode === 'list'}
                       />
-                      <div className="flex-1 min-w-0 space-y-0.5">
-                        <div className="font-bold text-xs sm:text-sm text-white truncate">{displayTitle}</div>
-                        <div className="hidden sm:block text-[11px] font-mono text-neutral-400 truncate">
+                      <div className="flex-1 min-w-0 space-y-1">
+                        <div className="font-bold text-sm text-white line-clamp-2 leading-snug">{displayTitle}</div>
+                        <div className="text-[11px] font-mono text-neutral-300 truncate tabular-nums">
                           {item.filename} · {formatBytes(item.size)}
                         </div>
                       </div>
-                      <div className="flex items-center gap-1.5 shrink-0">
+                      <div className="flex items-center gap-2 shrink-0">
                         <button
                           type="button"
                           onClick={() => handleLaunchCached(item)}
-                          className="flex-1 px-2.5 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-bold flex items-center justify-center gap-1"
+                          className="arcade-focus-ring flex-1 px-3 py-2 min-h-[40px] rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-bold flex items-center justify-center gap-1.5 transition-all active:scale-[0.98]"
                         >
-                          <Play className="w-3.5 h-3.5" />
+                          <Play className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
                           <span>Lancer</span>
                         </button>
                         <button
@@ -791,10 +820,11 @@ export function PlatformCatalogView({ mode, onLaunchStage, onCacheChanged, onJoi
                             await removeCachedRom(item.id);
                             refreshCache();
                           }}
-                          className="p-1.5 rounded-lg bg-neutral-800 hover:bg-rose-950 text-neutral-400 hover:text-rose-300"
+                          aria-label={`Supprimer ${displayTitle} du cache`}
+                          className="arcade-focus-ring p-2 min-w-[40px] min-h-[40px] rounded-xl bg-neutral-800 hover:bg-rose-950 border border-white/10 text-neutral-300 hover:text-rose-300 flex items-center justify-center transition-colors"
                           title="Supprimer du cache"
                         >
-                          <Trash2 className="w-3.5 h-3.5" />
+                          <Trash2 className="w-4 h-4" aria-hidden="true" />
                         </button>
                       </div>
                     </article>
@@ -807,23 +837,23 @@ export function PlatformCatalogView({ mode, onLaunchStage, onCacheChanged, onJoi
           {/* Catalogue principal */}
           {activeFilter !== 'local' && (
             <section className="space-y-2.5">
-              <div className="flex items-center justify-between">
-                <h3 className="text-xs font-bold uppercase tracking-wider text-neutral-300">
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-neutral-200">
                   Catalogue ({filteredCatalog.length})
                 </h3>
                 {mode === 'arcade' && (
-                  <span className="hidden sm:inline text-[11px] font-mono text-neutral-500">
+                  <span className="text-[11px] font-mono text-neutral-400">
                     {RETRO_SYSTEMS.length} cœurs EmulatorJS supportés
                   </span>
                 )}
               </div>
 
               {filteredCatalog.length === 0 ? (
-                <div className="p-8 rounded-xl bg-neutral-900/50 border border-neutral-800 text-center text-xs text-neutral-500">
+                <div className="p-8 rounded-2xl bg-neutral-900/50 border border-white/10 text-center text-xs text-neutral-400">
                   Aucun jeu ne correspond à votre filtre.
                 </div>
               ) : (
-                <div className={viewMode === 'grid' ? 'grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2.5 sm:gap-3' : 'space-y-2'}>
+                <div className={viewMode === 'grid' ? 'grid grid-cols-1 min-[520px]:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3' : 'space-y-2.5'}>
                   {visibleItems.map((entry, idx) => {
                     const isCached = cachedIds.has(entry.id);
                     const isBusy = downloadingId === entry.id;
@@ -833,11 +863,11 @@ export function PlatformCatalogView({ mode, onLaunchStage, onCacheChanged, onJoi
                       <article
                         key={entry.id}
                         onMouseEnter={() => setFocusedIdx(idx)}
-                        className={`rounded-xl bg-neutral-900/90 border p-2 sm:p-3 flex gap-2 sm:gap-3 transition-all ${
+                        className={`arcade-surface-elevated rounded-2xl border p-3 flex gap-3 transition-all ${
                           isFocused
                             ? 'border-cyan-400 shadow-lg shadow-cyan-500/15'
-                            : 'border-neutral-800 hover:border-cyan-500/50'
-                        } ${viewMode === 'grid' ? 'flex-col' : 'flex-row items-center justify-between'}`}
+                            : 'border-white/10 hover:border-cyan-400/50'
+                        } ${viewMode === 'grid' ? 'flex-col' : 'flex-row items-center justify-between flex-wrap sm:flex-nowrap'}`}
                       >
                         <GameCover
                           title={entry.title}
@@ -846,38 +876,38 @@ export function PlatformCatalogView({ mode, onLaunchStage, onCacheChanged, onJoi
                           imageUrl={entry.imageUrl || entry.coverUrl}
                           compact={viewMode === 'list'}
                         />
-                        <div className="flex-1 min-w-0 space-y-0.5 sm:space-y-1">
-                          <div className="flex items-start justify-between gap-1.5">
-                            <span className="font-bold text-xs sm:text-sm text-white line-clamp-2 sm:truncate leading-snug">
+                        <div className="flex-1 min-w-0 space-y-1">
+                          <div className="flex items-start justify-between gap-2">
+                            <span className="font-bold text-sm text-white line-clamp-2 leading-snug">
                               {entry.title}
                             </span>
                             {showPlatformBadge && (
-                              <span className="hidden sm:inline text-[10px] font-mono px-1.5 py-0.5 rounded bg-cyan-950/80 text-cyan-300 border border-cyan-800/60 shrink-0">
+                              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-cyan-950/90 text-cyan-300 border border-cyan-500/30 shrink-0">
                                 {entry.platformLabel}
                               </span>
                             )}
                           </div>
-                          <div className="text-[10px] sm:text-[11px] font-mono text-neutral-400 truncate">
+                          <div className="text-[11px] font-mono text-neutral-300 truncate">
                             {showPlatformBadge
-                              ? [entry.platformLabel, entry.year].filter(Boolean).join(' · ')
+                              ? [entry.platformLabel, entry.year, entry.genre].filter(Boolean).join(' · ')
                               : [entry.year, entry.genre].filter(Boolean).join(' · ')}
                           </div>
                           {viewMode === 'grid' && entry.description && (
-                            <p className="hidden sm:line-clamp-2 text-[11px] text-neutral-400">{entry.description}</p>
+                            <p className="line-clamp-2 text-xs text-neutral-400 leading-relaxed">{entry.description}</p>
                           )}
                         </div>
-                        <div className="flex items-center gap-1.5 shrink-0 pt-0.5">
+                        <div className="flex items-center gap-2 shrink-0 pt-0.5">
                           <button
                             type="button"
                             disabled={Boolean(downloadingId)}
                             onClick={() => handleLaunchCatalogEntry(entry)}
-                            className={`flex-1 px-2 sm:px-3 py-2 sm:py-1.5 rounded-lg text-xs font-bold flex items-center justify-center gap-1 transition-colors ${
+                            className={`arcade-focus-ring flex-1 px-3 py-2 min-h-[40px] rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all active:scale-[0.98] ${
                               isCached
                                 ? 'bg-emerald-500 hover:bg-emerald-400 text-black'
                                 : 'bg-cyan-500 hover:bg-cyan-400 disabled:opacity-50 text-black'
                             }`}
                           >
-                            {isCached ? <Play className="w-3.5 h-3.5" /> : <Download className="w-3.5 h-3.5" />}
+                            {isCached ? <Play className="w-3.5 h-3.5 shrink-0" aria-hidden="true" /> : <Download className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />}
                             <span className="truncate">{isBusy ? downloadProgress : 'Jouer'}</span>
                           </button>
                           {onJoinChannel && entry.core !== 'j2me' && entry.platform !== 'j2me' && mode !== 'java' && (
@@ -885,10 +915,10 @@ export function PlatformCatalogView({ mode, onLaunchStage, onCacheChanged, onJoi
                               type="button"
                               onClick={() => onJoinChannel(entry)}
                               title="Rejoindre le salon Fightcade 2"
-                              className="px-2.5 py-2 sm:py-1.5 rounded-lg bg-purple-500/20 hover:bg-purple-500/35 border border-purple-500/40 text-purple-200 text-xs font-bold flex items-center gap-1 transition-colors"
+                              className="arcade-focus-ring px-3 py-2 min-h-[40px] rounded-xl bg-purple-500/20 hover:bg-purple-500/35 border border-purple-500/40 text-purple-200 text-xs font-bold flex items-center gap-1.5 transition-colors"
                             >
-                              <Swords className="w-3.5 h-3.5" />
-                              <span className="hidden sm:inline">Salon</span>
+                              <Swords className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+                              <span>Salon</span>
                             </button>
                           )}
                         </div>
@@ -903,7 +933,7 @@ export function PlatformCatalogView({ mode, onLaunchStage, onCacheChanged, onJoi
                   <button
                     type="button"
                     onClick={() => setVisibleLimit((v) => v + PAGE_SIZE)}
-                    className="px-5 py-2.5 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-xs font-bold text-neutral-200 transition-colors"
+                    className="arcade-focus-ring px-5 py-2.5 min-h-[42px] rounded-xl bg-neutral-800 hover:bg-neutral-700 border border-white/10 text-xs font-bold text-neutral-100 transition-colors"
                   >
                     Afficher plus ({filteredCatalog.length - visibleLimit} restants)
                   </button>
@@ -913,15 +943,15 @@ export function PlatformCatalogView({ mode, onLaunchStage, onCacheChanged, onJoi
           )}
         </div>
 
-        {/* Barre d'actions rapides Game Mode (Desktop / Clavier & Manette uniquement) */}
-        <footer className="hidden md:flex px-4 py-1.5 bg-neutral-900/90 border-t border-neutral-800 flex-wrap items-center justify-between gap-2 text-[11px] font-mono text-neutral-400 shrink-0">
-          <div className="flex items-center gap-3 flex-wrap">
+        {/* Barre d'actions rapides Game Mode — Visible sur tous écrans (compacte & scrollable sur mobile) */}
+        <footer className="flex px-3 md:px-4 py-1.5 bg-neutral-900/95 border-t border-white/10 items-center justify-between gap-3 text-[11px] font-mono text-neutral-300 shrink-0 overflow-x-auto no-scrollbar pb-16 md:pb-1.5">
+          <div className="flex items-center gap-3 shrink-0">
             <span><strong className="text-emerald-400">[A / Entrée]</strong> Jouer Local (1 Coin)</span>
             <span><strong className="text-purple-400">[X]</strong> Rejoindre Salon En Ligne</span>
             <span><strong className="text-amber-400">[Y]</strong> Acheter / Insérer Coin</span>
-            <span><strong className="text-neutral-300">[Tab]</strong> Quick Menu</span>
+            <span><strong className="text-neutral-200">[Tab]</strong> Quick Menu</span>
           </div>
-          <span className="text-neutral-500">Game Mode · Clavier, Souris &amp; Manette</span>
+          <span className="text-neutral-400 shrink-0">Game Mode · Clavier, Tactile &amp; Manette</span>
         </footer>
       </div>
     </div>

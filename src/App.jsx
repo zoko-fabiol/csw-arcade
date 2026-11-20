@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useSettings } from './hooks/useSettings';
 import { SettingsModal } from './components/settings/SettingsModal';
-import { useOnlineStatus } from './hooks/useMobileNavigation';
+import { useMobileNavigation, useOnlineStatus } from './hooks/useMobileNavigation';
 import {
   downloadAndCacheRom,
   formatBytes,
@@ -38,7 +38,7 @@ import { applyRemoteSyncedStats, getRankTierMeta } from './services/scoreRanking
 import { countryCodeToFlag } from './data/countries';
 import { RollbackP2PEngine } from './services/rollbackP2P';
 import {
-  Gamepad2, Disc, Cpu, Coffee, Settings, Joystick, Coins, Layers, Swords, UserCheck, Cloud, Play, X, Plus
+  Gamepad2, Disc, Cpu, Coffee, Settings, Joystick, Coins, Layers, Swords, UserCheck, Cloud, Play, X, Plus, Wifi, WifiOff, Database, Users
 } from 'lucide-react';
 
 // ============================================================================
@@ -302,6 +302,7 @@ export default function App() {
     gameEntry,
     preloadedBlob = null,
     opponentName = null,
+    opponentUid = null,
   }) => {
     p2pEngineRef.current?.destroy();
     const engine = new RollbackP2PEngine({
@@ -310,14 +311,16 @@ export default function App() {
       onSignalIce: (cand) => {
         firebaseFightcadeService.postIceCandidate(challengeId, isHost ? 'caller' : 'callee', cand);
       },
+      onRenegotiateOffer: (offer) => {
+        firebaseFightcadeService.postRenegotiateOffer(challengeId, offer);
+      },
       onStats: (st) => setP2pStats(st),
     });
 
     // Secours WebSocket VPS en cas de filtrage NAT / Box
     engine.onRelayButtonFallback = ({ buttonIdx, pressed, frame }) => {
-      const targetUid = isHost ? activeMatchSync?.challenge?.toUid : activeMatchSync?.challenge?.fromUid;
-      if (targetUid) {
-        firebaseFightcadeService.sendRelayInput(targetUid, { buttonIdx, pressed, frame });
+      if (opponentUid) {
+        firebaseFightcadeService.sendRelayInput(opponentUid, { buttonIdx, pressed, frame });
       }
     };
     firebaseFightcadeService.onRelayInput((data) => {
@@ -327,27 +330,47 @@ export default function App() {
         frame: data.frame,
       });
     });
+    engine.addCleanup(() => firebaseFightcadeService.onRelayInput(null));
 
     p2pEngineRef.current = engine;
 
     if (isHost) {
       const offer = await engine.initConnection();
       await firebaseFightcadeService.postOffer(challengeId, offer);
-      firebaseFightcadeService.subscribeIceCandidates(challengeId, 'callee', (c) => engine.addRemoteCandidate(c));
-      firebaseFightcadeService.subscribeChallenge(challengeId, (ch) => {
-        if (ch.answer && !engine.hasRemoteDesc) {
+      const unsubIce = firebaseFightcadeService.subscribeIceCandidates(challengeId, 'callee', (c) =>
+        engine.addRemoteCandidate(c)
+      );
+      const unsubCh = firebaseFightcadeService.subscribeChallenge(challengeId, async (ch) => {
+        if (ch?.answer && !engine.hasRemoteDesc) {
           engine.acceptAnswer(ch.answer);
         }
-      });
-    } else {
-      await engine.initConnection();
-      firebaseFightcadeService.subscribeIceCandidates(challengeId, 'caller', (c) => engine.addRemoteCandidate(c));
-      firebaseFightcadeService.subscribeChallenge(challengeId, async (ch) => {
-        if (ch.offer && !engine.hasRemoteDesc) {
-          const answer = await engine.acceptOfferAndCreateAnswer(ch.offer);
-          await firebaseFightcadeService.postAnswer(challengeId, answer);
+        if (ch?.renegotiateAnswer) {
+          await engine.acceptRenegotiateAnswer(ch.renegotiateAnswer);
         }
       });
+      engine.addCleanup(unsubIce);
+      engine.addCleanup(unsubCh);
+    } else {
+      await engine.initConnection();
+      const unsubIce = firebaseFightcadeService.subscribeIceCandidates(challengeId, 'caller', (c) =>
+        engine.addRemoteCandidate(c)
+      );
+      const unsubCh = firebaseFightcadeService.subscribeChallenge(challengeId, async (ch) => {
+        if (ch?.offer && !engine.hasRemoteDesc) {
+          const answer = await engine.acceptOfferAndCreateAnswer(ch.offer);
+          if (answer) {
+            await firebaseFightcadeService.postAnswer(challengeId, answer);
+          }
+        }
+        if (ch?.renegotiateOffer) {
+          const answer = await engine.acceptRenegotiateOffer(ch.renegotiateOffer);
+          if (answer) {
+            await firebaseFightcadeService.postRenegotiateAnswer(challengeId, answer);
+          }
+        }
+      });
+      engine.addCleanup(unsubIce);
+      engine.addCleanup(unsubCh);
     }
 
     if (gameEntry) {
@@ -372,6 +395,7 @@ export default function App() {
     playerIndex,
     challengeId,
     opponentName,
+    opponentUid,
   }) => {
     setActiveMatchSync(null);
     if (isHost) {
@@ -383,6 +407,7 @@ export default function App() {
       gameEntry,
       preloadedBlob: fileBlob,
       opponentName,
+      opponentUid,
     });
   };
 
@@ -600,6 +625,33 @@ export default function App() {
     };
   }, []);
 
+  const handleCloseStage = () => {
+    const uid = userProfileRef.current?.uid;
+    if (uid) {
+      pushActiveSession(uid, null);
+    }
+    setRemoteActiveSession(null);
+    p2pEngineRef.current?.destroy();
+    p2pEngineRef.current = null;
+    setP2pStats(null);
+    setStageSession(null);
+    firebaseFightcadeService.clearActivePlayingGame();
+  };
+
+  const { exitToastVisible } = useMobileNavigation({
+    layers: [
+      { id: 'settings', active: isSettingsOpen, onClose: () => setIsSettingsOpen(false) },
+      { id: 'auth', active: isAuthOpen, onClose: () => setIsAuthOpen(false) },
+      { id: 'saspay', active: isSasPayOpen, onClose: () => setIsSasPayOpen(false) },
+      { id: 'noCoins', active: noCoinsModalOpen, onClose: () => setNoCoinsModalOpen(false) },
+      { id: 'buyMenu', active: buyMenuOpen, onClose: () => setBuyMenuOpen(false) },
+      { id: 'limitModal', active: Boolean(limitModalGame), onClose: () => setLimitModalGame(null) },
+      { id: 'matchSync', active: Boolean(activeMatchSync), onClose: () => setActiveMatchSync(null) },
+      { id: 'stage', active: Boolean(stageSession), onClose: handleCloseStage },
+      { id: 'channel', active: selectedChannelId !== null, onClose: () => setSelectedChannelId(null) },
+    ],
+  });
+
   const currentModeMeta = SHELL_MODES.find((m) => m.id === platformMode) || SHELL_MODES[0];
   const resolvedSelectedChannel =
     selectedChannelId === GLOBAL_CHANNEL_ID
@@ -607,71 +659,205 @@ export default function App() {
       : activeChannels.find((c) => c.gameId === selectedChannelId) || null;
 
   return (
-    <div className="flex flex-col h-[100dvh] w-screen overflow-hidden bg-neutral-950 font-sans text-neutral-100 pt-safe">
-      {/* Topbar Unifiée Game Mode — 1 ligne ultra-compacte sur mobile, complète sur desktop */}
-      <header className="flex flex-col md:flex-row md:flex-wrap md:items-center md:justify-between gap-1.5 md:gap-2 px-2.5 md:px-3 py-1.5 md:py-2 bg-neutral-950/95 border-b border-neutral-800 shrink-0 z-30">
-        {/* Ligne 1 : Logo + Actions essentielles */}
-        <div className="flex items-center justify-between gap-2 w-full md:w-auto">
+    <div className="flex flex-col h-[100dvh] w-screen overflow-hidden bg-neutral-950 font-sans text-neutral-100 pt-safe-pwa">
+      {/* Topbar Unifiée Cyber-Arcade Glass — Compacte, structurée & sans perte d'information */}
+      <header className="arcade-glass border-b border-white/10 shrink-0 z-30 px-2.5 sm:px-4 py-1.5 sm:py-2 space-y-1.5">
+        {/* Ligne 1 : Identité + Statut Système + Actions Desktop */}
+        <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2 min-w-0">
-            <img src="./icons/icon-192.png" alt="CSW Arcade" className="w-7 h-7 md:w-8 md:h-8 rounded-lg shrink-0" />
+            <img
+              src="./icons/icon-192.png"
+              alt="CSW Arcade"
+              className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl shrink-0 ring-1 ring-cyan-400/35 shadow-md shadow-cyan-500/10"
+            />
             <div className="min-w-0">
-              <div className="font-black tracking-wider text-sm text-white leading-tight">
+              <div className="font-black tracking-wider text-sm sm:text-base text-white leading-tight truncate">
                 CSW<span className="text-cyan-400">.</span>ARCADE
               </div>
-              <div className="text-[10px] font-mono text-neutral-400 hidden lg:block truncate">
+              <div className="text-[10px] sm:text-[11px] font-mono text-neutral-300 truncate">
                 {currentModeMeta.subtitle}
               </div>
             </div>
           </div>
 
-          {/* Actions rapides mobile (visibles sur mobile dans la ligne 1) */}
+          {/* Statut système + Paramètres sur Mobile (< md) — Ligne 1 droite */}
           <div className="flex md:hidden items-center gap-1.5 shrink-0">
-            <button
-              type="button"
-              onClick={() => setIsSasPayOpen(true)}
-              className={`flex items-center gap-1 px-2 py-1.5 rounded-lg border text-xs font-mono font-bold ${
-                coins <= 0
-                  ? 'bg-rose-950/60 border-rose-500/60 text-rose-300 animate-pulse'
-                  : 'bg-amber-950/40 border-amber-500/40 text-amber-300'
+            <span
+              className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg border text-[10px] font-mono font-semibold ${
+                isOnline
+                  ? 'bg-emerald-950/60 border-emerald-500/40 text-emerald-300'
+                  : 'bg-amber-950/60 border-amber-500/40 text-amber-300'
               }`}
-              title="Portefeuille Coins"
+              title={isOnline ? 'Connecté' : 'Hors-ligne'}
             >
-              <Coins className="w-3.5 h-3.5" />
-              <span>{String(coins).padStart(2, '0')}</span>
-            </button>
+              {isOnline ? <Wifi className="w-3 h-3 shrink-0" aria-hidden="true" /> : <WifiOff className="w-3 h-3 shrink-0" aria-hidden="true" />}
+              <span>{isOnline ? 'En ligne' : 'Hors-ligne'}</span>
+            </span>
+
+            <span
+              className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-neutral-900/90 border border-white/10 text-[10px] font-mono text-neutral-200 tabular-nums"
+              title="ROMs en cache IndexedDB"
+            >
+              <Database className="w-3 h-3 text-cyan-400 shrink-0" aria-hidden="true" />
+              <span>{cacheStats.count} · {formatBytes(cacheStats.totalBytes)}</span>
+            </span>
 
             <button
               type="button"
+              onClick={() => setIsSettingsOpen(true)}
+              aria-label="Paramètres unifiés"
+              title="Paramètres"
+              className="arcade-focus-ring flex items-center justify-center w-9 h-9 rounded-xl bg-neutral-900 hover:bg-neutral-800 border border-white/10 text-neutral-200 transition-colors"
+            >
+              <Settings className="w-4 h-4" aria-hidden="true" />
+            </button>
+          </div>
+
+          {/* Actions Desktop (md+) — Complètes et adaptatives */}
+          <div className="hidden md:flex items-center gap-2 flex-wrap justify-end relative">
+            <button
+              type="button"
               onClick={() => setIsAuthOpen(true)}
-              className="flex items-center gap-1 px-2 py-1.5 rounded-lg border bg-cyan-950/40 border-cyan-500/40 text-cyan-200 text-xs font-bold"
-              title="Profil & Rang"
+              title={`Connexion / Stats & Rang (${userProfile?.ratingPoints || 0} RP)`}
+              className={`arcade-focus-ring flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border text-xs font-bold transition-colors ${
+                userProfile?.isAuthenticated
+                  ? 'bg-emerald-950/50 border-emerald-500/40 text-emerald-200 hover:bg-emerald-950/80'
+                  : 'bg-cyan-950/40 border-cyan-500/40 text-cyan-200 hover:bg-cyan-950/70'
+              }`}
             >
               <span
-                className={`px-1 rounded border text-[10px] font-mono font-black ${
+                className={`px-1.5 py-0.5 rounded border text-[10px] font-mono font-black ${
                   getRankTierMeta(userProfile?.rank || 'D').color
                 }`}
               >
                 {userProfile?.rank || 'D'}
               </span>
-              <span className="truncate max-w-[72px]">{userProfile?.displayName || 'Joueur'}</span>
+              <span className="truncate max-w-[110px]">{userProfile?.displayName || 'Joueur'}</span>
+              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-white/10 text-neutral-200">
+                {userProfile?.region || 'FR'}
+              </span>
+              <UserCheck className="w-3.5 h-3.5 text-emerald-400" aria-hidden="true" />
             </button>
 
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => setIsSasPayOpen(true)}
+                className={`arcade-focus-ring flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border text-xs font-mono font-bold tabular-nums transition-colors ${
+                  coins <= 0
+                    ? 'bg-rose-950/50 border-rose-500/60 text-rose-200 hover:bg-rose-950/70'
+                    : 'bg-amber-950/40 border-amber-500/40 text-amber-200 hover:bg-amber-950/70'
+                }`}
+                title="Portefeuille Coins · Acheter via SasPay"
+              >
+                {coins <= 0 && <span className="w-2 h-2 rounded-full bg-rose-400 animate-ping shrink-0" aria-hidden="true" />}
+                <Coins className="w-3.5 h-3.5 text-amber-400" aria-hidden="true" />
+                <span>{String(coins).padStart(2, '0')}/99 COINS</span>
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500 text-black font-black">
+                  Acheter
+                </span>
+              </button>
+
+              {ENABLE_DEV_TEST_COINS && (
+                <button
+                  type="button"
+                  onClick={() => addCoins(10)}
+                  title="Mode Test : Ajouter +10 Coins gratuitement sans payer"
+                  className="arcade-focus-ring flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-black shadow-lg shadow-emerald-500/20 border border-emerald-400 transition-all active:scale-95"
+                >
+                  <Plus className="w-3.5 h-3.5 stroke-[3]" aria-hidden="true" />
+                  <span>10 COINS</span>
+                </button>
+              )}
+            </div>
+
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-neutral-900/90 border border-white/10 text-[11px] font-mono text-neutral-300 tabular-nums">
+              <Database className="w-3 h-3 text-cyan-400" aria-hidden="true" />
+              <span>Cache : {cacheStats.count} · {formatBytes(cacheStats.totalBytes)}</span>
+            </span>
+            <span
+              className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-full border text-[11px] font-mono ${
+                isOnline
+                  ? 'bg-emerald-950/50 border-emerald-700/50 text-emerald-300'
+                  : 'bg-amber-950/50 border-amber-700/50 text-amber-300'
+              }`}
+            >
+              {isOnline ? <Wifi className="w-3 h-3" aria-hidden="true" /> : <WifiOff className="w-3 h-3" aria-hidden="true" />}
+              <span>{isOnline ? 'En ligne' : 'Hors-ligne'}</span>
+            </span>
             <button
               type="button"
               onClick={() => setIsSettingsOpen(true)}
-              title="Paramètres"
-              className="p-1.5 rounded-lg bg-neutral-900 border border-neutral-800 text-neutral-200"
+              aria-label="Paramètres unifiés"
+              title="Paramètres unifiés"
+              className="arcade-focus-ring flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-neutral-900 hover:bg-neutral-800 border border-white/10 text-xs font-semibold text-neutral-200 transition-colors"
             >
-              <Settings className="w-4 h-4" />
+              <Settings className="w-4 h-4" aria-hidden="true" />
             </button>
           </div>
         </div>
 
-        {/* Barre d'Univers — Masquée sur mobile quand on est dans un Salon pour maximiser le Chat */}
+        {/* Ligne 2 Mobile (< md) : Barre Joueur & Portefeuille équilibrée sur 1 ligne */}
+        <div className="flex md:hidden items-center justify-between gap-1.5">
+          <button
+            type="button"
+            onClick={() => setIsAuthOpen(true)}
+            aria-label="Profil, Connexion, Stats et Rang"
+            className={`arcade-focus-ring flex-1 min-w-0 flex items-center justify-between gap-1.5 px-2.5 py-1.5 min-h-[36px] rounded-xl border text-xs font-bold transition-colors ${
+              userProfile?.isAuthenticated
+                ? 'bg-emerald-950/45 border-emerald-500/40 text-emerald-200'
+                : 'bg-cyan-950/40 border-cyan-500/40 text-cyan-200'
+            }`}
+          >
+            <span className="flex items-center gap-1.5 min-w-0">
+              <span
+                className={`px-1 rounded border text-[10px] font-mono font-black shrink-0 ${
+                  getRankTierMeta(userProfile?.rank || 'D').color
+                }`}
+              >
+                {userProfile?.rank || 'D'}
+              </span>
+              <span className="truncate">{userProfile?.displayName || 'Joueur'}</span>
+            </span>
+            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-white/10 text-neutral-200 shrink-0">
+              {userProfile?.region || 'FR'}
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setIsSasPayOpen(true)}
+            aria-label="Portefeuille Coins et achat SasPay"
+            className={`arcade-focus-ring flex items-center gap-1.5 px-2.5 py-1.5 min-h-[36px] rounded-xl border text-xs font-mono font-bold tabular-nums shrink-0 ${
+              coins <= 0
+                ? 'bg-rose-950/50 border-rose-500/60 text-rose-200'
+                : 'bg-amber-950/40 border-amber-500/40 text-amber-200'
+            }`}
+          >
+            {coins <= 0 && <span className="w-1.5 h-1.5 rounded-full bg-rose-400 animate-ping shrink-0" aria-hidden="true" />}
+            <Coins className="w-3.5 h-3.5 text-amber-400 shrink-0" aria-hidden="true" />
+            <span>{String(coins).padStart(2, '0')}/99</span>
+            <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500 text-black font-black">
+              Acheter
+            </span>
+          </button>
+
+          {ENABLE_DEV_TEST_COINS && (
+            <button
+              type="button"
+              onClick={() => addCoins(10)}
+              title="Mode Test : Ajouter +10 Coins gratuitement sans payer"
+              className="arcade-focus-ring flex items-center gap-0.5 px-2.5 py-1.5 min-h-[36px] rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-black shadow-md shadow-emerald-500/20 border border-emerald-400 transition-transform active:scale-95 shrink-0 tabular-nums"
+            >
+              <Plus className="w-3.5 h-3.5 stroke-[3]" aria-hidden="true" />
+              <span>10</span>
+            </button>
+          )}
+        </div>
+
+        {/* Ligne 3 : Barre d'Univers — Compacte et toujours accessible */}
         <nav
-          className={`${
-            selectedChannelId !== null ? 'hidden md:flex' : 'flex'
-          } items-center gap-1 overflow-x-auto no-scrollbar snap-x py-0.5 md:py-0`}
+          className="flex items-center gap-1.5 overflow-x-auto no-scrollbar snap-x"
           role="tablist"
           aria-label="Univers de jeux"
         >
@@ -689,100 +875,18 @@ export default function App() {
                   setSelectedChannelId(null);
                   setPlatformMode(m.id);
                 }}
-                className={`snap-start flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-colors shrink-0 ${
+                className={`arcade-focus-ring snap-start flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 min-h-[34px] rounded-xl text-xs font-bold transition-all shrink-0 ${
                   active
-                    ? 'bg-cyan-500/15 text-cyan-300 border border-cyan-500/50'
-                    : 'text-neutral-400 hover:text-white hover:bg-neutral-900 border border-transparent'
+                    ? 'bg-cyan-500/20 text-cyan-200 border border-cyan-400/60 shadow-sm shadow-cyan-500/20'
+                    : 'bg-neutral-900/60 text-neutral-300 hover:text-white hover:bg-neutral-800/80 border border-white/5'
                 }`}
               >
-                <Icon className="w-3.5 h-3.5 md:w-4 md:h-4" />
+                <Icon className="w-3.5 h-3.5 md:w-4 md:h-4 shrink-0" aria-hidden="true" />
                 <span>{m.label}</span>
               </button>
             );
           })}
         </nav>
-
-        {/* Actions Desktop (md+) */}
-        <div className="hidden md:flex items-center gap-2 relative">
-          {/* Bouton Profil / Login / Stats & Rang Firebase */}
-          <button
-            type="button"
-            onClick={() => setIsAuthOpen(true)}
-            title={`Connexion / Stats & Rang (${userProfile?.ratingPoints || 0} RP)`}
-            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-bold transition-colors ${
-              userProfile?.isAuthenticated
-                ? 'bg-emerald-950/50 border-emerald-500/40 text-emerald-200 hover:bg-emerald-950/80'
-                : 'bg-cyan-950/40 border-cyan-500/40 text-cyan-200 hover:bg-cyan-950/70'
-            }`}
-          >
-            <span
-              className={`px-1.5 py-0.2 rounded border text-[10px] font-mono font-black ${
-                getRankTierMeta(userProfile?.rank || 'D').color
-              }`}
-            >
-              {userProfile?.rank || 'D'}
-            </span>
-            <span className="truncate max-w-[110px]">{userProfile?.displayName || 'Joueur'}</span>
-            <span className="text-[10px] font-mono px-1 rounded bg-neutral-800 text-neutral-300">
-              {countryCodeToFlag(userProfile?.region)} {userProfile?.region || 'FR'}
-            </span>
-            <UserCheck className="w-3.5 h-3.5 text-emerald-400" />
-          </button>
-
-          {/* Portefeuille Coins (0-99) + Bouton Test Gratuit */}
-          <div className="flex items-center gap-1.5">
-            <button
-              type="button"
-              onClick={() => setIsSasPayOpen(true)}
-              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-mono font-bold transition-colors ${
-                coins <= 0
-                  ? 'bg-rose-950/60 border-rose-500/60 text-rose-300 animate-pulse'
-                  : 'bg-amber-950/40 border-amber-500/40 text-amber-300 hover:bg-amber-950/70'
-              }`}
-              title="Portefeuille Coins · Acheter via SasPay"
-            >
-              <Coins className="w-3.5 h-3.5" />
-              <span>{String(coins).padStart(2, '0')}/99 COINS</span>
-              <span className="hidden lg:inline text-[10px] px-1.5 py-0.5 rounded bg-amber-500 text-black font-black">
-                Acheter
-              </span>
-            </button>
-
-            {/* Bouton Mode Test : Ajouter +10 Coins gratuitement (désactivable via ENABLE_DEV_TEST_COINS) */}
-            {ENABLE_DEV_TEST_COINS && (
-              <button
-                type="button"
-                onClick={() => addCoins(10)}
-                title="Mode Test : Ajouter +10 Coins gratuitement sans payer"
-                className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-black shadow-lg shadow-emerald-500/20 border border-emerald-400 transition-all active:scale-95"
-              >
-                <Plus className="w-3.5 h-3.5 stroke-[3]" />
-                <span>+10 COINS</span>
-              </button>
-            )}
-          </div>
-
-          <span className="hidden xl:inline px-2.5 py-1 rounded-full bg-neutral-900 border border-neutral-800 text-[11px] font-mono text-neutral-300">
-            Cache : {cacheStats.count} · {formatBytes(cacheStats.totalBytes)}
-          </span>
-          <span
-            className={`hidden lg:inline px-2 py-1 rounded-full border text-[11px] font-mono ${
-              isOnline
-                ? 'bg-emerald-950/50 border-emerald-700/50 text-emerald-300'
-                : 'bg-amber-950/50 border-amber-700/50 text-amber-300'
-            }`}
-          >
-            {isOnline ? 'En ligne' : 'Hors-ligne'}
-          </span>
-          <button
-            type="button"
-            onClick={() => setIsSettingsOpen(true)}
-            title="Paramètres unifiés"
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-neutral-900 hover:bg-neutral-800 border border-neutral-800 text-xs font-semibold text-neutral-200 transition-colors"
-          >
-            <Settings className="w-3.5 h-3.5" />
-          </button>
-        </div>
 
         {/* Popover Portefeuille Test partagé Mobile & Desktop */}
         {buyMenuOpen && (
@@ -841,11 +945,12 @@ export default function App() {
           <button
             type="button"
             onClick={() => setSelectedChannelId(GLOBAL_CHANNEL_ID)}
-            className="fixed bottom-16 md:bottom-6 right-4 md:right-6 z-40 px-4 py-2.5 rounded-full bg-emerald-500 hover:bg-emerald-400 text-black font-black text-xs shadow-2xl flex items-center gap-2 animate-bounce transition-transform active:scale-95 border-2 border-neutral-950"
+            className="arcade-focus-ring fixed bottom-20 md:bottom-6 right-3 sm:right-6 z-40 px-4 py-2.5 min-h-[44px] rounded-full bg-emerald-500 hover:bg-emerald-400 text-black font-black text-xs shadow-2xl shadow-emerald-500/25 flex items-center gap-2 transition-transform active:scale-95 border-2 border-neutral-950"
             title="Des joueurs sont actuellement connectés au salon. Cliquez pour les rejoindre !"
           >
-            <span className="w-2.5 h-2.5 rounded-full bg-black animate-ping" />
-            <span>👥 {onlineCount} Joueurs au Salon · Cliquer pour Rejoindre</span>
+            <span className="w-2.5 h-2.5 rounded-full bg-black animate-ping shrink-0" aria-hidden="true" />
+            <Users className="w-4 h-4 shrink-0" aria-hidden="true" />
+            <span>{onlineCount} Joueurs au Salon · Rejoindre</span>
           </button>
         )}
 
@@ -1085,6 +1190,12 @@ export default function App() {
         </div>
       )}
 
+      {exitToastVisible && (
+        <div className="fixed bottom-20 md:bottom-14 left-1/2 -translate-x-1/2 z-[140] px-4 py-2 rounded-xl bg-neutral-900/95 border border-white/20 text-white text-xs font-semibold shadow-2xl max-w-[90%] text-center">
+          Appuyez encore sur Retour pour quitter l&apos;application
+        </div>
+      )}
+
       {/* Lecteur Unifié EmulatorJS / J2ME */}
       <UnifiedStageModal
         session={stageSession}
@@ -1116,31 +1227,11 @@ export default function App() {
         }}
         onOpenSalon={() => {
           const targetId = stageSession?.gameId || activeChannels[0]?.gameId || GLOBAL_CHANNEL_ID;
-          const uid = userProfileRef.current?.uid;
-          if (uid) {
-            pushActiveSession(uid, null);
-          }
-          setRemoteActiveSession(null);
-          p2pEngineRef.current?.destroy();
-          p2pEngineRef.current = null;
-          setP2pStats(null);
-          setStageSession(null);
-          firebaseFightcadeService.clearActivePlayingGame();
+          handleCloseStage();
           setSelectedChannelId(targetId);
         }}
         onInputDelayChange={(d) => p2pEngineRef.current?.setInputDelay(d)}
-        onClose={() => {
-          const uid = userProfileRef.current?.uid;
-          if (uid) {
-            pushActiveSession(uid, null);
-          }
-          setRemoteActiveSession(null);
-          p2pEngineRef.current?.destroy();
-          p2pEngineRef.current = null;
-          setP2pStats(null);
-          setStageSession(null);
-          firebaseFightcadeService.clearActivePlayingGame();
-        }}
+        onClose={handleCloseStage}
         onOpenSettings={() => setIsSettingsOpen(true)}
       />
     </div>

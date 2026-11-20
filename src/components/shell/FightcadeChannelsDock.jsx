@@ -24,20 +24,20 @@ export function FightcadeChannelsDock({
     <>
       {/* DOCK VERTICAL GAUCHE — DESKTOP & TABLETTE (md+) */}
       <nav
-        className="hidden md:flex w-16 lg:w-20 shrink-0 border-r border-neutral-800 bg-neutral-950 flex-col items-center py-3 gap-3 z-20"
+        className="hidden md:flex w-[72px] lg:w-20 shrink-0 border-r border-white/10 arcade-glass flex-col items-center py-3 gap-3 z-20"
         aria-label="Salons Fightcade 2 actifs (Lobby Global + max 3 jeux)"
       >
         <button
           type="button"
           onClick={onSelectLibrary}
           title="Catalogue des jeux (Game Mode)"
-          className={`w-12 h-12 rounded-xl flex flex-col items-center justify-center gap-0.5 transition-all border ${
+          className={`arcade-focus-ring w-12 h-12 rounded-2xl flex flex-col items-center justify-center gap-0.5 transition-all border ${
             selectedChannelId === null
-              ? 'bg-cyan-500/20 border-cyan-400 text-cyan-300 shadow-lg shadow-cyan-500/20'
-              : 'bg-neutral-900 border-neutral-800 text-neutral-400 hover:text-white hover:border-neutral-700'
+              ? 'bg-cyan-500/20 border-cyan-400 text-cyan-200 shadow-lg shadow-cyan-500/20'
+              : 'bg-neutral-900/80 border-white/10 text-neutral-300 hover:text-white hover:border-white/25'
           }`}
         >
-          <Gamepad2 className="w-5 h-5" />
+          <Gamepad2 className="w-5 h-5" aria-hidden="true" />
           <span className="text-[9px] font-bold">JEUX</span>
         </button>
 
@@ -46,15 +46,15 @@ export function FightcadeChannelsDock({
           type="button"
           onClick={() => onSelectChannel(GLOBAL_CHANNEL_ID)}
           title="Salon Communautaire Global Fightcade 2 (Tous les joueurs & messages)"
-          className={`relative w-12 h-12 rounded-xl flex flex-col items-center justify-center gap-0.5 transition-all border ${
+          className={`arcade-focus-ring relative w-12 h-12 rounded-2xl flex flex-col items-center justify-center gap-0.5 transition-all border ${
             isGlobalSelected
-              ? 'bg-emerald-500/20 border-emerald-400 text-emerald-300 shadow-lg shadow-emerald-500/20'
-              : 'bg-neutral-900 border-neutral-800 text-neutral-400 hover:text-emerald-300 hover:border-emerald-700/60'
+              ? 'bg-emerald-500/20 border-emerald-400 text-emerald-200 shadow-lg shadow-emerald-500/20'
+              : 'bg-neutral-900/80 border-white/10 text-neutral-300 hover:text-emerald-300 hover:border-emerald-500/40'
           }`}
         >
-          <Globe className="w-5 h-5" />
+          <Globe className="w-5 h-5" aria-hidden="true" />
           <span className="text-[9px] font-bold">SALON</span>
-          <span className="absolute -top-1.5 -right-1.5 px-1 py-0.2 rounded-full bg-emerald-500 text-black text-[9px] font-mono font-black border border-neutral-950">
+          <span className="absolute -top-1.5 -right-1.5 px-1.5 py-0.2 rounded-full bg-emerald-500 text-black text-[9px] font-mono font-black border border-neutral-950 tabular-nums">
             {onlineCount}
           </span>
         </button>
@@ -115,21 +115,21 @@ export function FightcadeChannelsDock({
 
       {/* BOTTOM NAVIGATION BAR — MOBILE (< md) */}
       <nav
-        className="md:hidden fixed bottom-0 inset-x-0 z-30 bg-neutral-950/95 backdrop-blur-xl border-t border-neutral-800 pb-safe"
+        className="md:hidden fixed bottom-0 inset-x-0 z-30 arcade-glass border-t border-white/10 pb-safe"
         aria-label="Navigation mobile"
       >
-        <div className="grid grid-cols-4 h-14 px-1">
+        <div className="grid grid-cols-4 h-16 px-1.5 gap-1">
           <button
             type="button"
             onClick={() => {
               setMobileChannelsSheetOpen(false);
               onSelectLibrary();
             }}
-            className={`flex flex-col items-center justify-center gap-0.5 rounded-xl transition-colors ${
-              selectedChannelId === null ? 'text-cyan-400' : 'text-neutral-400'
+            className={`arcade-focus-ring flex flex-col items-center justify-center gap-1 min-h-[44px] rounded-xl transition-colors ${
+              selectedChannelId === null ? 'text-cyan-300 bg-cyan-500/10' : 'text-neutral-300'
             }`}
           >
-            <Gamepad2 className="w-5 h-5" />
+            <Gamepad2 className="w-5 h-5" aria-hidden="true" />
             <span className="text-[10px] font-bold">Jeux</span>
           </button>
 
@@ -139,13 +139,13 @@ export function FightcadeChannelsDock({
               setMobileChannelsSheetOpen(false);
               onSelectChannel(GLOBAL_CHANNEL_ID);
             }}
-            className={`relative flex flex-col items-center justify-center gap-0.5 rounded-xl transition-colors ${
-              isGlobalSelected ? 'text-emerald-400' : 'text-neutral-400'
+            className={`arcade-focus-ring relative flex flex-col items-center justify-center gap-1 min-h-[44px] rounded-xl transition-colors ${
+              isGlobalSelected ? 'text-emerald-300 bg-emerald-500/10' : 'text-neutral-300'
             }`}
           >
             <span className="relative">
-              <Globe className="w-5 h-5" />
-              <span className="absolute -top-1 -right-2 px-1 rounded-full bg-emerald-500 text-black text-[9px] font-black leading-tight">
+              <Globe className="w-5 h-5" aria-hidden="true" />
+              <span className="absolute -top-1 -right-2 px-1 rounded-full bg-emerald-500 text-black text-[9px] font-black leading-tight tabular-nums">
                 {onlineCount}
               </span>
             </span>
@@ -161,14 +161,14 @@ export function FightcadeChannelsDock({
                 setMobileChannelsSheetOpen((v) => !v);
               }
             }}
-            className={`relative flex flex-col items-center justify-center gap-0.5 rounded-xl transition-colors ${
-              isGameChannelSelected || mobileChannelsSheetOpen ? 'text-cyan-400' : 'text-neutral-400'
+            className={`arcade-focus-ring relative flex flex-col items-center justify-center gap-1 min-h-[44px] rounded-xl transition-colors ${
+              isGameChannelSelected || mobileChannelsSheetOpen ? 'text-cyan-300 bg-cyan-500/10' : 'text-neutral-300'
             }`}
           >
             <span className="relative">
-              <Swords className="w-5 h-5" />
+              <Swords className="w-5 h-5" aria-hidden="true" />
               {activeChannels.length > 0 && (
-                <span className="absolute -top-1 -right-2 px-1 rounded-full bg-cyan-500 text-black text-[9px] font-black leading-tight">
+                <span className="absolute -top-1 -right-2 px-1 rounded-full bg-cyan-500 text-black text-[9px] font-black leading-tight tabular-nums">
                   {activeChannels.length}
                 </span>
               )}
@@ -182,10 +182,10 @@ export function FightcadeChannelsDock({
               setMobileChannelsSheetOpen(false);
               onOpenProfile?.();
             }}
-            className="flex flex-col items-center justify-center gap-0.5 rounded-xl text-neutral-400 active:text-amber-300 transition-colors"
+            className="arcade-focus-ring flex flex-col items-center justify-center gap-1 min-h-[44px] rounded-xl text-neutral-300 active:text-amber-300 transition-colors"
           >
             <span className="relative flex items-center justify-center">
-              <Trophy className="w-5 h-5 text-amber-400" />
+              <Trophy className="w-5 h-5 text-amber-400" aria-hidden="true" />
               <span className="absolute -top-1 -right-2.5 px-1 rounded bg-neutral-800 border border-amber-500/40 text-amber-300 text-[8px] font-mono font-black">
                 {userRank}
               </span>

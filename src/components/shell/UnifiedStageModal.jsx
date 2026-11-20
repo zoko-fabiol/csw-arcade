@@ -448,7 +448,17 @@ export function UnifiedStageModal({
         );
       }
     };
-  }, [p2pEngine]);
+    p2pEngine.onGuestReady = () => {
+      if (session?.isNetplay && session?.isHost) {
+        try {
+          iframeRef.current?.contentWindow?.postMessage(
+            { type: 'EXPORT_STATE', slot: 'frame0' },
+            window.location.origin
+          );
+        } catch {}
+      }
+    };
+  }, [p2pEngine, session?.isNetplay, session?.isHost]);
 
   useEffect(() => {
     if (!session || !iframeRef.current?.contentWindow) return;

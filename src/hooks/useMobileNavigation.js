@@ -7,6 +7,7 @@ import { useEffect, useRef, useState } from 'react';
  * - Exige un double-tap Retour pour quitter depuis l'accueil avec toast informatif
  */
 export function useMobileNavigation({
+  layers = null,
   activeGame,
   onExitGame,
   isSettingsOpen,
@@ -19,97 +20,66 @@ export function useMobileNavigation({
   onCloseWebRtcTest,
   isMobileSidebarOpen,
   onCloseMobileSidebar
-}) {
+} = {}) {
   const [exitToastVisible, setExitToastVisible] = useState(false);
   const lastBackPressTimeRef = useRef(0);
   const isNavigatingRef = useRef(false);
+
+  const resolvedLayers = Array.isArray(layers)
+    ? layers
+    : [
+        { id: 'settings', active: Boolean(isSettingsOpen), onClose: onCloseSettings },
+        { id: 'lobby', active: Boolean(isLobbyOpen), onClose: onCloseLobby },
+        { id: 'controller', active: Boolean(mobileControllerSession), onClose: onCloseMobileController },
+        { id: 'webrtc', active: Boolean(isWebRtcTestOpen), onClose: onCloseWebRtcTest },
+        { id: 'sidebar', active: Boolean(isMobileSidebarOpen), onClose: onCloseMobileSidebar },
+        { id: 'game', active: Boolean(activeGame), onClose: onExitGame },
+      ];
+
+  const layersRef = useRef(resolvedLayers);
+  layersRef.current = resolvedLayers;
+
+  const activeLayerKey = resolvedLayers
+    .filter((l) => l.active)
+    .map((l) => l.id)
+    .join(',');
 
   // Synchronisation de l'historique quand un écran ou modal s'ouvre
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
-    // Assurer un état initial dans l'historique
     if (!window.history.state) {
       window.history.replaceState({ screen: 'home' }, '');
     }
 
-    let currentLayer = null;
-    if (activeGame) {
-      currentLayer = 'game';
-    } else if (isSettingsOpen) {
-      currentLayer = 'settings';
-    } else if (isLobbyOpen) {
-      currentLayer = 'lobby';
-    } else if (mobileControllerSession) {
-      currentLayer = 'controller';
-    } else if (isWebRtcTestOpen) {
-      currentLayer = 'webrtc';
-    } else if (isMobileSidebarOpen) {
-      currentLayer = 'sidebar';
-    }
-
-    if (currentLayer) {
-      // Pousser un état d'écran dans l'historique
-      if (!isNavigatingRef.current && window.history.state?.layer !== currentLayer) {
-        window.history.pushState({ layer: currentLayer }, '');
+    const topLayer = layersRef.current.find((l) => l.active);
+    if (topLayer) {
+      if (!isNavigatingRef.current && window.history.state?.layer !== topLayer.id) {
+        window.history.pushState({ layer: topLayer.id }, '');
       }
     }
     isNavigatingRef.current = false;
-  }, [
-    activeGame,
-    isSettingsOpen,
-    isLobbyOpen,
-    mobileControllerSession,
-    isWebRtcTestOpen,
-    isMobileSidebarOpen
-  ]);
+  }, [activeLayerKey]);
 
   // Écoute de l'événement popstate (Bouton retour Android / Swipe retour iOS)
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
-    const handlePopState = (event) => {
+    const handlePopState = () => {
       isNavigatingRef.current = true;
 
-      // 1. Si un modal secondaire est ouvert, fermer le modal
-      if (isSettingsOpen) {
-        onCloseSettings();
-        return;
-      }
-      if (isLobbyOpen) {
-        onCloseLobby();
-        return;
-      }
-      if (mobileControllerSession) {
-        onCloseMobileController();
-        return;
-      }
-      if (isWebRtcTestOpen) {
-        onCloseWebRtcTest();
+      const topLayer = layersRef.current.find((l) => l.active);
+      if (topLayer) {
+        topLayer.onClose?.();
         return;
       }
 
-      // 2. Si le drawer de navigation mobile est ouvert, le fermer
-      if (isMobileSidebarOpen) {
-        onCloseMobileSidebar();
-        return;
-      }
-
-      // 3. Si une partie est active, quitter proprement la partie vers le catalogue
-      if (activeGame) {
-        console.log('[MobileNav] Geste retour détecté : fermeture propre de la partie en cours');
-        onExitGame();
-        return;
-      }
-
-      // 4. Si nous sommes à la racine (catalogue d'accueil), protection double-tap
+      // Racine (catalogue d'accueil) : protection double-tap
       const now = Date.now();
-      if (lastBackPressTimeRef.current > 0 && (now - lastBackPressTimeRef.current < 2000)) {
-        // Deuxième appui rapide : laisser Android quitter la PWA
+      if (lastBackPressTimeRef.current > 0 && now - lastBackPressTimeRef.current < 2000) {
         return;
       }
 
-      // Premier appui : bloquer la fermeture, réinjecter l'état et afficher le toast
       lastBackPressTimeRef.current = now;
       window.history.pushState({ screen: 'home' }, '');
       setExitToastVisible(true);
@@ -118,20 +88,7 @@ export function useMobileNavigation({
 
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
-  }, [
-    activeGame,
-    onExitGame,
-    isSettingsOpen,
-    onCloseSettings,
-    isLobbyOpen,
-    onCloseLobby,
-    mobileControllerSession,
-    onCloseMobileController,
-    isWebRtcTestOpen,
-    onCloseWebRtcTest,
-    isMobileSidebarOpen,
-    onCloseMobileSidebar
-  ]);
+  }, []);
 
   return { exitToastVisible };
 }

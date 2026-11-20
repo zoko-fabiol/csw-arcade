@@ -21,6 +21,19 @@
     <link rel="manifest" href="./manifest.json" />
 
     <script>
+      (function () {
+        try {
+          var isStandalone =
+            (window.matchMedia &&
+              (window.matchMedia('(display-mode: standalone)').matches ||
+               window.matchMedia('(display-mode: fullscreen)').matches ||
+               window.matchMedia('(display-mode: minimal-ui)').matches)) ||
+            window.navigator.standalone === true;
+          if (isStandalone) {
+            document.documentElement.classList.add('is-pwa-standalone');
+          }
+        } catch (e) {}
+      })();
       if ('serviceWorker' in navigator && window.location.protocol.startsWith('http')) {
         if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
           navigator.serviceWorker.getRegistrations().then((regs) => regs.forEach((r) => r.unregister()));

@@ -95,11 +95,14 @@ export function setupNetplayHub(server) {
   const allGlobalUsers = new Map(); // uid -> userObj (présence unifiée partagée sur tous les salons)
   const fcChallenges = new Map(); // challengeId -> challengeObj
 
-  // Nettoyage automatique des défis expirés
+  // Nettoyage automatique des défis expirés (conserver 10 min si accepté pour gros téléchargements CHD/PS1)
   setInterval(() => {
     const now = Date.now();
     for (const [id, ch] of fcChallenges.entries()) {
-      if (now > (ch.expiresAt || 0) + 60000) {
+      const ttl = ch.status === 'accepted'
+        ? (ch.updatedAtMs || ch.createdAt || now) + 10 * 60 * 1000
+        : (ch.expiresAt || 0) + 60000;
+      if (now > ttl) {
         fcChallenges.delete(id);
       }
     }
@@ -180,6 +183,12 @@ export function setupNetplayHub(server) {
             target.updatedAtMs = Date.now();
           } else if (action === 'postAnswer') {
             target.answer = answer;
+            target.updatedAtMs = Date.now();
+          } else if (action === 'renegotiateOffer') {
+            target.renegotiateOffer = offer;
+            target.updatedAtMs = Date.now();
+          } else if (action === 'renegotiateAnswer') {
+            target.renegotiateAnswer = answer;
             target.updatedAtMs = Date.now();
           } else if (action === 'addCandidate') {
             const list = role === 'caller' ? target.callerCandidates : target.calleeCandidates;
@@ -933,7 +942,15 @@ export function setupNetplayHub(server) {
           case 'CHALLENGE_INVITE': {
             const { challenge } = data;
             if (challenge && challenge.challengeId) {
-              fcChallenges.set(challenge.challengeId, challenge);
+              const existing = fcChallenges.get(challenge.challengeId);
+              fcChallenges.set(challenge.challengeId, {
+                callerCandidates: [],
+                calleeCandidates: [],
+                ...existing,
+                ...challenge,
+                status: existing?.status && existing.status !== 'pending' ? existing.status : challenge.status,
+                updatedAtMs: Date.now(),
+              });
               const targetUid = challenge.toUid;
               const sockets = connectedUsers.get(targetUid);
               if (sockets) {
@@ -997,7 +1014,8 @@ export function setupNetplayHub(server) {
             const { challengeId, targetUid } = data;
             if (challengeId && fcChallenges.has(challengeId)) {
               const ch = fcChallenges.get(challengeId);
-              ch.status = 'declined';
+              ch.status = 'cancelled';
+              ch.updatedAtMs = Date.now();
             }
             const sockets = connectedUsers.get(targetUid);
             if (sockets) {

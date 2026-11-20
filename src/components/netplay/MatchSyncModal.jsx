@@ -52,16 +52,34 @@ export function MatchSyncModal({
   const countdownIntervalRef = useRef(null);
   const waitTimerRef = useRef(null);
   const isLaunchingRef = useRef(false);
+  const localBlobRef = useRef(null);
 
   const opponentUid = isHost ? challenge?.toUid : challenge?.fromUid;
   const opponentName = isHost ? challenge?.toName : challenge?.fromName;
   const gameTitle = challenge?.gameTitle || challenge?.gameEntry?.title || 'Jeu Arcade';
   const platformLabel = challenge?.gameEntry?.platformLabel || 'Arcade FBNeo';
 
-  // 1. Initialisation de la phase
+  const latestMatchDataRef = useRef({});
+  latestMatchDataRef.current = {
+    challenge,
+    isHost,
+    opponentName,
+    opponentUid,
+    onLaunchMatch,
+  };
+
+  // 1. Initialisation & réinitialisation propre à chaque nouveau défi
   useEffect(() => {
     if (!isOpen || !challenge) return;
     isLaunchingRef.current = false;
+    localBlobRef.current = null;
+    setLocalBlob(null);
+    setLocalRomPct(0);
+    setLocalRomReady(false);
+    setLocalReady(false);
+    setRemoteRomPct(0);
+    setRemoteRomReady(false);
+    setRemoteReady(false);
     setCountdown(null);
     setCancelReason('');
 
@@ -70,7 +88,7 @@ export function MatchSyncModal({
         setPhase('syncing');
       } else {
         setPhase('waiting_opponent');
-        setWaitTimer(45);
+        setWaitTimer(20);
         waitTimerRef.current = setInterval(() => {
           setWaitTimer((prev) => {
             if (prev <= 1) {
@@ -106,12 +124,17 @@ export function MatchSyncModal({
         if (ch.status === 'accepted') {
           clearInterval(waitTimerRef.current);
           setPhase((prev) => (prev === 'waiting_opponent' ? 'syncing' : prev));
-        } else if (ch.status === 'declined' || ch.status === 'expired') {
+        } else if (ch.status === 'declined' || ch.status === 'expired' || ch.status === 'cancelled') {
           clearInterval(waitTimerRef.current);
-          setPhase('cancelled');
+          setPhase((prev) => {
+            if (prev === 'countdown') return prev;
+            return 'cancelled';
+          });
           setCancelReason(
             ch.status === 'declined'
               ? `${opponentName || "L'adversaire"} a décliné le match.`
+              : ch.status === 'cancelled'
+              ? `${opponentName || "L'adversaire"} a quitté la salle d'attente.`
               : "Le défi a expiré."
           );
         }
@@ -168,6 +191,7 @@ export function MatchSyncModal({
     })
       .then((blob) => {
         if (!isMounted) return;
+        localBlobRef.current = blob;
         setLocalBlob(blob);
         setLocalRomPct(100);
         setLocalRomReady(true);
@@ -220,17 +244,19 @@ export function MatchSyncModal({
         if (prev <= 1) {
           clearInterval(countdownIntervalRef.current);
           countdownIntervalRef.current = null;
-          // 0 = FIGHT ! Déclencher le lancement synchrone
+          // 0 = FIGHT ! Déclencher le lancement synchrone avec les refs à jour (évite localBlob stale)
           setTimeout(() => {
             if (!isLaunchingRef.current) {
               isLaunchingRef.current = true;
-              onLaunchMatch({
-                gameEntry: challenge.gameEntry,
-                fileBlob: localBlob,
-                isHost,
-                playerIndex: isHost ? 0 : 1,
-                challengeId: challenge.challengeId,
-                opponentName,
+              const latest = latestMatchDataRef.current;
+              latest.onLaunchMatch?.({
+                gameEntry: latest.challenge?.gameEntry,
+                fileBlob: localBlobRef.current,
+                isHost: latest.isHost,
+                playerIndex: latest.isHost ? 0 : 1,
+                challengeId: latest.challenge?.challengeId,
+                opponentName: latest.opponentName,
+                opponentUid: latest.opponentUid,
               });
             }
           }, 600);
@@ -244,9 +270,11 @@ export function MatchSyncModal({
   const handleCancel = () => {
     clearInterval(waitTimerRef.current);
     clearInterval(countdownIntervalRef.current);
-    if (challenge?.challengeId && opponentUid) {
+    if (phase !== 'cancelled' && challenge?.challengeId && opponentUid) {
       firebaseFightcadeService.sendMatchCancel(challenge.challengeId, opponentUid);
-      firebaseFightcadeService.respondChallenge(challenge.challengeId, false, opponentUid);
+      if (phase === 'waiting_opponent') {
+        firebaseFightcadeService.respondChallenge(challenge.challengeId, false, opponentUid);
+      }
     }
     onCancel?.();
   };
@@ -254,10 +282,10 @@ export function MatchSyncModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-fade-in">
-      <div className="relative w-full max-w-2xl bg-neutral-900 border-2 border-cyan-500/40 rounded-2xl shadow-2xl shadow-cyan-500/20 overflow-hidden flex flex-col">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/85 backdrop-blur-md animate-fade-in">
+      <div className="relative w-full max-w-2xl max-h-[92dvh] arcade-surface-elevated border-t-2 sm:border-2 border-cyan-500/40 rounded-t-2xl sm:rounded-2xl shadow-2xl shadow-cyan-500/20 overflow-hidden flex flex-col pb-safe">
         {/* En-tête arcade */}
-        <div className="px-6 py-4 bg-gradient-to-r from-neutral-950 via-neutral-900 to-neutral-950 border-b border-neutral-800 flex items-center justify-between">
+        <div className="px-4 sm:px-6 py-3.5 sm:py-4 bg-gradient-to-r from-neutral-950 via-neutral-900 to-neutral-950 border-b border-white/10 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-3">
             <span className="relative flex h-3 w-3">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>
@@ -284,7 +312,7 @@ export function MatchSyncModal({
         </div>
 
         {/* Corps central : Versus Cards */}
-        <div className="p-6 flex-1 flex flex-col justify-center">
+        <div className="p-4 sm:p-6 flex-1 overflow-y-auto flex flex-col justify-center">
           {phase === 'cancelled' ? (
             <div className="py-10 text-center flex flex-col items-center">
               <AlertTriangle className="w-12 h-12 text-rose-500 mb-3 animate-bounce" />

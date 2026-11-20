@@ -1381,40 +1381,36 @@
             notifyParent('STAGE_STATUS', { status: 'playing', message: 'Émulateur démarré.' });
             startRamTelemetry(msg.gameName || targetFilename, msg.core);
 
-            if (isNetplaySession) {
-              // Séquence Fightcade automatique :
+            if (isNetplaySession && netplayPlayerIndex === 0) {
+              // Séquence Fightcade déterministe (exécutée uniquement par l'Hôte P1) :
               // 1. Insérer 2 Coins pour P1 et 2 Coins pour P2
-              // 2. Déclencher START 1 et START 2 pour lancer immédiatement le mode VERSUS 2 Joueurs sans passer par l'IA solo
+              // 2. Déclencher START 1 et START 2 pour lancer immédiatement le mode VERSUS 2 Joueurs
+              // 3. Exporter le savestate Frame 0 APRÈS le Start pour synchroniser P2 exactement sur l'écran Versus
               setTimeout(() => {
                 try {
                   pulseEmuButton(0, 2, 80); // Coin P1
-                  setTimeout(() => pulseEmuButton(1, 2, 80), 160); // Coin P2
-                  setTimeout(() => pulseEmuButton(0, 2, 80), 320); // 2e Coin P1
-                  setTimeout(() => pulseEmuButton(1, 2, 80), 480); // 2e Coin P2
+                  setTimeout(() => pulseEmuButton(1, 2, 80), 140); // Coin P2
+                  setTimeout(() => pulseEmuButton(0, 2, 80), 280); // 2e Coin P1
+                  setTimeout(() => pulseEmuButton(1, 2, 80), 420); // 2e Coin P2
 
-                  // Auto-Start Versus 2 Joueurs 1.4s après insertion
                   setTimeout(() => {
                     pulseEmuButton(0, 3, 100); // Start 1
                     setTimeout(() => {
                       pulseEmuButton(1, 3, 100); // Start 2 (Challenger !)
                       console.log('[CSW Fightcade Netplay] Auto-Start 2 Joueurs Versus activé (P1 + P2).');
-                    }, 400);
-                  }, 1400);
+                      setTimeout(() => {
+                        try {
+                          const state = window.EJS_emulator?.gameManager?.getState?.();
+                          if (state) {
+                            const bytes = state instanceof Uint8Array ? state : new Uint8Array(state);
+                            notifyParent('STATE_EXPORTED', { stateBase64: bytesToBase64(bytes), slot: 'frame0' });
+                          }
+                        } catch {}
+                      }, 350);
+                    }, 350);
+                  }, 900);
                 } catch {}
-              }, 1800);
-            }
-
-            // La synchronisation des crédits en RAM est déclenchée à la demande par la touche 5 (ou le bouton Sync Crédits (5))
-            if (isNetplaySession && netplayPlayerIndex === 0) {
-              setTimeout(() => {
-                try {
-                  const state = window.EJS_emulator?.gameManager?.getState?.();
-                  if (state) {
-                    const bytes = state instanceof Uint8Array ? state : new Uint8Array(state);
-                    notifyParent('STATE_EXPORTED', { stateBase64: bytesToBase64(bytes), slot: 'frame0' });
-                  }
-                } catch {}
-              }, 1200);
+              }, 1000);
             }
           };
 

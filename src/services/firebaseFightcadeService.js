@@ -90,6 +90,7 @@ class FirebaseFightcadeService {
     this.ws = null;
     this.wsConnected = false;
     this.wsQueue = [];
+    this.wsReconnectDelay = 3500;
     this.incomingChallengeListeners = new Set();
     this.challengeListeners = new Map();
     this.matchSyncListeners = new Map();
@@ -135,13 +136,15 @@ class FirebaseFightcadeService {
   initWebSocket() {
     if (typeof window === 'undefined') return;
     try {
+      const envWs = typeof import.meta !== 'undefined' ? import.meta.env?.VITE_NETPLAY_WS_URL : '';
       const isHttps = window.location.protocol === 'https:';
       const wsProto = isHttps ? 'wss:' : 'ws:';
-      const wsUrl = `${wsProto}//${window.location.host}/ws/netplay`;
+      const wsUrl = envWs ? envWs : `${wsProto}//${window.location.host}/ws/netplay`;
       this.ws = new WebSocket(wsUrl);
 
       this.ws.onopen = () => {
         this.wsConnected = true;
+        this.wsReconnectDelay = 3500;
         this.sendWs({
           type: 'IDENTIFY',
           uid: this.identity?.uid,
@@ -163,14 +166,18 @@ class FirebaseFightcadeService {
 
       this.ws.onclose = () => {
         this.wsConnected = false;
-        setTimeout(() => this.initWebSocket(), 3500);
+        const delay = this.wsReconnectDelay || 3500;
+        this.wsReconnectDelay = Math.min(20000, Math.round(delay * 1.5));
+        setTimeout(() => this.initWebSocket(), delay);
       };
 
       this.ws.onerror = () => {
         this.wsConnected = false;
       };
     } catch {
-      setTimeout(() => this.initWebSocket(), 5000);
+      const delay = this.wsReconnectDelay || 5000;
+      this.wsReconnectDelay = Math.min(20000, Math.round(delay * 1.5));
+      setTimeout(() => this.initWebSocket(), delay);
     }
   }
 
@@ -178,6 +185,9 @@ class FirebaseFightcadeService {
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
       this.ws.send(JSON.stringify(data));
     } else {
+      if (this.wsQueue.length >= 50) {
+        this.wsQueue.shift();
+      }
       this.wsQueue.push(data);
     }
   }
@@ -223,6 +233,21 @@ class FirebaseFightcadeService {
       romReady: Boolean(romReady),
       isReady: Boolean(isReady),
     });
+
+    // Fallback Firestore garanti (si WebSocket VPS absent/coupé)
+    if (challengeId && (romReady || isReady || romPct === 0 || romPct >= 100 || romPct % 25 === 0)) {
+      const myUid = this.identity?.uid;
+      if (myUid) {
+        updateDoc(doc(db, 'fc_challenges', challengeId), {
+          [`syncByUid.${myUid}`]: {
+            romPct: Number(romPct) || 0,
+            romReady: Boolean(romReady),
+            isReady: Boolean(isReady),
+            updatedAtMs: Date.now(),
+          },
+        }).catch(() => {});
+      }
+    }
   }
 
   sendMatchCountdownStart(challengeId, targetUid) {
@@ -231,6 +256,11 @@ class FirebaseFightcadeService {
       challengeId,
       targetUid,
     });
+    if (challengeId) {
+      updateDoc(doc(db, 'fc_challenges', challengeId), {
+        countdownStartedAt: Date.now(),
+      }).catch(() => {});
+    }
   }
 
   sendMatchCancel(challengeId, targetUid) {
@@ -239,6 +269,11 @@ class FirebaseFightcadeService {
       challengeId,
       targetUid,
     });
+    if (challengeId) {
+      updateDoc(doc(db, 'fc_challenges', challengeId), {
+        status: 'cancelled',
+      }).catch(() => {});
+    }
   }
 
   subscribeMatchSync(challengeId, cb) {
@@ -246,12 +281,48 @@ class FirebaseFightcadeService {
       this.matchSyncListeners.set(challengeId, new Set());
     }
     this.matchSyncListeners.get(challengeId).add(cb);
+
+    let countdownTriggered = false;
+    let cancelTriggered = false;
+    const myUid = this.identity?.uid;
+
+    const unsubFs = onSnapshot(
+      doc(db, 'fc_challenges', challengeId),
+      (snap) => {
+        if (!snap.exists()) return;
+        const ch = snap.data();
+        if (ch.syncByUid && typeof ch.syncByUid === 'object') {
+          for (const [uid, st] of Object.entries(ch.syncByUid)) {
+            if (uid !== myUid && st) {
+              cb({
+                type: 'MATCH_SYNC_UPDATE',
+                challengeId,
+                romPct: st.romPct,
+                romReady: st.romReady,
+                isReady: st.isReady,
+              });
+            }
+          }
+        }
+        if (ch.countdownStartedAt && !countdownTriggered) {
+          countdownTriggered = true;
+          cb({ type: 'MATCH_COUNTDOWN_START', challengeId });
+        }
+        if (ch.status === 'cancelled' && !cancelTriggered) {
+          cancelTriggered = true;
+          cb({ type: 'MATCH_CANCELLED', challengeId });
+        }
+      },
+      () => {}
+    );
+
     return () => {
       const set = this.matchSyncListeners.get(challengeId);
       if (set) {
         set.delete(cb);
         if (set.size === 0) this.matchSyncListeners.delete(challengeId);
       }
+      unsubFs?.();
     };
   }
 
@@ -943,6 +1014,28 @@ class FirebaseFightcadeService {
     }).catch(() => {});
 
     updateDoc(doc(db, 'fc_challenges', challengeId), { answer }).catch(() => {});
+  }
+
+  async postRenegotiateOffer(challengeId, offer) {
+    const payload = { sdp: offer?.sdp, type: offer?.type, ts: Date.now() };
+    fetch('/api/fc-challenge', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'renegotiateOffer', id: challengeId, offer: payload }),
+    }).catch(() => {});
+
+    updateDoc(doc(db, 'fc_challenges', challengeId), { renegotiateOffer: payload }).catch(() => {});
+  }
+
+  async postRenegotiateAnswer(challengeId, answer) {
+    const payload = { sdp: answer?.sdp, type: answer?.type, ts: Date.now() };
+    fetch('/api/fc-challenge', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'renegotiateAnswer', id: challengeId, answer: payload }),
+    }).catch(() => {});
+
+    updateDoc(doc(db, 'fc_challenges', challengeId), { renegotiateAnswer: payload }).catch(() => {});
   }
 
   async postIceCandidate(challengeId, role, candidate) {

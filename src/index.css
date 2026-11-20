@@ -27,7 +27,31 @@
 }
 
 .pt-safe { padding-top: env(safe-area-inset-top, 0px); }
+.pt-safe-pwa {
+  padding-top: env(safe-area-inset-top, 0px);
+  box-sizing: border-box;
+}
+@media (display-mode: standalone), (display-mode: fullscreen), (display-mode: minimal-ui) {
+  @media (max-width: 1024px) {
+    .pt-safe-pwa {
+      padding-top: max(env(safe-area-inset-top, 0px), 48px);
+    }
+  }
+}
+html.is-pwa-standalone .pt-safe-pwa {
+  padding-top: max(env(safe-area-inset-top, 0px), 48px);
+}
+@media (min-width: 1025px) and (pointer: fine) {
+  html.is-pwa-standalone .pt-safe-pwa {
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+}
 .pb-safe { padding-bottom: env(safe-area-inset-bottom, 0px); }
+@media (max-width: 1024px) {
+  html.is-pwa-standalone .pb-safe {
+    padding-bottom: max(env(safe-area-inset-bottom, 0px), 10px);
+  }
+}
 .pl-safe { padding-left: env(safe-area-inset-left, 0px); }
 .pr-safe { padding-right: env(safe-area-inset-right, 0px); }
 
@@ -63,6 +87,30 @@
 
 .neon-border-glow-red {
   box-shadow: 0 0 15px rgba(255, 0, 60, 0.3), inset 0 0 15px rgba(255, 0, 60, 0.15);
+}
+
+/* Surfaces Cyber-Arcade Glass (UI/UX Pro Max) */
+.arcade-glass {
+  background: rgba(15, 16, 22, 0.84);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+
+.arcade-surface-elevated {
+  background: linear-gradient(180deg, rgba(24, 26, 36, 0.92) 0%, rgba(14, 15, 21, 0.96) 100%);
+}
+
+.arcade-focus-ring {
+  @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-950;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 /* Custom Scrollbar Arcade */
