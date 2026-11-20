@@ -91,6 +91,114 @@ export function setupNetplayHub(server) {
 
   // Relais temps réel local / LAN pour les salons Fightcade 2 (chat & présence) — garantit le fonctionnement même sans règles Firestore publiées
   const fcLobbies = new Map(); // gameId -> { messages: [], users: Map<uid, userObj> }
+  const fcChallenges = new Map(); // challengeId -> challengeObj
+
+  // Nettoyage automatique des défis expirés
+  setInterval(() => {
+    const now = Date.now();
+    for (const [id, ch] of fcChallenges.entries()) {
+      if (now > (ch.expiresAt || 0) + 60000) {
+        fcChallenges.delete(id);
+      }
+    }
+  }, 10000);
+
+  server.middlewares.use('/api/fc-challenge', (req, res) => {
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    if (req.method === 'OPTIONS') {
+      res.statusCode = 204;
+      return res.end();
+    }
+
+    const url = new URL(req.url, 'http://localhost:3003');
+    const challengeId = url.searchParams.get('id');
+    const toUid = url.searchParams.get('toUid');
+
+    if (req.method === 'GET') {
+      const now = Date.now();
+      if (challengeId) {
+        const ch = fcChallenges.get(challengeId);
+        if (ch) {
+          res.statusCode = 200;
+          return res.end(JSON.stringify({ ok: true, challenge: ch }));
+        }
+        res.statusCode = 404;
+        return res.end(JSON.stringify({ ok: false, error: 'Challenge introuvable' }));
+      }
+
+      if (toUid) {
+        const list = [];
+        for (const ch of fcChallenges.values()) {
+          if (ch.toUid === toUid && ch.status === 'pending' && ch.expiresAt > now) {
+            list.push(ch);
+          }
+        }
+        res.statusCode = 200;
+        return res.end(JSON.stringify({ ok: true, challenges: list }));
+      }
+
+      res.statusCode = 400;
+      return res.end(JSON.stringify({ ok: false, error: 'Paramètre id ou toUid requis' }));
+    }
+
+    if (req.method === 'POST') {
+      let body = '';
+      req.on('data', (chunk) => { body += chunk; });
+      req.on('end', () => {
+        try {
+          const payload = body ? JSON.parse(body) : {};
+          const { action, challenge, id, status, offer, answer, role, candidate } = payload;
+
+          if (action === 'create' && challenge?.challengeId) {
+            fcChallenges.set(challenge.challengeId, {
+              ...challenge,
+              callerCandidates: [],
+              calleeCandidates: [],
+              updatedAtMs: Date.now()
+            });
+            res.statusCode = 200;
+            return res.end(JSON.stringify({ ok: true }));
+          }
+
+          const targetId = id || challenge?.challengeId;
+          const target = fcChallenges.get(targetId);
+          if (!target) {
+            res.statusCode = 404;
+            return res.end(JSON.stringify({ ok: false, error: 'Challenge introuvable' }));
+          }
+
+          if (action === 'respond') {
+            target.status = status;
+            target.updatedAtMs = Date.now();
+          } else if (action === 'postOffer') {
+            target.offer = offer;
+            target.updatedAtMs = Date.now();
+          } else if (action === 'postAnswer') {
+            target.answer = answer;
+            target.updatedAtMs = Date.now();
+          } else if (action === 'addCandidate') {
+            const list = role === 'caller' ? target.callerCandidates : target.calleeCandidates;
+            list.push(candidate);
+            target.updatedAtMs = Date.now();
+          }
+
+          res.statusCode = 200;
+          return res.end(JSON.stringify({ ok: true, challenge: target }));
+        } catch (err) {
+          res.statusCode = 400;
+          return res.end(JSON.stringify({ ok: false, error: err.message }));
+        }
+      });
+      return;
+    }
+
+    res.statusCode = 405;
+    res.end(JSON.stringify({ ok: false }));
+  });
+
   const getFcLobby = (gameId) => {
     const key = String(gameId || 'global-lobby');
     if (!fcLobbies.has(key)) {

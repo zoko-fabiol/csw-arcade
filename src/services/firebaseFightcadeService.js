@@ -438,7 +438,8 @@ class FirebaseFightcadeService {
     const pullRelay = async () => {
       try {
         const res = await fetch(`/api/fc-lobby?gameId=${encodeURIComponent(gameId)}`);
-        if (res.ok) {
+        const ct = res.headers.get('content-type') || '';
+        if (res.ok && ct.includes('json')) {
           const data = await res.json();
           if (Array.isArray(data.users)) {
             relayUsers = data.users;
@@ -509,7 +510,8 @@ class FirebaseFightcadeService {
     const pullRelay = async () => {
       try {
         const res = await fetch(`/api/fc-lobby?gameId=${encodeURIComponent(gameId)}`);
-        if (res.ok) {
+        const ct = res.headers.get('content-type') || '';
+        if (res.ok && ct.includes('json')) {
           const data = await res.json();
           if (Array.isArray(data.messages)) {
             relayMsgs = [...this._readLocalMsgs(gameId), ...data.messages];
@@ -603,8 +605,7 @@ class FirebaseFightcadeService {
     this.identity = getPlayerIdentity();
     const challengeId = `ch_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
     const gameTitle = gameEntry?.title || targetUser?.currentGame?.title || gameId;
-    const ref = doc(db, 'fc_challenges', challengeId);
-    await setDoc(ref, {
+    const challengeObj = {
       challengeId,
       gameId,
       gameTitle,
@@ -618,7 +619,18 @@ class FirebaseFightcadeService {
       createdAt: Date.now(),
       offer: null,
       answer: null,
-    });
+    };
+
+    // 1. Relais serveur VPS
+    fetch('/api/fc-challenge', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'create', challenge: challengeObj }),
+    }).catch(() => {});
+
+    // 2. Synchronisation Firebase Firestore
+    const ref = doc(db, 'fc_challenges', challengeId);
+    setDoc(ref, challengeObj).catch(() => {});
 
     this.sendMessage(
       gameId,
@@ -631,12 +643,45 @@ class FirebaseFightcadeService {
 
   subscribeIncomingChallenges(cb) {
     this.identity = getPlayerIdentity();
+    let firestoreList = [];
+    let relayList = [];
+
+    const emitMerged = () => {
+      const now = Date.now();
+      const map = new Map();
+      [...relayList, ...firestoreList].forEach((c) => {
+        if (c && c.challengeId && c.expiresAt > now && c.status === 'pending') {
+          map.set(c.challengeId, c);
+        }
+      });
+      cb(Array.from(map.values()));
+    };
+
+    const pullRelay = async () => {
+      try {
+        const res = await fetch(`/api/fc-challenge?toUid=${encodeURIComponent(this.identity.uid)}`);
+        const ct = res.headers.get('content-type') || '';
+        if (res.ok && ct.includes('json')) {
+          const data = await res.json();
+          if (Array.isArray(data.challenges)) {
+            relayList = data.challenges;
+            emitMerged();
+          }
+        }
+      } catch {
+        emitMerged();
+      }
+    };
+
+    pullRelay();
+    const pollId = setInterval(pullRelay, 1500);
+
     const q = query(
       collection(db, 'fc_challenges'),
       where('toUid', '==', this.identity.uid),
       where('status', '==', 'pending')
     );
-    return onSnapshot(
+    const unsubFs = onSnapshot(
       q,
       (snap) => {
         const now = Date.now();
@@ -645,47 +690,147 @@ class FirebaseFightcadeService {
           const c = d.data();
           if (c && c.expiresAt > now) list.push(c);
         });
-        cb(list);
+        firestoreList = list;
+        emitMerged();
       },
-      () => cb([])
+      () => emitMerged()
     );
+
+    return () => {
+      clearInterval(pollId);
+      unsubFs?.();
+    };
   }
 
   subscribeChallenge(challengeId, cb) {
-    return onSnapshot(doc(db, 'fc_challenges', challengeId), (snap) => {
-      if (snap.exists()) cb(snap.data());
-    });
+    let lastStatus = null;
+
+    const pullRelay = async () => {
+      try {
+        const res = await fetch(`/api/fc-challenge?id=${encodeURIComponent(challengeId)}`);
+        const ct = res.headers.get('content-type') || '';
+        if (res.ok && ct.includes('json')) {
+          const data = await res.json();
+          if (data.challenge) {
+            lastStatus = data.challenge.status;
+            cb(data.challenge);
+          }
+        }
+      } catch {}
+    };
+
+    pullRelay();
+    const pollId = setInterval(pullRelay, 1000);
+
+    const unsubFs = onSnapshot(
+      doc(db, 'fc_challenges', challengeId),
+      (snap) => {
+        if (snap.exists()) {
+          cb(snap.data());
+        }
+      },
+      () => {}
+    );
+
+    return () => {
+      clearInterval(pollId);
+      unsubFs?.();
+    };
   }
 
   async respondChallenge(challengeId, accept = true) {
-    await updateDoc(doc(db, 'fc_challenges', challengeId), {
-      status: accept ? 'accepted' : 'declined',
-    });
+    const status = accept ? 'accepted' : 'declined';
+    fetch('/api/fc-challenge', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'respond', id: challengeId, status }),
+    }).catch(() => {});
+
+    updateDoc(doc(db, 'fc_challenges', challengeId), { status }).catch(() => {});
   }
 
   async postOffer(challengeId, offer) {
-    await updateDoc(doc(db, 'fc_challenges', challengeId), { offer });
+    fetch('/api/fc-challenge', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'postOffer', id: challengeId, offer }),
+    }).catch(() => {});
+
+    updateDoc(doc(db, 'fc_challenges', challengeId), { offer }).catch(() => {});
   }
 
   async postAnswer(challengeId, answer) {
-    await updateDoc(doc(db, 'fc_challenges', challengeId), { answer });
+    fetch('/api/fc-challenge', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'postAnswer', id: challengeId, answer }),
+    }).catch(() => {});
+
+    updateDoc(doc(db, 'fc_challenges', challengeId), { answer }).catch(() => {});
   }
 
   async postIceCandidate(challengeId, role, candidate) {
     if (!candidate) return;
+    const candJson = candidate.toJSON ? candidate.toJSON() : candidate;
+
+    fetch('/api/fc-challenge', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'addCandidate', id: challengeId, role, candidate: candJson }),
+    }).catch(() => {});
+
     const subCol = role === 'caller' ? 'callerCandidates' : 'calleeCandidates';
-    await addDoc(collection(db, 'fc_challenges', challengeId, subCol), candidate.toJSON());
+    addDoc(collection(db, 'fc_challenges', challengeId, subCol), candJson).catch(() => {});
   }
 
   subscribeIceCandidates(challengeId, remoteRole, cb) {
-    const subCol = remoteRole === 'caller' ? 'callerCandidates' : 'calleeCandidates';
-    return onSnapshot(collection(db, 'fc_challenges', challengeId, subCol), (snap) => {
-      snap.docChanges().forEach((change) => {
-        if (change.type === 'added') {
-          cb(change.doc.data());
+    const seenCandidates = new Set();
+
+    const pullRelay = async () => {
+      try {
+        const res = await fetch(`/api/fc-challenge?id=${encodeURIComponent(challengeId)}`);
+        const ct = res.headers.get('content-type') || '';
+        if (res.ok && ct.includes('json')) {
+          const data = await res.json();
+          const list = remoteRole === 'caller' ? data.challenge?.callerCandidates : data.challenge?.calleeCandidates;
+          if (Array.isArray(list)) {
+            list.forEach((c) => {
+              const key = JSON.stringify(c);
+              if (!seenCandidates.has(key)) {
+                seenCandidates.add(key);
+                cb(c);
+              }
+            });
+          }
         }
-      });
-    });
+      } catch {}
+    };
+
+    pullRelay();
+    const pollId = setInterval(pullRelay, 800);
+
+    const subCol = remoteRole === 'caller' ? 'callerCandidates' : 'calleeCandidates';
+    const unsubFs = onSnapshot(
+      collection(db, 'fc_challenges', challengeId, subCol),
+      (snap) => {
+        snap.docChanges().forEach((change) => {
+          if (change.type === 'added') {
+            const data = change.doc.data();
+            const key = JSON.stringify(data);
+            if (!seenCandidates.has(key)) {
+              seenCandidates.add(key);
+              cb(data);
+            }
+          }
+        });
+      },
+      () => {}
+    );
+
+    return () => {
+      clearInterval(pollId);
+      unsubFs?.();
+    };
   }
 }
 
