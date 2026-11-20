@@ -204,7 +204,7 @@ export default function App() {
         gameEntry
       );
     } catch {
-      if (refundCoinOnFail) addCoins(1);
+      if (refundCoinOnFail) addCoins(isNetplay && isHost ? 2 : 1);
       setBootNotice(`Téléchargement indisponible pour « ${gameEntry.title} » (Coin remboursé). Réessayez dans un instant.`);
       setTimeout(() => setBootNotice(''), 4200);
     }
@@ -248,12 +248,13 @@ export default function App() {
     }
   };
 
-  const requireAndConsumeCoin = () => {
-    if (!hasCoins(1)) {
+  // Consomme des Coins (1 en Solo, 2 pour l'hôte en match Multijoueur qui offre la partie à son invité)
+  const requireAndConsumeCoin = (amount = 1) => {
+    if (!hasCoins(amount)) {
       setNoCoinsModalOpen(true);
       return false;
     }
-    const res = consumeCoin(1);
+    const res = consumeCoin(amount);
     if (!res.ok) {
       setNoCoinsModalOpen(true);
       return false;
@@ -329,7 +330,8 @@ export default function App() {
   };
 
   const handleChallengePlayer = async (channel, targetUser) => {
-    if (!hasCoins(1)) {
+    // Règle CSW-Arcade : L'hôte paie pour les deux joueurs (2 Coins requis chez l'hôte, 0 pour l'invité)
+    if (!hasCoins(2)) {
       setNoCoinsModalOpen(true);
       return;
     }
@@ -337,7 +339,8 @@ export default function App() {
     const unsub = firebaseFightcadeService.subscribeChallenge(challengeId, (ch) => {
       if (ch.status === 'accepted') {
         unsub();
-        if (!requireAndConsumeCoin()) return;
+        // Débiter exactement 2 Coins chez l'hôte pour financer les deux slots du match multijoueur
+        if (!requireAndConsumeCoin(2)) return;
         startRollbackP2PMatch({ challengeId, isHost: true, gameEntry: channel.entry });
       }
     });
@@ -346,7 +349,7 @@ export default function App() {
   const handleRespondChallenge = async (accept) => {
     if (!incomingChallenge) return;
     const ch = incomingChallenge;
-    if (accept && !requireAndConsumeCoin()) return;
+    // L'invité NE PAIE RIEN : 0 Coin débité chez l'invité (l'hôte a payé pour les deux)
     setIncomingChallenge(null);
     await firebaseFightcadeService.respondChallenge(ch.challengeId, accept);
     if (accept) {
@@ -806,9 +809,9 @@ export default function App() {
             <div className="flex items-center gap-3">
               <Coins className="w-7 h-7 text-amber-400 shrink-0" />
               <div>
-                <h3 className="text-sm font-black text-white">Crédits insuffisants (0 Coin)</h3>
+                <h3 className="text-sm font-black text-white">Crédits insuffisants</h3>
                 <p className="text-xs text-neutral-300 mt-1">
-                  Achetez des coins via SasPay pour démarrer une partie ou lancer un défi.
+                  1 Coin est requis en Solo, et 2 Coins sont requis pour lancer un défi Multijoueur (vous financez les deux slots pour jouer à deux).
                 </p>
               </div>
             </div>
@@ -843,7 +846,7 @@ export default function App() {
             <span>Défi Fightcade 2 reçu !</span>
           </div>
           <p className="text-xs text-neutral-200">
-            <strong>{incomingChallenge.fromName}</strong> vous défie sur <strong>{incomingChallenge.gameTitle}</strong> (1 Coin requis).
+            <strong>{incomingChallenge.fromName}</strong> vous défie sur <strong>{incomingChallenge.gameTitle}</strong> (Match offert par l'hôte · 0 Coin requis).
           </p>
           <div className="flex gap-2">
             <button
@@ -851,7 +854,7 @@ export default function App() {
               onClick={() => handleRespondChallenge(true)}
               className="flex-1 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-black"
             >
-              Accepter (1 Coin)
+              Accepter (Offert)
             </button>
             <button
               type="button"

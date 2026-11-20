@@ -673,6 +673,7 @@ export function FightcadeLobbyView({
                               handleChallenge(u, u.currentGame || userActiveGames[0] || null);
                             }
                           }}
+                          title="Lancer le défi (2 Coins débités chez vous pour financer les deux slots · Gratuit pour l'invité)"
                           className="px-2.5 py-1.5 rounded-lg bg-cyan-500 hover:bg-cyan-400 disabled:opacity-50 text-black text-[11px] font-bold flex items-center gap-1 shrink-0"
                         >
                           <Swords className="w-3.5 h-3.5" />
