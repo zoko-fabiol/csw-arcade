@@ -33,6 +33,7 @@ const SASPAY_COIN_PACKS = {
 export function setupNetplayHub(server) {
   const rooms = new Map(); // roomCode -> Room
   const clientRooms = new Map(); // ws -> { roomCode, playerIndex, role }
+  const connectedUsers = new Map(); // uid -> Set<WebSocket>
 
   // Génération d'un code court de salon (ex: ARC-72 ou 4 caractères simples)
   function generateRoomCode() {
@@ -835,6 +836,12 @@ export function setupNetplayHub(server) {
   }
 
   function handleClientDisconnect(ws) {
+    if (ws.uid && connectedUsers.has(ws.uid)) {
+      const set = connectedUsers.get(ws.uid);
+      set.delete(ws);
+      if (set.size === 0) connectedUsers.delete(ws.uid);
+    }
+
     const info = clientRooms.get(ws);
     if (!info) return;
     clientRooms.delete(ws);
@@ -875,6 +882,109 @@ export function setupNetplayHub(server) {
         const data = JSON.parse(message.toString());
 
         switch(data.type) {
+          case 'IDENTIFY': {
+            const { uid, name } = data;
+            if (uid) {
+              ws.uid = uid;
+              ws.userName = name;
+              if (!connectedUsers.has(uid)) connectedUsers.set(uid, new Set());
+              connectedUsers.get(uid).add(ws);
+              ws.send(JSON.stringify({ type: 'IDENTIFIED', uid, ok: true }));
+            }
+            break;
+          }
+
+          case 'CHALLENGE_INVITE': {
+            const { challenge } = data;
+            if (challenge && challenge.challengeId) {
+              fcChallenges.set(challenge.challengeId, challenge);
+              const targetUid = challenge.toUid;
+              const sockets = connectedUsers.get(targetUid);
+              if (sockets) {
+                const msg = JSON.stringify({ type: 'INCOMING_CHALLENGE', challenge });
+                for (const s of sockets) {
+                  if (s.readyState === WebSocket.OPEN) s.send(msg);
+                }
+              }
+            }
+            break;
+          }
+
+          case 'CHALLENGE_REPLY': {
+            const { challengeId, status, toUid } = data;
+            const ch = fcChallenges.get(challengeId);
+            if (ch) {
+              ch.status = status;
+              ch.updatedAtMs = Date.now();
+            }
+            const sockets = connectedUsers.get(toUid);
+            if (sockets) {
+              const msg = JSON.stringify({ type: 'CHALLENGE_STATUS_CHANGED', challengeId, status, challenge: ch });
+              for (const s of sockets) {
+                if (s.readyState === WebSocket.OPEN) s.send(msg);
+              }
+            }
+            break;
+          }
+
+          case 'MATCH_SYNC_UPDATE': {
+            const { challengeId, targetUid, romPct, romReady, isReady } = data;
+            const sockets = connectedUsers.get(targetUid);
+            if (sockets) {
+              const msg = JSON.stringify({
+                type: 'MATCH_SYNC_UPDATE',
+                challengeId,
+                romPct,
+                romReady: Boolean(romReady),
+                isReady: Boolean(isReady),
+              });
+              for (const s of sockets) {
+                if (s.readyState === WebSocket.OPEN) s.send(msg);
+              }
+            }
+            break;
+          }
+
+          case 'MATCH_COUNTDOWN_START': {
+            const { challengeId, targetUid } = data;
+            const sockets = connectedUsers.get(targetUid);
+            if (sockets) {
+              const msg = JSON.stringify({ type: 'MATCH_COUNTDOWN_START', challengeId });
+              for (const s of sockets) {
+                if (s.readyState === WebSocket.OPEN) s.send(msg);
+              }
+            }
+            break;
+          }
+
+          case 'MATCH_CANCEL': {
+            const { challengeId, targetUid } = data;
+            if (challengeId && fcChallenges.has(challengeId)) {
+              const ch = fcChallenges.get(challengeId);
+              ch.status = 'declined';
+            }
+            const sockets = connectedUsers.get(targetUid);
+            if (sockets) {
+              const msg = JSON.stringify({ type: 'MATCH_CANCELLED', challengeId });
+              for (const s of sockets) {
+                if (s.readyState === WebSocket.OPEN) s.send(msg);
+              }
+            }
+            break;
+          }
+
+          case 'RELAY_INPUT': {
+            const { targetUid, buttonIdx, pressed, frame } = data;
+            const sockets = connectedUsers.get(targetUid);
+            if (sockets) {
+              const msg = JSON.stringify({ type: 'REMOTE_BTN_RELAY', buttonIdx, pressed, frame });
+              for (const s of sockets) {
+                if (s.readyState === WebSocket.OPEN) s.send(msg);
+              }
+            }
+            break;
+          }
+
           case 'CREATE_ROOM': {
             const { gameId, gameTitle, maxPlayers = 2, hostName = 'Hôte' } = data;
 

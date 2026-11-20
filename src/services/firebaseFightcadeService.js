@@ -87,12 +87,21 @@ class FirebaseFightcadeService {
     this.customStatus = 'available'; // 'available' | 'afk'
     this.heartbeats = new Map();
     this.channelListeners = new Set();
+    this.ws = null;
+    this.wsConnected = false;
+    this.wsQueue = [];
+    this.incomingChallengeListeners = new Set();
+    this.challengeListeners = new Map();
+    this.matchSyncListeners = new Map();
+    this.relayInputListener = null;
 
     // Toujours maintenir la présence dans le salon global + les salons actifs
     this.startHeartbeat(GLOBAL_CHANNEL_ID);
     this.activeChannels.forEach((ch) => {
       this.startHeartbeat(ch.gameId);
     });
+
+    this.initWebSocket();
 
     subscribeAuthProfile((profile) => {
       const prevUid = this.identity?.uid;
@@ -121,6 +130,141 @@ class FirebaseFightcadeService {
         });
       });
     }
+  }
+
+  initWebSocket() {
+    if (typeof window === 'undefined') return;
+    try {
+      const isHttps = window.location.protocol === 'https:';
+      const wsProto = isHttps ? 'wss:' : 'ws:';
+      const wsUrl = `${wsProto}//${window.location.host}/ws/netplay`;
+      this.ws = new WebSocket(wsUrl);
+
+      this.ws.onopen = () => {
+        this.wsConnected = true;
+        this.sendWs({
+          type: 'IDENTIFY',
+          uid: this.identity?.uid,
+          name: this.identity?.name,
+          region: this.identity?.region || 'FR',
+        });
+        while (this.wsQueue.length > 0) {
+          const item = this.wsQueue.shift();
+          try { this.ws.send(JSON.stringify(item)); } catch {}
+        }
+      };
+
+      this.ws.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          this.handleWsMessage(data);
+        } catch {}
+      };
+
+      this.ws.onclose = () => {
+        this.wsConnected = false;
+        setTimeout(() => this.initWebSocket(), 3500);
+      };
+
+      this.ws.onerror = () => {
+        this.wsConnected = false;
+      };
+    } catch {
+      setTimeout(() => this.initWebSocket(), 5000);
+    }
+  }
+
+  sendWs(data) {
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      this.ws.send(JSON.stringify(data));
+    } else {
+      this.wsQueue.push(data);
+    }
+  }
+
+  handleWsMessage(data) {
+    if (!data || !data.type) return;
+
+    if (data.type === 'INCOMING_CHALLENGE' && data.challenge) {
+      this.incomingChallengeListeners.forEach((cb) => {
+        try { cb([data.challenge]); } catch {}
+      });
+    } else if (data.type === 'CHALLENGE_STATUS_CHANGED') {
+      const listeners = this.challengeListeners.get(data.challengeId);
+      if (listeners) {
+        listeners.forEach((cb) => {
+          try { cb(data.challenge || { status: data.status, challengeId: data.challengeId }); } catch {}
+        });
+      }
+    } else if (
+      data.type === 'MATCH_SYNC_UPDATE' ||
+      data.type === 'MATCH_COUNTDOWN_START' ||
+      data.type === 'MATCH_CANCELLED'
+    ) {
+      const listeners = this.matchSyncListeners.get(data.challengeId);
+      if (listeners) {
+        listeners.forEach((cb) => {
+          try { cb(data); } catch {}
+        });
+      }
+    } else if (data.type === 'REMOTE_BTN_RELAY') {
+      this.relayInputListener?.(data);
+    }
+  }
+
+  sendMatchSyncUpdate(challengeId, targetUid, { romPct = 0, romReady = false, isReady = false } = {}) {
+    this.sendWs({
+      type: 'MATCH_SYNC_UPDATE',
+      challengeId,
+      targetUid,
+      romPct,
+      romReady: Boolean(romReady),
+      isReady: Boolean(isReady),
+    });
+  }
+
+  sendMatchCountdownStart(challengeId, targetUid) {
+    this.sendWs({
+      type: 'MATCH_COUNTDOWN_START',
+      challengeId,
+      targetUid,
+    });
+  }
+
+  sendMatchCancel(challengeId, targetUid) {
+    this.sendWs({
+      type: 'MATCH_CANCEL',
+      challengeId,
+      targetUid,
+    });
+  }
+
+  subscribeMatchSync(challengeId, cb) {
+    if (!this.matchSyncListeners.has(challengeId)) {
+      this.matchSyncListeners.set(challengeId, new Set());
+    }
+    this.matchSyncListeners.get(challengeId).add(cb);
+    return () => {
+      const set = this.matchSyncListeners.get(challengeId);
+      if (set) {
+        set.delete(cb);
+        if (set.size === 0) this.matchSyncListeners.delete(challengeId);
+      }
+    };
+  }
+
+  sendRelayInput(targetUid, { buttonIdx, pressed, frame = 0 } = {}) {
+    this.sendWs({
+      type: 'RELAY_INPUT',
+      targetUid,
+      buttonIdx,
+      pressed,
+      frame,
+    });
+  }
+
+  onRelayInput(cb) {
+    this.relayInputListener = cb;
   }
 
   loadSavedChannels() {
@@ -629,12 +773,13 @@ class FirebaseFightcadeService {
       answer: null,
     };
 
-    // 1. Relais serveur VPS
+    // 1. Relais serveur VPS (HTTP + WebSocket instantané)
     fetch('/api/fc-challenge', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'create', challenge: challengeObj }),
     }).catch(() => {});
+    this.sendWs({ type: 'CHALLENGE_INVITE', challenge: challengeObj });
 
     // 2. Synchronisation Firebase Firestore
     const ref = doc(db, 'fc_challenges', challengeId);
@@ -653,6 +798,7 @@ class FirebaseFightcadeService {
     this.identity = getPlayerIdentity();
     let firestoreList = [];
     let relayList = [];
+    this.incomingChallengeListeners.add(cb);
 
     const emitMerged = () => {
       const now = Date.now();
@@ -705,6 +851,7 @@ class FirebaseFightcadeService {
     );
 
     return () => {
+      this.incomingChallengeListeners.delete(cb);
       clearInterval(pollId);
       unsubFs?.();
     };
@@ -712,6 +859,10 @@ class FirebaseFightcadeService {
 
   subscribeChallenge(challengeId, cb) {
     let lastStatus = null;
+    if (!this.challengeListeners.has(challengeId)) {
+      this.challengeListeners.set(challengeId, new Set());
+    }
+    this.challengeListeners.get(challengeId).add(cb);
 
     const pullRelay = async () => {
       try {
@@ -741,18 +892,27 @@ class FirebaseFightcadeService {
     );
 
     return () => {
+      const set = this.challengeListeners.get(challengeId);
+      if (set) {
+        set.delete(cb);
+        if (set.size === 0) this.challengeListeners.delete(challengeId);
+      }
       clearInterval(pollId);
       unsubFs?.();
     };
   }
 
-  async respondChallenge(challengeId, accept = true) {
+  async respondChallenge(challengeId, accept = true, toUid = null) {
     const status = accept ? 'accepted' : 'declined';
     fetch('/api/fc-challenge', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'respond', id: challengeId, status }),
     }).catch(() => {});
+
+    if (toUid) {
+      this.sendWs({ type: 'CHALLENGE_REPLY', challengeId, status, toUid });
+    }
 
     updateDoc(doc(db, 'fc_challenges', challengeId), { status }).catch(() => {});
   }
@@ -836,6 +996,7 @@ class FirebaseFightcadeService {
     );
 
     return () => {
+      this.incomingChallengeListeners.delete(cb);
       clearInterval(pollId);
       unsubFs?.();
     };

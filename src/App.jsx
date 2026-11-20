@@ -13,6 +13,7 @@ import { UnifiedStageModal } from './components/shell/UnifiedStageModal';
 import { FightcadeChannelsDock } from './components/shell/FightcadeChannelsDock';
 import { FightcadeLobbyView } from './components/shell/FightcadeLobbyView';
 import { AuthModal } from './components/auth/AuthModal';
+import { MatchSyncModal } from './components/netplay/MatchSyncModal';
 import { SasPayModal } from './components/wallet/SasPayModal';
 import { getPendingSasPayPayment, savePendingSasPayPayment, verifySasPayPayment } from './services/saspayService';
 import { addCoins, consumeCoin, fillMaxCoins, hasCoins, setWalletCoins, subscribeWallet } from './services/walletService';
@@ -95,6 +96,7 @@ export default function App() {
   const [selectedChannelId, setSelectedChannelId] = useState(null);
   const [limitModalGame, setLimitModalGame] = useState(null);
   const [incomingChallenge, setIncomingChallenge] = useState(null);
+  const [activeMatchSync, setActiveMatchSync] = useState(null);
   const [p2pStats, setP2pStats] = useState(null);
   const [bootNotice, setBootNotice] = useState('');
   const [remoteActiveSession, setRemoteActiveSession] = useState(null);
@@ -166,6 +168,7 @@ export default function App() {
       refundCoinOnFail = true,
       opponentName = null,
       initialStateBase64 = null,
+      preloadedBlob = null,
     } = {}
   ) => {
     if (!gameEntry) return;
@@ -175,19 +178,21 @@ export default function App() {
       ? []
       : ['.nes', '.sfc', '.smc', '.gba', '.gb', '.gbc', '.n64', '.z64', '.v64', '.md', '.gen', '.bin', '.sms', '.gg', '.pce', '.nds', '.chd', '.pbp', '.iso', '.jar'];
 
-    setBootNotice(`Téléchargement & vérification de « ${gameEntry.title} »…`);
+    setBootNotice(`Lancement de « ${gameEntry.title} »…`);
     try {
-      const fileBlob = await downloadAndCacheRom(gameEntry, {
-        mode: core,
-        core,
-        extractExtensions: extractExts,
-        onProgress: ({ received, total }) => {
-          if (total > 0) {
-            const pct = Math.min(100, Math.round((received / total) * 100));
-            setBootNotice(`Chargement « ${gameEntry.title} » : ${pct}% (${formatBytes(received)})`);
-          }
-        },
-      });
+      const fileBlob =
+        preloadedBlob ||
+        (await downloadAndCacheRom(gameEntry, {
+          mode: core,
+          core,
+          extractExtensions: extractExts,
+          onProgress: ({ received, total }) => {
+            if (total > 0) {
+              const pct = Math.min(100, Math.round((received / total) * 100));
+              setBootNotice(`Chargement « ${gameEntry.title} » : ${pct}% (${formatBytes(received)})`);
+            }
+          },
+        }));
       refreshPlatformCache();
       setBootNotice('');
       handleLaunchStage(
@@ -290,7 +295,13 @@ export default function App() {
     if (selectedChannelId === gameId) setSelectedChannelId(null);
   };
 
-  const startRollbackP2PMatch = async ({ challengeId, isHost, gameEntry }) => {
+  const startRollbackP2PMatch = async ({
+    challengeId,
+    isHost,
+    gameEntry,
+    preloadedBlob = null,
+    opponentName = null,
+  }) => {
     p2pEngineRef.current?.destroy();
     const engine = new RollbackP2PEngine({
       isHost,
@@ -300,6 +311,22 @@ export default function App() {
       },
       onStats: (st) => setP2pStats(st),
     });
+
+    // Secours WebSocket VPS en cas de filtrage NAT / Box
+    engine.onRelayButtonFallback = ({ buttonIdx, pressed, frame }) => {
+      const targetUid = isHost ? activeMatchSync?.challenge?.toUid : activeMatchSync?.challenge?.fromUid;
+      if (targetUid) {
+        firebaseFightcadeService.sendRelayInput(targetUid, { buttonIdx, pressed, frame });
+      }
+    };
+    firebaseFightcadeService.onRelayInput((data) => {
+      engine.onRemoteButton?.({
+        buttonIdx: data.buttonIdx,
+        pressed: data.pressed,
+        frame: data.frame,
+      });
+    });
+
     p2pEngineRef.current = engine;
 
     if (isHost) {
@@ -330,25 +357,55 @@ export default function App() {
         isNetplay: true,
         isHost,
         playerIndex: isHost ? 0 : 1,
-        badgeSuffix: isHost ? 'P1 HOST · ROLLBACK P2P' : 'P2 GUEST · ROLLBACK P2P',
+        badgeSuffix: isHost ? 'P1 HOST · NETPLAY 2P' : 'P2 GUEST · NETPLAY 2P',
+        preloadedBlob,
+        opponentName,
       });
     }
   };
 
+  const handleLaunchMatchFromSync = async ({
+    gameEntry,
+    fileBlob,
+    isHost,
+    playerIndex,
+    challengeId,
+    opponentName,
+  }) => {
+    setActiveMatchSync(null);
+    if (isHost) {
+      if (!requireAndConsumeCoin(2)) return;
+    }
+    await startRollbackP2PMatch({
+      challengeId,
+      isHost,
+      gameEntry,
+      preloadedBlob: fileBlob,
+      opponentName,
+    });
+  };
+
   const handleChallengePlayer = async (channel, targetUser) => {
-    // Règle CSW-Arcade : L'hôte paie pour les deux joueurs (2 Coins requis chez l'hôte, 0 pour l'invité)
+    // Règle CSW-Arcade : L'hôte doit disposer de 2 Coins pour inviter
     if (!hasCoins(2)) {
       setNoCoinsModalOpen(true);
       return;
     }
     const challengeId = await firebaseFightcadeService.sendChallenge(channel.gameId, targetUser, channel.entry);
-    const unsub = firebaseFightcadeService.subscribeChallenge(challengeId, (ch) => {
-      if (ch.status === 'accepted') {
-        unsub();
-        // Débiter exactement 2 Coins chez l'hôte pour financer les deux slots du match multijoueur
-        if (!requireAndConsumeCoin(2)) return;
-        startRollbackP2PMatch({ challengeId, isHost: true, gameEntry: channel.entry });
-      }
+    setActiveMatchSync({
+      challengeId,
+      challenge: {
+        challengeId,
+        gameId: channel.gameId,
+        gameTitle: channel.title,
+        gameEntry: channel.entry,
+        fromUid: userProfileRef.current?.uid,
+        fromName: userProfileRef.current?.displayName || userProfileRef.current?.name || 'Hôte',
+        toUid: targetUser.uid,
+        toName: targetUser.name,
+        status: 'pending',
+      },
+      isHost: true,
     });
   };
 
@@ -357,13 +414,17 @@ export default function App() {
     const ch = incomingChallenge;
     // L'invité NE PAIE RIEN : 0 Coin débité chez l'invité (l'hôte a payé pour les deux)
     setIncomingChallenge(null);
-    await firebaseFightcadeService.respondChallenge(ch.challengeId, accept);
+    await firebaseFightcadeService.respondChallenge(ch.challengeId, accept, ch.fromUid);
     if (accept) {
       const channel = activeChannels.find((c) => c.gameId === ch.gameId);
-      await startRollbackP2PMatch({
+      const resolvedGameEntry = ch.gameEntry || channel?.entry || { id: ch.gameId, title: ch.gameTitle };
+      setActiveMatchSync({
         challengeId: ch.challengeId,
+        challenge: {
+          ...ch,
+          gameEntry: resolvedGameEntry,
+        },
         isHost: false,
-        gameEntry: ch.gameEntry || channel?.entry || { id: ch.gameId, title: ch.gameTitle },
       });
     }
   };
@@ -810,6 +871,16 @@ export default function App() {
         onClose={() => setIsAuthOpen(false)}
         userProfile={userProfile}
         activeChannels={activeChannels}
+      />
+
+      {/* Sas de Synchronisation Multijoueur (Match Room) */}
+      <MatchSyncModal
+        isOpen={Boolean(activeMatchSync)}
+        challenge={activeMatchSync?.challenge}
+        isHost={activeMatchSync?.isHost}
+        userProfile={userProfile}
+        onLaunchMatch={handleLaunchMatchFromSync}
+        onCancel={() => setActiveMatchSync(null)}
       />
 
       {/* Boutique Paiement SasPay */}

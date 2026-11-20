@@ -264,7 +264,18 @@ export async function downloadAndCacheRom(entry, { mode = 'retro', core = 'nes',
     return new File([cached.data], cached.filename || entry.filename, { type: 'application/octet-stream' });
   }
 
-  const urls = Array.isArray(entry.urls) ? entry.urls : [];
+  let urls = Array.isArray(entry.urls) ? entry.urls.filter(Boolean) : [];
+  if (urls.length === 0 && (entry.filename || entry.id)) {
+    const rawFn = entry.filename || `${String(entry.id).replace(/^arc-neo-/, '')}.zip`;
+    const cleanFn = rawFn.endsWith('.zip') || rawFn.includes('.') ? rawFn : `${rawFn}.zip`;
+    const encoded = encodeURIComponent(cleanFn);
+    urls = [
+      `/api/rom-proxy?file=${encoded}`,
+      `https://archive.org/cors/neo-geo-mvs-romset/${encoded}`,
+      `/api/rom-proxy?url=${encodeURIComponent(`https://archive.org/download/neo-geo-mvs-romset/${encoded}`)}`,
+      `https://archive.org/download/neo-geo-mvs-romset/${encoded}`,
+    ];
+  }
   if (urls.length === 0) {
     markRomAsDead(entry.id);
     const err = new Error('ROM indisponible (aucune source)');

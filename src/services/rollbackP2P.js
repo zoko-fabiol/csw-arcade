@@ -216,6 +216,7 @@ export class RollbackP2PEngine {
 
   sendButtonEvent(buttonIdx, pressed) {
     this.currentFrame += 1;
+    let sentP2P = false;
     if (this.udpChannel?.readyState === 'open') {
       try {
         this.udpChannel.send(
@@ -226,9 +227,20 @@ export class RollbackP2PEngine {
             f: this.currentFrame + this.inputDelay,
           })
         );
+        sentP2P = true;
       } catch {
         /* noop */
       }
+    }
+    // Secours WebSocket VPS garanti : si le canal UDP direct WebRTC n'est pas prêt ou bloqué par le NAT
+    if (!sentP2P && this.onRelayButtonFallback) {
+      try {
+        this.onRelayButtonFallback({
+          buttonIdx: Number(buttonIdx),
+          pressed: Boolean(pressed),
+          frame: this.currentFrame + this.inputDelay,
+        });
+      } catch {}
     }
   }
 
