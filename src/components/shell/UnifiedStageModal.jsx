@@ -49,6 +49,9 @@ export function UnifiedStageModal({
   const [quickMenuOpen, setQuickMenuOpen] = useState(false);
   const [pauseMenuOpen, setPauseMenuOpen] = useState(false);
   const [scorePanelOpen, setScorePanelOpen] = useState(false);
+  const [fsBarVisible, setFsBarVisible] = useState(false);
+  const fsHideTimerRef = useRef(null);
+  const fsTouchStartYRef = useRef(null);
   const [liveRamTelemetry, setLiveRamTelemetry] = useState({ score: 0, lives: null, mode: 'heuristic' });
   const [ramToast, setRamToast] = useState(null); // { tone: 'loss' | 'record', text: string }
   const [gameLeaderboard, setGameLeaderboard] = useState([]);
@@ -113,10 +116,34 @@ export function UnifiedStageModal({
   }, [session?.gameId, session?.title]);
 
   useEffect(() => {
-    const onFs = () => setIsFullscreen(Boolean(document.fullscreenElement));
+    const onFs = () => {
+      const fs = Boolean(document.fullscreenElement);
+      setIsFullscreen(fs);
+      setFsBarVisible(false);
+    };
     document.addEventListener('fullscreenchange', onFs);
-    return () => document.removeEventListener('fullscreenchange', onFs);
+    return () => {
+      document.removeEventListener('fullscreenchange', onFs);
+      if (fsHideTimerRef.current) clearTimeout(fsHideTimerRef.current);
+    };
   }, []);
+
+  const revealFsBar = (autoHideDelayMs = 3200) => {
+    setFsBarVisible(true);
+    if (fsHideTimerRef.current) clearTimeout(fsHideTimerRef.current);
+    if (autoHideDelayMs > 0) {
+      fsHideTimerRef.current = setTimeout(() => {
+        setFsBarVisible(false);
+      }, autoHideDelayMs);
+    }
+  };
+
+  const scheduleHideFsBar = (delayMs = 1100) => {
+    if (fsHideTimerRef.current) clearTimeout(fsHideTimerRef.current);
+    fsHideTimerRef.current = setTimeout(() => {
+      setFsBarVisible(false);
+    }, delayMs);
+  };
 
   useEffect(() => {
     const isTypingTarget = (el) => {
@@ -443,14 +470,13 @@ export function UnifiedStageModal({
 
   const sendButton = (button) => {
     if (button === 'coin') {
-      const next = addCoins(1);
-      setCoinLocked(false);
       if (iframeRef.current?.contentWindow) {
         iframeRef.current.focus();
         iframeRef.current.contentWindow.postMessage(
-          { type: 'UPDATE_COINS', coins: next, locked: false, resume: true },
+          { type: 'UPDATE_COINS', coins, locked: coins <= 0, resume: coins > 0 },
           window.location.origin
         );
+        iframeRef.current.contentWindow.postMessage({ type: 'FORCE_SYNC_CREDITS' }, window.location.origin);
       }
       return;
     }
@@ -503,6 +529,8 @@ export function UnifiedStageModal({
     setTimeout(() => onClose?.(), 180);
   };
 
+  const showFsBar = !isFullscreen || fsBarVisible || pauseMenuOpen || quickMenuOpen || scorePanelOpen;
+
   return (
     <div
       ref={stageRef}
@@ -510,7 +538,61 @@ export function UnifiedStageModal({
       role="dialog"
       aria-modal="true"
     >
-      <div className="flex items-center justify-between gap-1.5 md:gap-2 px-2 md:px-3 py-1.5 md:py-2 bg-neutral-900/95 border-b border-neutral-800 shrink-0">
+      {/* Zone sensible en haut de l'écran en mode Plein Écran (curseur en haut sur PC ou swipe vers le bas sur mobile) */}
+      {isFullscreen && !showFsBar && (
+        <div
+          onMouseEnter={() => revealFsBar(0)}
+          onMouseMove={() => revealFsBar(0)}
+          onTouchStart={(e) => {
+            fsTouchStartYRef.current = e.touches?.[0]?.clientY ?? null;
+          }}
+          onTouchMove={(e) => {
+            const y0 = fsTouchStartYRef.current;
+            const y1 = e.touches?.[0]?.clientY;
+            if (typeof y0 === 'number' && typeof y1 === 'number' && y1 - y0 > 12) {
+              fsTouchStartYRef.current = null;
+              revealFsBar(4000);
+            }
+          }}
+          onTouchEnd={() => {
+            fsTouchStartYRef.current = null;
+          }}
+          className="fixed top-0 inset-x-0 h-6 sm:h-4 z-[55] bg-transparent"
+          title="Glissez vers le bas ou placez le curseur en haut pour afficher la barre"
+        />
+      )}
+
+      <div
+        onMouseEnter={() => {
+          if (isFullscreen && fsHideTimerRef.current) clearTimeout(fsHideTimerRef.current);
+        }}
+        onMouseLeave={() => {
+          if (isFullscreen) scheduleHideFsBar(900);
+        }}
+        onTouchStart={(e) => {
+          if (isFullscreen) {
+            fsTouchStartYRef.current = e.touches?.[0]?.clientY ?? null;
+            revealFsBar(4500);
+          }
+        }}
+        onTouchMove={(e) => {
+          const y0 = fsTouchStartYRef.current;
+          const y1 = e.touches?.[0]?.clientY;
+          if (isFullscreen && typeof y0 === 'number' && typeof y1 === 'number' && y0 - y1 > 18) {
+            fsTouchStartYRef.current = null;
+            setFsBarVisible(false);
+          }
+        }}
+        className={`${
+          isFullscreen
+            ? `fixed top-0 inset-x-0 z-[60] transition-all duration-300 ease-out shadow-2xl ${
+                showFsBar
+                  ? 'translate-y-0 opacity-100 pointer-events-auto'
+                  : '-translate-y-full opacity-0 pointer-events-none'
+              }`
+            : 'relative shrink-0'
+        } flex items-center justify-between gap-1.5 md:gap-2 px-2 md:px-3 py-1.5 md:py-2 bg-neutral-900/95 backdrop-blur-md border-b border-neutral-800`}
+      >
         <div className="flex items-center gap-1.5 md:gap-2.5 min-w-0">
           <button
             type="button"

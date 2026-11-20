@@ -346,7 +346,7 @@
       }, 150);
     }
 
-    // Forcer la synchronisation exacte des crédits du portefeuille dans la RAM de la ROM (déclenché par la touche 5)
+    // Forcer la synchronisation exacte des crédits du portefeuille dans la RAM de la ROM (déclenché par la touche 5 ou le bouton Sync Crédits)
     async function forceSyncCreditsToRam() {
       if (isSyncingCredits) return;
       const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -354,15 +354,23 @@
       const currentRam = readRamCredits();
       if (currentRam >= 0) {
         romCreditsInGame = currentRam;
-      } else if (romCreditsInGame >= targetWalletCoins) {
-        // Si l'utilisateur appuie sur 5 alors que la synchro précédente avait tourné pendant le BIOS, réinitialiser le compteur
-        romCreditsInGame = 0;
-        ramCalibrated = false;
-        liveCreditAddrs = [];
       }
 
-      if (targetWalletCoins <= 0) return;
-      if (ramCalibrated && currentRam === targetWalletCoins) return;
+      if (targetWalletCoins <= 0) {
+        writeCreditsToRam(0);
+        return;
+      }
+
+      // Si l'adresse RAM des crédits est déjà calibrée, écrire la valeur exacte du portefeuille sans jamais ajouter d'impulsion en trop
+      if (ramCalibrated) {
+        if (currentRam !== targetWalletCoins) {
+          writeCreditsToRam(targetWalletCoins);
+        }
+        return;
+      }
+
+      // Ne jamais réinjecter des crédits si la synchro a déjà atteint le solde du portefeuille
+      if (romCreditsInGame >= targetWalletCoins) return;
 
       isSyncingCredits = true;
       let candidates = null;

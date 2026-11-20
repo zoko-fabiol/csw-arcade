@@ -1,4 +1,34 @@
 import { WebSocketServer, WebSocket } from 'ws';
+import fs from 'node:fs';
+import path from 'node:path';
+
+function loadEnvValue(key, fallback = '') {
+  if (process.env[key]) return process.env[key];
+  try {
+    const envPath = path.resolve(process.cwd(), '.env');
+    if (fs.existsSync(envPath)) {
+      const lines = fs.readFileSync(envPath, 'utf8').split(/\r?\n/);
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed || trimmed.startsWith('#')) continue;
+        const eq = trimmed.indexOf('=');
+        if (eq > 0 && trimmed.slice(0, eq).trim() === key) {
+          return trimmed.slice(eq + 1).trim();
+        }
+      }
+    }
+  } catch {
+    /* ignore */
+  }
+  return fallback;
+}
+
+const SASPAY_COIN_PACKS = {
+  pack_10: { id: 'pack_10', coins: 10, amount: 250, currency: 'XOF', label: '10 Coins CSW-Arcade' },
+  pack_25: { id: 'pack_25', coins: 25, amount: 400, currency: 'XOF', label: '25 Coins CSW-Arcade' },
+  pack_50: { id: 'pack_50', coins: 50, amount: 550, currency: 'XOF', label: '50 Coins CSW-Arcade' },
+  pack_99: { id: 'pack_99', coins: 99, amount: 655, currency: 'XOF', label: '99 Coins (Meilleure Offre)' },
+};
 
 export function setupNetplayHub(server) {
   const rooms = new Map(); // roomCode -> Room
@@ -350,6 +380,320 @@ export function setupNetplayHub(server) {
       }
     });
   }
+
+  // ============================================================================
+  // PASSERELLE DE PAIEMENT SASPAY (Clé secrète côté serveur uniquement)
+  // ============================================================================
+  const saspayTransactions = new Map(); // paymentId -> { paymentId, uid, coins, amount, currency, status, credited, createdAtMs }
+
+  function creditSyncedWalletCoins(uid, coinsToAdd) {
+    if (!uid || !coinsToAdd) return 0;
+    const rec = getAccountRecord(uid);
+    const base = typeof rec.coins === 'number' ? rec.coins : 0;
+    const next = Math.max(0, Math.min(99, base + Math.floor(coinsToAdd)));
+    rec.coins = next;
+    rec.coinsUpdatedAtMs = Date.now();
+    rec.updatedAtMs = Date.now();
+    return next;
+  }
+
+  function isSasPayPaidStatus(statusStr) {
+    const s = String(statusStr || '').toLowerCase();
+    return ['paid', 'success', 'succeeded', 'completed', 'complete', 'approved'].includes(s);
+  }
+
+  function formatSasPayError(apiData, statusCode) {
+    const raw = apiData?.message || apiData?.detail || apiData?.error;
+    if (typeof raw === 'string' && raw.trim()) return raw;
+    if (raw && typeof raw === 'object') {
+      const parts = [];
+      for (const [k, v] of Object.entries(raw)) {
+        const msg = Array.isArray(v) ? v.join(', ') : typeof v === 'object' ? JSON.stringify(v) : String(v);
+        parts.push(`${k}: ${msg}`);
+      }
+      if (parts.length > 0) return parts.join(' · ');
+    }
+    return `Erreur SasPay (HTTP ${statusCode})`;
+  }
+
+  let cachedSasPayNetworks = null;
+  let cachedSasPayNetworksAt = 0;
+
+  server.middlewares.use('/api/saspay/networks', async (req, res) => {
+    res.setHeader('Content-Type', 'application/json');
+    const now = Date.now();
+    if (cachedSasPayNetworks && now - cachedSasPayNetworksAt < 10 * 60 * 1000) {
+      return res.end(JSON.stringify({ ok: true, data: cachedSasPayNetworks }));
+    }
+    const baseUrl = loadEnvValue('SASPAY_BASE_URL', 'https://api.saspay.me/api/v1');
+    const secretKey = loadEnvValue('SASPAY_SECRET_KEY');
+    try {
+      const all = [];
+      let nextUrl = `${baseUrl}/networks/?page=1`;
+      for (let guard = 0; guard < 10 && nextUrl; guard++) {
+        const r = await fetch(nextUrl, {
+          headers: {
+            Accept: 'application/json',
+            ...(secretKey ? { Authorization: `Bearer ${secretKey}` } : {}),
+          },
+        });
+        if (!r.ok) break;
+        const json = await r.json().catch(() => ({}));
+        const d = json?.data || json;
+        const rows = Array.isArray(d?.results) ? d.results : Array.isArray(d) ? d : [];
+        all.push(...rows);
+        nextUrl = d?.next || null;
+      }
+      cachedSasPayNetworks = all.filter((n) => n?.is_active !== false);
+      cachedSasPayNetworksAt = now;
+      return res.end(JSON.stringify({ ok: true, data: cachedSasPayNetworks }));
+    } catch (e) {
+      res.statusCode = 502;
+      return res.end(JSON.stringify({ ok: false, error: e?.message || 'SasPay networks unreachable' }));
+    }
+  });
+
+  server.middlewares.use('/api/saspay/countries', async (req, res) => {
+    res.setHeader('Content-Type', 'application/json');
+    const baseUrl = loadEnvValue('SASPAY_BASE_URL', 'https://api.saspay.me/api/v1');
+    try {
+      const r = await fetch(`${baseUrl}/countries/`, {
+        headers: { Accept: 'application/json' },
+      });
+      const data = await r.json().catch(() => ({}));
+      res.statusCode = r.ok ? 200 : r.status;
+      return res.end(JSON.stringify({ ok: r.ok, data }));
+    } catch (e) {
+      res.statusCode = 502;
+      return res.end(JSON.stringify({ ok: false, error: e?.message || 'SasPay unreachable' }));
+    }
+  });
+
+  server.middlewares.use('/api/saspay/checkout', (req, res) => {
+    res.setHeader('Content-Type', 'application/json');
+    if (req.method !== 'POST') {
+      res.statusCode = 405;
+      return res.end(JSON.stringify({ ok: false, error: 'Method not allowed' }));
+    }
+    const secretKey = loadEnvValue('SASPAY_SECRET_KEY');
+    const baseUrl = loadEnvValue('SASPAY_BASE_URL', 'https://api.saspay.me/api/v1');
+    if (!secretKey) {
+      res.statusCode = 500;
+      return res.end(JSON.stringify({ ok: false, error: 'SASPAY_SECRET_KEY manquante côté serveur' }));
+    }
+
+    const chunks = [];
+    req.on('data', (c) => chunks.push(c));
+    req.on('end', async () => {
+      try {
+        const body = JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}');
+        const pack = SASPAY_COIN_PACKS[body.packId];
+        if (!pack) {
+          res.statusCode = 400;
+          return res.end(JSON.stringify({ ok: false, error: 'Pack de coins invalide' }));
+        }
+        const uid = String(body.uid || 'guest');
+        const origin = String(body.origin || 'http://localhost:3003').replace(/\/+$/, '');
+        const method = body.mode === 'softpay' ? 'softpay' : 'checkout';
+
+        let targetUrl = `${baseUrl}/checkout-sessions/`;
+        const custEmail = String(body.email || 'joueur@csw-arcade.com').trim();
+        const custName = String(body.displayName || 'Joueur CSW').trim();
+        const nameParts = custName.split(/\s+/).filter(Boolean);
+        const custFirstName = String(body.firstName || nameParts[0] || 'Joueur').trim();
+        const custLastName = String(body.lastName || nameParts.slice(1).join(' ') || custFirstName).trim();
+        const custPhone = body.phone ? String(body.phone).trim() : undefined;
+
+        let saspayPayload = {
+          amount: pack.amount,
+          currency: pack.currency,
+          description: `${pack.label} (${uid})`,
+          return_url: `${origin}/?saspay_status=success`,
+          success_url: `${origin}/?saspay_status=success`,
+          cancel_url: `${origin}/?saspay_status=cancel`,
+          customer_email: custEmail,
+          customer_name: `${custFirstName} ${custLastName}`.trim(),
+          ...(custPhone ? { customer_phone: custPhone } : {}),
+          metadata: { uid, packId: pack.id, coins: pack.coins },
+        };
+
+        if (method === 'softpay' && body.phone && body.network) {
+          targetUrl = `${baseUrl}/payments/softpay/`;
+          saspayPayload = {
+            amount: pack.amount,
+            currency: pack.currency,
+            phone: String(body.phone).trim(),
+            network: String(body.network).trim().toLowerCase(),
+            country: body.country ? String(body.country).trim().toUpperCase() : undefined,
+            description: `${pack.label} (${uid})`,
+            metadata: { uid, packId: pack.id, coins: pack.coins },
+            customer: {
+              first_name: custFirstName,
+              last_name: custLastName,
+              email: custEmail,
+              phone: String(body.phone).trim(),
+            },
+          };
+        }
+
+        const apiRes = await fetch(targetUrl, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${secretKey}`,
+            'Content-Type': 'application/json',
+            Accept: 'application/json',
+          },
+          body: JSON.stringify(saspayPayload),
+        });
+
+        const apiData = await apiRes.json().catch(() => ({}));
+        if (!apiRes.ok) {
+          res.statusCode = apiRes.status || 400;
+          return res.end(
+            JSON.stringify({
+              ok: false,
+              error: formatSasPayError(apiData, apiRes.status),
+              details: apiData,
+            })
+          );
+        }
+
+        const paymentId =
+          apiData?.id ||
+          apiData?.payment_id ||
+          apiData?.reference ||
+          apiData?.data?.id ||
+          apiData?.data?.payment_id ||
+          `sp_${Date.now()}`;
+
+        const checkoutUrl =
+          apiData?.checkout_url ||
+          apiData?.payment_url ||
+          apiData?.url ||
+          apiData?.redirect_url ||
+          apiData?.data?.checkout_url ||
+          apiData?.data?.url ||
+          null;
+
+        const status = apiData?.status || apiData?.data?.status || 'pending';
+        const paidNow = isSasPayPaidStatus(status);
+        let newCoins = null;
+        if (paidNow) {
+          newCoins = creditSyncedWalletCoins(uid, pack.coins);
+        }
+
+        saspayTransactions.set(String(paymentId), {
+          paymentId: String(paymentId),
+          uid,
+          coins: pack.coins,
+          amount: pack.amount,
+          currency: pack.currency,
+          status: String(status),
+          credited: paidNow,
+          createdAtMs: Date.now(),
+        });
+
+        res.statusCode = 200;
+        return res.end(
+          JSON.stringify({
+            ok: true,
+            paymentId: String(paymentId),
+            checkoutUrl,
+            status,
+            paid: paidNow,
+            coinsAdded: paidNow ? pack.coins : 0,
+            newCoins,
+            pack,
+            raw: apiData,
+          })
+        );
+      } catch (e) {
+        res.statusCode = 500;
+        return res.end(JSON.stringify({ ok: false, error: e?.message || 'Erreur serveur SasPay' }));
+      }
+    });
+  });
+
+  server.middlewares.use('/api/saspay/verify', async (req, res) => {
+    res.setHeader('Content-Type', 'application/json');
+    const url = new URL(req.url, 'http://localhost');
+    const paymentId = url.searchParams.get('paymentId');
+    const uidParam = url.searchParams.get('uid');
+    if (!paymentId) {
+      res.statusCode = 400;
+      return res.end(JSON.stringify({ ok: false, error: 'paymentId manquant' }));
+    }
+
+    const tx = saspayTransactions.get(paymentId);
+    if (tx?.credited) {
+      return res.end(
+        JSON.stringify({ ok: true, paid: true, alreadyCredited: true, coinsAdded: tx.coins, status: tx.status })
+      );
+    }
+
+    const secretKey = loadEnvValue('SASPAY_SECRET_KEY');
+    const baseUrl = loadEnvValue('SASPAY_BASE_URL', 'https://api.saspay.me/api/v1');
+    try {
+      const apiRes = await fetch(`${baseUrl}/payments/${encodeURIComponent(paymentId)}/verify/`, {
+        headers: {
+          Authorization: `Bearer ${secretKey}`,
+          Accept: 'application/json',
+        },
+      });
+      const apiData = await apiRes.json().catch(() => ({}));
+      const status = apiData?.status || apiData?.data?.status || 'pending';
+      const paid = apiRes.ok && isSasPayPaidStatus(status);
+      let newCoins = null;
+      let coinsAdded = 0;
+
+      if (paid) {
+        const targetUid = tx?.uid || uidParam || apiData?.metadata?.uid;
+        coinsAdded = tx?.coins || Number(apiData?.metadata?.coins || 10);
+        if (targetUid && !tx?.credited) {
+          newCoins = creditSyncedWalletCoins(targetUid, coinsAdded);
+        }
+        saspayTransactions.set(paymentId, {
+          ...(tx || { paymentId, uid: targetUid, coins: coinsAdded }),
+          status: String(status),
+          credited: true,
+        });
+      }
+
+      res.statusCode = 200;
+      return res.end(JSON.stringify({ ok: true, paid, status, coinsAdded, newCoins }));
+    } catch (e) {
+      res.statusCode = 502;
+      return res.end(JSON.stringify({ ok: false, error: e?.message || 'Erreur vérification SasPay' }));
+    }
+  });
+
+  server.middlewares.use('/api/saspay/webhook', (req, res) => {
+    res.setHeader('Content-Type', 'application/json');
+    if (req.method !== 'POST') {
+      res.statusCode = 405;
+      return res.end(JSON.stringify({ ok: false }));
+    }
+    const chunks = [];
+    req.on('data', (c) => chunks.push(c));
+    req.on('end', () => {
+      try {
+        const event = JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}');
+        const data = event?.data || event;
+        const paymentId = String(data?.id || data?.payment_id || data?.reference || '');
+        const status = data?.status || event?.event || '';
+        if (paymentId && isSasPayPaidStatus(status)) {
+          const tx = saspayTransactions.get(paymentId);
+          if (tx && !tx.credited) {
+            creditSyncedWalletCoins(tx.uid, tx.coins);
+            tx.credited = true;
+            tx.status = String(status);
+          }
+        }
+      } catch {}
+      res.statusCode = 200;
+      res.end(JSON.stringify({ received: true }));
+    });
+  });
 
   function broadcastRoomUpdate(room) {
     const payload = JSON.stringify({

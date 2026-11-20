@@ -13,6 +13,8 @@ import { UnifiedStageModal } from './components/shell/UnifiedStageModal';
 import { FightcadeChannelsDock } from './components/shell/FightcadeChannelsDock';
 import { FightcadeLobbyView } from './components/shell/FightcadeLobbyView';
 import { AuthModal } from './components/auth/AuthModal';
+import { SasPayModal } from './components/wallet/SasPayModal';
+import { getPendingSasPayPayment, savePendingSasPayPayment, verifySasPayPayment } from './services/saspayService';
 import { addCoins, consumeCoin, fillMaxCoins, hasCoins, setWalletCoins, subscribeWallet } from './services/walletService';
 import {
   firebaseFightcadeService,
@@ -79,6 +81,7 @@ export default function App() {
   const [cacheStats, setCacheStats] = useState({ count: 0, totalBytes: 0 });
   const [coins, setCoins] = useState(0);
   const [buyMenuOpen, setBuyMenuOpen] = useState(false);
+  const [isSasPayOpen, setIsSasPayOpen] = useState(false);
   const [noCoinsModalOpen, setNoCoinsModalOpen] = useState(false);
 
   // Fightcade 2 : Lobby Global + 3 salons actifs max, défis 15s & WebRTC Rollback P2P
@@ -201,10 +204,8 @@ export default function App() {
         gameEntry
       );
     } catch {
-      markRomAsDead(gameEntry.id);
       if (refundCoinOnFail) addCoins(1);
-      if (selectedChannelId === gameEntry.id) setSelectedChannelId(null);
-      setBootNotice(`ROM indisponible (« ${gameEntry.title} ») : jeu supprimé de la liste (Coin remboursé).`);
+      setBootNotice(`Téléchargement indisponible pour « ${gameEntry.title} » (Coin remboursé). Réessayez dans un instant.`);
       setTimeout(() => setBootNotice(''), 4200);
     }
   };
@@ -397,6 +398,28 @@ export default function App() {
     };
   }, [isSettingsOpen, settings?.netplay?.challengeSound]);
 
+  // Vérifier automatiquement un paiement SasPay en attente au retour sur l'application
+  useEffect(() => {
+    const pending = getPendingSasPayPayment();
+    if (!pending?.paymentId) return;
+    const params = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+    if (params?.get('saspay_status') === 'cancel') {
+      savePendingSasPayPayment(null);
+      return;
+    }
+    verifySasPayPayment(pending.paymentId, userProfileRef.current?.uid)
+      .then((res) => {
+        if (res?.paid) {
+          const added = res.coinsAdded || pending.coins || 10;
+          addCoins(added);
+          savePendingSasPayPayment(null);
+          setBootNotice(`✅ Paiement SasPay confirmé : +${added} Coins ajoutés à votre compte !`);
+          setTimeout(() => setBootNotice(''), 5500);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
   // Synchronisation Parfaite du Compte Multi-Appareils (Crédits, Salons actifs, Partie en cours / Reprise Cloud)
   useEffect(() => {
     const uid = userProfile?.uid;
@@ -421,10 +444,10 @@ export default function App() {
         applyRemoteSyncedStats(uid, sync.gameStats);
       }
 
-      // 3. Détecter si une partie est en cours / en pause sur un AUTRE appareil connecté au même compte
+      // 3. Détecter si une partie est en cours sur un AUTRE appareil connecté au même compte
       const sess = sync.activeSession;
-      if (sess && sess.deviceId && sess.deviceId !== myDevId) {
-        if (stageSessionRef.current && sess.status === 'playing' && (sess.updatedAtMs || 0) > sessionStartedAtRef.current + 1500) {
+      if (sess && sess.deviceId && sess.deviceId !== myDevId && sess.status === 'playing') {
+        if (stageSessionRef.current && (sess.updatedAtMs || 0) > sessionStartedAtRef.current + 1500) {
           // Un autre appareil vient de reprendre la partie !
           setBootNotice(`☁️ Votre partie « ${sess.title} » a été poursuivie sur ${sess.deviceName}.`);
           setTimeout(() => setBootNotice(''), 5000);
@@ -434,7 +457,7 @@ export default function App() {
             hasSavestate: Boolean(sync.hasSavestate || sess.hasSavestate),
           });
         }
-      } else if (!sess || sess.deviceId === myDevId) {
+      } else {
         setRemoteActiveSession(null);
       }
     });
@@ -454,6 +477,47 @@ export default function App() {
     if (!uid) return;
     pushChannelsSync(uid, activeChannels, selectedChannelId);
   }, [userProfile?.uid, activeChannels, selectedChannelId]);
+
+  // Heartbeat régulier pour maintenir la session active tant qu'on joue (expire après 3 minutes en cas d'inactivité)
+  useEffect(() => {
+    if (!stageSession) return;
+    const interval = setInterval(() => {
+      const uid = userProfileRef.current?.uid;
+      const curSess = stageSessionRef.current;
+      if (uid && curSess) {
+        const gid = normalizeGameChannelId(activeGameEntryRef.current || { id: curSess.gameId, title: curSess.title });
+        pushActiveSession(uid, {
+          gameId: gid,
+          title: curSess.title,
+          core: curSess.core,
+          kind: curSess.kind,
+          platformLabel: activeGameEntryRef.current?.platformLabel || curSess.core?.toUpperCase() || 'Arcade',
+          filename: curSess.filename,
+          gameEntry: activeGameEntryRef.current,
+          inSalon: curSess.kind !== 'j2me',
+          status: 'playing',
+          hasSavestate: curSess.kind !== 'j2me',
+        });
+      }
+    }, 45000);
+    return () => clearInterval(interval);
+  }, [stageSession]);
+
+  // Nettoyage immédiat de la session lors de la fermeture de la fenêtre / onglet du navigateur
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      const uid = userProfileRef.current?.uid;
+      if (uid && stageSessionRef.current) {
+        pushActiveSession(uid, null);
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    window.addEventListener('pagehide', handleBeforeUnload);
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      window.removeEventListener('pagehide', handleBeforeUnload);
+    };
+  }, []);
 
   const currentModeMeta = SHELL_MODES.find((m) => m.id === platformMode) || SHELL_MODES[0];
   const resolvedSelectedChannel =
@@ -483,7 +547,7 @@ export default function App() {
           <div className="flex md:hidden items-center gap-1.5 shrink-0">
             <button
               type="button"
-              onClick={() => setBuyMenuOpen((v) => !v)}
+              onClick={() => setIsSasPayOpen(true)}
               className={`flex items-center gap-1 px-2 py-1.5 rounded-lg border text-xs font-mono font-bold ${
                 coins <= 0
                   ? 'bg-rose-950/60 border-rose-500/60 text-rose-300 animate-pulse'
@@ -588,18 +652,18 @@ export default function App() {
           <div className="relative">
             <button
               type="button"
-              onClick={() => setBuyMenuOpen((v) => !v)}
+              onClick={() => setIsSasPayOpen(true)}
               className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-mono font-bold transition-colors ${
                 coins <= 0
                   ? 'bg-rose-950/60 border-rose-500/60 text-rose-300 animate-pulse'
                   : 'bg-amber-950/40 border-amber-500/40 text-amber-300 hover:bg-amber-950/70'
               }`}
-              title="Portefeuille Coins (0-99)"
+              title="Portefeuille Coins · Acheter via SasPay"
             >
               <Coins className="w-3.5 h-3.5" />
               <span>{String(coins).padStart(2, '0')}/99 COINS</span>
               <span className="hidden lg:inline text-[10px] px-1.5 py-0.5 rounded bg-amber-500 text-black font-black">
-                + Acheter (Test)
+                + Acheter (SasPay)
               </span>
             </button>
           </div>
@@ -726,6 +790,15 @@ export default function App() {
         activeChannels={activeChannels}
       />
 
+      {/* Boutique Paiement SasPay */}
+      <SasPayModal
+        isOpen={isSasPayOpen}
+        onClose={() => setIsSasPayOpen(false)}
+        onOpenAuth={() => setIsAuthOpen(true)}
+        userProfile={userProfile}
+        currentCoins={coins}
+      />
+
       {/* Modale Crédits Insuffisants (0 Coin) */}
       {noCoinsModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
@@ -735,35 +808,25 @@ export default function App() {
               <div>
                 <h3 className="text-sm font-black text-white">Crédits insuffisants (0 Coin)</h3>
                 <p className="text-xs text-neutral-300 mt-1">
-                  Achetez des coins dans le salon pour démarrer une partie ou lancer un défi.
+                  Achetez des coins via SasPay pour démarrer une partie ou lancer un défi.
                 </p>
               </div>
             </div>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-2 gap-2">
               <button
                 type="button"
                 onClick={() => {
-                  addCoins(5);
                   setNoCoinsModalOpen(false);
+                  setIsSasPayOpen(true);
                 }}
-                className="py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-black text-xs font-black"
+                className="py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-black text-xs font-black"
               >
-                +5 Coins (Test)
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  fillMaxCoins();
-                  setNoCoinsModalOpen(false);
-                }}
-                className="py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-black"
-              >
-                Max 99 Coins
+                Acheter des Coins (SasPay)
               </button>
               <button
                 type="button"
                 onClick={() => setNoCoinsModalOpen(false)}
-                className="py-2 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-xs font-bold"
+                className="py-2.5 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-xs font-bold"
               >
                 Fermer
               </button>
@@ -804,6 +867,7 @@ export default function App() {
       {/* Bannière Synchronisation Compte Multi-Appareils : Poursuivre sa partie directement sur cet appareil */}
       {remoteActiveSession &&
         !stageSession &&
+        remoteActiveSession.status === 'playing' &&
         (remoteActiveSession.updatedAtMs || 0) !== dismissedSessionTs && (
           <div className="fixed bottom-20 md:bottom-6 left-3 right-3 md:left-auto md:right-6 z-[115] md:w-[400px] rounded-2xl bg-neutral-900/95 backdrop-blur-xl border-2 border-emerald-400/70 p-4 shadow-2xl space-y-3">
             <div className="flex items-start justify-between gap-2">
@@ -813,7 +877,14 @@ export default function App() {
               </div>
               <button
                 type="button"
-                onClick={() => setDismissedSessionTs(remoteActiveSession.updatedAtMs || Date.now())}
+                onClick={() => {
+                  setDismissedSessionTs(remoteActiveSession.updatedAtMs || Date.now());
+                  const uid = userProfileRef.current?.uid;
+                  if (uid) {
+                    pushActiveSession(uid, null);
+                  }
+                  setRemoteActiveSession(null);
+                }}
                 className="p-1 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-neutral-400 hover:text-white"
                 title="Fermer"
               >
@@ -822,7 +893,7 @@ export default function App() {
             </div>
             <div className="space-y-1">
               <p className="text-xs text-neutral-100">
-                Vous {remoteActiveSession.status === 'playing' ? 'jouez actuellement' : 'jouiez récemment'} à{' '}
+                Vous jouez actuellement à{' '}
                 <strong className="text-white">« {remoteActiveSession.title} »</strong> sur{' '}
                 <strong className="text-cyan-300">{remoteActiveSession.deviceName}</strong>.
               </p>
@@ -916,20 +987,10 @@ export default function App() {
         onOpenSalon={() => {
           const targetId = stageSession?.gameId || activeChannels[0]?.gameId || GLOBAL_CHANNEL_ID;
           const uid = userProfileRef.current?.uid;
-          if (uid && stageSession) {
-            pushActiveSession(uid, {
-              gameId: normalizeGameChannelId(activeGameEntryRef.current || { id: stageSession.gameId, title: stageSession.title }),
-              title: stageSession.title,
-              core: stageSession.core,
-              kind: stageSession.kind,
-              platformLabel: activeGameEntryRef.current?.platformLabel || stageSession.core?.toUpperCase() || 'Arcade',
-              filename: stageSession.filename,
-              gameEntry: activeGameEntryRef.current,
-              inSalon: stageSession.kind !== 'j2me',
-              status: 'paused',
-              hasSavestate: stageSession.kind !== 'j2me',
-            });
+          if (uid) {
+            pushActiveSession(uid, null);
           }
+          setRemoteActiveSession(null);
           p2pEngineRef.current?.destroy();
           p2pEngineRef.current = null;
           setP2pStats(null);
@@ -940,20 +1001,10 @@ export default function App() {
         onInputDelayChange={(d) => p2pEngineRef.current?.setInputDelay(d)}
         onClose={() => {
           const uid = userProfileRef.current?.uid;
-          if (uid && stageSession) {
-            pushActiveSession(uid, {
-              gameId: normalizeGameChannelId(activeGameEntryRef.current || { id: stageSession.gameId, title: stageSession.title }),
-              title: stageSession.title,
-              core: stageSession.core,
-              kind: stageSession.kind,
-              platformLabel: activeGameEntryRef.current?.platformLabel || stageSession.core?.toUpperCase() || 'Arcade',
-              filename: stageSession.filename,
-              gameEntry: activeGameEntryRef.current,
-              inSalon: stageSession.kind !== 'j2me',
-              status: 'paused',
-              hasSavestate: stageSession.kind !== 'j2me',
-            });
+          if (uid) {
+            pushActiveSession(uid, null);
           }
+          setRemoteActiveSession(null);
           p2pEngineRef.current?.destroy();
           p2pEngineRef.current = null;
           setP2pStats(null);

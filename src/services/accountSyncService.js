@@ -10,12 +10,13 @@ import { doc, getDoc, onSnapshot, serverTimestamp, setDoc } from 'firebase/fires
 import { db } from '../config/firebase';
 
 const DEVICE_ID_KEY = 'csw_device_session_id_v1';
-const HANDOFF_MAX_AGE_MS = 30 * 60 * 1000; // 30 minutes de reprise disponible
+const HANDOFF_MAX_AGE_MS = 3 * 60 * 1000; // Expiration automatique après 3 minutes d'inactivité
 
 export function getDeviceInfo() {
   let deviceId = 'dev_' + Math.random().toString(36).slice(2, 10);
   try {
-    deviceId = sessionStorage.getItem(DEVICE_ID_KEY) || deviceId;
+    deviceId = localStorage.getItem(DEVICE_ID_KEY) || sessionStorage.getItem(DEVICE_ID_KEY) || deviceId;
+    localStorage.setItem(DEVICE_ID_KEY, deviceId);
     sessionStorage.setItem(DEVICE_ID_KEY, deviceId);
   } catch {
     /* noop */
@@ -189,12 +190,19 @@ export function pushActiveSession(uid, sessionMeta) {
             }
           : null,
         inSalon: Boolean(sessionMeta.inSalon),
-        status: sessionMeta.status || 'playing', // 'playing' | 'paused'
+        status: sessionMeta.status || 'playing',
         hasSavestate: Boolean(sessionMeta.hasSavestate),
         updatedAtMs: Date.now(),
       }
     : null;
-  return postAccountPatch(uid, { activeSession: cleanSession });
+
+  if (!sessionMeta) {
+    try {
+      setDoc(doc(db, 'users', uid, 'sync', 'handoff_state'), { dataBase64: null, updatedAt: serverTimestamp() }, { merge: true }).catch(() => {});
+    } catch {}
+  }
+
+  return postAccountPatch(uid, { activeSession: cleanSession, hasSavestate: Boolean(cleanSession?.hasSavestate) });
 }
 
 export async function pushCloudSavestate(uid, gameId, rawStateBase64) {
@@ -254,12 +262,21 @@ export function subscribeAccountSync(uid, onUpdate) {
     const f = latestFs || {};
     const useFsCoins = (f.coinsUpdatedAtMs || 0) > (r.coinsUpdatedAtMs || 0);
     const useFsChannels = (f.channelsUpdatedAtMs || 0) > (r.channelsUpdatedAtMs || 0);
-    const rSessTs = r.activeSession?.updatedAtMs || 0;
-    const fSessTs = f.activeSession?.updatedAtMs || 0;
-    const activeSession = fSessTs > rSessTs ? f.activeSession : r.activeSession || f.activeSession || null;
+    
+    // Déterminer la source de session la plus récente pour activeSession
+    const rTime = r.updatedAtMs || 0;
+    const fTime = f.updatedAtMs || (f.updatedAt?.toMillis ? f.updatedAt.toMillis() : 0);
+    const mostRecentSource = fTime > rTime ? f : r;
+    const activeSession = mostRecentSource?.activeSession !== undefined
+      ? mostRecentSource.activeSession
+      : (f.activeSession ?? r.activeSession ?? null);
 
     const now = Date.now();
-    const isFreshSession = activeSession && now - (activeSession.updatedAtMs || 0) < HANDOFF_MAX_AGE_MS;
+    const isFreshSession = Boolean(
+      activeSession &&
+      activeSession.status === 'playing' &&
+      now - (activeSession.updatedAtMs || 0) < HANDOFF_MAX_AGE_MS
+    );
 
     onUpdate({
       uid,
@@ -269,7 +286,7 @@ export function subscribeAccountSync(uid, onUpdate) {
       channelsUpdatedAtMs: Math.max(f.channelsUpdatedAtMs || 0, r.channelsUpdatedAtMs || 0),
       selectedChannelId: r.selectedChannelId ?? f.selectedChannelId ?? null,
       activeSession: isFreshSession ? activeSession : null,
-      hasSavestate: Boolean(r.hasSavestate || activeSession?.hasSavestate),
+      hasSavestate: Boolean(isFreshSession && (r.hasSavestate || activeSession?.hasSavestate)),
       gameStats: Array.isArray(r.gameStats) ? r.gameStats : null,
     });
   };

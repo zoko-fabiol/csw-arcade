@@ -26,6 +26,8 @@ temp_nonmerged/
 -C
 
 # Fichiers temporaires et éditeurs
+.env
+.env.local
 scratch/
 .vscode/
 *.log

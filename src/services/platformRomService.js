@@ -4,45 +4,26 @@
 
 const PLATFORM_IDB_NAME = 'csw_platform_roms_db';
 const PLATFORM_IDB_STORE = 'rom_files';
-const DEAD_ROMS_KEY = 'csw_dead_roms_v2';
+const DEAD_ROMS_KEY = 'csw_dead_roms_v3';
 try {
-  if (typeof localStorage !== 'undefined') localStorage.removeItem('csw_dead_roms_v1');
+  if (typeof localStorage !== 'undefined') {
+    localStorage.removeItem('csw_dead_roms_v1');
+    localStorage.removeItem('csw_dead_roms_v2');
+  }
 } catch {
   /* noop */
 }
 
 const deadRomListeners = new Set();
 const verifiedRomIds = new Set();
-let deadRomSet = (() => {
-  try {
-    const raw = typeof localStorage !== 'undefined' ? localStorage.getItem(DEAD_ROMS_KEY) : null;
-    const arr = raw ? JSON.parse(raw) : [];
-    return new Set(Array.isArray(arr) ? arr : []);
-  } catch {
-    return new Set();
-  }
-})();
+let deadRomSet = new Set();
 
 export function getDeadRomIds() {
   return new Set(deadRomSet);
 }
 
-export function markRomAsDead(id) {
-  if (!id || deadRomSet.has(id)) return;
-  deadRomSet.add(id);
-  try {
-    localStorage.setItem(DEAD_ROMS_KEY, JSON.stringify([...deadRomSet]));
-  } catch {
-    /* noop */
-  }
-  const snap = new Set(deadRomSet);
-  deadRomListeners.forEach((cb) => {
-    try {
-      cb(snap);
-    } catch {
-      /* noop */
-    }
-  });
+export function markRomAsDead(_id) {
+  // Ne plus masquer définitivement les jeux du catalogue d'origine (ex: KOF 2002) en cas d'erreur temporaire Archive.org
 }
 
 export function subscribeDeadRoms(cb) {
@@ -74,26 +55,8 @@ function isValidRomBuffer(buffer) {
 
 export async function probeRomAvailability(entry) {
   if (!entry?.id) return false;
-  if (deadRomSet.has(entry.id)) return false;
   if (verifiedRomIds.has(entry.id)) return true;
-  if (!Array.isArray(entry.urls) || entry.urls.length === 0) {
-    markRomAsDead(entry.id);
-    return false;
-  }
-  const proxyUrl = entry.urls.find((u) => u.startsWith('/api/rom-proxy')) || entry.urls[0];
-  try {
-    const res = await fetch(proxyUrl, { method: 'HEAD' });
-    if (res.ok) {
-      verifiedRomIds.add(entry.id);
-      return true;
-    }
-    if (res.status === 404 || res.status === 403 || res.status === 401) {
-      markRomAsDead(entry.id);
-      return false;
-    }
-  } catch {
-    /* network offline or transient: don't blacklist */
-  }
+  if (!Array.isArray(entry.urls) || entry.urls.length === 0) return false;
   return true;
 }
 
