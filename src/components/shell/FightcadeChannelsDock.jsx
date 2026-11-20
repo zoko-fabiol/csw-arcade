@@ -6,6 +6,7 @@ import { GLOBAL_CHANNEL_ID } from '../../services/firebaseFightcadeService';
 export function FightcadeChannelsDock({
   activeChannels = [],
   selectedChannelId = null,
+  onlineCount = 1,
   onSelectLibrary,
   onSelectChannel,
   onLeaveChannel,
@@ -53,7 +54,9 @@ export function FightcadeChannelsDock({
         >
           <Globe className="w-5 h-5" />
           <span className="text-[9px] font-bold">SALON</span>
-          <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-emerald-400 border-2 border-neutral-950" />
+          <span className="absolute -top-1.5 -right-1.5 px-1 py-0.2 rounded-full bg-emerald-500 text-black text-[9px] font-mono font-black border border-neutral-950">
+            {onlineCount}
+          </span>
         </button>
 
         <div className="w-8 h-px bg-neutral-800" />
@@ -142,7 +145,9 @@ export function FightcadeChannelsDock({
           >
             <span className="relative">
               <Globe className="w-5 h-5" />
-              <span className="absolute -top-0.5 -right-1 w-2 h-2 rounded-full bg-emerald-400" />
+              <span className="absolute -top-1 -right-2 px-1 rounded-full bg-emerald-500 text-black text-[9px] font-black leading-tight">
+                {onlineCount}
+              </span>
             </span>
             <span className="text-[10px] font-bold">Salon</span>
           </button>

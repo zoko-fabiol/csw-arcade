@@ -94,6 +94,7 @@ export default function App() {
   // Fightcade 2 : Lobby Global + 3 salons actifs max, défis 15s & WebRTC Rollback P2P
   const [activeChannels, setActiveChannels] = useState([]);
   const [selectedChannelId, setSelectedChannelId] = useState(null);
+  const [onlineCount, setOnlineCount] = useState(1);
   const [limitModalGame, setLimitModalGame] = useState(null);
   const [incomingChallenge, setIncomingChallenge] = useState(null);
   const [activeMatchSync, setActiveMatchSync] = useState(null);
@@ -468,6 +469,16 @@ export default function App() {
     };
   }, [isSettingsOpen, settings?.netplay?.challengeSound]);
 
+  // Écoute temps-réel du nombre de joueurs connectés aux Salons Fightcade 2
+  useEffect(() => {
+    const unsub = firebaseFightcadeService.subscribeChannelUsers(GLOBAL_CHANNEL_ID, (users) => {
+      if (Array.isArray(users)) {
+        setOnlineCount(Math.max(1, users.length));
+      }
+    });
+    return () => unsub?.();
+  }, []);
+
   // Vérifier automatiquement un paiement SasPay en attente au retour sur l'application
   useEffect(() => {
     const pending = getPendingSasPayPayment();
@@ -815,6 +826,7 @@ export default function App() {
         <FightcadeChannelsDock
           activeChannels={activeChannels}
           selectedChannelId={selectedChannelId}
+          onlineCount={onlineCount}
           onSelectLibrary={() => setSelectedChannelId(null)}
           onSelectChannel={(id) => setSelectedChannelId(id)}
           onLeaveChannel={handleLeaveFightcadeChannel}
@@ -824,6 +836,18 @@ export default function App() {
           onCloseLimitModal={() => setLimitModalGame(null)}
           onReplaceChannel={handleReplaceFightcadeChannel}
         />
+
+        {onlineCount > 1 && selectedChannelId === null && (
+          <button
+            type="button"
+            onClick={() => setSelectedChannelId(GLOBAL_CHANNEL_ID)}
+            className="fixed bottom-16 md:bottom-6 right-4 md:right-6 z-40 px-4 py-2.5 rounded-full bg-emerald-500 hover:bg-emerald-400 text-black font-black text-xs shadow-2xl flex items-center gap-2 animate-bounce transition-transform active:scale-95 border-2 border-neutral-950"
+            title="Des joueurs sont actuellement connectés au salon. Cliquez pour les rejoindre !"
+          >
+            <span className="w-2.5 h-2.5 rounded-full bg-black animate-ping" />
+            <span>👥 {onlineCount} Joueurs au Salon · Cliquer pour Rejoindre</span>
+          </button>
+        )}
 
         {resolvedSelectedChannel ? (
           <FightcadeLobbyView

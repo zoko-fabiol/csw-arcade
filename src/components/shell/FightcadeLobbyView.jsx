@@ -165,6 +165,16 @@ export function FightcadeLobbyView({
       resolvedEntry = channel.entry;
     }
 
+    if (!resolvedEntry) {
+      const fallbackActive = activeChannels.find((c) => c.entry);
+      if (fallbackActive) {
+        targetGid = fallbackActive.gameId;
+        targetTitle = fallbackActive.title;
+        targetPlatform = fallbackActive.platformLabel || 'Arcade';
+        resolvedEntry = fallbackActive.entry;
+      }
+    }
+
     const targetChannel = {
       gameId: targetGid,
       title: targetTitle,
@@ -280,8 +290,8 @@ export function FightcadeLobbyView({
         </div>
       </div>
 
-      {/* Onglets Mobile (< lg) : bascule plein écran entre Chat / Joueurs / Records sans écrasement vertical */}
-      <div className="lg:hidden grid grid-cols-3 border-b border-neutral-800 bg-neutral-900/60 text-xs font-bold shrink-0">
+      {/* Onglets Mobile (< md) : bascule plein écran entre Chat / Joueurs / Records sans écrasement vertical */}
+      <div className="md:hidden grid grid-cols-3 border-b border-neutral-800 bg-neutral-900/60 text-xs font-bold shrink-0">
         <button
           type="button"
           onClick={() => setMobilePanel('chat')}
@@ -334,14 +344,14 @@ export function FightcadeLobbyView({
       </div>
 
       {/* Corps : Chat Communautaire en direct + Liste des joueurs et leurs jeux actifs */}
-      <div className="flex-1 grid grid-cols-1 lg:grid-cols-3 min-h-0 overflow-hidden">
+      <div className="flex-1 grid grid-cols-1 md:grid-cols-3 min-h-0 overflow-hidden">
         {/* Chat Communautaire du salon */}
         <div
           className={`${
-            mobilePanel === 'chat' ? 'flex' : 'hidden lg:flex'
-          } lg:col-span-2 flex-col min-h-0 lg:border-r border-neutral-800`}
+            mobilePanel === 'chat' ? 'flex' : 'hidden md:flex'
+          } md:col-span-2 flex-col min-h-0 md:border-r border-neutral-800`}
         >
-          <div className="hidden lg:flex px-4 py-2 bg-neutral-900/40 border-b border-neutral-800 items-center justify-between text-[11px] font-mono uppercase tracking-wider text-neutral-400">
+          <div className="hidden md:flex px-4 py-2 bg-neutral-900/40 border-b border-neutral-800 items-center justify-between text-[11px] font-mono uppercase tracking-wider text-neutral-400">
             <span>Chat Communautaire — #{channel.gameId}</span>
             <span className="text-[10px] text-neutral-500">
               Commandes : /gg · /ready · /afk · Cliquez sur un pseudo pour @mentionner
@@ -491,10 +501,10 @@ export function FightcadeLobbyView({
         {/* Colonne Droite : Joueurs au salon + Classement Meilleurs Scores du jeu */}
         <div
           className={`${
-            mobilePanel !== 'chat' ? 'flex' : 'hidden lg:flex'
+            mobilePanel !== 'chat' ? 'flex' : 'hidden md:flex'
           } flex-col min-h-0 bg-neutral-900/20`}
         >
-          <div className="hidden lg:flex px-3 py-2 bg-neutral-900/40 border-b border-neutral-800 items-center justify-between gap-2 text-[11px] font-mono uppercase tracking-wider text-neutral-400">
+          <div className="hidden md:flex px-3 py-2 bg-neutral-900/40 border-b border-neutral-800 items-center justify-between gap-2 text-[11px] font-mono uppercase tracking-wider text-neutral-400">
             <div className="flex items-center gap-1.5">
               <button
                 type="button"

@@ -551,8 +551,14 @@ class FirebaseFightcadeService {
     const emitMerged = () => {
       const now = Date.now();
       const map = new Map();
-      [...relayUsers, ...firestoreUsers].forEach((u) => {
-        if (u && u.uid && now - (u.lastSeen || 0) < 65000) {
+      // Les utilisateurs reçus du serveur VPS sont déjà filtrés par le heartbeat du backend
+      relayUsers.forEach((u) => {
+        if (u && u.uid) {
+          map.set(u.uid, u);
+        }
+      });
+      firestoreUsers.forEach((u) => {
+        if (u && u.uid && (Math.abs(now - (u.lastSeen || 0)) < 180000 || !u.lastSeen)) {
           const prev = map.get(u.uid);
           if (!prev || (u.lastSeen || 0) >= (prev.lastSeen || 0)) {
             map.set(u.uid, u);

@@ -1,4 +1,4 @@
-const SHELL_CACHE_NAME = 'csw-arcade-shell-v16-react-fc2';
+const SHELL_CACHE_NAME = 'csw-arcade-shell-v19-live-sync';
 const ENGINE_CACHE_NAME = 'csw-arcade-engine-v6';
 
 // Assets essentiels du moteur WebAssembly (FBNeo + EmulatorJS)
@@ -135,18 +135,17 @@ self.addEventListener('fetch', (event) => {
       return;
     }
 
+    // Stratégie Network-First pour les assets locaux pour toujours obtenir les dernières mises à jour
     event.respondWith(
-      caches.match(event.request).then((cachedResponse) => {
-        const fetchPromise = fetch(event.request).then((networkResponse) => {
+      fetch(event.request)
+        .then((networkResponse) => {
           if (networkResponse && networkResponse.status === 200) {
             const clone = networkResponse.clone();
             caches.open(SHELL_CACHE_NAME).then((cache) => cache.put(event.request, clone));
           }
           return networkResponse;
-        }).catch(() => cachedResponse);
-
-        return cachedResponse || fetchPromise;
-      })
+        })
+        .catch(() => caches.match(event.request))
     );
   }
 });
