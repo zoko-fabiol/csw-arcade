@@ -286,6 +286,7 @@ export function setupNetplayHub(server) {
               }
             }
           } else if (payload.action === 'presence' && payload.user?.uid) {
+            console.log(`[LOBBY PRESENCE] ${payload.user.name} (${payload.user.uid}) in ${targetId}`);
             const u = {
               ...payload.user,
               currentLobby: targetId,
@@ -294,6 +295,7 @@ export function setupNetplayHub(server) {
             lobby.users.set(payload.user.uid, u);
             allGlobalUsers.set(payload.user.uid, u);
           } else if (payload.action === 'leave' && payload.uid) {
+            console.log(`[LOBBY LEAVE] ${payload.uid} from ${targetId}`);
             lobby.users.delete(payload.uid);
             allGlobalUsers.delete(payload.uid);
           }
