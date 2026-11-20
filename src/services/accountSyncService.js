@@ -270,6 +270,7 @@ export function subscribeAccountSync(uid, onUpdate) {
       selectedChannelId: r.selectedChannelId ?? f.selectedChannelId ?? null,
       activeSession: isFreshSession ? activeSession : null,
       hasSavestate: Boolean(r.hasSavestate || activeSession?.hasSavestate),
+      gameStats: Array.isArray(r.gameStats) ? r.gameStats : null,
     });
   };
 

@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
+import { buildDefaultConsoleControls } from '../data/consoleControlProfiles';
 
 const STORAGE_KEY = 'csw_arcade_settings_v1';
+const DEFAULT_CONSOLE_CONTROLS = buildDefaultConsoleControls();
 
 export const DEFAULT_SETTINGS = {
   controls: {
@@ -92,7 +94,8 @@ export const DEFAULT_SETTINGS = {
     inputDelay: 1, // 0 à 3 frames
     showHud: true,
     challengeSound: true
-  }
+  },
+  consoleControls: DEFAULT_CONSOLE_CONTROLS
 };
 
 /**
@@ -104,6 +107,18 @@ export function useSettings() {
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) {
         const parsed = JSON.parse(saved);
+        const mergedConsoles = {};
+        for (const cid of Object.keys(DEFAULT_CONSOLE_CONTROLS)) {
+          const defC = DEFAULT_CONSOLE_CONTROLS[cid];
+          const savedC = parsed.consoleControls?.[cid] || {};
+          mergedConsoles[cid] = {
+            keyboard: {
+              p1: { ...defC.keyboard.p1, ...(savedC.keyboard?.p1 || {}) },
+              p2: { ...defC.keyboard.p2, ...(savedC.keyboard?.p2 || {}) },
+            },
+            gamepad: { ...defC.gamepad, ...(savedC.gamepad || {}) },
+          };
+        }
         return {
           ...DEFAULT_SETTINGS,
           ...parsed,
@@ -116,7 +131,8 @@ export function useSettings() {
           audio: { ...DEFAULT_SETTINGS.audio, ...(parsed.audio || {}) },
           system: { ...DEFAULT_SETTINGS.system, ...(parsed.system || {}) },
           touch: { ...DEFAULT_SETTINGS.touch, ...(parsed.touch || {}) },
-          performance: { ...DEFAULT_SETTINGS.performance, ...(parsed.performance || {}) }
+          performance: { ...DEFAULT_SETTINGS.performance, ...(parsed.performance || {}) },
+          consoleControls: mergedConsoles,
         };
       }
     } catch (e) {
@@ -244,6 +260,101 @@ export function useSettings() {
     }));
   }, []);
 
+  const updateConsoleKeyBinding = useCallback((consoleId, player, action, keyCode) => {
+    setSettings((prev) => {
+      const currentConsoles = prev.consoleControls || DEFAULT_CONSOLE_CONTROLS;
+      const target = currentConsoles[consoleId] || DEFAULT_CONSOLE_CONTROLS[consoleId] || DEFAULT_CONSOLE_CONTROLS.arcade;
+      const next = {
+        ...prev,
+        consoleControls: {
+          ...currentConsoles,
+          [consoleId]: {
+            ...target,
+            keyboard: {
+              ...target.keyboard,
+              [player]: {
+                ...(target.keyboard?.[player] || {}),
+                [action]: keyCode,
+              },
+            },
+          },
+        },
+      };
+      if (consoleId === 'arcade') {
+        next.controls = {
+          ...prev.controls,
+          [player]: {
+            ...(prev.controls?.[player] || {}),
+            [action]: keyCode,
+          },
+        };
+      }
+      return next;
+    });
+  }, []);
+
+  const updateConsoleGamepadBinding = useCallback((consoleId, action, physicalBtnIdx) => {
+    setSettings((prev) => {
+      const currentConsoles = prev.consoleControls || DEFAULT_CONSOLE_CONTROLS;
+      const target = currentConsoles[consoleId] || DEFAULT_CONSOLE_CONTROLS[consoleId] || DEFAULT_CONSOLE_CONTROLS.arcade;
+      const nextGamepadMap = {
+        ...(target.gamepad || {}),
+        [action]: physicalBtnIdx,
+      };
+      const next = {
+        ...prev,
+        consoleControls: {
+          ...currentConsoles,
+          [consoleId]: {
+            ...target,
+            gamepad: nextGamepadMap,
+          },
+        },
+      };
+      if (consoleId === 'arcade') {
+        next.gamepad = {
+          ...prev.gamepad,
+          buttons: {
+            ...(prev.gamepad?.buttons || {}),
+            [action]: physicalBtnIdx,
+          },
+        };
+      }
+      return next;
+    });
+  }, []);
+
+  const resetConsoleControls = useCallback((consoleId) => {
+    const def = DEFAULT_CONSOLE_CONTROLS[consoleId];
+    if (!def) return;
+    setSettings((prev) => {
+      const next = {
+        ...prev,
+        consoleControls: {
+          ...(prev.consoleControls || DEFAULT_CONSOLE_CONTROLS),
+          [consoleId]: {
+            keyboard: {
+              p1: { ...def.keyboard.p1 },
+              p2: { ...def.keyboard.p2 },
+            },
+            gamepad: { ...def.gamepad },
+          },
+        },
+      };
+      if (consoleId === 'arcade') {
+        next.controls = {
+          p1: { ...DEFAULT_SETTINGS.controls.p1 },
+          p2: { ...DEFAULT_SETTINGS.controls.p2 },
+        };
+        next.gamepad = {
+          ...prev.gamepad,
+          buttons: { ...DEFAULT_SETTINGS.gamepad.buttons },
+        };
+      }
+      return next;
+    });
+  }, []);
+
   /**
    * Réinitialise l'ensemble des paramètres d'usine NeoRAGEx
    */
@@ -254,6 +365,9 @@ export function useSettings() {
   return {
     settings,
     updateKeyBinding,
+    updateConsoleKeyBinding,
+    updateConsoleGamepadBinding,
+    resetConsoleControls,
     updateVideoSetting,
     updateAudioSetting,
     updateSystemSetting,

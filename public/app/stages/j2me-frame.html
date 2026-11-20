@@ -885,6 +885,60 @@
 
     setupInputListeners();
 
+    // Lecture dynamique des touches configurées pour Java / J2ME (Clavier + Manette)
+    const J2ME_ACTION_TO_CODE = {
+      up: "ArrowUp",
+      down: "ArrowDown",
+      left: "ArrowLeft",
+      right: "ArrowRight",
+      a: "Digit5",
+      b: "KeyQ",
+      c: "KeyW",
+      d: "Digit8",
+      l1: "Digit7",
+      r1: "Digit9",
+      l2: "Digit1",
+      r2: "Digit3",
+      start: "Digit0",
+    };
+
+    function getJavaCustomSettings() {
+      try {
+        const raw = localStorage.getItem("csw_arcade_settings_v1");
+        const parsed = raw ? JSON.parse(raw) : {};
+        return parsed?.consoleControls?.java || null;
+      } catch {
+        return null;
+      }
+    }
+
+    // Relais clavier personnalisé pour Java / J2ME
+    window.addEventListener("keydown", (e) => {
+      if (e.repeat) return;
+      const javaCfg = getJavaCustomSettings();
+      const kb = javaCfg?.keyboard?.p1;
+      if (!kb) return;
+      for (const [act, j2meCode] of Object.entries(J2ME_ACTION_TO_CODE)) {
+        if (kb[act] && kb[act] === e.code && e.code !== j2meCode) {
+          e.preventDefault();
+          triggerVirtualKey(true, j2meCode);
+          return;
+        }
+      }
+    }, true);
+
+    window.addEventListener("keyup", (e) => {
+      const javaCfg = getJavaCustomSettings();
+      const kb = javaCfg?.keyboard?.p1;
+      if (!kb) return;
+      for (const [act, j2meCode] of Object.entries(J2ME_ACTION_TO_CODE)) {
+        if (kb[act] && kb[act] === e.code && e.code !== j2meCode) {
+          triggerVirtualKey(false, j2meCode);
+          return;
+        }
+      }
+    }, true);
+
     // Support natif Manette physique (Xbox, PS4/PS5, Switch, Bluetooth) à 60Hz pour tous les jeux Java/Gameloft !
     const gpPrevState = new Map();
     const GP_BTN_MAP = {
@@ -904,12 +958,26 @@
       15: "ArrowRight",
     };
 
+    function getEffectiveJavaGamepadMap() {
+      const javaCfg = getJavaCustomSettings();
+      const padCfg = javaCfg?.gamepad;
+      if (!padCfg || typeof padCfg !== "object") return GP_BTN_MAP;
+      const map = { 12: "ArrowUp", 13: "ArrowDown", 14: "ArrowLeft", 15: "ArrowRight" };
+      for (const [act, physIdx] of Object.entries(padCfg)) {
+        if (typeof physIdx === "number" && J2ME_ACTION_TO_CODE[act]) {
+          map[physIdx] = J2ME_ACTION_TO_CODE[act];
+        }
+      }
+      return map;
+    }
+
     function pollGamepads() {
       const pads = navigator.getGamepads ? navigator.getGamepads() : [];
       const pad = Array.from(pads).find((p) => p && p.connected);
       if (pad) {
         const nextMap = new Map();
-        Object.entries(GP_BTN_MAP).forEach(([idxStr, code]) => {
+        const activeGpMap = getEffectiveJavaGamepadMap();
+        Object.entries(activeGpMap).forEach(([idxStr, code]) => {
           const btn = pad.buttons[Number(idxStr)];
           if (btn && btn.pressed) nextMap.set(code, true);
         });

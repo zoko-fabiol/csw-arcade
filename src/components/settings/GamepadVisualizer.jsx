@@ -20,7 +20,32 @@ const NEO_GEO_ACTIONS = [
   { id: 'start', label: 'START (Lancer Partie)', badge: 'START', color: 'purple' }
 ];
 
-export function GamepadVisualizer({ settings, onUpdateGamepadSetting }) {
+const PHYSICAL_BUTTON_LABELS = [
+  { idx: 0, name: 'B0 (A / ✕)' },
+  { idx: 1, name: 'B1 (B / ○)' },
+  { idx: 2, name: 'B2 (X / □)' },
+  { idx: 3, name: 'B3 (Y / △)' },
+  { idx: 4, name: 'B4 (L1 / LB)' },
+  { idx: 5, name: 'B5 (R1 / RB)' },
+  { idx: 6, name: 'B6 (L2 / LT)' },
+  { idx: 7, name: 'B7 (R2 / RT)' },
+  { idx: 8, name: 'B8 (Select / View)' },
+  { idx: 9, name: 'B9 (Start / Menu)' },
+  { idx: 10, name: 'B10 (Stick L3)' },
+  { idx: 11, name: 'B11 (Stick R3)' },
+  { idx: 12, name: 'B12 (D-Pad ↑)' },
+  { idx: 13, name: 'B13 (D-Pad ↓)' },
+  { idx: 14, name: 'B14 (D-Pad ←)' },
+  { idx: 15, name: 'B15 (D-Pad →)' },
+];
+
+export function GamepadVisualizer({
+  settings,
+  onUpdateGamepadSetting,
+  consoleProfile = null,
+  consoleGamepadButtons = null,
+  onUpdateConsoleGamepadButton = null,
+}) {
   const [selectedType, setSelectedType] = useState(() => {
     return settings?.gamepad?.controllerType || 'auto';
   });
@@ -28,19 +53,28 @@ export function GamepadVisualizer({ settings, onUpdateGamepadSetting }) {
   const [activePhysicalButtons, setActivePhysicalButtons] = useState(new Set());
   const [activeAxes, setActiveAxes] = useState({ x: 0, y: 0 });
   const [configuringKey, setConfiguringKey] = useState(null); // Index physique en cours d'assignation
+  const [listeningPadAction, setListeningPadAction] = useState(null); // Action console en attente d'un appui manette
+  const listeningPadActionRef = useRef(null);
+  listeningPadActionRef.current = listeningPadAction;
 
   const p1Index = settings?.gamepad?.p1Index ?? 0;
   const p2Index = settings?.gamepad?.p2Index ?? 1;
   const dpadMode = settings?.gamepad?.dpadMode || 'both';
 
-  const customButtons = settings?.gamepad?.buttons || {
-    a: 0,
-    b: 1,
-    c: 2,
-    d: 3,
-    coin: 8,
-    start: 9
-  };
+  const activeConsoleActions = (consoleProfile?.actions || []).filter(
+    (a) => !['up', 'down', 'left', 'right'].includes(a.key)
+  );
+  const customButtons =
+    consoleGamepadButtons && Object.keys(consoleGamepadButtons).length > 0
+      ? consoleGamepadButtons
+      : settings?.gamepad?.buttons || {
+          a: 0,
+          b: 1,
+          c: 2,
+          d: 3,
+          coin: 8,
+          start: 9,
+        };
 
   // Détection des manettes branchées et identification du profil
   useEffect(() => {
@@ -93,6 +127,19 @@ export function GamepadVisualizer({ settings, onUpdateGamepadSetting }) {
           });
           setActivePhysicalButtons(pressed);
 
+          if (listeningPadActionRef.current && pressed.size > 0) {
+            const firstBtn = Array.from(pressed)[0];
+            if (onUpdateConsoleGamepadButton) {
+              onUpdateConsoleGamepadButton(listeningPadActionRef.current, firstBtn);
+            } else {
+              onUpdateGamepadSetting('buttons', {
+                ...customButtons,
+                [listeningPadActionRef.current]: firstBtn,
+              });
+            }
+            setListeningPadAction(null);
+          }
+
           if (gp.axes && gp.axes.length >= 2) {
             setActiveAxes({ x: gp.axes[0], y: gp.axes[1] });
           }
@@ -111,6 +158,8 @@ export function GamepadVisualizer({ settings, onUpdateGamepadSetting }) {
   const getAssignedAction = (physicalIndex) => {
     for (const [action, pIdx] of Object.entries(customButtons)) {
       if (pIdx === physicalIndex) {
+        const fromConsole = activeConsoleActions.find((a) => a.key === action);
+        if (fromConsole) return fromConsole;
         return NEO_GEO_ACTIONS.find(a => a.id === action);
       }
     }
@@ -118,8 +167,12 @@ export function GamepadVisualizer({ settings, onUpdateGamepadSetting }) {
   };
 
   const assignAction = (actionId, physicalIndex) => {
-    const updated = { ...customButtons, [actionId]: physicalIndex };
-    onUpdateGamepadSetting('buttons', updated);
+    if (onUpdateConsoleGamepadButton) {
+      onUpdateConsoleGamepadButton(actionId, physicalIndex);
+    } else {
+      const updated = { ...customButtons, [actionId]: physicalIndex };
+      onUpdateGamepadSetting('buttons', updated);
+    }
     setConfiguringKey(null);
   };
 
@@ -397,7 +450,10 @@ export function GamepadVisualizer({ settings, onUpdateGamepadSetting }) {
           </div>
 
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-            {NEO_GEO_ACTIONS.map(act => (
+            {(activeConsoleActions.length > 0
+              ? activeConsoleActions.map((a) => ({ id: a.key, label: a.label, badge: a.badge }))
+              : NEO_GEO_ACTIONS
+            ).map(act => (
               <button
                 key={act.id}
                 onClick={() => assignAction(act.id, configuringKey)}
@@ -407,12 +463,69 @@ export function GamepadVisualizer({ settings, onUpdateGamepadSetting }) {
                     : 'bg-neutral-950 hover:bg-neutral-800 text-neutral-200 border-neutral-800 hover:border-neutral-700'
                 }`}
               >
-                <span>{act.label}</span>
-                <span className="text-[10px] px-1.5 py-0.5 rounded bg-black/40 text-cyan-300">
+                <span className="truncate pr-1">{act.label}</span>
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-black/40 text-cyan-300 shrink-0">
                   [{act.badge}]
                 </span>
               </button>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* 5. MAPPING COMPLET PAR CONSOLE (CLIC OU APPUI MANETTE DIRECT) */}
+      {activeConsoleActions.length > 0 && (
+        <div className="p-3.5 rounded-xl bg-neutral-950 border border-neutral-800 space-y-2.5">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-xs font-bold text-cyan-300">
+              Touches Manette — {consoleProfile?.label || 'Console'}
+            </span>
+            <span className="text-[10px] text-neutral-400">
+              {listeningPadAction
+                ? 'Appuyez sur un bouton de votre manette…'
+                : 'Cliquez sur « Détecter » puis appuyez sur la manette'}
+            </span>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            {activeConsoleActions.map((act) => {
+              const assignedIdx = customButtons[act.key];
+              const isListening = listeningPadAction === act.key;
+              return (
+                <div
+                  key={act.key}
+                  className="p-2.5 rounded-xl bg-neutral-900/90 border border-neutral-800 flex items-center justify-between gap-2"
+                >
+                  <div className="min-w-0">
+                    <div className="text-[11px] font-bold text-neutral-200 truncate">{act.label}</div>
+                    <div className="text-[10px] text-neutral-500 font-mono">Badge [{act.badge}]</div>
+                  </div>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <select
+                      value={assignedIdx ?? ''}
+                      onChange={(e) => assignAction(act.key, Number(e.target.value))}
+                      className="px-2 py-1 rounded-lg bg-neutral-950 border border-neutral-700 text-[10px] font-mono text-white"
+                    >
+                      {PHYSICAL_BUTTON_LABELS.map((pb) => (
+                        <option key={pb.idx} value={pb.idx}>
+                          {pb.name}
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      onClick={() => setListeningPadAction(isListening ? null : act.key)}
+                      className={`px-2 py-1 rounded-lg text-[10px] font-bold transition-colors ${
+                        isListening
+                          ? 'bg-amber-500 text-black animate-pulse'
+                          : 'bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-500/40 text-cyan-200'
+                      }`}
+                    >
+                      {isListening ? 'Appuyez…' : 'Détecter'}
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}

@@ -31,7 +31,7 @@ import {
   pushCoinsSync,
   subscribeAccountSync,
 } from './services/accountSyncService';
-import { getRankTierMeta } from './services/scoreRankingService';
+import { applyRemoteSyncedStats, getRankTierMeta } from './services/scoreRankingService';
 import { countryCodeToFlag } from './data/countries';
 import { RollbackP2PEngine } from './services/rollbackP2P';
 import {
@@ -51,6 +51,9 @@ export default function App() {
   const {
     settings,
     updateKeyBinding,
+    updateConsoleKeyBinding,
+    updateConsoleGamepadBinding,
+    resetConsoleControls,
     updateVideoSetting,
     updateAudioSetting,
     updateSystemSetting,
@@ -411,6 +414,11 @@ export default function App() {
       if (Array.isArray(sync.activeChannels) && sync.channelsUpdatedAtMs > lastRemoteChannelsTsRef.current) {
         lastRemoteChannelsTsRef.current = sync.channelsUpdatedAtMs;
         firebaseFightcadeService.applySyncedChannels(sync.activeChannels);
+      }
+
+      // 2b. Synchroniser les statistiques & meilleurs scores des jeux entre tous les appareils du compte
+      if (Array.isArray(sync.gameStats) && sync.gameStats.length > 0) {
+        applyRemoteSyncedStats(uid, sync.gameStats);
       }
 
       // 3. Détecter si une partie est en cours / en pause sur un AUTRE appareil connecté au même compte
@@ -856,6 +864,9 @@ export default function App() {
         onClose={() => setIsSettingsOpen(false)}
         settings={settings}
         updateKeyBinding={updateKeyBinding}
+        updateConsoleKeyBinding={updateConsoleKeyBinding}
+        updateConsoleGamepadBinding={updateConsoleGamepadBinding}
+        resetConsoleControls={resetConsoleControls}
         updateVideoSetting={updateVideoSetting}
         updateAudioSetting={updateAudioSetting}
         updateSystemSetting={updateSystemSetting}

@@ -153,31 +153,47 @@
 
     let currentCoreName = 'fbneo';
 
-    function buildControllersConfig(controls, coreName = currentCoreName) {
-      if (!controls) return null;
-      const p1 = controls.p1 || {};
-      const p2 = controls.p2 || {};
-      const isArcade = ['fbneo', 'arcade', 'mame2003_plus'].includes(String(coreName || '').toLowerCase());
+    function resolveConsoleIdFromCore(coreName) {
+      const c = String(coreName || '').toLowerCase();
+      if (['fbneo', 'arcade', 'mame2003_plus'].includes(c)) return 'arcade';
+      if (['psx', 'ps1', 'pcsx_rearmed'].includes(c)) return 'playstation';
+      if (['segamd', 'genesis_plus_gx', 'picodrive', 'sms', 'gg', 'sega'].includes(c)) return 'sega';
+      if (['nes', 'fceumm', 'nestopia', 'snes', 'snes9x', 'gba', 'mgba', 'gb', 'gbc', 'gambatte', 'n64', 'mupen64plus_next', 'nds', 'melonds'].includes(c)) return 'nintendo';
+      return 'arcade';
+    }
+
+    function buildControllersConfig(controls, coreName = currentCoreName, hw = null) {
+      const consoleId = resolveConsoleIdFromCore(coreName);
+      const effectiveHw = hw || readHardwareSettings();
+      const consoleKb = effectiveHw?.consoleControls?.[consoleId]?.keyboard;
+      const sourceControls = consoleKb || controls;
+      if (!sourceControls) return null;
+      const p1 = sourceControls.p1 || {};
+      const p2 = sourceControls.p2 || {};
+      const lowerCore = String(coreName || '').toLowerCase();
+      const isArcade = ['fbneo', 'arcade', 'mame2003_plus'].includes(lowerCore);
+      const isN64 = ['n64', 'mupen64plus_next'].includes(lowerCore);
       return {
         0: {
           0: { value: getKeyCode(p1.a, 74), value2: 'BUTTON_2' }, // B / Cross / Neo Geo A
           1: { value: getKeyCode(p1.c, 85), value2: 'BUTTON_4' }, // Y / Square / Neo Geo C
-          2: isArcade ? { value: 0, value2: '' } : { value: 16, value2: 'SELECT' },
-          3: { value: getKeyCode(p1.start, 49), value2: 'START' },
+          2: isArcade ? { value: 0, value2: '' } : { value: getKeyCode(p1.coin, 16), value2: 'SELECT' },
+          3: { value: getKeyCode(p1.start, isArcade ? 49 : 13), value2: 'START' },
           4: { value: getKeyCode(p1.up, 87), value2: 'DPAD_UP' },
           5: { value: getKeyCode(p1.down, 83), value2: 'DPAD_DOWN' },
           6: { value: getKeyCode(p1.left, 65), value2: 'DPAD_LEFT' },
           7: { value: getKeyCode(p1.right, 68), value2: 'DPAD_RIGHT' },
           8: { value: getKeyCode(p1.b, 75), value2: 'BUTTON_1' }, // A / Circle / Neo Geo B
           9: { value: getKeyCode(p1.d, 73), value2: 'BUTTON_3' }, // X / Triangle / Neo Geo D
-          10: { value: 81, value2: 'LEFT_TOP_SHOULDER' }, // Q / L1
-          11: { value: 69, value2: 'RIGHT_TOP_SHOULDER' }, // E / R1
-          12: { value: 90, value2: 'LEFT_BOTTOM_SHOULDER' }, // Z / L2
-          13: { value: 67, value2: 'RIGHT_BOTTOM_SHOULDER' }, // C / R2
-          16: { value: 39, value2: 'LEFT_STICK_X:+1' },
-          17: { value: 37, value2: 'LEFT_STICK_X:-1' },
-          18: { value: 40, value2: 'LEFT_STICK_Y:+1' },
-          19: { value: 38, value2: 'LEFT_STICK_Y:-1' },
+          10: { value: getKeyCode(p1.l1, 81), value2: 'LEFT_TOP_SHOULDER' }, // Q / L1
+          11: { value: getKeyCode(p1.r1, 69), value2: 'RIGHT_TOP_SHOULDER' }, // E / R1
+          12: { value: getKeyCode(p1.l2, 90), value2: 'LEFT_BOTTOM_SHOULDER' }, // Z / L2 / N64 Z-Trigger
+          13: { value: getKeyCode(p1.r2, 67), value2: 'RIGHT_BOTTOM_SHOULDER' }, // C / R2
+          // Sur N64 (Mario Kart 64, Pokémon Stadium...), le stick analogique doit répondre immédiatement aux touches principales
+          16: { value: isN64 ? getKeyCode(p1.right, 68) : 39, value2: 'LEFT_STICK_X:+1' },
+          17: { value: isN64 ? getKeyCode(p1.left, 65) : 37, value2: 'LEFT_STICK_X:-1' },
+          18: { value: isN64 ? getKeyCode(p1.down, 83) : 40, value2: 'LEFT_STICK_Y:+1' },
+          19: { value: isN64 ? getKeyCode(p1.up, 87) : 38, value2: 'LEFT_STICK_Y:-1' },
           20: { value: 0, value2: 'RIGHT_STICK_X:+1' },
           21: { value: 0, value2: 'RIGHT_STICK_X:-1' },
           22: { value: 0, value2: 'RIGHT_STICK_Y:+1' },
@@ -226,8 +242,8 @@
           }
         } catch {}
       }
-      if (hw.controls && window.EJS_emulator) {
-        const cfg = buildControllersConfig(hw.controls);
+      if ((hw.controls || hw.consoleControls) && window.EJS_emulator) {
+        const cfg = buildControllersConfig(hw.controls, currentCoreName, hw);
         if (cfg) {
           window.EJS_emulator.controls = cfg;
           window.EJS_emulator.defaultControllers = cfg;
@@ -268,7 +284,7 @@
       }
     }
 
-    const BUTTON_INDEX_ORDER = [4, 5, 6, 7, 0, 8, 1, 9, 2, 3];
+    const BUTTON_INDEX_ORDER = [4, 5, 6, 7, 0, 8, 1, 9, 10, 11, 12, 13, 2, 3];
     let targetWalletCoins = 5;
     let romCreditsInGame = 0;
     let isSyncingCredits = false;
@@ -440,6 +456,15 @@
       return -1;
     }
 
+    function bytesToBase64(bytes) {
+      let bin = '';
+      const chunk = 0x8000;
+      for (let i = 0; i < bytes.length; i += chunk) {
+        bin += String.fromCharCode(...bytes.subarray(i, i + chunk));
+      }
+      return btoa(bin);
+    }
+
     function dispatchSyntheticKey(kc, type) {
       const ev = new KeyboardEvent(type, { keyCode: kc, which: kc, bubbles: true, cancelable: true });
       Object.defineProperty(ev, 'keyCode', { get: () => kc });
@@ -448,6 +473,54 @@
       window.dispatchEvent(ev);
       document.dispatchEvent(ev);
     }
+
+    // Pont universel clavier -> EmulatorJS (garantit que ZQSD/WASD + Flèches + J/K/U/I/Espace/Entrée fonctionnent sur Mario Kart 64, N64, PS1, SNES, Arcade)
+    function handleUniversalKeyboardBridge(code, keyCode, isDown) {
+      const myPort = netplayPlayerIndex === 1 ? 1 : 0;
+      const lowerCore = String(currentCoreName || '').toLowerCase();
+      const isAnalogConsole = ['n64', 'mupen64plus_next', 'psx', 'ps1', 'pcsx_rearmed', 'nds', 'melonds'].includes(lowerCore);
+
+      // Flèches directionnelles -> fonctionnent aussi comme DPAD + Stick Analogique
+      if (code === 'ArrowUp' || keyCode === 38) {
+        simulateEmuInput(myPort, 19, isDown);
+        simulateEmuInput(myPort, 4, isDown);
+        return;
+      }
+      if (code === 'ArrowDown' || keyCode === 40) {
+        simulateEmuInput(myPort, 18, isDown);
+        simulateEmuInput(myPort, 5, isDown);
+        return;
+      }
+      if (code === 'ArrowLeft' || keyCode === 37) {
+        simulateEmuInput(myPort, 17, isDown);
+        simulateEmuInput(myPort, 6, isDown);
+        return;
+      }
+      if (code === 'ArrowRight' || keyCode === 39) {
+        simulateEmuInput(myPort, 16, isDown);
+        simulateEmuInput(myPort, 7, isDown);
+        return;
+      }
+
+      // WASD / ZQSD -> sur N64/PS1, pilotent aussi le Stick Analogique en plus du DPAD
+      if (isAnalogConsole) {
+        const portMap = window.EJS_emulator?.controls?.[myPort] || buildControllersConfig(readHardwareSettings().controls)?.[0];
+        if (portMap) {
+          if (keyCode === portMap[4]?.value) simulateEmuInput(myPort, 19, isDown);
+          if (keyCode === portMap[5]?.value) simulateEmuInput(myPort, 18, isDown);
+          if (keyCode === portMap[6]?.value) simulateEmuInput(myPort, 17, isDown);
+          if (keyCode === portMap[7]?.value) simulateEmuInput(myPort, 16, isDown);
+        }
+      }
+
+      if (code === 'Space' || code === 'Enter' || code === 'Digit1' || code === 'Numpad1') {
+        simulateEmuInput(myPort, 3, isDown);
+      }
+    }
+
+    window.addEventListener('pointerdown', () => {
+      try { window.focus(); } catch {}
+    });
 
     window.addEventListener('keydown', (e) => {
       if (e.key === 'Tab') {
@@ -465,8 +538,9 @@
           forceSyncCreditsToRam();
           return;
         }
-        if (btnIdx === 3) {
-          simulateEmuInput(myPort, 3, true);
+        handleUniversalKeyboardBridge(e.code || '', e.keyCode || e.which, true);
+        if (btnIdx >= 0) {
+          simulateEmuInput(myPort, btnIdx, true);
         }
         if (isNetplaySession && btnIdx >= 0) {
           notifyParent('NETPLAY_LOCAL_BTN', { buttonIdx: btnIdx, pressed: true });
@@ -478,7 +552,8 @@
       if (!e._cswSynthetic) {
         const myPort = netplayPlayerIndex === 1 ? 1 : 0;
         const btnIdx = resolveUniversalKey(e);
-        if (btnIdx === 2 || btnIdx === 3) {
+        handleUniversalKeyboardBridge(e.code || '', e.keyCode || e.which, false);
+        if (btnIdx >= 0) {
           simulateEmuInput(myPort, btnIdx, false);
         }
         if (isNetplaySession && btnIdx >= 0) {
@@ -617,25 +692,25 @@
     function getSystemRamView() {
       try {
         const mod = getWasmModule();
-        if (!mod || !mod.HEAPU8) return null;
-        if (typeof mod._retro_get_memory_data === 'function' && typeof mod._retro_get_memory_size === 'function') {
+        if (mod && mod.HEAPU8 && typeof mod._retro_get_memory_data === 'function' && typeof mod._retro_get_memory_size === 'function') {
           const ptr = mod._retro_get_memory_data(2); // RETRO_MEMORY_SYSTEM_RAM
           const size = mod._retro_get_memory_size(2);
           if (ptr > 0 && size >= 512 && ptr + size <= mod.HEAPU8.length) {
-            return mod.HEAPU8.subarray(ptr, ptr + size);
+            return { ram: mod.HEAPU8.subarray(ptr, ptr + size), isRawSystemRam: true };
           }
         }
-        // Fallback savestate RAM pour les cœurs arcade (FBNeo / MAME) qui n'exposent pas memory_data(2)
+        // Savestate RAM complet (EmulatorJS FBNeo / MAME / PS1 / SNES / Mega Drive / GBA)
         const state = window.EJS_emulator?.gameManager?.getState?.();
         if (state && state.length > 4096) {
-          return state instanceof Uint8Array ? state : new Uint8Array(state);
+          const bytes = state instanceof Uint8Array ? state : new Uint8Array(state);
+          return { ram: bytes, isRawSystemRam: false };
         }
       } catch {}
       return null;
     }
 
     function readBcd3(buf, off) {
-      if (off + 3 > buf.length) return -1;
+      if (off < 0 || off + 3 > buf.length) return -1;
       const b0 = buf[off], b1 = buf[off + 1], b2 = buf[off + 2];
       const h0 = b0 >> 4, l0 = b0 & 0xF;
       const h1 = b1 >> 4, l1 = b1 & 0xF;
@@ -644,22 +719,63 @@
       return (h0 * 10 + l0) * 10000 + (h1 * 10 + l1) * 100 + (h2 * 10 + l2);
     }
 
+    function readBcd4(buf, off) {
+      if (off < 0 || off + 4 > buf.length) return -1;
+      const b0 = buf[off], b1 = buf[off + 1], b2 = buf[off + 2], b3 = buf[off + 3];
+      const h0 = b0 >> 4, l0 = b0 & 0xF;
+      const h1 = b1 >> 4, l1 = b1 & 0xF;
+      const h2 = b2 >> 4, l2 = b2 & 0xF;
+      const h3 = b3 >> 4, l3 = b3 & 0xF;
+      if (h0 > 9 || l0 > 9 || h1 > 9 || l1 > 9 || h2 > 9 || l2 > 9 || h3 > 9 || l3 > 9) return -1;
+      return (h0 * 10 + l0) * 1000000 + (h1 * 10 + l1) * 10000 + (h2 * 10 + l2) * 100 + (h3 * 10 + l3);
+    }
+
     function readHeuristicValue(ram, addr) {
-      if (!addr || addr.offset + 4 > ram.length) return 0;
+      if (!addr || addr.offset < 0 || addr.offset + 4 > ram.length) return 0;
       const dv = new DataView(ram.buffer, ram.byteOffset, ram.byteLength);
+      if (addr.type === 'bcd4') {
+        const v = readBcd4(ram, addr.offset);
+        return v >= 0 ? v : 0;
+      }
       if (addr.type === 'bcd3') {
         const v = readBcd3(ram, addr.offset);
         return v >= 0 ? v : 0;
       }
       if (addr.type === 'u32be') return dv.getUint32(addr.offset, false);
       if (addr.type === 'u32le') return dv.getUint32(addr.offset, true);
+      if (addr.type === 'u16be') return dv.getUint16(addr.offset, false);
       if (addr.type === 'u16le') return dv.getUint16(addr.offset, true);
       return 0;
     }
 
+    function bumpScoreCandidate(key, offset, type, curVal, prevVal, requiredHits) {
+      const rec = cswRamTelemetry.scoreCandidates.get(key) || {
+        offset,
+        type,
+        hits: 0,
+        val: prevVal,
+        sameTicks: 0,
+      };
+      // Rejeter si la valeur précédente enregistrée ne correspond pas à une progression monotone
+      if (curVal < rec.val) {
+        cswRamTelemetry.scoreCandidates.delete(key);
+        return null;
+      }
+      rec.hits += 1;
+      rec.val = curVal;
+      cswRamTelemetry.scoreCandidates.set(key, rec);
+      if (rec.hits >= requiredHits) {
+        cswRamTelemetry.lockedScoreAddr = { offset, type };
+        return curVal;
+      }
+      return null;
+    }
+
     function runHeuristicRamScan(ram) {
-      // Limiter le scan heuristique aux premiers 131072 octets de RAM système pour rester < 2ms/tick
-      const scanLen = Math.min(ram.length, 131072);
+      // Scanner jusqu'à 6 Mo de RAM / Savestate (FBNeo Neo Geo / CPS2 / PS1) grâce au diff 32-bit (< 3ms/tick)
+      const scanLen = Math.min(ram.length, 6291456) & ~3;
+      if (scanLen < 1024) return { score: cswRamTelemetry.lastScore, lives: cswRamTelemetry.lastLives };
+
       const prev = cswRamTelemetry.prevSnapshot;
       if (!prev || prev.length !== scanLen) {
         cswRamTelemetry.prevSnapshot = new Uint8Array(ram.subarray(0, scanLen));
@@ -670,74 +786,136 @@
       let detectedScore = cswRamTelemetry.lastScore;
       if (cswRamTelemetry.lockedScoreAddr) {
         const v = readHeuristicValue(ram, cswRamTelemetry.lockedScoreAddr);
-        if (v < 99999999) {
+        if (v < 50000000) {
           detectedScore = v;
+        } else {
+          cswRamTelemetry.lockedScoreAddr = null;
         }
       } else {
-        // Découvrir les compteurs qui augmentent par paliers typiques de score (+10..+20000) sans bouger à chaque frame
+        const cur32 = new Uint32Array(ram.buffer, ram.byteOffset, scanLen >> 2);
+        const prev32 = new Uint32Array(prev.buffer, prev.byteOffset, scanLen >> 2);
         const dvCur = new DataView(ram.buffer, ram.byteOffset, scanLen);
         const dvPrev = new DataView(prev.buffer, prev.byteOffset, scanLen);
-        for (let off = 0; off < scanLen - 4; off += 2) {
-          // Test BCD 3 octets (très courant en Arcade / Neo Geo / Capcom / Konami / Sega)
-          const bcdCur = readBcd3(ram, off);
-          const bcdPrev = readBcd3(prev, off);
-          if (bcdCur > bcdPrev && bcdPrev >= 0 && bcdCur <= 999999) {
-            const diff = bcdCur - bcdPrev;
-            if (diff >= 5 && diff <= 25000 && (diff % 5 === 0 || diff % 10 === 0)) {
-              const key = `bcd3_${off}`;
-              const rec = cswRamTelemetry.scoreCandidates.get(key) || { offset: off, type: 'bcd3', hits: 0, val: 0 };
-              rec.hits += 1;
-              rec.val = bcdCur;
-              cswRamTelemetry.scoreCandidates.set(key, rec);
-              if (rec.hits >= 2) {
-                cswRamTelemetry.lockedScoreAddr = { offset: off, type: 'bcd3' };
-                detectedScore = bcdCur;
-                break;
+        const words = scanLen >> 2;
+
+        // Invalider les candidats qui ont diminué entre deux ticks
+        for (const [k, rec] of cswRamTelemetry.scoreCandidates.entries()) {
+          const curV = readHeuristicValue(ram, rec);
+          if (curV < rec.val || curV >= 50000000) {
+            cswRamTelemetry.scoreCandidates.delete(k);
+          }
+        }
+
+        for (let w = 16; w < words - 2; w++) {
+          if (cur32[w] === prev32[w]) continue; // Saute instantanément 99.5% de la RAM inchangée
+          const base = w << 2;
+
+          // Tester les alignements 2 octets (base+0, base+2 : standard Motorola 68000 Neo Geo / Mega Drive)
+          // et 1 octet (base+0..3 : BCD 3/4 octets)
+          for (let sub = 0; sub < 4; sub++) {
+            const off = base + sub;
+            if (off + 4 >= scanLen) break;
+
+            // A. BCD 4 octets (8 chiffres : Metal Slug, KOF, Neo Geo, Capcom)
+            const b4Cur = readBcd4(ram, off);
+            const b4Prev = readBcd4(prev, off);
+            if (b4Cur > b4Prev && b4Prev >= 0 && b4Cur <= 99999999) {
+              const diff = b4Cur - b4Prev;
+              if (diff >= 10 && diff <= 50000 && diff % 10 === 0) {
+                const locked = bumpScoreCandidate(`bcd4_${off}`, off, 'bcd4', b4Cur, b4Prev, 2);
+                if (locked !== null) { detectedScore = locked; break; }
               }
             }
-          }
-          // Test u32 little-endian / big-endian (PS1, SNES, Mega Drive, GBA)
-          if (off % 4 === 0) {
-            const leCur = dvCur.getUint32(off, true);
-            const lePrev = dvPrev.getUint32(off, true);
-            if (leCur > lePrev && leCur <= 9999999) {
-              const diff = leCur - lePrev;
-              if (diff >= 10 && diff <= 25000 && diff % 10 === 0) {
-                const key = `u32le_${off}`;
-                const rec = cswRamTelemetry.scoreCandidates.get(key) || { offset: off, type: 'u32le', hits: 0, val: 0 };
-                rec.hits += 1;
-                rec.val = leCur;
-                cswRamTelemetry.scoreCandidates.set(key, rec);
-                if (rec.hits >= 2) {
-                  cswRamTelemetry.lockedScoreAddr = { offset: off, type: 'u32le' };
-                  detectedScore = leCur;
-                  break;
+
+            // B. BCD 3 octets (6 chiffres)
+            const b3Cur = readBcd3(ram, off);
+            const b3Prev = readBcd3(prev, off);
+            if (b3Cur > b3Prev && b3Prev >= 0 && b3Cur <= 999999) {
+              const diff = b3Cur - b3Prev;
+              if (diff >= 10 && diff <= 50000 && diff % 10 === 0) {
+                const locked = bumpScoreCandidate(`bcd3_${off}`, off, 'bcd3', b3Cur, b3Prev, 2);
+                if (locked !== null) { detectedScore = locked; break; }
+              }
+            }
+
+            // Pour u32 / u16, vérifier les offsets pairs (sub === 0 || sub === 2)
+            if ((sub & 1) === 0) {
+              // C. u32 Big-Endian (Neo Geo MVS & Sega Mega Drive 68000)
+              const beCur = dvCur.getUint32(off, false);
+              const bePrev = dvPrev.getUint32(off, false);
+              if (beCur > bePrev && bePrev < 5000000 && beCur <= 9999999) {
+                const diff = beCur - bePrev;
+                if (diff >= 10 && diff <= 50000 && diff % 10 === 0) {
+                  const locked = bumpScoreCandidate(`u32be_${off}`, off, 'u32be', beCur, bePrev, 2);
+                  if (locked !== null) { detectedScore = locked; break; }
+                }
+              }
+
+              // D. u32 Little-Endian (PlayStation PS1, SNES, GBA, N64)
+              const leCur = dvCur.getUint32(off, true);
+              const lePrev = dvPrev.getUint32(off, true);
+              if (leCur > lePrev && lePrev < 5000000 && leCur <= 9999999) {
+                const diff = leCur - lePrev;
+                if (diff >= 10 && diff <= 50000 && diff % 10 === 0) {
+                  const locked = bumpScoreCandidate(`u32le_${off}`, off, 'u32le', leCur, lePrev, 2);
+                  if (locked !== null) { detectedScore = locked; break; }
+                }
+              }
+
+              // E. u16 Big-Endian & Little-Endian (Jeux de sport ex: Street Hoop +2/+3 pts, NES, Arcade)
+              const u16beCur = dvCur.getUint16(off, false);
+              const u16bePrev = dvPrev.getUint16(off, false);
+              if (u16beCur > u16bePrev && u16beCur <= 500) {
+                const diff = u16beCur - u16bePrev;
+                if (diff >= 2 && diff <= 6) {
+                  const locked = bumpScoreCandidate(`u16be_${off}`, off, 'u16be', u16beCur, u16bePrev, 3);
+                  if (locked !== null) { detectedScore = locked; break; }
+                }
+              }
+
+              const u16leCur = dvCur.getUint16(off, true);
+              const u16lePrev = dvPrev.getUint16(off, true);
+              if (u16leCur > u16lePrev && u16leCur <= 500) {
+                const diff = u16leCur - u16lePrev;
+                if (diff >= 2 && diff <= 6) {
+                  const locked = bumpScoreCandidate(`u16le_${off}`, off, 'u16le', u16leCur, u16lePrev, 3);
+                  if (locked !== null) { detectedScore = locked; break; }
                 }
               }
             }
           }
+          if (cswRamTelemetry.lockedScoreAddr) break;
         }
       }
 
       // 2. Suivi heuristique d'un compteur de vies (octets entre 1..9 qui descendent de -1 lors d'une mort)
       let detectedLives = cswRamTelemetry.lastLives;
-      if (cswRamTelemetry.lockedLivesAddr !== null) {
+      if (cswRamTelemetry.lockedLivesAddr !== null && cswRamTelemetry.lockedLivesAddr < scanLen) {
         const lv = ram[cswRamTelemetry.lockedLivesAddr];
         if (lv <= 15) detectedLives = lv;
       } else if (cswRamTelemetry.hadActivePlay) {
-        for (let off = 0; off < Math.min(scanLen, 65536); off++) {
-          const cur = ram[off];
-          const old = prev[off];
-          if (old >= 2 && old <= 6 && cur === old - 1) {
-            const rec = cswRamTelemetry.livesCandidates.get(off) || { initial: old, drops: 0 };
-            rec.drops += 1;
-            cswRamTelemetry.livesCandidates.set(off, rec);
-            if (rec.drops >= 2) {
-              cswRamTelemetry.lockedLivesAddr = off;
-              detectedLives = cur;
-              break;
+        const cur32 = new Uint32Array(ram.buffer, ram.byteOffset, scanLen >> 2);
+        const prev32 = new Uint32Array(prev.buffer, prev.byteOffset, scanLen >> 2);
+        const words = scanLen >> 2;
+        for (let w = 16; w < words - 1; w++) {
+          if (cur32[w] === prev32[w]) continue;
+          const base = w << 2;
+          for (let b = 0; b < 4; b++) {
+            const off = base + b;
+            const cur = ram[off];
+            const old = prev[off];
+            if (old >= 2 && old <= 6 && cur === old - 1) {
+              const rec = cswRamTelemetry.livesCandidates.get(off) || { initial: old, drops: 0 };
+              rec.drops += 1;
+              cswRamTelemetry.livesCandidates.set(off, rec);
+              if (rec.drops >= 2) {
+                cswRamTelemetry.lockedLivesAddr = off;
+                detectedLives = cur;
+                break;
+              }
             }
           }
+          if (cswRamTelemetry.lockedLivesAddr !== null) break;
         }
       }
 
@@ -774,16 +952,31 @@
       cswRamTelemetry.lastSavedScore = 0;
     }
 
+    function isHeavy3dCore(core) {
+      return ['n64', 'mupen64plus_next', 'psx', 'ps1', 'pcsx_rearmed', 'nds', 'melonds', 'desmume'].includes(
+        String(core || '').toLowerCase()
+      );
+    }
+
     function tickRamTelemetry() {
-      const ram = getSystemRamView();
-      if (!ram) return;
+      // Sur N64 / PS1 / NDS, un savestate fait 16 à 32 Mo : ne jamais appeler getState() en boucle
+      // sous peine de provoquer des freezes (ex: Pokémon Stadium) et un crash mémoire du navigateur.
+      if (isHeavy3dCore(cswRamTelemetry.core)) {
+        const mod = getWasmModule();
+        if (!mod || typeof mod._retro_get_memory_data !== 'function') return;
+      }
+      const view = getSystemRamView();
+      if (!view || !view.ram) return;
+      const { ram, isRawSystemRam } = view;
 
       let score = 0;
       let lives = null;
       let p1Rounds = null;
       let p2Rounds = null;
 
-      if (cswRamTelemetry.profile) {
+      // N'utiliser les offsets absolus de RAM_GAME_PROFILES que sur une vraie vue RAM système ;
+      // sur un savestate RetroArch complet, utiliser le scanner heuristique multi-format (BCD / Big-Endian / Little-Endian).
+      if (isRawSystemRam && cswRamTelemetry.profile) {
         const res = cswRamTelemetry.profile.read(ram);
         if (res) {
           score = Number(res.score || 0);
@@ -829,8 +1022,8 @@
         emitRamLossCreditSignal('score_reset_restart_ram');
       }
 
-      // 4. Sauvegarde automatique continue dès qu'un nouveau palier de score RAM significatif est atteint
-      if (cswRamTelemetry.peakScore >= 100 && cswRamTelemetry.peakScore > cswRamTelemetry.lastSavedScore) {
+      // 4. Sauvegarde automatique continue dès qu'un nouveau palier de score RAM significatif est atteint (>= 2 pts pour sports, >= 10 pts pour arcade)
+      if (cswRamTelemetry.peakScore >= 2 && cswRamTelemetry.peakScore > cswRamTelemetry.lastSavedScore) {
         emitRamAutoScore(cswRamTelemetry.peakScore, 'milestone');
       }
 
@@ -868,7 +1061,8 @@
       cswRamTelemetry.livesCandidates.clear();
       cswRamTelemetry.lockedLivesAddr = null;
 
-      cswRamTelemetry.timer = setInterval(tickRamTelemetry, 550);
+      const intervalMs = isHeavy3dCore(lowerCore) ? 1500 : 900;
+      cswRamTelemetry.timer = setInterval(tickRamTelemetry, intervalMs);
     }
 
     window.addEventListener('message', (event) => {
@@ -890,14 +1084,68 @@
         return;
       }
 
+      if (msg.type === 'FORWARD_KEY') {
+        const isDown = msg.eventType === 'keydown';
+        const kc = Number(msg.keyCode || 0);
+        const code = msg.code || '';
+        const myPort = netplayPlayerIndex === 1 ? 1 : 0;
+        if (code === 'Digit5' || code === 'Numpad5') {
+          if (isDown) forceSyncCreditsToRam();
+          return;
+        }
+        handleUniversalKeyboardBridge(code, kc, isDown);
+        const btnIdx = findLocalButtonIndex(kc);
+        if (btnIdx >= 0) {
+          simulateEmuInput(myPort, btnIdx, isDown);
+        }
+        return;
+      }
+
+      if (msg.type === 'PAUSE_EMU') {
+        try { window.EJS_emulator?.pause?.(); } catch {}
+        return;
+      }
+
+      if (msg.type === 'RESUME_EMU') {
+        try {
+          window.EJS_emulator?.play?.();
+          window.focus();
+        } catch {}
+        return;
+      }
+
       if (msg.type === 'EXPORT_STATE') {
         try {
           const state = window.EJS_emulator?.gameManager?.getState?.();
           if (state) {
             const bytes = state instanceof Uint8Array ? state : new Uint8Array(state);
-            let bin = '';
-            for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
-            notifyParent('STATE_EXPORTED', { stateBase64: btoa(bin), slot: msg.slot || 'quick' });
+            // Pour la synchro cloud auto en arrière-plan, ignorer les blobs > 12 Mo pour éviter tout freeze
+            if (msg.slot === 'cloud_handoff' && bytes.length > 12 * 1024 * 1024) {
+              return;
+            }
+            let screenshotDataUrl = null;
+            if (msg.slot !== 'cloud_handoff' && msg.slot !== 'frame0') {
+              try {
+                const srcCanvas = document.querySelector('#game canvas');
+                if (srcCanvas && srcCanvas.width > 0 && srcCanvas.height > 0) {
+                  const thumb = document.createElement('canvas');
+                  const maxW = 320;
+                  const scale = Math.min(1, maxW / srcCanvas.width);
+                  thumb.width = Math.max(1, Math.round(srcCanvas.width * scale));
+                  thumb.height = Math.max(1, Math.round(srcCanvas.height * scale));
+                  const tctx = thumb.getContext('2d');
+                  if (tctx) {
+                    tctx.drawImage(srcCanvas, 0, 0, thumb.width, thumb.height);
+                    screenshotDataUrl = thumb.toDataURL('image/jpeg', 0.7);
+                  }
+                }
+              } catch {}
+            }
+            notifyParent('STATE_EXPORTED', {
+              stateBase64: bytesToBase64(bytes),
+              slot: msg.slot || 'quick',
+              screenshotDataUrl,
+            });
           }
         } catch {}
         return;
@@ -1070,7 +1318,7 @@
           }
 
           const hw = readHardwareSettings();
-          let ctrlCfg = buildControllersConfig(hw.controls) || buildControllersConfig({ p1: {}, p2: {} });
+          let ctrlCfg = buildControllersConfig(hw.controls, msg.core, hw) || buildControllersConfig({ p1: {}, p2: {} }, msg.core, hw);
           if (isNetplaySession && netplayPlayerIndex === 1 && ctrlCfg) {
             ctrlCfg = { 0: ctrlCfg[1], 1: ctrlCfg[0], 2: {}, 3: {} };
           }
@@ -1118,9 +1366,7 @@
                   const state = window.EJS_emulator?.gameManager?.getState?.();
                   if (state) {
                     const bytes = state instanceof Uint8Array ? state : new Uint8Array(state);
-                    let bin = '';
-                    for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
-                    notifyParent('STATE_EXPORTED', { stateBase64: btoa(bin), slot: 'frame0' });
+                    notifyParent('STATE_EXPORTED', { stateBase64: bytesToBase64(bytes), slot: 'frame0' });
                   }
                 } catch {}
               }, 650);

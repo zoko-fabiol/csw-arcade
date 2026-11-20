@@ -139,8 +139,10 @@ export function setupNetplayHub(server) {
     res.end(JSON.stringify({ ok: false }));
   });
 
-  // Relais de Synchronisation Parfaite du Compte Multi-Appareils (Crédits, Salons actifs, Reprise de partie / Savestate Cloud)
-  const accountSyncStore = new Map(); // uid -> { coins, coinsUpdatedAtMs, activeChannels, selectedChannelId, activeSession, stateBlob, updatedAtMs }
+  // Relais de Synchronisation Parfaite du Compte Multi-Appareils (Crédits, Salons actifs, Stats/Scores, Reprise de partie / Savestate Cloud)
+  const accountSyncStore = new Map(); // uid -> { coins, ..., gameStats: Map<gameId, stat>, ... }
+  const gameLeaderboards = new Map(); // gameId -> Map<uid, lbEntry>
+
   const getAccountRecord = (uid) => {
     const key = String(uid || '');
     if (!accountSyncStore.has(key)) {
@@ -152,12 +154,62 @@ export function setupNetplayHub(server) {
         channelsUpdatedAtMs: 0,
         selectedChannelId: null,
         activeSession: null,
-        statePayload: null, // { gameId, encoding: 'gzip' | 'raw', dataBase64, savedAtMs }
+        statePayload: null,
+        gameStats: new Map(),
         updatedAtMs: 0,
       });
     }
     return accountSyncStore.get(key);
   };
+
+  server.middlewares.use('/api/game-leaderboard', (req, res) => {
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    if (req.method === 'OPTIONS') {
+      res.statusCode = 204;
+      return res.end();
+    }
+    const url = new URL(req.url, 'http://localhost:3003');
+    const gameId = url.searchParams.get('gameId') || '';
+
+    if (req.method === 'GET') {
+      const lbMap = gameLeaderboards.get(gameId);
+      const rows = lbMap
+        ? Array.from(lbMap.values()).sort((a, b) => (b.bestScore || 0) - (a.bestScore || 0)).slice(0, 25)
+        : [];
+      res.statusCode = 200;
+      return res.end(JSON.stringify({ ok: true, rows }));
+    }
+
+    if (req.method === 'POST') {
+      let body = '';
+      req.on('data', (c) => { body += c; });
+      req.on('end', () => {
+        try {
+          const entry = body ? JSON.parse(body) : {};
+          const gid = entry.gameId || gameId;
+          if (gid && entry.uid) {
+            if (!gameLeaderboards.has(gid)) gameLeaderboards.set(gid, new Map());
+            const lbMap = gameLeaderboards.get(gid);
+            const prev = lbMap.get(entry.uid);
+            if (!prev || Number(entry.bestScore || 0) >= Number(prev.bestScore || 0)) {
+              lbMap.set(entry.uid, { ...prev, ...entry, updatedAtMs: Date.now() });
+            }
+          }
+          res.statusCode = 200;
+          return res.end(JSON.stringify({ ok: true }));
+        } catch (err) {
+          res.statusCode = 400;
+          return res.end(JSON.stringify({ ok: false, error: err.message }));
+        }
+      });
+      return;
+    }
+    res.statusCode = 405;
+    res.end(JSON.stringify({ ok: false }));
+  });
 
   server.middlewares.use('/api/account-sync', (req, res) => {
     res.setHeader('Content-Type', 'application/json');
@@ -190,6 +242,7 @@ export function setupNetplayHub(server) {
           channelsUpdatedAtMs: rec.channelsUpdatedAtMs,
           selectedChannelId: rec.selectedChannelId,
           activeSession: rec.activeSession,
+          gameStats: Array.from(rec.gameStats.values()),
           hasSavestate: Boolean(rec.statePayload && rec.statePayload.dataBase64),
           savestateMeta: rec.statePayload
             ? {
@@ -235,6 +288,26 @@ export function setupNetplayHub(server) {
             rec.activeSession = payload.activeSession
               ? { ...payload.activeSession, updatedAtMs: now }
               : null;
+          }
+          if (Array.isArray(payload.gameStats)) {
+            for (const st of payload.gameStats) {
+              if (!st?.gameId) continue;
+              const prev = rec.gameStats.get(st.gameId);
+              if (
+                !prev ||
+                Number(st.bestScore || 0) > Number(prev.bestScore || 0) ||
+                Number(st.gamesPlayed || 0) > Number(prev.gamesPlayed || 0) ||
+                Number(st.playTimeSeconds || 0) > Number(prev.playTimeSeconds || 0)
+              ) {
+                rec.gameStats.set(st.gameId, {
+                  ...prev,
+                  ...st,
+                  bestScore: Math.max(Number(prev?.bestScore || 0), Number(st.bestScore || 0)),
+                  gamesPlayed: Math.max(Number(prev?.gamesPlayed || 0), Number(st.gamesPlayed || 0)),
+                  playTimeSeconds: Math.max(Number(prev?.playTimeSeconds || 0), Number(st.playTimeSeconds || 0)),
+                });
+              }
+            }
           }
           if (payload.statePayload && payload.statePayload.dataBase64) {
             rec.statePayload = {

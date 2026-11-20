@@ -27,6 +27,7 @@ import {
 import { getPlayerIdentity, setPlayerDisplayName } from '../../services/firebaseFightcadeService';
 import { formatBytes, getPlatformCacheStats, listCachedRoms, removeCachedRom } from '../../services/platformRomService';
 import { GamepadVisualizer } from './GamepadVisualizer';
+import { CONSOLE_CONTROL_PROFILES, getConsoleControlProfile } from '../../data/consoleControlProfiles';
 import { useDeviceType } from '../../utils/deviceDetector';
 import { SHADER_PRESETS, resolveProfile } from '../../utils/performanceProfile';
 
@@ -35,6 +36,9 @@ export function SettingsModal({
   onClose, 
   settings, 
   updateKeyBinding, 
+  updateConsoleKeyBinding,
+  updateConsoleGamepadBinding,
+  resetConsoleControls,
   updateVideoSetting, 
   updateAudioSetting, 
   updateSystemSetting, 
@@ -51,6 +55,7 @@ export function SettingsModal({
   const [playerName, setPlayerName] = useState(() => getPlayerIdentity().name);
   const [cacheInfo, setCacheInfo] = useState({ count: 0, totalBytes: 0 });
   const [controlSubTab, setControlSubTab] = useState('touch');
+  const [selectedConsoleId, setSelectedConsoleId] = useState('arcade');
   const [activePlayer, setActivePlayer] = useState('p1');
   const [listeningAction, setListeningAction] = useState(null);
   const [connectedGamepad, setConnectedGamepad] = useState(null);
@@ -97,14 +102,18 @@ export function SettingsModal({
         return;
       }
 
-      // Assignation de la touche
-      updateKeyBinding(activePlayer, listeningAction, e.code);
+      // Assignation de la touche pour la console sélectionnée
+      if (updateConsoleKeyBinding) {
+        updateConsoleKeyBinding(selectedConsoleId, activePlayer, listeningAction, e.code);
+      } else {
+        updateKeyBinding(activePlayer, listeningAction, e.code);
+      }
       setListeningAction(null);
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [activePlayer, listeningAction, updateKeyBinding]);
+  }, [activePlayer, listeningAction, selectedConsoleId, updateConsoleKeyBinding, updateKeyBinding]);
 
   // Fermer avec Escape si pas en écoute de touche
   useEffect(() => {
@@ -122,22 +131,11 @@ export function SettingsModal({
 
   if (!isOpen) return null;
 
-  const controlLabels = [
-    { key: 'up', label: 'Direction : HAUT' },
-    { key: 'down', label: 'Direction : BAS' },
-    { key: 'left', label: 'Direction : GAUCHE' },
-    { key: 'right', label: 'Direction : DROITE' },
-    { key: 'a', label: 'Touche 1 : Bouton A (Poing Faible / Tir)' },
-    { key: 'b', label: 'Touche 2 : Bouton B (Pied Faible / Saut)' },
-    { key: 'c', label: 'Touche 3 : Bouton C (Poing Fort / Grenade)' },
-    { key: 'd', label: 'Touche 4 : Bouton D (Pied Fort / Spécial)' },
-    { key: 'ab', label: 'Touche 5 : Macro A+B (Roulade / Esquive KOF)' },
-    { key: 'cd', label: 'Touche 6 : Macro C+D (Attaque Projection Blowback)' },
-    { key: 'abc', label: 'Touche 7 : Macro A+B+C (MAX Mode / Super KOF)' },
-    { key: 'turbo', label: 'Touche 8 : Turbo A (Tir Automatique 30Hz Metal Slug)' },
-    { key: 'coin', label: 'COIN (Insérer Crédit)' },
-    { key: 'start', label: 'START (Lancer Partie)' }
-  ];
+  const selectedConsoleProfile = getConsoleControlProfile(selectedConsoleId);
+  const activeKeyboardMap =
+    settings?.consoleControls?.[selectedConsoleId]?.keyboard?.[activePlayer] ||
+    settings?.controls?.[activePlayer] ||
+    {};
 
   return (
     <div 
@@ -209,8 +207,8 @@ export function SettingsModal({
           {/* ================= ONGLET 1 : CONTRÔLES ================= */}
           {activeTab === 'controls' && (
             <div className="space-y-4 sm:space-y-5">
-              {/* Sous-navigation Contrôles : Tactile (priorité mobile) / Manette / Clavier (desktop uniquement) */}
-              <div className={`grid ${isMobile ? 'grid-cols-2' : 'grid-cols-3'} gap-1.5 sm:gap-2 p-1 bg-neutral-950 rounded-xl border border-neutral-800 text-[11px] sm:text-xs font-bold`}>
+              {/* Sous-navigation Contrôles : Tactile / Manette / Clavier */}
+              <div className="grid grid-cols-3 gap-1.5 sm:gap-2 p-1 bg-neutral-950 rounded-xl border border-neutral-800 text-[11px] sm:text-xs font-bold">
                 <button
                   onClick={() => setControlSubTab('touch')}
                   className={`py-1.5 sm:py-2 px-2 sm:px-3 rounded-lg flex items-center justify-center gap-1.5 sm:gap-2 transition-all ${
@@ -237,27 +235,80 @@ export function SettingsModal({
                   <span className="sm:hidden">MANETTE</span>
                 </button>
 
-                {!isMobile && (
-                  <button
-                    onClick={() => setControlSubTab('keyboard')}
-                    className={`py-1.5 sm:py-2 px-2 sm:px-3 rounded-lg flex items-center justify-center gap-1.5 sm:gap-2 transition-all ${
-                      controlSubTab === 'keyboard'
-                        ? 'bg-cyan-500 text-black shadow-md'
-                        : 'text-neutral-400 hover:text-white hover:bg-neutral-900'
-                    }`}
-                  >
-                    <Keyboard className="w-3.5 h-3.5 shrink-0" />
-                    <span className="hidden sm:inline">CLAVIER (P1 / P2)</span>
-                    <span className="sm:hidden">CLAVIER</span>
-                  </button>
-                )}
+                <button
+                  onClick={() => setControlSubTab('keyboard')}
+                  className={`py-1.5 sm:py-2 px-2 sm:px-3 rounded-lg flex items-center justify-center gap-1.5 sm:gap-2 transition-all ${
+                    controlSubTab === 'keyboard'
+                      ? 'bg-cyan-500 text-black shadow-md'
+                      : 'text-neutral-400 hover:text-white hover:bg-neutral-900'
+                  }`}
+                >
+                  <Keyboard className="w-3.5 h-3.5 shrink-0" />
+                  <span className="hidden sm:inline">CLAVIER (P1 / P2)</span>
+                  <span className="sm:hidden">CLAVIER</span>
+                </button>
               </div>
+
+              {/* Sélecteur de Console (Arcade, Nintendo, PlayStation, Sega, Java) pour Manette & Clavier */}
+              {(controlSubTab === 'gamepad' || controlSubTab === 'keyboard') && (
+                <div className="p-2.5 rounded-xl bg-neutral-950 border border-neutral-800 space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[10px] font-mono uppercase text-neutral-400">
+                      Console à configurer ({controlSubTab === 'keyboard' ? 'Clavier' : 'Manette'}) :
+                    </span>
+                    {resetConsoleControls && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          resetConsoleControls(selectedConsoleId);
+                          setListeningAction(null);
+                        }}
+                        className="text-[10px] font-bold text-amber-300 hover:text-amber-200 flex items-center gap-1"
+                      >
+                        <RotateCcw className="w-3 h-3" />
+                        <span>Réinitialiser {selectedConsoleProfile.shortLabel}</span>
+                      </button>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-5 gap-1.5">
+                    {CONSOLE_CONTROL_PROFILES.map((prof) => {
+                      const active = prof.id === selectedConsoleId;
+                      return (
+                        <button
+                          key={prof.id}
+                          type="button"
+                          onClick={() => {
+                            setSelectedConsoleId(prof.id);
+                            setListeningAction(null);
+                          }}
+                          className={`py-1.5 px-2 rounded-lg text-[10px] sm:text-[11px] font-bold border transition-all truncate ${
+                            active
+                              ? 'bg-cyan-500/20 border-cyan-400 text-cyan-200 shadow-sm'
+                              : 'bg-neutral-900 border-neutral-800 text-neutral-400 hover:text-white hover:border-neutral-700'
+                          }`}
+                          title={prof.description}
+                        >
+                          {prof.shortLabel}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <p className="text-[10px] text-neutral-500 font-mono">
+                    {selectedConsoleProfile.description}
+                  </p>
+                </div>
+              )}
 
               {/* Sous-onglet 1 : MANETTE INTERACTIVE */}
               {controlSubTab === 'gamepad' && (
                 <GamepadVisualizer
                   settings={settings}
                   onUpdateGamepadSetting={updateGamepadSetting}
+                  consoleProfile={selectedConsoleProfile}
+                  consoleGamepadButtons={settings?.consoleControls?.[selectedConsoleId]?.gamepad || {}}
+                  onUpdateConsoleGamepadButton={(actionKey, physIdx) =>
+                    updateConsoleGamepadBinding?.(selectedConsoleId, actionKey, physIdx)
+                  }
                 />
               )}
 
@@ -304,31 +355,31 @@ export function SettingsModal({
                   {/* Message instructif si écoute de touche */}
                   {listeningAction && (
                     <div className="p-3 bg-cyan-950/80 border border-cyan-500 rounded-xl text-center text-cyan-300 animate-pulse font-bold">
-                      Appuyez sur la touche souhaitée pour "{listeningAction.toUpperCase()}" (ou Échap pour annuler)...
+                      Appuyez sur la touche souhaitée pour [{selectedConsoleProfile.label}] « {listeningAction.toUpperCase()} » (ou Échap pour annuler)...
                     </div>
                   )}
 
-                  {/* Grille de Mapping des Touches */}
-                  <div className="grid grid-cols-2 gap-2.5">
-                    {controlLabels.map(({ key, label }) => {
-                      const currentCode = settings.controls[activePlayer][key] || 'Non assigné';
+                  {/* Grille de Mapping des Touches pour la console sélectionnée */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    {selectedConsoleProfile.actions.map(({ key, label }) => {
+                      const currentCode = activeKeyboardMap[key] || 'Non assigné';
                       const isListening = listeningAction === key;
 
                       return (
                         <div 
                           key={key}
-                          className="p-3 bg-neutral-950 border border-neutral-800 rounded-xl flex items-center justify-between hover:border-neutral-700 transition-colors"
+                          className="p-3 bg-neutral-950 border border-neutral-800 rounded-xl flex items-center justify-between gap-2 hover:border-neutral-700 transition-colors"
                         >
-                          <span className="text-neutral-400 text-[11px] font-medium">{label}</span>
+                          <span className="text-neutral-300 text-[11px] font-medium">{label}</span>
                           <button
                             onClick={() => setListeningAction(key)}
-                            className={`px-3 py-1.5 rounded-lg text-xs font-bold font-mono transition-all ${
+                            className={`px-3 py-1.5 rounded-lg text-xs font-bold font-mono shrink-0 transition-all ${
                               isListening 
                                 ? 'bg-cyan-500 text-black animate-bounce' 
                                 : 'bg-neutral-800 hover:bg-neutral-700 text-white'
                             }`}
                           >
-                            {isListening ? 'Appuyez...' : currentCode.replace('Key', '').replace('Digit', '')}
+                            {isListening ? 'Appuyez...' : String(currentCode).replace('Key', '').replace('Digit', '')}
                           </button>
                         </div>
                       );

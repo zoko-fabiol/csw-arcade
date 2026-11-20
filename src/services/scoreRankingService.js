@@ -164,31 +164,207 @@ export function subscribeLocalStatsUpdates(cb) {
   return () => statsListeners.delete(cb);
 }
 
+function mergeStatEntry(existing, incoming) {
+  if (!existing) return incoming;
+  if (!incoming) return existing;
+  const bestScore = Math.max(Number(existing.bestScore || 0), Number(incoming.bestScore || 0));
+  const gamesPlayed = Math.max(Number(existing.gamesPlayed || 0), Number(incoming.gamesPlayed || 0));
+  const playTimeSeconds = Math.max(Number(existing.playTimeSeconds || 0), Number(incoming.playTimeSeconds || 0));
+  const totalScore = Math.max(Number(existing.totalScore || 0), Number(incoming.totalScore || 0));
+  const { gameRank, gameRatingPoints } = evaluateSingleGameScore(bestScore, Math.max(1, gamesPlayed));
+  const newest = (incoming.updatedAtMs || 0) >= (existing.updatedAtMs || 0) ? incoming : existing;
+  return {
+    ...existing,
+    ...incoming,
+    gameTitle: newest.gameTitle || existing.gameTitle || incoming.gameTitle,
+    platformLabel: newest.platformLabel || existing.platformLabel || incoming.platformLabel,
+    bestScore,
+    lastScore: newest.lastScore ?? existing.lastScore ?? 0,
+    totalScore,
+    gamesPlayed,
+    playTimeSeconds,
+    gameRank,
+    gameRatingPoints,
+    updatedAtMs: Math.max(Number(existing.updatedAtMs || 0), Number(incoming.updatedAtMs || 0)),
+  };
+}
+
+function migrateGuestStatsIntoMap(uid, targetMap) {
+  if (!uid || String(uid).startsWith('p_')) return false;
+  let changed = false;
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && k.startsWith(LOCAL_STATS_PREFIX + 'p_')) {
+        const guestMap = JSON.parse(localStorage.getItem(k) || '{}');
+        if (guestMap && typeof guestMap === 'object') {
+          Object.values(guestMap).forEach((st) => {
+            if (!st?.gameId) return;
+            targetMap[st.gameId] = mergeStatEntry(targetMap[st.gameId], st);
+            changed = true;
+          });
+        }
+      }
+    }
+  } catch {
+    /* noop */
+  }
+  return changed;
+}
+
+export function applyRemoteSyncedStats(uid, remoteStatsList) {
+  if (!uid || !Array.isArray(remoteStatsList) || remoteStatsList.length === 0) return;
+  const localMap = readLocalStatsMap(uid);
+  let changed = false;
+  for (const st of remoteStatsList) {
+    if (!st?.gameId) continue;
+    const prev = localMap[st.gameId];
+    const merged = mergeStatEntry(prev, st);
+    if (
+      !prev ||
+      merged.bestScore !== prev.bestScore ||
+      merged.gamesPlayed !== prev.gamesPlayed ||
+      merged.playTimeSeconds !== prev.playTimeSeconds
+    ) {
+      localMap[st.gameId] = merged;
+      changed = true;
+    }
+  }
+  if (changed) {
+    writeLocalStatsMap(uid, localMap);
+    const list = Object.values(localMap).sort((a, b) => (b.bestScore || 0) - (a.bestScore || 0));
+    notifyStatsListeners(uid, list);
+  }
+}
+
 /**
- * Charge toutes les stats de jeux d'un joueur (fusion localStorage + Firestore users/{uid}/gameStats).
+ * Charge toutes les stats de jeux d'un joueur (fusion localStorage + migration invité + relais /api/account-sync + Firestore).
  */
 export async function loadPlayerGameStats(uid) {
   if (!uid) return { stats: [], evaluation: evaluatePlayerRank([]) };
   const localMap = readLocalStatsMap(uid);
+  const migrated = migrateGuestStatsIntoMap(uid, localMap);
 
+  // 1. Récupérer depuis le relais serveur /api/account-sync (fonctionne même sans règles Firestore publiées)
+  try {
+    const res = await fetch(`/api/account-sync?uid=${encodeURIComponent(uid)}`);
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data?.gameStats)) {
+        data.gameStats.forEach((remote) => {
+          if (!remote?.gameId) return;
+          localMap[remote.gameId] = mergeStatEntry(localMap[remote.gameId], remote);
+        });
+      }
+    }
+  } catch {
+    /* ignore */
+  }
+
+  // 2. Récupérer depuis Firebase Firestore
   try {
     const snap = await getDocs(collection(db, 'users', uid, 'gameStats'));
     snap.forEach((d) => {
       const remote = d.data();
       if (!remote?.gameId) return;
-      const existing = localMap[remote.gameId];
-      if (!existing || Number(remote.bestScore || 0) >= Number(existing.bestScore || 0)) {
-        localMap[remote.gameId] = { ...existing, ...remote };
-      }
+      localMap[remote.gameId] = mergeStatEntry(localMap[remote.gameId], remote);
     });
-    writeLocalStatsMap(uid, localMap);
   } catch {
     /* offline fallback */
   }
 
-  const stats = Object.values(localMap).sort((a, b) => (b.bestScore || 0) - (a.bestScore || 0));
+  writeLocalStatsMap(uid, localMap);
+  const stats = Object.values(localMap).sort(
+    (a, b) => (b.bestScore || 0) - (a.bestScore || 0) || (b.updatedAtMs || 0) - (a.updatedAtMs || 0)
+  );
   const evaluation = evaluatePlayerRank(stats);
+
+  if (stats.length > 0 && migrated) {
+    fetch(`/api/account-sync?uid=${encodeURIComponent(uid)}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ uid, gameStats: stats }),
+    }).catch(() => {});
+  } else if (stats.length > 0) {
+    // Synchronisation bidirectionnelle vers le relais serveur si ce navigateur détient déjà des stats locales
+    fetch(`/api/account-sync?uid=${encodeURIComponent(uid)}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ uid, gameStats: stats }),
+    }).catch(() => {});
+  }
+
+  notifyStatsListeners(uid, stats);
   return { stats, evaluation };
+}
+
+/**
+ * Enregistre automatiquement l'activité d'une partie lancée (parties jouées, temps de jeu, présence dans les stats du personnage).
+ */
+export async function recordGameSessionActivity({
+  userProfile,
+  gameId,
+  gameTitle,
+  platformLabel = 'Arcade',
+  incrementParty = false,
+  addPlayTimeSeconds = 0,
+}) {
+  if (!userProfile?.uid) return null;
+  const uid = userProfile.uid;
+  const normGameId = normalizeScoreGameId(gameId || gameTitle);
+  const title = String(gameTitle || normGameId).trim();
+
+  const localMap = readLocalStatsMap(uid);
+  const prev = localMap[normGameId] || {
+    gameId: normGameId,
+    gameTitle: title,
+    platformLabel,
+    bestScore: 0,
+    lastScore: 0,
+    totalScore: 0,
+    gamesPlayed: 0,
+    playTimeSeconds: 0,
+    history: [],
+  };
+
+  const gamesPlayed = Math.max(1, Number(prev.gamesPlayed || 0) + (incrementParty ? 1 : 0));
+  const playTimeSeconds = Number(prev.playTimeSeconds || 0) + Math.max(0, Math.floor(addPlayTimeSeconds));
+  const { gameRank, gameRatingPoints } = evaluateSingleGameScore(prev.bestScore || 0, gamesPlayed);
+
+  const updated = {
+    ...prev,
+    gameId: normGameId,
+    gameTitle: title,
+    platformLabel,
+    gamesPlayed,
+    playTimeSeconds,
+    gameRank,
+    gameRatingPoints,
+    updatedAtMs: Date.now(),
+  };
+
+  localMap[normGameId] = updated;
+  writeLocalStatsMap(uid, localMap);
+
+  const nextStatsList = Object.values(localMap).sort(
+    (a, b) => (b.bestScore || 0) - (a.bestScore || 0) || (b.updatedAtMs || 0) - (a.updatedAtMs || 0)
+  );
+  const evaluation = evaluatePlayerRank(nextStatsList);
+
+  fetch(`/api/account-sync?uid=${encodeURIComponent(uid)}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ uid, gameStats: [updated] }),
+  }).catch(() => {});
+
+  setDoc(
+    doc(db, 'users', uid, 'gameStats', normGameId),
+    { ...updated, updatedAt: serverTimestamp() },
+    { merge: true }
+  ).catch(() => {});
+
+  notifyStatsListeners(uid, nextStatsList);
+  return { gameStat: updated, allStats: nextStatsList, evaluation };
 }
 
 /**
@@ -269,6 +445,13 @@ export async function recordGameScore({
   const oldRank = prevEval.rank;
   const rankChanged = oldRank !== evaluation.rank;
 
+  // Relais serveur multi-appareils : stats personnelles du compte
+  fetch(`/api/account-sync?uid=${encodeURIComponent(uid)}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ uid, gameStats: [updatedGameStat] }),
+  }).catch(() => {});
+
   // Persistance Firestore : stats personnelles par jeu
   await setDoc(
     doc(db, 'users', uid, 'gameStats', normGameId),
@@ -296,6 +479,13 @@ export async function recordGameScore({
     source,
     updatedAtMs: Date.now(),
   };
+
+  // Relais serveur : classement partagé du jeu
+  fetch(`/api/game-leaderboard?gameId=${encodeURIComponent(normGameId)}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(lbEntry),
+  }).catch(() => {});
 
   // Cache local du classement du jeu (fonctionne même sans règles Firestore publiées)
   try {
@@ -351,11 +541,12 @@ export async function recordGameScore({
 }
 
 /**
- * Écoute en temps réel le classement (Top 25) des meilleurs scores pour un jeu donné (Firestore + local).
+ * Écoute en temps réel le classement (Top 25) des meilleurs scores pour un jeu donné (Firestore + relais serveur + local).
  */
 export function subscribeGameLeaderboard(gameId, cb) {
   const normGameId = normalizeScoreGameId(gameId);
   let fsRows = [];
+  let relayRows = [];
 
   const emitMerged = () => {
     let localRows = [];
@@ -366,7 +557,7 @@ export function subscribeGameLeaderboard(gameId, cb) {
       localRows = [];
     }
     const map = new Map();
-    [...(Array.isArray(localRows) ? localRows : []), ...fsRows].forEach((r) => {
+    [...(Array.isArray(localRows) ? localRows : []), ...relayRows, ...fsRows].forEach((r) => {
       if (!r?.uid) return;
       const prev = map.get(r.uid);
       if (!prev || Number(r.bestScore || 0) >= Number(prev.bestScore || 0)) {
@@ -379,9 +570,30 @@ export function subscribeGameLeaderboard(gameId, cb) {
     cb(sorted);
   };
 
+  const pullRelay = async () => {
+    try {
+      const res = await fetch(`/api/game-leaderboard?gameId=${encodeURIComponent(normGameId)}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data?.rows)) {
+          relayRows = data.rows;
+          emitMerged();
+        }
+      }
+    } catch {
+      /* ignore */
+    }
+  };
+
   emitMerged();
+  pullRelay();
+  const pollId = setInterval(pullRelay, 5000);
+
   const onLocal = (e) => {
-    if (!e?.detail?.gameId || e.detail.gameId === normGameId) emitMerged();
+    if (!e?.detail?.gameId || e.detail.gameId === normGameId) {
+      emitMerged();
+      pullRelay();
+    }
   };
   window.addEventListener('csw-lb-updated', onLocal);
 
@@ -402,6 +614,7 @@ export function subscribeGameLeaderboard(gameId, cb) {
   );
 
   return () => {
+    clearInterval(pollId);
     window.removeEventListener('csw-lb-updated', onLocal);
     unsubFs?.();
   };

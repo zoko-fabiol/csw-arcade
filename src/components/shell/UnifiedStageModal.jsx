@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
-  X, Maximize2, Minimize2, RotateCcw, Settings, Coins, Play, Sliders, Save, UploadCloud, Trophy, Award, Gamepad2
+  X, Maximize2, Minimize2, RotateCcw, Settings, Coins, Play, Pause, Sliders, Save, UploadCloud, Trophy, Award, Gamepad2, Trash2
 } from 'lucide-react';
 import { addCoins, consumeCoin, hasCoins, setWalletCoins, subscribeWallet } from '../../services/walletService';
 import { getCurrentUserProfile, subscribeAuthProfile } from '../../services/authService';
@@ -8,9 +8,11 @@ import {
   getRankTierMeta,
   normalizeScoreGameId,
   recordGameScore,
+  recordGameSessionActivity,
   subscribeGameLeaderboard,
 } from '../../services/scoreRankingService';
 import { firebaseFightcadeService, GLOBAL_CHANNEL_ID } from '../../services/firebaseFightcadeService';
+import { deleteGameSlot, listGameSlots, loadGameSlot, saveGameSlot } from '../../services/gameSaveService';
 import { countryCodeToFlag } from '../../data/countries';
 import { MobilePlatformController } from './MobilePlatformController';
 
@@ -45,6 +47,7 @@ export function UnifiedStageModal({
   const [coins, setCoins] = useState(0);
   const [coinLocked, setCoinLocked] = useState(false);
   const [quickMenuOpen, setQuickMenuOpen] = useState(false);
+  const [pauseMenuOpen, setPauseMenuOpen] = useState(false);
   const [scorePanelOpen, setScorePanelOpen] = useState(false);
   const [liveRamTelemetry, setLiveRamTelemetry] = useState({ score: 0, lives: null, mode: 'heuristic' });
   const [ramToast, setRamToast] = useState(null); // { tone: 'loss' | 'record', text: string }
@@ -53,7 +56,9 @@ export function UnifiedStageModal({
   const userProfileRef = useRef(userProfile);
   userProfileRef.current = userProfile;
   const toastTimerRef = useRef(null);
+  const sessionActivityLoggedRef = useRef(false);
   const [savedState, setSavedState] = useState(null);
+  const [savedSlots, setSavedSlots] = useState([]);
   const [inputDelay, setInputDelay] = useState(p2pStats?.inputDelay ?? 1);
   const [touchPadVisible, setTouchPadVisible] = useState(() => detectDefaultTouchPad());
 
@@ -61,6 +66,23 @@ export function UnifiedStageModal({
     setRamToast({ tone, text });
     if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
     toastTimerRef.current = setTimeout(() => setRamToast(null), 4800);
+  };
+
+  const openPauseMenu = () => {
+    setQuickMenuOpen(false);
+    setScorePanelOpen(false);
+    setPauseMenuOpen(true);
+    try {
+      iframeRef.current?.contentWindow?.postMessage({ type: 'PAUSE_EMU' }, window.location.origin);
+    } catch {}
+  };
+
+  const closePauseMenuAndResume = () => {
+    setPauseMenuOpen(false);
+    try {
+      iframeRef.current?.focus();
+      iframeRef.current?.contentWindow?.postMessage({ type: 'RESUME_EMU' }, window.location.origin);
+    } catch {}
   };
 
   useEffect(() => subscribeWallet(setCoins), []);
@@ -77,6 +99,8 @@ export function UnifiedStageModal({
   useEffect(() => {
     if (!session) {
       setScorePanelOpen(false);
+      setPauseMenuOpen(false);
+      setQuickMenuOpen(false);
       setLiveRamTelemetry({ score: 0, lives: null, mode: 'heuristic' });
       setRamToast(null);
       setGameLeaderboard([]);
@@ -84,6 +108,7 @@ export function UnifiedStageModal({
     }
     const gid = normalizeScoreGameId(session.gameId || session.title);
     const unsub = subscribeGameLeaderboard(gid, setGameLeaderboard);
+    listGameSlots(userProfileRef.current?.uid, gid).then(setSavedSlots).catch(() => setSavedSlots([]));
     return () => unsub?.();
   }, [session?.gameId, session?.title]);
 
@@ -94,15 +119,55 @@ export function UnifiedStageModal({
   }, []);
 
   useEffect(() => {
-    const onKey = (e) => {
-      if (e.key === 'Tab' && session) {
+    const isTypingTarget = (el) => {
+      const tag = el?.tagName;
+      return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || el?.isContentEditable;
+    };
+    const onKeyDown = (e) => {
+      if (!session) return;
+      if (e.key === 'Tab') {
         e.preventDefault();
-        setQuickMenuOpen((prev) => !prev);
+        if (pauseMenuOpen) closePauseMenuAndResume();
+        else openPauseMenu();
+        return;
+      }
+      if (session.kind !== 'j2me' && !quickMenuOpen && !pauseMenuOpen && !isTypingTarget(e.target)) {
+        try {
+          iframeRef.current?.contentWindow?.postMessage(
+            {
+              type: 'FORWARD_KEY',
+              eventType: 'keydown',
+              code: e.code || '',
+              key: e.key || '',
+              keyCode: e.keyCode || e.which || 0,
+            },
+            window.location.origin
+          );
+        } catch {}
       }
     };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [session]);
+    const onKeyUp = (e) => {
+      if (!session || session.kind === 'j2me' || quickMenuOpen || pauseMenuOpen || isTypingTarget(e.target)) return;
+      try {
+        iframeRef.current?.contentWindow?.postMessage(
+          {
+            type: 'FORWARD_KEY',
+            eventType: 'keyup',
+            code: e.code || '',
+            key: e.key || '',
+            keyCode: e.keyCode || e.which || 0,
+          },
+          window.location.origin
+        );
+      } catch {}
+    };
+    window.addEventListener('keydown', onKeyDown);
+    window.addEventListener('keyup', onKeyUp);
+    return () => {
+      window.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener('keyup', onKeyUp);
+    };
+  }, [session, quickMenuOpen, pauseMenuOpen]);
 
   useEffect(() => {
     if (!session || !iframeRef.current?.contentWindow) return;
@@ -116,6 +181,25 @@ export function UnifiedStageModal({
     if (!session) return;
     setStatusText('Chargement du moteur…');
     setCoinLocked(false);
+    sessionActivityLoggedRef.current = false;
+
+    const gid = normalizeScoreGameId(session.gameId || session.title);
+    const platformLabel = session.kind === 'j2me' ? 'Mobile / J2ME' : session.core?.toUpperCase() || 'Arcade';
+    const logSessionStartOnce = () => {
+      if (sessionActivityLoggedRef.current) return;
+      sessionActivityLoggedRef.current = true;
+      recordGameSessionActivity({
+        userProfile: userProfileRef.current,
+        gameId: gid,
+        gameTitle: session.title,
+        platformLabel,
+        incrementParty: true,
+        addPlayTimeSeconds: 0,
+      }).catch(() => {});
+    };
+
+    // Enregistrer automatiquement la partie dans les stats du joueur même si le moteur met quelques secondes à émettre STAGE_STATUS
+    const fallbackLogTimer = setTimeout(logSessionStartOnce, 3500);
 
     const handleMessage = (event) => {
       if (event.source !== iframeRef.current?.contentWindow || !event.data) return;
@@ -156,6 +240,7 @@ export function UnifiedStageModal({
       } else if (event.data.type === 'STAGE_STATUS') {
         if (event.data.message) setStatusText(event.data.message);
         if (event.data.status === 'playing') {
+          logSessionStartOnce();
           try {
             iframeRef.current?.focus();
             // Si on reprend une partie synchronisée depuis un autre appareil, injecter le savestate automatiquement !
@@ -248,21 +333,66 @@ export function UnifiedStageModal({
         p2pEngine?.sendButtonEvent?.(event.data.buttonIdx, event.data.pressed);
       } else if (event.data.type === 'STATE_EXPORTED' && event.data.stateBase64) {
         setSavedState(event.data.stateBase64);
-        if (event.data.slot === 'frame0') {
+        const slotName = event.data.slot || 'quick';
+        if (slotName === 'frame0') {
           p2pEngine?.sendFrame0State?.(event.data.stateBase64);
-        } else if (event.data.slot === 'cloud_handoff') {
+        } else if (slotName === 'cloud_handoff') {
           onCloudCheckpoint?.(event.data.stateBase64);
+        } else {
+          // Sauvegarde manuelle persistante dans IndexedDB (États 1 à 5) + miniature écran + synchro Cloud
+          const slotMatch = String(slotName).match(/^slot_(\d)$/);
+          const slotNum = slotMatch ? Number(slotMatch[1]) : 1;
+          const uid = userProfileRef.current?.uid;
+          saveGameSlot(uid, gid, slotNum, event.data.stateBase64, {
+            title: session.title,
+            core: session.core,
+            screenshotDataUrl: event.data.screenshotDataUrl || null,
+          })
+            .then(() => listGameSlots(uid, gid))
+            .then((slots) => {
+              setSavedSlots(slots);
+              showRamToast('record', `💾 État ${slotNum} sauvegardé !`);
+            })
+            .catch(() => showRamToast('record', `💾 État sauvegardé en mémoire rapide !`));
+          if (slotNum === 1) {
+            onCloudCheckpoint?.(event.data.stateBase64);
+          }
         }
       }
     };
 
     window.addEventListener('message', handleMessage);
-    return () => window.removeEventListener('message', handleMessage);
+    return () => {
+      clearTimeout(fallbackLogTimer);
+      window.removeEventListener('message', handleMessage);
+    };
   }, [session, bootKey, p2pEngine]);
 
-  // Sauvegarde automatique Cloud Handoff toutes les 12 secondes pendant la partie (pour reprendre sur un autre appareil)
+  // Suivi automatique du temps de jeu (toutes les 15s) pour toutes les plateformes (Arcade, PS1, Nintendo, Sega, Java/J2ME)
+  useEffect(() => {
+    if (!session) return;
+    const gid = normalizeScoreGameId(session.gameId || session.title);
+    const platformLabel = session.kind === 'j2me' ? 'Mobile / J2ME' : session.core?.toUpperCase() || 'Arcade';
+    const id = setInterval(() => {
+      recordGameSessionActivity({
+        userProfile: userProfileRef.current,
+        gameId: gid,
+        gameTitle: session.title,
+        platformLabel,
+        incrementParty: false,
+        addPlayTimeSeconds: 15,
+      }).catch(() => {});
+    }, 15000);
+    return () => clearInterval(id);
+  }, [session?.gameId, session?.title, session?.core, session?.kind, bootKey]);
+
+  // Sauvegarde automatique Cloud Handoff en arrière-plan (espacée sur les cœurs 3D lourds pour éviter tout freeze)
   useEffect(() => {
     if (!session || session.kind === 'j2me') return;
+    const isHeavy = ['n64', 'mupen64plus_next', 'psx', 'ps1', 'pcsx_rearmed', 'nds', 'melonds'].includes(
+      String(session.core || '').toLowerCase()
+    );
+    const intervalMs = isHeavy ? 45000 : 20000;
     const id = setInterval(() => {
       try {
         iframeRef.current?.contentWindow?.postMessage(
@@ -270,7 +400,7 @@ export function UnifiedStageModal({
           window.location.origin
         );
       } catch {}
-    }, 12000);
+    }, intervalMs);
     return () => clearInterval(id);
   }, [session, bootKey]);
 
@@ -482,6 +612,41 @@ export function UnifiedStageModal({
                 {ratio === 'stretch' ? 'Étiré' : '4:3'}
               </button>
             </>
+          )}
+          <button
+            type="button"
+            onClick={() => (pauseMenuOpen ? closePauseMenuAndResume() : openPauseMenu())}
+            title="Mettre en pause et ouvrir le menu PPSSPP (5 états de sauvegarde + Paramètres)"
+            className={`flex items-center gap-1 px-2.5 md:px-3 py-1.5 rounded-lg border text-xs font-bold transition-colors ${
+              pauseMenuOpen
+                ? 'bg-cyan-500 text-black border-cyan-400'
+                : 'bg-cyan-500/20 hover:bg-cyan-500/30 border-cyan-500/50 text-cyan-200'
+            }`}
+          >
+            {pauseMenuOpen ? <Play className="w-3.5 h-3.5" /> : <Pause className="w-3.5 h-3.5" />}
+            <span>{pauseMenuOpen ? 'Reprendre' : 'Pause'}</span>
+          </button>
+          {session.kind !== 'j2me' && savedSlots.length > 0 && (
+            <button
+              type="button"
+              onClick={async () => {
+                const gid = normalizeScoreGameId(session.gameId || session.title);
+                const b64 = await loadGameSlot(userProfileRef.current?.uid, gid, savedSlots[0].slot);
+                if (b64) {
+                  iframeRef.current?.focus();
+                  iframeRef.current?.contentWindow?.postMessage(
+                    { type: 'LOAD_STATE', stateBase64: b64 },
+                    window.location.origin
+                  );
+                  showRamToast('record', `📂 État ${savedSlots[0].slot} chargé !`);
+                }
+              }}
+              title={`Charger la dernière sauvegarde (État ${savedSlots[0].slot})`}
+              className="hidden sm:flex items-center gap-1 px-2 md:px-2.5 py-1.5 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/50 text-emerald-200 text-xs font-bold transition-colors"
+            >
+              <UploadCloud className="w-3.5 h-3.5" />
+              <span>Reprendre État</span>
+            </button>
           )}
           <button
             type="button"
@@ -699,6 +864,213 @@ export function UnifiedStageModal({
           );
         })()}
 
+        {/* MENU PAUSE STYLE PPSSPP (Jeu figé + 5 États de sauvegarde avec aperçu + Paramètres directs) */}
+        {pauseMenuOpen && (
+          <div className="absolute inset-0 z-50 bg-neutral-950/90 backdrop-blur-lg flex flex-col p-3 sm:p-6 overflow-y-auto">
+            <div className="max-w-5xl w-full mx-auto flex flex-col gap-4 sm:gap-5 my-auto">
+              {/* En-tête PPSSPP */}
+              <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-neutral-800">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="px-2 py-0.5 rounded bg-amber-500/20 border border-amber-500/50 text-amber-300 text-[10px] font-mono font-black uppercase">
+                      ⏸ Jeu en Pause
+                    </span>
+                    <span className="text-[11px] font-mono text-cyan-300">{session.badge}</span>
+                  </div>
+                  <h2 className="text-base sm:text-xl font-black text-white mt-1 truncate">
+                    {session.title}
+                  </h2>
+                </div>
+                <button
+                  type="button"
+                  onClick={closePauseMenuAndResume}
+                  className="flex items-center gap-2 px-4 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-black font-black text-xs sm:text-sm transition-colors shadow-lg"
+                >
+                  <Play className="w-4 h-4" />
+                  <span>Reprendre la partie</span>
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-5">
+                {/* Colonne Gauche : Actions rapides (Reprendre, Paramètres, Recommencer, Quitter) */}
+                <div className="lg:col-span-4 flex flex-col gap-2.5">
+                  <button
+                    type="button"
+                    onClick={closePauseMenuAndResume}
+                    className="w-full px-4 py-3 rounded-xl bg-neutral-900 hover:bg-neutral-800 border border-cyan-500/40 text-left flex items-center gap-3 transition-colors"
+                  >
+                    <Play className="w-4 h-4 text-cyan-400 shrink-0" />
+                    <div>
+                      <div className="text-xs font-black text-white">Continuer</div>
+                      <div className="text-[10px] text-neutral-400">Relancer l’émulation immédiatement</div>
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => onOpenSettings?.()}
+                    className="w-full px-4 py-3 rounded-xl bg-neutral-900 hover:bg-neutral-800 border border-purple-500/40 text-left flex items-center gap-3 transition-colors"
+                  >
+                    <Settings className="w-4 h-4 text-purple-400 shrink-0" />
+                    <div>
+                      <div className="text-xs font-black text-white">Paramètres</div>
+                      <div className="text-[10px] text-neutral-400">
+                        Configurer manettes, clavier par console, vidéo &amp; audio
+                      </div>
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPauseMenuOpen(false);
+                      handleRestartGame();
+                    }}
+                    className="w-full px-4 py-3 rounded-xl bg-neutral-900 hover:bg-neutral-800 border border-neutral-800 text-left flex items-center gap-3 transition-colors"
+                  >
+                    <RotateCcw className="w-4 h-4 text-amber-400 shrink-0" />
+                    <div>
+                      <div className="text-xs font-black text-white">Recommencer</div>
+                      <div className="text-[10px] text-neutral-400">Redémarrer le jeu (-1 crédit)</div>
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPauseMenuOpen(false);
+                      handleCloseStage();
+                    }}
+                    className="w-full px-4 py-3 rounded-xl bg-rose-950/35 hover:bg-rose-950/60 border border-rose-500/35 text-left flex items-center gap-3 transition-colors"
+                  >
+                    <X className="w-4 h-4 text-rose-400 shrink-0" />
+                    <div>
+                      <div className="text-xs font-black text-rose-200">Quitter le jeu</div>
+                      <div className="text-[10px] text-rose-300/70">Retourner au catalogue</div>
+                    </div>
+                  </button>
+                </div>
+
+                {/* Colonne Droite : 5 États de Sauvegarde (PPSSPP Save States avec aperçu écran) */}
+                <div className="lg:col-span-8 space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-xs font-mono uppercase tracking-wider text-cyan-300 font-bold">
+                      États de Sauvegarde (5 Emplacements)
+                    </h3>
+                    <span className="text-[10px] font-mono text-neutral-400">
+                      {session.kind === 'j2me' ? 'Indisponible sur J2ME' : 'Sauvés localement + aperçu'}
+                    </span>
+                  </div>
+
+                  {session.kind === 'j2me' ? (
+                    <div className="p-6 rounded-xl bg-neutral-900 border border-neutral-800 text-center text-xs text-neutral-400">
+                      Les sauvegardes d’état visuelles sont disponibles sur Arcade, Nintendo, PlayStation et Sega. Utilisez la sauvegarde interne des jeux Java.
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5">
+                      {[1, 2, 3, 4, 5].map((slotNum) => {
+                        const existing = savedSlots.find((s) => s.slot === slotNum);
+                        const gid = normalizeScoreGameId(session.gameId || session.title);
+                        return (
+                          <div
+                            key={slotNum}
+                            className={`rounded-xl border overflow-hidden flex flex-col transition-colors ${
+                              existing
+                                ? 'bg-neutral-900 border-cyan-500/40'
+                                : 'bg-neutral-900/60 border-neutral-800'
+                            }`}
+                          >
+                            {/* Aperçu visuel de la sauvegarde */}
+                            <div className="relative h-24 sm:h-28 bg-black flex items-center justify-center overflow-hidden border-b border-neutral-800">
+                              {existing?.screenshotDataUrl ? (
+                                <img
+                                  src={existing.screenshotDataUrl}
+                                  alt={`État ${slotNum}`}
+                                  className="w-full h-full object-cover"
+                                />
+                              ) : (
+                                <span className="text-[11px] font-mono text-neutral-600">
+                                  {existing ? 'Sauvegarde prête' : 'Emplacement vide'}
+                                </span>
+                              )}
+                              <span className="absolute top-1.5 left-1.5 px-1.5 py-0.5 rounded bg-black/75 border border-neutral-700 text-[10px] font-mono font-black text-white">
+                                État {slotNum}
+                              </span>
+                              {existing && (
+                                <button
+                                  type="button"
+                                  title={`Supprimer État ${slotNum}`}
+                                  onClick={async () => {
+                                    const uid = userProfileRef.current?.uid;
+                                    await deleteGameSlot(uid, gid, slotNum);
+                                    const next = await listGameSlots(uid, gid);
+                                    setSavedSlots(next);
+                                  }}
+                                  className="absolute top-1.5 right-1.5 p-1 rounded bg-black/75 hover:bg-rose-900 text-neutral-400 hover:text-rose-200 transition-colors"
+                                >
+                                  <Trash2 className="w-3 h-3" />
+                                </button>
+                              )}
+                            </div>
+
+                            {/* Infos & Boutons Sauver / Charger */}
+                            <div className="p-2.5 flex flex-col gap-2">
+                              <div className="text-[10px] font-mono text-neutral-400 truncate">
+                                {existing
+                                  ? new Date(existing.savedAtMs).toLocaleString('fr-FR', {
+                                      day: '2-digit',
+                                      month: '2-digit',
+                                      hour: '2-digit',
+                                      minute: '2-digit',
+                                    })
+                                  : 'Aucune donnée enregistrée'}
+                              </div>
+                              <div className="grid grid-cols-2 gap-1.5">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    iframeRef.current?.contentWindow?.postMessage(
+                                      { type: 'EXPORT_STATE', slot: `slot_${slotNum}` },
+                                      window.location.origin
+                                    );
+                                  }}
+                                  className="py-1.5 px-2 rounded-lg bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-500/40 text-cyan-200 text-[11px] font-bold flex items-center justify-center gap-1"
+                                >
+                                  <Save className="w-3 h-3" />
+                                  <span>Sauver</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={!existing}
+                                  onClick={async () => {
+                                    const b64 = await loadGameSlot(userProfileRef.current?.uid, gid, slotNum);
+                                    if (b64) {
+                                      iframeRef.current?.contentWindow?.postMessage(
+                                        { type: 'LOAD_STATE', stateBase64: b64 },
+                                        window.location.origin
+                                      );
+                                      closePauseMenuAndResume();
+                                      showRamToast('record', `📂 État ${slotNum} chargé !`);
+                                    }
+                                  }}
+                                  className="py-1.5 px-2 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 disabled:opacity-35 border border-emerald-500/40 text-emerald-200 text-[11px] font-bold flex items-center justify-center gap-1"
+                                >
+                                  <UploadCloud className="w-3 h-3" />
+                                  <span>Charger</span>
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Quick Menu Overlay (Style Guide Xbox / PS) */}
         {quickMenuOpen && (
           <aside className="absolute inset-y-0 right-0 w-80 max-w-full bg-neutral-950/92 backdrop-blur-xl border-l border-cyan-500/30 p-4 flex flex-col gap-4 z-40 shadow-2xl">
@@ -763,32 +1135,73 @@ export function UnifiedStageModal({
               </div>
             )}
 
-            {/* Savestate Rapide */}
+            {/* Sauvegardes Persistantes (3 Slots par jeu dans IndexedDB) */}
             {session.kind !== 'j2me' && (
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={() => iframeRef.current?.contentWindow?.postMessage({ type: 'EXPORT_STATE' }, window.location.origin)}
-                  className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-xs font-bold text-white"
-                >
-                  <Save className="w-3.5 h-3.5 text-cyan-400" />
-                  <span>Sauver État</span>
-                </button>
-                <button
-                  type="button"
-                  disabled={!savedState}
-                  onClick={() =>
-                    savedState &&
-                    iframeRef.current?.contentWindow?.postMessage(
-                      { type: 'LOAD_STATE', stateBase64: savedState },
-                      window.location.origin
-                    )
-                  }
-                  className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700 disabled:opacity-40 text-xs font-bold text-white"
-                >
-                  <UploadCloud className="w-3.5 h-3.5 text-emerald-400" />
-                  <span>Charger État</span>
-                </button>
+              <div className="p-3 rounded-xl bg-neutral-900 border border-cyan-500/30 space-y-2">
+                <div className="flex items-center justify-between text-xs font-bold text-cyan-300">
+                  <span>Sauvegardes de la partie</span>
+                  <span className="text-[10px] font-mono text-neutral-400">Persistées par jeu</span>
+                </div>
+                <div className="space-y-1.5">
+                  {[1, 2, 3].map((slotNum) => {
+                    const existing = savedSlots.find((s) => s.slot === slotNum);
+                    return (
+                      <div
+                        key={slotNum}
+                        className="flex items-center justify-between gap-2 p-2 rounded-lg bg-neutral-950 border border-neutral-800"
+                      >
+                        <div className="min-w-0">
+                          <div className="text-xs font-bold text-white">Slot {slotNum}</div>
+                          <div className="text-[10px] font-mono text-neutral-500 truncate">
+                            {existing
+                              ? `Sauvé à ${new Date(existing.savedAtMs).toLocaleTimeString('fr-FR', {
+                                  hour: '2-digit',
+                                  minute: '2-digit',
+                                })}`
+                              : 'Vide'}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              iframeRef.current?.focus();
+                              iframeRef.current?.contentWindow?.postMessage(
+                                { type: 'EXPORT_STATE', slot: `slot_${slotNum}` },
+                                window.location.origin
+                              );
+                            }}
+                            className="px-2 py-1 rounded bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-500/40 text-[11px] font-bold text-cyan-200"
+                          >
+                            Sauver
+                          </button>
+                          <button
+                            type="button"
+                            disabled={!existing && !savedState}
+                            onClick={async () => {
+                              const gid = normalizeScoreGameId(session.gameId || session.title);
+                              const b64 = existing
+                                ? await loadGameSlot(userProfileRef.current?.uid, gid, slotNum)
+                                : savedState;
+                              if (b64) {
+                                iframeRef.current?.focus();
+                                iframeRef.current?.contentWindow?.postMessage(
+                                  { type: 'LOAD_STATE', stateBase64: b64 },
+                                  window.location.origin
+                                );
+                                setQuickMenuOpen(false);
+                                showRamToast('record', `📂 Sauvegarde Slot ${slotNum} chargée !`);
+                              }
+                            }}
+                            className="px-2 py-1 rounded bg-emerald-500/20 hover:bg-emerald-500/30 disabled:opacity-35 border border-emerald-500/40 text-[11px] font-bold text-emerald-200"
+                          >
+                            Charger
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             )}
 

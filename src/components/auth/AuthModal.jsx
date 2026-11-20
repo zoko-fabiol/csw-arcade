@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
-  X, LogIn, UserPlus, User, ShieldCheck, Globe, Trophy, LogOut, Sparkles, CheckCircle2, AlertCircle, BarChart3, Award
+  X, LogIn, UserPlus, User, ShieldCheck, Globe, Trophy, LogOut, Sparkles, CheckCircle2, AlertCircle, BarChart3, Award, RefreshCw
 } from 'lucide-react';
 import {
   formatFirebaseAuthError,
@@ -12,7 +12,18 @@ import {
   updateUserProfile,
 } from '../../services/authService';
 import { ALL_COUNTRIES, getCountryByCode } from '../../data/countries';
-import { getRankTierMeta } from '../../services/scoreRankingService';
+import { getRankTierMeta, loadPlayerGameStats } from '../../services/scoreRankingService';
+
+function formatPlayTime(totalSeconds = 0) {
+  const s = Math.max(0, Math.floor(Number(totalSeconds) || 0));
+  if (s < 60) return `${s}s`;
+  const m = Math.floor(s / 60);
+  const rem = s % 60;
+  if (m < 60) return rem > 0 ? `${m}m ${rem}s` : `${m}m`;
+  const h = Math.floor(m / 60);
+  const remM = m % 60;
+  return `${h}h ${remM}m`;
+}
 
 export function AuthModal({ isOpen, onClose, userProfile, activeChannels = [] }) {
   const [tab, setTab] = useState(userProfile?.isAuthenticated ? 'profile' : 'register');
@@ -26,6 +37,7 @@ export function AuthModal({ isOpen, onClose, userProfile, activeChannels = [] })
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
+  const [syncingStats, setSyncingStats] = useState(false);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -37,7 +49,12 @@ export function AuthModal({ isOpen, onClose, userProfile, activeChannels = [] })
     setTab(userProfile?.isAuthenticated ? 'profile' : 'register');
     setError('');
     setSuccessMsg('');
-  }, [isOpen, userProfile]);
+  }, [isOpen, userProfile?.uid, userProfile?.isAuthenticated]);
+
+  useEffect(() => {
+    if (!isOpen || !userProfile?.uid) return;
+    loadPlayerGameStats(userProfile.uid).catch(() => {});
+  }, [isOpen, tab, userProfile?.uid]);
 
   const filteredCountries = useMemo(() => {
     const q = countrySearch.trim().toLowerCase();
@@ -49,9 +66,22 @@ export function AuthModal({ isOpen, onClose, userProfile, activeChannels = [] })
 
   if (!isOpen) return null;
 
+  const isLoggedIn = Boolean(userProfile?.isAuthenticated);
+  const activeTab = isLoggedIn && (tab === 'register' || tab === 'login') ? 'profile' : tab;
   const rankMeta = getRankTierMeta(userProfile?.rank || 'D');
   const countryMeta = getCountryByCode(userProfile?.region || 'FR');
   const gameStats = Array.isArray(userProfile?.gameStats) ? userProfile.gameStats : [];
+  const totalPlayTimeSeconds = gameStats.reduce((acc, st) => acc + Number(st.playTimeSeconds || 0), 0);
+
+  const handleRefreshStats = async () => {
+    if (!userProfile?.uid || syncingStats) return;
+    setSyncingStats(true);
+    try {
+      await loadPlayerGameStats(userProfile.uid);
+    } finally {
+      setTimeout(() => setSyncingStats(false), 350);
+    }
+  };
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -169,37 +199,45 @@ export function AuthModal({ isOpen, onClose, userProfile, activeChannels = [] })
           </button>
         </div>
 
-        {/* Navigation Onglets */}
-        <div className="grid grid-cols-4 border-b border-neutral-800 bg-neutral-950/60 text-xs font-bold shrink-0">
-          <button
-            type="button"
-            onClick={() => { setTab('register'); setError(''); setSuccessMsg(''); }}
-            className={`py-2.5 flex items-center justify-center gap-1.5 border-b-2 transition-colors ${
-              tab === 'register'
-                ? 'border-cyan-400 text-cyan-300 bg-cyan-950/25'
-                : 'border-transparent text-neutral-400 hover:text-neutral-200'
-            }`}
-          >
-            <UserPlus className="w-3.5 h-3.5" />
-            <span>Sign-In / Créer</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => { setTab('login'); setError(''); setSuccessMsg(''); }}
-            className={`py-2.5 flex items-center justify-center gap-1.5 border-b-2 transition-colors ${
-              tab === 'login'
-                ? 'border-cyan-400 text-cyan-300 bg-cyan-950/25'
-                : 'border-transparent text-neutral-400 hover:text-neutral-200'
-            }`}
-          >
-            <LogIn className="w-3.5 h-3.5" />
-            <span>Login</span>
-          </button>
+        {/* Navigation Onglets : masquer Sign-In & Login lorsque l'utilisateur est déjà connecté */}
+        <div
+          className={`grid ${
+            isLoggedIn ? 'grid-cols-2' : 'grid-cols-4'
+          } border-b border-neutral-800 bg-neutral-950/60 text-xs font-bold shrink-0`}
+        >
+          {!isLoggedIn && (
+            <>
+              <button
+                type="button"
+                onClick={() => { setTab('register'); setError(''); setSuccessMsg(''); }}
+                className={`py-2.5 flex items-center justify-center gap-1.5 border-b-2 transition-colors ${
+                  activeTab === 'register'
+                    ? 'border-cyan-400 text-cyan-300 bg-cyan-950/25'
+                    : 'border-transparent text-neutral-400 hover:text-neutral-200'
+                }`}
+              >
+                <UserPlus className="w-3.5 h-3.5" />
+                <span>Sign-In / Créer</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => { setTab('login'); setError(''); setSuccessMsg(''); }}
+                className={`py-2.5 flex items-center justify-center gap-1.5 border-b-2 transition-colors ${
+                  activeTab === 'login'
+                    ? 'border-cyan-400 text-cyan-300 bg-cyan-950/25'
+                    : 'border-transparent text-neutral-400 hover:text-neutral-200'
+                }`}
+              >
+                <LogIn className="w-3.5 h-3.5" />
+                <span>Login</span>
+              </button>
+            </>
+          )}
           <button
             type="button"
             onClick={() => { setTab('stats'); setError(''); setSuccessMsg(''); }}
             className={`py-2.5 flex items-center justify-center gap-1.5 border-b-2 transition-colors ${
-              tab === 'stats'
+              activeTab === 'stats'
                 ? 'border-amber-400 text-amber-300 bg-amber-950/25'
                 : 'border-transparent text-neutral-400 hover:text-neutral-200'
             }`}
@@ -211,7 +249,7 @@ export function AuthModal({ isOpen, onClose, userProfile, activeChannels = [] })
             type="button"
             onClick={() => { setTab('profile'); setError(''); setSuccessMsg(''); }}
             className={`py-2.5 flex items-center justify-center gap-1.5 border-b-2 transition-colors ${
-              tab === 'profile'
+              activeTab === 'profile'
                 ? 'border-cyan-400 text-cyan-300 bg-cyan-950/25'
                 : 'border-transparent text-neutral-400 hover:text-neutral-200'
             }`}
@@ -237,7 +275,7 @@ export function AuthModal({ isOpen, onClose, userProfile, activeChannels = [] })
           )}
 
           {/* ONGLET INSCRIPTION COMPLÈTE (Nom, Prénom, Pseudo, Pays parmi tous les pays, Email, Mot de passe) */}
-          {tab === 'register' && (
+          {!isLoggedIn && activeTab === 'register' && (
             <form onSubmit={handleRegister} className="space-y-3">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                 <div>
@@ -362,7 +400,7 @@ export function AuthModal({ isOpen, onClose, userProfile, activeChannels = [] })
           )}
 
           {/* ONGLET LOGIN */}
-          {tab === 'login' && (
+          {!isLoggedIn && activeTab === 'login' && (
             <form onSubmit={handleLogin} className="space-y-3">
               <div>
                 <label className="block text-[11px] font-mono uppercase text-neutral-400 mb-1">
@@ -419,7 +457,7 @@ export function AuthModal({ isOpen, onClose, userProfile, activeChannels = [] })
           )}
 
           {/* ONGLET STATS DU PERSONNAGE & ÉVALUATION AUTOMATIQUE DU RANG */}
-          {tab === 'stats' && (
+          {activeTab === 'stats' && (
             <div className="space-y-4">
               {/* Carte Évaluation du Rang */}
               <div className="p-4 rounded-xl bg-neutral-950 border border-amber-500/35 space-y-3">
@@ -460,7 +498,8 @@ export function AuthModal({ isOpen, onClose, userProfile, activeChannels = [] })
                   <div className="flex justify-between text-[10px] font-mono text-neutral-400">
                     <span>Progression : {userProfile?.progressPercent || 0}%</span>
                     <span>
-                      {userProfile?.gamesCount || 0} jeu(x) scoré(s) · {userProfile?.totalParties || 0} partie(s)
+                      {userProfile?.gamesCount || 0} jeu(x) joué(s) · {userProfile?.totalParties || 0} partie(s)
+                      {totalPlayTimeSeconds > 0 ? ` · ⏱ ${formatPlayTime(totalPlayTimeSeconds)}` : ''}
                     </span>
                   </div>
                 </div>
@@ -474,15 +513,16 @@ export function AuthModal({ isOpen, onClose, userProfile, activeChannels = [] })
                     </div>
                   </div>
                   <div className="p-2 rounded-lg bg-neutral-900 border border-neutral-800 text-center">
-                    <div className="text-[10px] font-mono text-neutral-400">JEUX MAÎTRISÉS</div>
+                    <div className="text-[10px] font-mono text-neutral-400">JEUX JOUÉS</div>
                     <div className="text-xs font-mono font-black text-cyan-300">
                       {userProfile?.gamesCount || 0}
                     </div>
                   </div>
                   <div className="p-2 rounded-lg bg-neutral-900 border border-neutral-800 text-center">
-                    <div className="text-[10px] font-mono text-neutral-400">PARTIES SCORÉES</div>
+                    <div className="text-[10px] font-mono text-neutral-400">PARTIES · TEMPS</div>
                     <div className="text-xs font-mono font-black text-emerald-300">
                       {userProfile?.totalParties || 0}
+                      {totalPlayTimeSeconds > 0 ? ` · ${formatPlayTime(totalPlayTimeSeconds)}` : ''}
                     </div>
                   </div>
                 </div>
@@ -490,26 +530,37 @@ export function AuthModal({ isOpen, onClose, userProfile, activeChannels = [] })
 
               {/* Liste des stats par jeu */}
               <div className="space-y-2">
-                <div className="text-[11px] font-mono uppercase text-neutral-400 flex items-center justify-between">
-                  <span>Meilleurs scores stockés par jeu ({gameStats.length})</span>
-                  <span className="text-[10px] text-emerald-400">100% Automatique depuis la RAM</span>
+                <div className="text-[11px] font-mono uppercase text-neutral-400 flex items-center justify-between gap-2">
+                  <span>Stats &amp; Scores par jeu ({gameStats.length})</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] text-emerald-400 hidden sm:inline">RAM Auto</span>
+                    <button
+                      type="button"
+                      onClick={handleRefreshStats}
+                      className="flex items-center gap-1 px-2 py-0.5 rounded bg-neutral-800 hover:bg-neutral-700 text-[10px] font-mono text-cyan-300 transition-colors"
+                    >
+                      <RefreshCw className={`w-3 h-3 ${syncingStats ? 'animate-spin' : ''}`} />
+                      <span>Actualiser</span>
+                    </button>
+                  </div>
                 </div>
 
                 {gameStats.length === 0 ? (
                   <div className="p-5 rounded-xl bg-neutral-950 border border-neutral-800 text-center text-xs text-neutral-400 space-y-1">
-                    <p className="font-bold text-neutral-300">Aucun score RAM enregistré pour le moment.</p>
+                    <p className="font-bold text-neutral-300">Aucune statistique enregistrée pour le moment.</p>
                     <p className="text-[11px]">
-                      Jouez à un jeu : la RAM du jeu envoie et stocke automatiquement vos meilleurs scores lors d’une victoire, d’un record ou d’une fin de partie !
+                      Lancez un jeu : vos parties, votre temps de jeu et vos scores RAM sont enregistrés et synchronisés automatiquement.
                     </p>
                   </div>
                 ) : (
                   <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
                     {gameStats.map((st) => {
                       const gRank = getRankTierMeta(st.gameRank || 'D');
+                      const hasScore = Number(st.bestScore || 0) > 0;
                       return (
                         <div
                           key={st.gameId}
-                          className="p-3 rounded-xl bg-neutral-950 border border-neutral-800 flex items-center justify-between gap-2"
+                          className="p-3 rounded-xl bg-neutral-950 border border-neutral-800 hover:border-neutral-700 transition-colors flex items-center justify-between gap-2"
                         >
                           <div className="min-w-0">
                             <div className="flex items-center gap-2">
@@ -518,17 +569,37 @@ export function AuthModal({ isOpen, onClose, userProfile, activeChannels = [] })
                               </span>
                               <span className="text-xs font-bold text-white truncate">{st.gameTitle}</span>
                             </div>
-                            <div className="text-[10px] font-mono text-neutral-400 mt-0.5">
-                              {st.platformLabel || 'Arcade'} · {st.gamesPlayed || 1} partie(s) · +{st.gameRatingPoints || 0} RP
+                            <div className="flex flex-wrap items-center gap-1.5 text-[10px] font-mono text-neutral-400 mt-1">
+                              <span className="px-1.5 py-0.5 rounded bg-neutral-900 border border-neutral-800 text-cyan-300">
+                                {st.platformLabel || 'Arcade'}
+                              </span>
+                              <span>{st.gamesPlayed || 1} partie(s)</span>
+                              {st.playTimeSeconds > 0 && <span>· ⏱ {formatPlayTime(st.playTimeSeconds)}</span>}
+                              <span className="text-amber-300/90">· +{st.gameRatingPoints || 0} RP</span>
                             </div>
                           </div>
                           <div className="text-right shrink-0">
-                            <div className="text-xs font-mono font-black text-amber-300">
-                              🏆 {(st.bestScore || 0).toLocaleString('fr-FR')} pts
-                            </div>
-                            <div className="text-[10px] font-mono text-neutral-500">
-                              Dernier : {(st.lastScore || 0).toLocaleString('fr-FR')}
-                            </div>
+                            {hasScore ? (
+                              <>
+                                <div className="text-xs font-mono font-black text-amber-300">
+                                  🏆 {Number(st.bestScore).toLocaleString('fr-FR')} pts
+                                </div>
+                                {Number(st.lastScore || 0) > 0 && (
+                                  <div className="text-[10px] font-mono text-neutral-500">
+                                    Dernier : {Number(st.lastScore).toLocaleString('fr-FR')}
+                                  </div>
+                                )}
+                              </>
+                            ) : (
+                              <>
+                                <div className="text-[11px] font-mono font-bold text-neutral-300">
+                                  Session suivie
+                                </div>
+                                <div className="text-[10px] font-mono text-neutral-500">
+                                  En attente score RAM
+                                </div>
+                              </>
+                            )}
                           </div>
                         </div>
                       );
@@ -540,7 +611,7 @@ export function AuthModal({ isOpen, onClose, userProfile, activeChannels = [] })
           )}
 
           {/* ONGLET PROFIL JOUEUR */}
-          {tab === 'profile' && (
+          {activeTab === 'profile' && (
             <form onSubmit={handleSaveProfile} className="space-y-3">
               <div className="p-3 rounded-xl bg-neutral-950 border border-neutral-800 flex items-center justify-between">
                 <div className="flex items-center gap-2.5">
