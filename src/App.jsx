@@ -354,7 +354,7 @@ export default function App() {
       await startRollbackP2PMatch({
         challengeId: ch.challengeId,
         isHost: false,
-        gameEntry: channel?.entry || { id: ch.gameId, title: ch.gameTitle },
+        gameEntry: ch.gameEntry || channel?.entry || { id: ch.gameId, title: ch.gameTitle },
       });
     }
   };

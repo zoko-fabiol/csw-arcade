@@ -138,17 +138,39 @@ export function FightcadeLobbyView({
 
   const handleChallenge = async (u, targetGameOverride = null) => {
     setPendingChallengeId(u.uid);
-    const targetChannel = targetGameOverride
-      ? {
-          gameId: targetGameOverride.gameId,
-          title: targetGameOverride.title,
-          platformLabel: targetGameOverride.platformLabel || 'Arcade',
-          entry:
-            activeChannels.find((c) => c.gameId === targetGameOverride.gameId)?.entry ||
-            channel.entry ||
-            targetGameOverride,
-        }
-      : channel;
+    let resolvedEntry = null;
+    let targetGid = null;
+    let targetTitle = null;
+    let targetPlatform = 'Arcade';
+
+    if (!isGlobal && channel && channel.entry) {
+      // Dans le salon d'un jeu précis (ex: Street Fighter II) : toujours prioriser le jeu du salon courant !
+      targetGid = channel.gameId;
+      targetTitle = channel.title;
+      targetPlatform = channel.platformLabel || 'Arcade';
+      resolvedEntry = channel.entry;
+    } else if (targetGameOverride) {
+      targetGid = targetGameOverride.gameId || targetGameOverride.id;
+      targetTitle = targetGameOverride.title;
+      targetPlatform = targetGameOverride.platformLabel || 'Arcade';
+      resolvedEntry =
+        targetGameOverride.entry ||
+        activeChannels.find((c) => c.gameId === targetGid)?.entry ||
+        (channel?.gameId === targetGid ? channel.entry : null) ||
+        targetGameOverride;
+    } else {
+      targetGid = channel.gameId;
+      targetTitle = channel.title;
+      targetPlatform = channel.platformLabel || 'Arcade';
+      resolvedEntry = channel.entry;
+    }
+
+    const targetChannel = {
+      gameId: targetGid,
+      title: targetTitle,
+      platformLabel: targetPlatform,
+      entry: resolvedEntry,
+    };
     await onChallengePlayer(targetChannel, u);
     setTimeout(() => setPendingChallengeId(null), 15000);
   };
@@ -642,7 +664,15 @@ export function FightcadeLobbyView({
                         <button
                           type="button"
                           disabled={pendingChallengeId === u.uid}
-                          onClick={() => handleChallenge(u, u.currentGame || userActiveGames[0] || null)}
+                          onClick={() => {
+                            if (!isGlobal) {
+                              // Salon d'un jeu précis : défier sur le jeu du salon courant !
+                              handleChallenge(u, channel);
+                            } else {
+                              // Salon global : défier sur le jeu en cours ou le premier jeu actif
+                              handleChallenge(u, u.currentGame || userActiveGames[0] || null);
+                            }
+                          }}
                           className="px-2.5 py-1.5 rounded-lg bg-cyan-500 hover:bg-cyan-400 disabled:opacity-50 text-black text-[11px] font-bold flex items-center gap-1 shrink-0"
                         >
                           <Swords className="w-3.5 h-3.5" />

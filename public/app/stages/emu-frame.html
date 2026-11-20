@@ -455,8 +455,8 @@
     }
 
     function findLocalButtonIndex(keyCode) {
-      const myPort = netplayPlayerIndex === 1 ? 1 : 0;
-      const portMap = window.EJS_emulator?.controls?.[myPort] || buildControllersConfig(readHardwareSettings().controls)?.[0];
+      // Pour les touches locales du joueur physique, utiliser toujours les touches principales de la configuration
+      const portMap = buildControllersConfig(readHardwareSettings().controls)?.[0] || window.EJS_emulator?.controls?.[0];
       if (!portMap) return -1;
       for (const idx of BUTTON_INDEX_ORDER) {
         if (portMap[idx]?.value === keyCode) return idx;
@@ -540,14 +540,21 @@
         const myPort = netplayPlayerIndex === 1 ? 1 : 0;
         const btnIdx = resolveUniversalKey(e);
         if (btnIdx === 2) {
-          // Touche 5 : force la synchronisation des crédits du portefeuille dans la RAM de la ROM (sans ajouter de coin au portefeuille)
+          // Touche 5 / Coin : injecter une impulsion Coin et transmettre en Netplay
           e.preventDefault();
           e.stopImmediatePropagation();
+          pulseEmuButton(isNetplaySession ? 0 : myPort, 2, 70);
+          if (isNetplaySession) {
+            notifyParent('NETPLAY_LOCAL_BTN', { buttonIdx: 2, pressed: true });
+            setTimeout(() => notifyParent('NETPLAY_LOCAL_BTN', { buttonIdx: 2, pressed: false }), 70);
+          }
           forceSyncCreditsToRam();
           return;
         }
         handleUniversalKeyboardBridge(e.code || '', e.keyCode || e.which, true);
         if (btnIdx >= 0) {
+          e.preventDefault();
+          e.stopImmediatePropagation();
           simulateEmuInput(myPort, btnIdx, true);
         }
         if (isNetplaySession && btnIdx >= 0) {
@@ -562,6 +569,8 @@
         const btnIdx = resolveUniversalKey(e);
         handleUniversalKeyboardBridge(e.code || '', e.keyCode || e.which, false);
         if (btnIdx >= 0) {
+          e.preventDefault();
+          e.stopImmediatePropagation();
           simulateEmuInput(myPort, btnIdx, false);
         }
         if (isNetplaySession && btnIdx >= 0) {
@@ -1367,6 +1376,20 @@
             notifyParent('STAGE_STATUS', { status: 'playing', message: 'Émulateur démarré.' });
             startRamTelemetry(msg.gameName || targetFilename, msg.core);
 
+            if (isNetplaySession) {
+              // Dès que la ROM est prête, insérer automatiquement 4 crédits arcade
+              // (pièce J1 + pièce J2) pour permettre le défi 2 joueurs immédiat sans IA solo
+              setTimeout(() => {
+                try {
+                  pulseEmuButton(0, 2, 80); // Coin P1
+                  setTimeout(() => pulseEmuButton(1, 2, 80), 160); // Coin P2
+                  setTimeout(() => pulseEmuButton(0, 2, 80), 320); // 2e Coin P1
+                  setTimeout(() => pulseEmuButton(1, 2, 80), 480); // 2e Coin P2
+                  console.log('[CSW Netplay] Crédits arcade automatiques insérés pour J1 et J2.');
+                } catch {}
+              }, 1800);
+            }
+
             // La synchronisation des crédits en RAM est déclenchée à la demande par la touche 5 (ou le bouton Sync Crédits (5))
             if (isNetplaySession && netplayPlayerIndex === 0) {
               setTimeout(() => {
@@ -1377,7 +1400,7 @@
                     notifyParent('STATE_EXPORTED', { stateBase64: bytesToBase64(bytes), slot: 'frame0' });
                   }
                 } catch {}
-              }, 650);
+              }, 1200);
             }
           };
 
