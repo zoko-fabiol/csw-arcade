@@ -965,8 +965,8 @@ export default function App() {
         </div>
       )}
 
-      {/* Modale Défi Entrant Fightcade 2 (15s) — visible même par-dessus l'émulateur */}
-      {incomingChallenge && (
+      {/* Modale Défi Entrant Fightcade 2 (15s) — visible uniquement par l'adversaire invité, jamais par l'expéditeur */}
+      {incomingChallenge && incomingChallenge.fromUid !== userProfile?.uid && !activeMatchSync && (
         <div className="fixed bottom-20 md:bottom-6 inset-x-3 md:inset-x-auto md:right-6 z-[120] md:w-80 rounded-2xl bg-neutral-900 border-2 border-cyan-400 p-4 shadow-2xl space-y-3">
           <div className="flex items-center gap-2 text-cyan-300 font-black text-xs uppercase">
             <Swords className="w-4 h-4 animate-pulse" />

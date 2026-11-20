@@ -430,7 +430,8 @@
     function simulateEmuInput(player, buttonId, isPressed) {
       const gm = window.EJS_emulator?.gameManager;
       if (!gm) return false;
-      const val = isPressed ? 1 : 0;
+      const isAxis = buttonId >= 16 && buttonId <= 23;
+      const val = isPressed ? (isAxis ? 32767 : 1) : 0;
       const fn = gm.functions?.simulateInput || gm.simulateInput;
       const ctx = gm.functions?.simulateInput ? gm.functions : gm;
       if (typeof fn === 'function') {
@@ -556,6 +557,10 @@
           e.preventDefault();
           e.stopImmediatePropagation();
           simulateEmuInput(myPort, btnIdx, true);
+          if (btnIdx === 4) simulateEmuInput(myPort, 19, true);
+          else if (btnIdx === 5) simulateEmuInput(myPort, 18, true);
+          else if (btnIdx === 6) simulateEmuInput(myPort, 17, true);
+          else if (btnIdx === 7) simulateEmuInput(myPort, 16, true);
         }
         if (isNetplaySession && btnIdx >= 0) {
           notifyParent('NETPLAY_LOCAL_BTN', { buttonIdx: btnIdx, pressed: true });
@@ -572,6 +577,10 @@
           e.preventDefault();
           e.stopImmediatePropagation();
           simulateEmuInput(myPort, btnIdx, false);
+          if (btnIdx === 4) simulateEmuInput(myPort, 19, false);
+          else if (btnIdx === 5) simulateEmuInput(myPort, 18, false);
+          else if (btnIdx === 6) simulateEmuInput(myPort, 17, false);
+          else if (btnIdx === 7) simulateEmuInput(myPort, 16, false);
         }
         if (isNetplaySession && btnIdx >= 0) {
           notifyParent('NETPLAY_LOCAL_BTN', { buttonIdx: btnIdx, pressed: false });
@@ -1187,10 +1196,13 @@
         const remotePort = netplayPlayerIndex === 1 ? 0 : 1;
         const btnIdx = Number(msg.buttonIdx);
         const pressed = Boolean(msg.pressed);
-        if (!simulateEmuInput(remotePort, btnIdx, pressed)) {
-          const kc = window.EJS_emulator?.controls?.[remotePort]?.[btnIdx]?.value;
-          if (kc) dispatchSyntheticKey(kc, pressed ? 'keydown' : 'keyup');
-        }
+        simulateEmuInput(remotePort, btnIdx, pressed);
+        if (btnIdx === 4) simulateEmuInput(remotePort, 19, pressed);
+        else if (btnIdx === 5) simulateEmuInput(remotePort, 18, pressed);
+        else if (btnIdx === 6) simulateEmuInput(remotePort, 17, pressed);
+        else if (btnIdx === 7) simulateEmuInput(remotePort, 16, pressed);
+        const kc = window.EJS_emulator?.controls?.[remotePort]?.[btnIdx]?.value;
+        if (kc) dispatchSyntheticKey(kc, pressed ? 'keydown' : 'keyup');
         return;
       }
 
@@ -1336,9 +1348,6 @@
 
           const hw = readHardwareSettings();
           let ctrlCfg = buildControllersConfig(hw.controls, msg.core, hw) || buildControllersConfig({ p1: {}, p2: {} }, msg.core, hw);
-          if (isNetplaySession && netplayPlayerIndex === 1 && ctrlCfg) {
-            ctrlCfg = { 0: ctrlCfg[1], 1: ctrlCfg[0], 2: {}, 3: {} };
-          }
 
           window.EJS_player = '#game';
           window.EJS_core = isFbneo ? 'arcade' : msg.core;
@@ -1368,24 +1377,29 @@
           window.EJS_onGameStart = () => {
             bootEl.hidden = true;
             applyHardwareSettings(readHardwareSettings());
-            if (isNetplaySession && netplayPlayerIndex === 1 && ctrlCfg && window.EJS_emulator) {
-              window.EJS_emulator.controls = ctrlCfg;
-              try { window.EJS_emulator.setupKeys?.(); } catch {}
-            }
             try { window.focus(); } catch {}
             notifyParent('STAGE_STATUS', { status: 'playing', message: 'Émulateur démarré.' });
             startRamTelemetry(msg.gameName || targetFilename, msg.core);
 
             if (isNetplaySession) {
-              // Dès que la ROM est prête, insérer automatiquement 4 crédits arcade
-              // (pièce J1 + pièce J2) pour permettre le défi 2 joueurs immédiat sans IA solo
+              // Séquence Fightcade automatique :
+              // 1. Insérer 2 Coins pour P1 et 2 Coins pour P2
+              // 2. Déclencher START 1 et START 2 pour lancer immédiatement le mode VERSUS 2 Joueurs sans passer par l'IA solo
               setTimeout(() => {
                 try {
                   pulseEmuButton(0, 2, 80); // Coin P1
                   setTimeout(() => pulseEmuButton(1, 2, 80), 160); // Coin P2
                   setTimeout(() => pulseEmuButton(0, 2, 80), 320); // 2e Coin P1
                   setTimeout(() => pulseEmuButton(1, 2, 80), 480); // 2e Coin P2
-                  console.log('[CSW Netplay] Crédits arcade automatiques insérés pour J1 et J2.');
+
+                  // Auto-Start Versus 2 Joueurs 1.4s après insertion
+                  setTimeout(() => {
+                    pulseEmuButton(0, 3, 100); // Start 1
+                    setTimeout(() => {
+                      pulseEmuButton(1, 3, 100); // Start 2 (Challenger !)
+                      console.log('[CSW Fightcade Netplay] Auto-Start 2 Joueurs Versus activé (P1 + P2).');
+                    }, 400);
+                  }, 1400);
                 } catch {}
               }, 1800);
             }

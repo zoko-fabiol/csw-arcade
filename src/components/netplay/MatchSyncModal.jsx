@@ -155,15 +155,15 @@ export function MatchSyncModal({
       core,
       onProgress: ({ received, total }) => {
         if (!isMounted) return;
-        if (total > 0) {
-          const pct = Math.min(100, Math.round((received / total) * 100));
-          setLocalRomPct(pct);
-          firebaseFightcadeService.sendMatchSyncUpdate(challenge.challengeId, opponentUid, {
-            romPct: pct,
-            romReady: false,
-            isReady: false,
-          });
-        }
+        const pct = total > 0
+          ? Math.min(99, Math.round((received / total) * 100))
+          : Math.min(95, Math.max(15, Math.round(received / (1024 * 50))));
+        setLocalRomPct(pct);
+        firebaseFightcadeService.sendMatchSyncUpdate(challenge.challengeId, opponentUid, {
+          romPct: pct,
+          romReady: false,
+          isReady: false,
+        });
       },
     })
       .then((blob) => {
@@ -173,11 +173,16 @@ export function MatchSyncModal({
         setLocalRomReady(true);
         setLocalReady(true);
 
-        firebaseFightcadeService.sendMatchSyncUpdate(challenge.challengeId, opponentUid, {
-          romPct: 100,
-          romReady: true,
-          isReady: true,
-        });
+        const notifyReady = () => {
+          firebaseFightcadeService.sendMatchSyncUpdate(challenge.challengeId, opponentUid, {
+            romPct: 100,
+            romReady: true,
+            isReady: true,
+          });
+        };
+        notifyReady();
+        setTimeout(notifyReady, 500);
+        setTimeout(notifyReady, 1200);
       })
       .catch((err) => {
         if (!isMounted) return;

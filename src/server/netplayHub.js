@@ -939,7 +939,7 @@ export function setupNetplayHub(server) {
               if (sockets) {
                 const msg = JSON.stringify({ type: 'INCOMING_CHALLENGE', challenge });
                 for (const s of sockets) {
-                  if (s.readyState === WebSocket.OPEN) s.send(msg);
+                  if (s !== ws && s.readyState === WebSocket.OPEN) s.send(msg);
                 }
               }
             }
@@ -957,7 +957,7 @@ export function setupNetplayHub(server) {
             if (sockets) {
               const msg = JSON.stringify({ type: 'CHALLENGE_STATUS_CHANGED', challengeId, status, challenge: ch });
               for (const s of sockets) {
-                if (s.readyState === WebSocket.OPEN) s.send(msg);
+                if (s !== ws && s.readyState === WebSocket.OPEN) s.send(msg);
               }
             }
             break;
@@ -975,7 +975,7 @@ export function setupNetplayHub(server) {
                 isReady: Boolean(isReady),
               });
               for (const s of sockets) {
-                if (s.readyState === WebSocket.OPEN) s.send(msg);
+                if (s !== ws && s.readyState === WebSocket.OPEN) s.send(msg);
               }
             }
             break;
@@ -987,7 +987,7 @@ export function setupNetplayHub(server) {
             if (sockets) {
               const msg = JSON.stringify({ type: 'MATCH_COUNTDOWN_START', challengeId });
               for (const s of sockets) {
-                if (s.readyState === WebSocket.OPEN) s.send(msg);
+                if (s !== ws && s.readyState === WebSocket.OPEN) s.send(msg);
               }
             }
             break;
@@ -1003,7 +1003,7 @@ export function setupNetplayHub(server) {
             if (sockets) {
               const msg = JSON.stringify({ type: 'MATCH_CANCELLED', challengeId });
               for (const s of sockets) {
-                if (s.readyState === WebSocket.OPEN) s.send(msg);
+                if (s !== ws && s.readyState === WebSocket.OPEN) s.send(msg);
               }
             }
             break;
@@ -1015,7 +1015,7 @@ export function setupNetplayHub(server) {
             if (sockets) {
               const msg = JSON.stringify({ type: 'REMOTE_BTN_RELAY', buttonIdx, pressed, frame });
               for (const s of sockets) {
-                if (s.readyState === WebSocket.OPEN) s.send(msg);
+                if (s !== ws && s.readyState === WebSocket.OPEN) s.send(msg);
               }
             }
             break;

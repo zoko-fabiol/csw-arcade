@@ -186,9 +186,11 @@ class FirebaseFightcadeService {
     if (!data || !data.type) return;
 
     if (data.type === 'INCOMING_CHALLENGE' && data.challenge) {
-      this.incomingChallengeListeners.forEach((cb) => {
-        try { cb([data.challenge]); } catch {}
-      });
+      if (data.challenge.fromUid !== this.identity.uid) {
+        this.incomingChallengeListeners.forEach((cb) => {
+          try { cb([data.challenge]); } catch {}
+        });
+      }
     } else if (data.type === 'CHALLENGE_STATUS_CHANGED') {
       const listeners = this.challengeListeners.get(data.challengeId);
       if (listeners) {
@@ -810,7 +812,7 @@ class FirebaseFightcadeService {
       const now = Date.now();
       const map = new Map();
       [...relayList, ...firestoreList].forEach((c) => {
-        if (c && c.challengeId && c.expiresAt > now && c.status === 'pending') {
+        if (c && c.challengeId && c.expiresAt > now && c.status === 'pending' && c.fromUid !== this.identity.uid) {
           map.set(c.challengeId, c);
         }
       });
