@@ -37,8 +37,14 @@ import { applyRemoteSyncedStats, getRankTierMeta } from './services/scoreRanking
 import { countryCodeToFlag } from './data/countries';
 import { RollbackP2PEngine } from './services/rollbackP2P';
 import {
-  Gamepad2, Disc, Cpu, Coffee, Settings, Joystick, Coins, Layers, Swords, UserCheck, Cloud, Play, X
+  Gamepad2, Disc, Cpu, Coffee, Settings, Joystick, Coins, Layers, Swords, UserCheck, Cloud, Play, X, Plus
 } from 'lucide-react';
+
+// ============================================================================
+// MODE TEST DÉVELOPPEUR : Afficher le bouton "+10 COINS (Test Gratuit)"
+// Passez simplement cette variable à `false` avant la mise sur le marché !
+// ============================================================================
+export const ENABLE_DEV_TEST_COINS = true;
 
 const SHELL_MODES = [
   { id: 'all', label: 'Tous les jeux', subtitle: 'Game Mode Unifié · Tous Univers', icon: Layers },
@@ -651,8 +657,8 @@ export default function App() {
             <UserCheck className="w-3.5 h-3.5 text-emerald-400" />
           </button>
 
-          {/* Portefeuille Coins (0-99) + Bouton Test */}
-          <div className="relative">
+          {/* Portefeuille Coins (0-99) + Bouton Test Gratuit */}
+          <div className="flex items-center gap-1.5">
             <button
               type="button"
               onClick={() => setIsSasPayOpen(true)}
@@ -666,9 +672,22 @@ export default function App() {
               <Coins className="w-3.5 h-3.5" />
               <span>{String(coins).padStart(2, '0')}/99 COINS</span>
               <span className="hidden lg:inline text-[10px] px-1.5 py-0.5 rounded bg-amber-500 text-black font-black">
-                + Acheter (SasPay)
+                Acheter
               </span>
             </button>
+
+            {/* Bouton Mode Test : Ajouter +10 Coins gratuitement (désactivable via ENABLE_DEV_TEST_COINS) */}
+            {ENABLE_DEV_TEST_COINS && (
+              <button
+                type="button"
+                onClick={() => addCoins(10)}
+                title="Mode Test : Ajouter +10 Coins gratuitement sans payer"
+                className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-black shadow-lg shadow-emerald-500/20 border border-emerald-400 transition-all active:scale-95"
+              >
+                <Plus className="w-3.5 h-3.5 stroke-[3]" />
+                <span>+10 COINS</span>
+              </button>
+            )}
           </div>
 
           <span className="hidden xl:inline px-2.5 py-1 rounded-full bg-neutral-900 border border-neutral-800 text-[11px] font-mono text-neutral-300">
@@ -816,16 +835,29 @@ export default function App() {
               </div>
             </div>
             <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  setNoCoinsModalOpen(false);
-                  setIsSasPayOpen(true);
-                }}
-                className="py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-black text-xs font-black"
-              >
-                Acheter des Coins (SasPay)
-              </button>
+              {ENABLE_DEV_TEST_COINS ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    addCoins(10);
+                    setNoCoinsModalOpen(false);
+                  }}
+                  className="py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-black"
+                >
+                  +10 Coins (Test Gratuit)
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setNoCoinsModalOpen(false);
+                    setIsSasPayOpen(true);
+                  }}
+                  className="py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-black text-xs font-black"
+                >
+                  Acheter des Coins (SasPay)
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => setNoCoinsModalOpen(false)}

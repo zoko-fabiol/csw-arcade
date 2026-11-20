@@ -636,9 +636,20 @@ export function UnifiedStageModal({
 
         <div className="flex items-center gap-1 md:gap-1.5 shrink-0">
           {session.kind !== 'j2me' && (
-            <span className="px-2 md:px-2.5 py-1 rounded-lg bg-amber-950/50 border border-amber-500/40 text-amber-300 text-[11px] md:text-xs font-mono font-bold">
+            <span className="px-2 md:px-2.5 py-1 rounded-lg bg-amber-950/50 border border-amber-500/40 text-amber-300 text-[11px] md:text-xs font-mono font-bold flex items-center gap-1.5">
               <span className="lg:hidden">{String(coins).padStart(2, '0')}</span>
-              <span className="hidden lg:inline">CRÉDITS SYNCHRONISÉS : {String(coins).padStart(2, '0')}/99</span>
+              <span className="hidden lg:inline">CRÉDITS : {String(coins).padStart(2, '0')}/99</span>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  addCoins(10);
+                }}
+                title="Mode Test : Ajouter +10 Coins gratuitement"
+                className="px-1.5 py-0.5 rounded bg-emerald-500 hover:bg-emerald-400 text-black text-[10px] font-black transition-all active:scale-95"
+              >
+                +10
+              </button>
             </span>
           )}
           <button
