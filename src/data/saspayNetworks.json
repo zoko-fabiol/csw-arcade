@@ -1,0 +1,632 @@
+[
+  {
+    "id": "a852e69b-9c70-4b9e-972b-876505ae6318",
+    "country": "7f470804-76cf-4c28-b845-6bc12932929b",
+    "code": "moov_bf",
+    "name": "Moov Burkina Faso",
+    "is_active": true,
+    "created_at": "2026-08-09T19:48:04.849341Z",
+    "updated_at": "2026-09-19T06:27:17.742657Z"
+  },
+  {
+    "id": "10c360ee-143e-4795-93c3-c8b3f5d5b772",
+    "country": "7f470804-76cf-4c28-b845-6bc12932929b",
+    "code": "orange_bf",
+    "name": "Orange Burkina Faso",
+    "is_active": true,
+    "created_at": "2026-08-09T19:48:04.956300Z",
+    "updated_at": "2026-09-19T06:27:25.032297Z"
+  },
+  {
+    "id": "0430ed7e-b8f7-40ed-8778-1aa909ca37b9",
+    "country": "7f470804-76cf-4c28-b845-6bc12932929b",
+    "code": "touchcash_bf",
+    "name": "TouchCash Burkina Faso",
+    "is_active": true,
+    "created_at": "2026-09-20T19:21:56.754207Z",
+    "updated_at": "2026-09-20T19:21:56.754228Z"
+  },
+  {
+    "id": "4839a300-cfe8-4325-95b7-9b7058816ff7",
+    "country": "b03ed84a-6072-442c-beb2-50fc6cd40084",
+    "code": "celtiis_bj",
+    "name": "Celtiis Cash Bénin",
+    "is_active": true,
+    "created_at": "2026-08-09T19:48:05.089042Z",
+    "updated_at": "2026-09-19T06:27:32.871195Z"
+  },
+  {
+    "id": "06341564-60a4-456a-89c6-d784c396e591",
+    "country": "b03ed84a-6072-442c-beb2-50fc6cd40084",
+    "code": "moov_bj",
+    "name": "Moov Money Benin",
+    "is_active": true,
+    "created_at": "2026-08-09T19:48:04.854549Z",
+    "updated_at": "2026-09-19T06:27:18.190181Z"
+  },
+  {
+    "id": "db7a879d-54f3-4036-8d2f-f2b2f2036bf9",
+    "country": "b03ed84a-6072-442c-beb2-50fc6cd40084",
+    "code": "mtn_bj",
+    "name": "MTN MoMo Benin",
+    "is_active": true,
+    "created_at": "2026-08-09T19:48:04.892111Z",
+    "updated_at": "2026-09-19T06:27:20.917683Z"
+  },
+  {
+    "id": "452cb40e-3f68-4735-9e41-43c3c747e3f5",
+    "country": "39085f8a-a277-47dd-a5f7-74ec89f75b40",
+    "code": "afrimoney_cd",
+    "name": "Afrimoney Congo",
+    "is_active": true,
+    "created_at": "2026-09-20T19:20:55.813479Z",
+    "updated_at": "2026-09-20T19:20:55.813504Z"
+  },
+  {
+    "id": "aad38605-7fce-42bc-b6cc-33781be6d6de",
+    "country": "39085f8a-a277-47dd-a5f7-74ec89f75b40",
+    "code": "airtel_cd",
+    "name": "Airtel Congo",
+    "is_active": true,
+    "created_at": "2026-08-09T19:48:04.769013Z",
+    "updated_at": "2026-09-19T06:27:11.865245Z"
+  },
+  {
+    "id": "454b827e-0591-49a6-ab25-242ca9551610",
+    "country": "39085f8a-a277-47dd-a5f7-74ec89f75b40",
+    "code": "orange_cd",
+    "name": "Orange Congo",
+    "is_active": true,
+    "created_at": "2026-08-09T19:48:04.961935Z",
+    "updated_at": "2026-09-19T06:27:25.479558Z"
+  },
+  {
+    "id": "9ffe0fdc-15c0-42ce-89e6-0d6a2cdd8352",
+    "country": "39085f8a-a277-47dd-a5f7-74ec89f75b40",
+    "code": "vodacom_cd",
+    "name": "Vodacom Congo",
+    "is_active": true,
+    "created_at": "2026-08-09T19:48:05.048328Z",
+    "updated_at": "2026-09-19T06:27:30.085519Z"
+  },
+  {
+    "id": "85a0fe11-b13f-4727-9215-88adb06bbc14",
+    "country": "1a760ae2-7e4e-48b3-b5db-2a247b65de17",
+    "code": "airtel_cg",
+    "name": "Airtel Congo Brazzaville",
+    "is_active": true,
+    "created_at": "2026-08-09T19:48:11.967972Z",
+    "updated_at": "2026-08-09T19:48:15.345414Z"
+  },
+  {
+    "id": "5dcf8389-d109-4f7a-97af-b9bed219fbc0",
+    "country": "1a760ae2-7e4e-48b3-b5db-2a247b65de17",
+    "code": "mtn_cg",
+    "name": "MTN Congo Brazzaville",
+    "is_active": true,
+    "created_at": "2026-08-09T19:48:12.019104Z",
+    "updated_at": "2026-08-09T19:48:15.402907Z"
+  },
+  {
+    "id": "81ab88eb-fd15-4a82-b676-38dbcaa015a4",
+    "country": "a3ef607f-6d80-4f51-b8f5-09a965743001",
+    "code": "djamo_ci",
+    "name": "Djamo Côte d'Ivoire",
+    "is_active": true,
+    "created_at": "2026-08-09T19:48:11.919786Z",
+    "updated_at": "2026-08-09T19:48:15.315345Z"
+  },
+  {
+    "id": "7e3eec03-793a-4721-a1d0-475a053d0b7f",
+    "country": "a3ef607f-6d80-4f51-b8f5-09a965743001",
+    "code": "moov_ci",
+    "name": "Moov Money CI",
+    "is_active": true,
+    "created_at": "2026-08-09T19:48:04.859089Z",
+    "updated_at": "2026-09-19T06:27:18.653493Z"
+  },
+  {
+    "id": "a55f36e1-dcd3-4e71-9d89-2cca692b7a10",
+    "country": "a3ef607f-6d80-4f51-b8f5-09a965743001",
+    "code": "mtn_ci",
+    "name": "MTN MoMo CI",
+    "is_active": true,
+    "created_at": "2026-08-09T19:48:04.900131Z",
+    "updated_at": "2026-09-19T06:27:21.370878Z"
+  },
+  {
+    "id": "225c4508-3721-40db-9492-1e7ccb0a1f74",
+    "country": "a3ef607f-6d80-4f51-b8f5-09a965743001",
+    "code": "orange_ci",
+    "name": "Orange Money CI",
+    "is_active": true,
+    "created_at": "2026-08-09T19:48:04.978940Z",
+    "updated_at": "2026-09-19T06:27:25.941529Z"
+  },
+  {
+    "id": "efe5b4dd-0ec1-43f4-9cdf-0d4533c8f3ec",
+    "country": "a3ef607f-6d80-4f51-b8f5-09a965743001",
+    "code": "wave_ci",
+    "name": "Wave CI",
+    "is_active": true,
+    "created_at": "2026-08-09T19:48:05.061834Z",
+    "updated_at": "2026-09-19T06:27:31.028655Z"
+  },
+  {
+    "id": "a6c4d050-d093-4b77-9aff-cc53f9358327",
+    "country": "4a37f84a-f67e-41e4-8d0c-713e07c4b65c",
+    "code": "mtn_cm",
+    "name": "MTN MoMo Cameroon",
+    "is_active": true,
+    "created_at": "2026-08-09T19:48:04.908579Z",
+    "updated_at": "2026-09-19T06:27:21.832508Z"
+  },
+  {
+    "id": "254319dd-e2e3-4908-aad0-2b40088102ec",
+    "country": "4a37f84a-f67e-41e4-8d0c-713e07c4b65c",
+    "code": "orange_cm",
+    "name": "Orange Money Cameroon",
+    "is_active": true,
+    "created_at": "2026-08-09T19:48:04.987378Z",
+    "updated_at": "2026-09-19T06:27:26.392525Z"
+  },
+  {
+    "id": "3141ff80-6206-4b69-8962-08f1a4f6da89",
+    "country": "24830c71-0b45-44d7-9600-ab24bb31e9e2",
+    "code": "airtel_ga",
+    "name": "Airtel Gabon",
+    "is_active": true,
+    "created_at": "2026-08-09T19:48:12.442519Z",
+    "updated_at": "2026-08-09T19:48:15.694732Z"
+  },
+  {
+    "id": "88126b41-ea45-4074-b654-d33e15357037",
+    "country": "24830c71-0b45-44d7-9600-ab24bb31e9e2",
+    "code": "moov_ga",
+    "name": "Moov Money Gabon",
+    "is_active": true,
+    "created_at": "2026-09-20T19:20:29.101631Z",
+    "updated_at": "2026-09-20T19:20:29.101661Z"
+  },
+  {
+    "id": "b42a7f61-3d88-42b3-809c-1f23150c9f87",
+    "country": "b64fb469-f09c-46a3-ad25-223319451c91",
+    "code": "mtn_gh",
+    "name": "MTN MoMo Ghana",
+    "is_active": true,
+    "created_at": "2026-08-09T19:48:04.918899Z",
+    "updated_at": "2026-09-19T06:27:22.289803Z"
+  },
+  {
+    "id": "c6e6d09c-5ec9-4540-b813-2209aa725cfd",
+    "country": "b64fb469-f09c-46a3-ad25-223319451c91",
+    "code": "tigo_gh",
+    "name": "Airtel/Tigo Ghana",
+    "is_active": true,
+    "created_at": "2026-08-09T19:48:05.017546Z",
+    "updated_at": "2026-09-19T06:27:28.196310Z"
+  },
+  {
+    "id": "034d7b72-4cd3-4159-909e-bb18326f649e",
+    "country": "b64fb469-f09c-46a3-ad25-223319451c91",
+    "code": "vodafone_gh",
+    "name": "Vodafone Ghana",
+    "is_active": true,
+    "created_at": "2026-08-09T19:48:05.054336Z",
+    "updated_at": "2026-09-19T06:27:30.538199Z"
+  },
+  {
+    "id": "504f33b6-5d68-4115-9a35-d97eb907a12a",
+    "country": "5f79cd36-3cfb-4972-843f-ba37cf8b60f0",
+    "code": "mtn_gn",
+    "name": "MTN MoMo Guinea",
+    "is_active": true,
+    "created_at": "2026-08-09T19:48:04.925455Z",
+    "updated_at": "2026-09-19T06:27:22.753667Z"
+  },
+  {
+    "id": "2f33bfc6-a319-4d81-9983-514a28669435",
+    "country": "85f5f718-6e66-487a-a841-14ca3be40560",
+    "code": "bank_transfer_in",
+    "name": "Virement bancaire Inde",
+    "is_active": true,
+    "created_at": "2026-09-20T18:52:06.588540Z",
+    "updated_at": "2026-09-20T18:52:06.588559Z"
+  },
+  {
+    "id": "7098113e-c752-47bf-bca3-39b1ece78bf9",
+    "country": "8ee98b22-4d36-4219-b91e-c5851a71dbac",
+    "code": "airtel_ke",
+    "name": "Airtel Money Kenya",
+    "is_active": true,
+    "created_at": "2026-09-20T19:20:14.772247Z",
+    "updated_at": "2026-09-20T19:20:14.772275Z"
+  },
+  {
+    "id": "85ef50f2-e367-4f41-990c-bf035c73e2c8",
+    "country": "8ee98b22-4d36-4219-b91e-c5851a71dbac",
+    "code": "mpesa_ke",
+    "name": "M-Pesa Kenya",
+    "is_active": true,
+    "created_at": "2026-08-09T19:48:04.877967Z",
+    "updated_at": "2026-09-19T06:27:20.022729Z"
+  },
+  {
+    "id": "8885b896-4552-47f2-9115-6a9e474d2b88",
+    "country": "b92599cc-7d13-4c01-8ed3-605cbfd2fae6",
+    "code": "mobi_cash_ml",
+    "name": "Mobi Cash Mali",
+    "is_active": true,
+    "created_at": "2026-08-09T19:48:04.841271Z",
+    "updated_at": "2026-09-19T06:27:17.288133Z"
+  },
+  {
+    "id": "28bf9f61-763d-47a7-8f2a-77f450777a88",
+    "country": "b92599cc-7d13-4c01-8ed3-605cbfd2fae6",
+    "code": "moov_ml",
+    "name": "Moov Money Mali",
+    "is_active": true,
+    "created_at": "2026-08-09T19:48:04.864793Z",
+    "updated_at": "2026-09-19T06:27:19.102303Z"
+  },
+  {
+    "id": "ce846669-5e24-4f5b-a153-3e2d39f44bc2",
+    "country": "b92599cc-7d13-4c01-8ed3-605cbfd2fae6",
+    "code": "orange_ml",
+    "name": "Orange Money Mali",
+    "is_active": true,
+    "created_at": "2026-08-09T19:48:05.000101Z",
+    "updated_at": "2026-09-19T06:27:27.302431Z"
+  },
+  {
+    "id": "47db054d-d207-4924-946c-4662852f7d0f",
+    "country": "b92599cc-7d13-4c01-8ed3-605cbfd2fae6",
+    "code": "wave_ml",
+    "name": "Wave Mali",
+    "is_active": true,
+    "created_at": "2026-09-20T19:22:19.281885Z",
+    "updated_at": "2026-09-20T19:22:19.281910Z"
+  },
+  {
+    "id": "ac2a8f98-66b1-4037-9abd-beac0004a017",
+    "country": "92924323-8fbd-416b-918b-9ce43d22133b",
+    "code": "airtel_mw",
+    "name": "Airtel Money Malawi",
+    "is_active": true,
+    "created_at": "2026-08-09T19:48:04.773750Z",
+    "updated_at": "2026-09-19T06:27:12.315385Z"
+  },
+  {
+    "id": "6b6c89ea-0fee-4fc8-a4cc-911c4e50c9e8",
+    "country": "92924323-8fbd-416b-918b-9ce43d22133b",
+    "code": "tnm_mw",
+    "name": "TNM Mpamba Malawi",
+    "is_active": true,
+    "created_at": "2026-08-09T19:48:05.028298Z",
+    "updated_at": "2026-09-19T06:27:29.141151Z"
+  },
+  {
+    "id": "2fb29e65-9f1f-4e4d-9f31-ca6e9e2786e0",
+    "country": "99768e1c-f2f6-4a40-95d4-7dffb7ad0378",
+    "code": "movitel_mz",
+    "name": "Movitel Mozambique",
+    "is_active": true,
+    "created_at": "2026-08-09T19:48:13.109108Z",
+    "updated_at": "2026-08-09T19:48:16.041985Z"
+  },
+  {
+    "id": "9abb384f-b9fb-4870-a4ab-2b0e40b26a71",
+    "country": "99768e1c-f2f6-4a40-95d4-7dffb7ad0378",
+    "code": "vodacom_mz",
+    "name": "Vodacom Mozambique",
+    "is_active": true,
+    "created_at": "2026-08-09T19:48:13.158339Z",
+    "updated_at": "2026-08-09T19:48:16.081972Z"
+  },
+  {
+    "id": "17a06f6b-1ae6-4bde-9e13-d4970f63ca4c",
+    "country": "ad4bf248-4a9a-4de5-bdf4-75c4d56a40d4",
+    "code": "airtel_ne",
+    "name": "Airtel Niger",
+    "is_active": true,
+    "created_at": "2026-08-09T19:48:04.779757Z",
+    "updated_at": "2026-09-19T06:27:12.763204Z"
+  },
+  {
+    "id": "08c27110-0216-4f6f-8cca-101641aed227",
+    "country": "96fe2994-eae8-45cb-bae4-384982773297",
+    "code": "airtel_ng",
+    "name": "Airtel Money Nigeria",
+    "is_active": true,
+    "created_at": "2026-08-09T19:48:04.788928Z",
+    "updated_at": "2026-09-19T06:27:13.214170Z"
+  },
+  {
+    "id": "1e7f867d-7b19-4068-915a-0da34f70935c",
+    "country": "96fe2994-eae8-45cb-bae4-384982773297",
+    "code": "allbanks_ng",
+    "name": "Nigeria - Tous les réseaux bancaires",
+    "is_active": true,
+    "created_at": "2026-09-20T19:23:39.726768Z",
+    "updated_at": "2026-09-20T19:23:39.726822Z"
+  },
+  {
+    "id": "d79cf0ea-d869-49bc-924a-f681f4e1067c",
+    "country": "96fe2994-eae8-45cb-bae4-384982773297",
+    "code": "mtn_ng",
+    "name": "MTN Nigeria",
+    "is_active": true,
+    "created_at": "2026-08-09T19:48:04.933018Z",
+    "updated_at": "2026-09-19T06:27:23.209831Z"
+  },
+  {
+    "id": "37f4b7dd-9edb-4f10-b6e4-ee288c0f5c8f",
+    "country": "67b6594a-7622-429a-b437-4ac4e1568fa1",
+    "code": "airtel_rw",
+    "name": "Airtel Rwanda",
+    "is_active": true,
+    "created_at": "2026-08-09T19:48:04.796150Z",
+    "updated_at": "2026-09-19T06:27:13.663870Z"
+  },
+  {
+    "id": "8f5babe4-5f43-4a4e-a58c-fa51543780c4",
+    "country": "67b6594a-7622-429a-b437-4ac4e1568fa1",
+    "code": "mtn_rw",
+    "name": "MTN MoMo Rwanda",
+    "is_active": true,
+    "created_at": "2026-08-09T19:48:04.938352Z",
+    "updated_at": "2026-09-19T06:27:23.666055Z"
+  },
+  {
+    "id": "f06deada-2ff4-496d-b86b-26059d69919c",
+    "country": "270eba5a-b46e-4ee3-be51-cec00016b99b",
+    "code": "orange_sl",
+    "name": "Orange Sierra Leone",
+    "is_active": true,
+    "created_at": "2026-08-09T19:48:13.872099Z",
+    "updated_at": "2026-08-09T19:48:16.618963Z"
+  },
+  {
+    "id": "ba6e6106-eba7-4344-9afc-28371ee0fcc6",
+    "country": "f579b148-f903-4db0-a057-f40dd493cb76",
+    "code": "djamo_sn",
+    "name": "Djamo Sénégal",
+    "is_active": true,
+    "created_at": "2026-08-09T19:48:13.764047Z",
+    "updated_at": "2026-08-09T19:48:16.572490Z"
+  },
+  {
+    "id": "5e95ff9f-1654-4a33-be45-bc61cf8272b6",
+    "country": "f579b148-f903-4db0-a057-f40dd493cb76",
+    "code": "expresso_sn",
+    "name": "Expresso Sénégal",
+    "is_active": true,
+    "created_at": "2026-08-09T19:48:13.683290Z",
+    "updated_at": "2026-08-09T19:48:16.517606Z"
+  },
+  {
+    "id": "4518424a-2998-49cd-b3b6-04e2d2d10645",
+    "country": "f579b148-f903-4db0-a057-f40dd493cb76",
+    "code": "freemoney_sn",
+    "name": "Free Money Senegal",
+    "is_active": true,
+    "created_at": "2026-08-09T19:48:04.828414Z",
+    "updated_at": "2026-09-19T06:27:16.388684Z"
+  },
+  {
+    "id": "25fa6d7c-f5fb-4e3f-baf7-c172ad7e207a",
+    "country": "f579b148-f903-4db0-a057-f40dd493cb76",
+    "code": "orange_sn",
+    "name": "Orange Money Senegal",
+    "is_active": true,
+    "created_at": "2026-08-09T19:48:05.008529Z",
+    "updated_at": "2026-09-19T06:27:27.750536Z"
+  },
+  {
+    "id": "26b22d30-e030-404c-a0ca-ed4a34f3bc53",
+    "country": "f579b148-f903-4db0-a057-f40dd493cb76",
+    "code": "paydunya_sn",
+    "name": "Compte PayDunya",
+    "is_active": true,
+    "created_at": "2026-08-09T19:48:13.813603Z",
+    "updated_at": "2026-08-09T19:48:17.059882Z"
+  },
+  {
+    "id": "aec0d733-6c80-4ab9-a714-ee43c54310bf",
+    "country": "f579b148-f903-4db0-a057-f40dd493cb76",
+    "code": "wave_sn",
+    "name": "Wave Senegal",
+    "is_active": true,
+    "created_at": "2026-08-09T19:48:05.068909Z",
+    "updated_at": "2026-09-19T06:27:31.480082Z"
+  },
+  {
+    "id": "f4b2098c-b4d2-498d-b2bc-e5322ef2495b",
+    "country": "f579b148-f903-4db0-a057-f40dd493cb76",
+    "code": "wizall_sn",
+    "name": "Wizall Senegal",
+    "is_active": true,
+    "created_at": "2026-08-09T19:48:05.074087Z",
+    "updated_at": "2026-09-19T06:27:31.946494Z"
+  },
+  {
+    "id": "1c1683fe-d969-4c53-b3f7-d5ff9f952ab8",
+    "country": "e2f590ad-13ea-4c81-bd73-554a92801940",
+    "code": "mixx_tg",
+    "name": "Mixx Togo",
+    "is_active": true,
+    "created_at": "2026-08-09T19:48:14.222192Z",
+    "updated_at": "2026-08-09T19:48:14.222211Z"
+  },
+  {
+    "id": "5c9148be-1a4a-40eb-b409-199466ceba39",
+    "country": "e2f590ad-13ea-4c81-bd73-554a92801940",
+    "code": "moov_tg",
+    "name": "Moov Money Togo",
+    "is_active": true,
+    "created_at": "2026-08-09T19:48:04.870646Z",
+    "updated_at": "2026-09-19T06:27:19.571280Z"
+  },
+  {
+    "id": "fc047546-aed2-4981-9bca-b642af380ebb",
+    "country": "e2f590ad-13ea-4c81-bd73-554a92801940",
+    "code": "togocel",
+    "name": "Togocel Money",
+    "is_active": true,
+    "created_at": "2026-08-09T19:48:05.041388Z",
+    "updated_at": "2026-09-19T06:27:29.597511Z"
+  },
+  {
+    "id": "f0e75f8a-94c6-4780-ab40-651be4f99266",
+    "country": "e94053c0-d20a-4479-b470-3af1142aa51c",
+    "code": "airtel_tz",
+    "name": "Airtel Tanzania",
+    "is_active": true,
+    "created_at": "2026-08-09T19:48:04.801820Z",
+    "updated_at": "2026-09-19T06:27:14.113551Z"
+  },
+  {
+    "id": "d6614e38-5f55-4bec-bd4d-08a01a2c27b6",
+    "country": "e94053c0-d20a-4479-b470-3af1142aa51c",
+    "code": "ezypesa_tz",
+    "name": "EzyPesa Tanzania",
+    "is_active": true,
+    "created_at": "2026-09-20T19:23:19.385967Z",
+    "updated_at": "2026-09-20T19:23:19.385993Z"
+  },
+  {
+    "id": "8b80c3b5-aa40-4447-bca5-a5986e8b55a2",
+    "country": "e94053c0-d20a-4479-b470-3af1142aa51c",
+    "code": "halopesa_tz",
+    "name": "Halopesa",
+    "is_active": true,
+    "created_at": "2026-08-09T19:48:04.833395Z",
+    "updated_at": "2026-09-19T06:27:16.835445Z"
+  },
+  {
+    "id": "2e745396-2c3c-4911-aaf5-a5843766c064",
+    "country": "e94053c0-d20a-4479-b470-3af1142aa51c",
+    "code": "mpesa_tz",
+    "name": "Vodacom Tanzania",
+    "is_active": true,
+    "created_at": "2026-08-09T19:48:04.886207Z",
+    "updated_at": "2026-09-19T06:27:20.471080Z"
+  },
+  {
+    "id": "9aa05aa6-847c-42da-adcb-cb139a0688fc",
+    "country": "e94053c0-d20a-4479-b470-3af1142aa51c",
+    "code": "tigo_tz",
+    "name": "Tigo Tanzania",
+    "is_active": true,
+    "created_at": "2026-08-09T19:48:05.022868Z",
+    "updated_at": "2026-09-19T06:27:28.649094Z"
+  },
+  {
+    "id": "3276217b-0653-4ab5-8c0c-06669175983f",
+    "country": "e94053c0-d20a-4479-b470-3af1142aa51c",
+    "code": "ttcl_tz",
+    "name": "TTCL Tanzania",
+    "is_active": true,
+    "created_at": "2026-09-20T19:23:10.553353Z",
+    "updated_at": "2026-09-20T19:23:10.553377Z"
+  },
+  {
+    "id": "06bf2b9a-e273-4b5e-a357-27414688023f",
+    "country": "b45212a9-0299-413a-8e9c-125a607d3067",
+    "code": "airtel_ug",
+    "name": "Airtel Uganda",
+    "is_active": true,
+    "created_at": "2026-08-09T19:48:04.806627Z",
+    "updated_at": "2026-09-19T06:27:14.579965Z"
+  },
+  {
+    "id": "57b3e88c-dbf3-4363-bfa3-15934f5eb771",
+    "country": "b45212a9-0299-413a-8e9c-125a607d3067",
+    "code": "mtn_ug",
+    "name": "MTN MoMo Uganda",
+    "is_active": true,
+    "created_at": "2026-08-09T19:48:04.944400Z",
+    "updated_at": "2026-09-19T06:27:24.120886Z"
+  },
+  {
+    "id": "1e685f60-85c4-4bdc-b70a-a62c1349706a",
+    "country": "12b4236e-90e0-4a6f-b6dc-f0b59e05da4d",
+    "code": "bank_transfer_us",
+    "name": "Virement bancaire USA",
+    "is_active": true,
+    "created_at": "2026-09-20T18:52:12.997530Z",
+    "updated_at": "2026-09-20T18:52:12.997550Z"
+  },
+  {
+    "id": "706070ad-c369-41e4-b72b-8db4f6fffc8e",
+    "country": "10c85695-70dd-47b2-b213-4c317e39c0b0",
+    "code": "airtel_cd_usd",
+    "name": "Airtel Congo (USD)",
+    "is_active": true,
+    "created_at": "2026-10-02T07:59:35.846217Z",
+    "updated_at": "2026-10-02T07:59:35.846235Z"
+  },
+  {
+    "id": "66f57909-fe5f-4c0b-888c-c637cbfdc2b7",
+    "country": "10c85695-70dd-47b2-b213-4c317e39c0b0",
+    "code": "orange_cd_usd",
+    "name": "Orange Congo (USD)",
+    "is_active": true,
+    "created_at": "2026-10-02T07:59:36.574119Z",
+    "updated_at": "2026-10-02T07:59:36.574137Z"
+  },
+  {
+    "id": "4f918364-4c85-4bb2-bacb-681c49f9f659",
+    "country": "10c85695-70dd-47b2-b213-4c317e39c0b0",
+    "code": "vodacom_cd_usd",
+    "name": "Vodacom Congo (USD)",
+    "is_active": true,
+    "created_at": "2026-10-02T07:59:37.315276Z",
+    "updated_at": "2026-10-02T07:59:37.315295Z"
+  },
+  {
+    "id": "c1f112ff-48c5-4b94-b72c-4e6d6b5c850b",
+    "country": "5fea6d2b-ef37-4ae1-9b51-c77aecc316cf",
+    "code": "card",
+    "name": "Carte bancaire",
+    "is_active": true,
+    "created_at": "2026-09-06T22:26:38.961160Z",
+    "updated_at": "2026-10-16T11:06:28.046881Z"
+  },
+  {
+    "id": "5ba246d2-66ba-4000-bf2e-ee4ff86f4328",
+    "country": "dec96e3c-3229-4e5a-9712-a506292f65b8",
+    "code": "crypto",
+    "name": "Crypto / Stablecoin",
+    "is_active": true,
+    "created_at": "2026-09-06T22:26:38.994850Z",
+    "updated_at": "2026-10-16T11:06:30.066221Z"
+  },
+  {
+    "id": "e13e1f97-c26a-4582-a324-5438c3c40a96",
+    "country": "447eccba-df3c-49a0-859d-18e969a70139",
+    "code": "airtel_zm",
+    "name": "Airtel Zambia",
+    "is_active": true,
+    "created_at": "2026-08-09T19:48:04.811418Z",
+    "updated_at": "2026-09-19T06:27:15.032867Z"
+  },
+  {
+    "id": "45132473-10c1-44dc-bf97-e15345813373",
+    "country": "447eccba-df3c-49a0-859d-18e969a70139",
+    "code": "mtn_zm",
+    "name": "MTN MoMo Zambia",
+    "is_active": true,
+    "created_at": "2026-08-09T19:48:04.950979Z",
+    "updated_at": "2026-09-19T06:27:24.578873Z"
+  },
+  {
+    "id": "448b88bf-c5bb-45d7-b718-bea6ad2398c7",
+    "country": "447eccba-df3c-49a0-859d-18e969a70139",
+    "code": "zamtel_zm",
+    "name": "Zamtel Kwacha",
+    "is_active": true,
+    "created_at": "2026-08-09T19:48:05.082730Z",
+    "updated_at": "2026-09-19T06:27:32.401143Z"
+  }
+]

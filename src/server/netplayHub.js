@@ -90,6 +90,143 @@ export function setupNetplayHub(server) {
     }
   });
 
+  // Proxy ROM universel en production (standalone.js port 3003) & dev : streaming local public/roms ou proxy Archive.org
+  const mappingPath = path.resolve(process.cwd(), 'src/data/fbneoMapping.json');
+  let romNameMap = {};
+  try {
+    if (fs.existsSync(mappingPath)) {
+      romNameMap = JSON.parse(fs.readFileSync(mappingPath, 'utf8'));
+    }
+  } catch {
+    /* ignore */
+  }
+
+  server.middlewares.use('/api/rom-proxy', async (req, res) => {
+    try {
+      if (req.method === 'OPTIONS') {
+        res.writeHead(204, {
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS',
+          'Access-Control-Allow-Headers': '*',
+        });
+        return res.end();
+      }
+
+      const romsDir = path.resolve(process.cwd(), 'public/roms');
+      const url = new URL(req.url, 'http://localhost:3003');
+      const customUrl = url.searchParams.get('url');
+
+      if (customUrl && /^https?:\/\//i.test(customUrl)) {
+        const remoteRes = await fetch(customUrl, {
+          method: req.method === 'HEAD' ? 'HEAD' : 'GET',
+          redirect: 'follow',
+          headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) CSW-Arcade' },
+        });
+        const ct = (remoteRes.headers.get('content-type') || 'application/octet-stream').toLowerCase();
+        if (!remoteRes.ok || ct.includes('text/html')) {
+          res.writeHead(404, { 'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json' });
+          return res.end(JSON.stringify({ error: 'ROM indisponible', status: remoteRes.status }));
+        }
+        const cl = remoteRes.headers.get('content-length');
+        res.writeHead(200, {
+          'Content-Type': 'application/octet-stream',
+          ...(cl ? { 'Content-Length': cl } : {}),
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS',
+          'Access-Control-Expose-Headers': 'Content-Length, Content-Type',
+          'Cache-Control': 'public, max-age=31536000',
+        });
+        if (req.method === 'HEAD' || !remoteRes.body) return res.end();
+        const reader = remoteRes.body.getReader();
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          res.write(Buffer.from(value));
+        }
+        return res.end();
+      }
+
+      const rawParam = url.searchParams.get('file') || url.searchParams.get('id') || '';
+      const cleanName = path
+        .basename(decodeURIComponent(rawParam))
+        .replace(/\.(zip|bin|dat|rom)$/i, '')
+        .replace(/^arc-(neo|mame)-/i, '')
+        .toLowerCase();
+      const resolvedName = romNameMap[cleanName] || cleanName;
+
+      if (!resolvedName) {
+        res.writeHead(400, { 'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json' });
+        return res.end(JSON.stringify({ error: 'Paramètre file ou url manquant' }));
+      }
+
+      let filePath = path.resolve(romsDir, `${resolvedName}.zip`);
+      if (!fs.existsSync(filePath)) {
+        const altPath = path.resolve(romsDir, `${cleanName}.zip`);
+        if (fs.existsSync(altPath)) filePath = altPath;
+      }
+
+      if (fs.existsSync(filePath)) {
+        const stat = fs.statSync(filePath);
+        res.writeHead(200, {
+          'Content-Type': 'application/zip',
+          'Content-Length': stat.size,
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS',
+          'Access-Control-Expose-Headers': 'Content-Length, Content-Type',
+          'Cache-Control': 'public, max-age=31536000',
+        });
+        if (req.method === 'HEAD') return res.end();
+        return fs.createReadStream(filePath).pipe(res);
+      }
+
+      const candidateUrls = [
+        `https://archive.org/download/neo-geo-mvs-romset/${encodeURIComponent(resolvedName)}.zip`,
+        `https://archive.org/download/MAME_2003-Plus_Reference_Set_2018/roms/${encodeURIComponent(resolvedName)}.zip`,
+        `https://archive.org/download/NeoGeoRomCollectionByGhostware/${encodeURIComponent(resolvedName)}.zip`,
+      ];
+
+      for (const remoteUrl of candidateUrls) {
+        try {
+          const remoteRes = await fetch(remoteUrl, {
+            method: req.method === 'HEAD' ? 'HEAD' : 'GET',
+            redirect: 'follow',
+            headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) CSW-Arcade' },
+          });
+          const ct = (remoteRes.headers.get('content-type') || '').toLowerCase();
+          if (remoteRes.ok && !ct.includes('text/html')) {
+            const cl = remoteRes.headers.get('content-length');
+            res.writeHead(200, {
+              'Content-Type': 'application/zip',
+              ...(cl ? { 'Content-Length': cl } : {}),
+              'Access-Control-Allow-Origin': '*',
+              'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS',
+              'Access-Control-Expose-Headers': 'Content-Length, Content-Type',
+              'Cache-Control': 'public, max-age=31536000',
+            });
+            if (req.method === 'HEAD' || !remoteRes.body) return res.end();
+            const reader = remoteRes.body.getReader();
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
+              res.write(Buffer.from(value));
+            }
+            return res.end();
+          }
+        } catch {
+          /* try next candidate */
+        }
+      }
+
+      res.writeHead(404, { 'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json' });
+      return res.end(JSON.stringify({ error: `ROM introuvable: ${resolvedName}.zip` }));
+    } catch (err) {
+      if (!res.headersSent) {
+        res.writeHead(500, { 'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: err.message }));
+      }
+    }
+  });
+
   // Relais temps réel local / LAN pour les salons Fightcade 2 (chat & présence) — garantit le fonctionnement même sans règles Firestore publiées
   const fcLobbies = new Map(); // gameId -> { messages: [], users: Map<uid, userObj> }
   const allGlobalUsers = new Map(); // uid -> userObj (présence unifiée partagée sur tous les salons)
@@ -176,7 +313,10 @@ export function setupNetplayHub(server) {
           }
 
           if (action === 'respond') {
-            target.status = status;
+            // Statut monotone : un défi déjà accepté ne peut plus devenir "declined" (réponse tardive/obsolète)
+            if (!(target.status === 'accepted' && status === 'declined')) {
+              target.status = status;
+            }
             target.updatedAtMs = Date.now();
           } else if (action === 'postOffer') {
             target.offer = offer;
@@ -576,7 +716,7 @@ export function setupNetplayHub(server) {
   server.middlewares.use('/api/saspay/networks', async (req, res) => {
     res.setHeader('Content-Type', 'application/json');
     const now = Date.now();
-    if (cachedSasPayNetworks && now - cachedSasPayNetworksAt < 10 * 60 * 1000) {
+    if (Array.isArray(cachedSasPayNetworks) && cachedSasPayNetworks.length > 0 && now - cachedSasPayNetworksAt < 10 * 60 * 1000) {
       return res.end(JSON.stringify({ ok: true, data: cachedSasPayNetworks }));
     }
     const baseUrl = loadEnvValue('SASPAY_BASE_URL', 'https://api.saspay.me/api/v1');
@@ -598,13 +738,23 @@ export function setupNetplayHub(server) {
         all.push(...rows);
         nextUrl = d?.next || null;
       }
-      cachedSasPayNetworks = all.filter((n) => n?.is_active !== false);
-      cachedSasPayNetworksAt = now;
-      return res.end(JSON.stringify({ ok: true, data: cachedSasPayNetworks }));
-    } catch (e) {
-      res.statusCode = 502;
-      return res.end(JSON.stringify({ ok: false, error: e?.message || 'SasPay networks unreachable' }));
+      const activeList = all.filter((n) => n?.is_active !== false);
+      if (activeList.length > 0) {
+        cachedSasPayNetworks = activeList;
+        cachedSasPayNetworksAt = now;
+        return res.end(JSON.stringify({ ok: true, data: cachedSasPayNetworks }));
+      }
+    } catch {
+      /* fallback below */
     }
+    try {
+      const fbPath = path.resolve(process.cwd(), 'src/data/saspayNetworks.json');
+      if (fs.existsSync(fbPath)) {
+        const fbData = JSON.parse(fs.readFileSync(fbPath, 'utf8'));
+        return res.end(JSON.stringify({ ok: true, data: fbData }));
+      }
+    } catch {}
+    return res.end(JSON.stringify({ ok: true, data: [] }));
   });
 
   server.middlewares.use('/api/saspay/countries', async (req, res) => {
@@ -966,7 +1116,7 @@ export function setupNetplayHub(server) {
           case 'CHALLENGE_REPLY': {
             const { challengeId, status, toUid } = data;
             const ch = fcChallenges.get(challengeId);
-            if (ch) {
+            if (ch && !(ch.status === 'accepted' && status === 'declined')) {
               ch.status = status;
               ch.updatedAtMs = Date.now();
             }

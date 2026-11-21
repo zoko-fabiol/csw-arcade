@@ -117,6 +117,79 @@
     let started = false;
     let isNetplaySession = false;
     let netplayPlayerIndex = 0;
+    let emuGameStarted = false;
+    let pendingLoadStateBase64 = null;
+    const forwardedKeyDownSet = new Set();
+    let prevNetplayGamepadMask = 0;
+    let netplayGamepadRafId = null;
+
+    function applyLoadStateBase64(b64) {
+      if (!b64) return false;
+      const gm = window.EJS_emulator?.gameManager;
+      if (!emuGameStarted || !gm?.loadState) {
+        pendingLoadStateBase64 = b64;
+        return false;
+      }
+      try {
+        const bin = atob(b64);
+        const bytes = new Uint8Array(bin.length);
+        for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+        gm.loadState(bytes);
+        pendingLoadStateBase64 = null;
+        return true;
+      } catch {
+        return false;
+      }
+    }
+
+    function startNetplayGamepadLoop() {
+      if (!isNetplaySession || netplayGamepadRafId) return;
+      const poll = () => {
+        if (!isNetplaySession) {
+          netplayGamepadRafId = null;
+          return;
+        }
+        try {
+          const pads = navigator.getGamepads ? navigator.getGamepads() : [];
+          const gp = pads && (pads[0] || pads[1] || pads[2] || pads[3]);
+          if (gp && gp.connected) {
+            const b = gp.buttons || [];
+            const ax = gp.axes || [];
+            let mask = 0;
+            const pressed = (i) => Boolean(b[i] && (b[i].pressed || b[i].value > 0.5));
+            if (pressed(0)) mask |= 1 << 0; // B / Cross -> Btn 0
+            if (pressed(2)) mask |= 1 << 1; // X / Square -> Btn 1
+            if (pressed(8)) mask |= 1 << 2; // Select / Back -> Coin (2)
+            if (pressed(9)) mask |= 1 << 3; // Start -> Start (3)
+            if (pressed(12) || (ax[1] !== undefined && ax[1] < -0.45)) mask |= 1 << 4; // Up
+            if (pressed(13) || (ax[1] !== undefined && ax[1] > 0.45)) mask |= 1 << 5; // Down
+            if (pressed(14) || (ax[0] !== undefined && ax[0] < -0.45)) mask |= 1 << 6; // Left
+            if (pressed(15) || (ax[0] !== undefined && ax[0] > 0.45)) mask |= 1 << 7; // Right
+            if (pressed(1)) mask |= 1 << 8; // A / Circle -> Btn 8
+            if (pressed(3)) mask |= 1 << 9; // Y / Triangle -> Btn 9
+            if (pressed(4)) mask |= 1 << 10; // L1
+            if (pressed(5)) mask |= 1 << 11; // R1
+            if (pressed(6)) mask |= 1 << 12; // L2
+            if (pressed(7)) mask |= 1 << 13; // R2
+
+            const diff = mask ^ prevNetplayGamepadMask;
+            if (diff !== 0) {
+              prevNetplayGamepadMask = mask;
+              const myPort = netplayPlayerIndex === 1 ? 1 : 0;
+              for (let i = 0; i < 14; i++) {
+                if ((diff >> i) & 1) {
+                  const isDown = Boolean((mask >> i) & 1);
+                  simulateEmuInput(myPort, i, isDown);
+                  notifyParent('NETPLAY_LOCAL_BTN', { buttonIdx: i, pressed: isDown });
+                }
+              }
+            }
+          }
+        } catch {}
+        netplayGamepadRafId = requestAnimationFrame(poll);
+      };
+      netplayGamepadRafId = requestAnimationFrame(poll);
+    }
 
     window.captureStageStream = (fps = 30) => {
       const c = document.querySelector('#game canvas');
@@ -1114,15 +1187,38 @@
         const isDown = msg.eventType === 'keydown';
         const kc = Number(msg.keyCode || 0);
         const code = msg.code || '';
+        const key = msg.key || '';
         const myPort = netplayPlayerIndex === 1 ? 1 : 0;
-        if (code === 'Digit5' || code === 'Numpad5') {
-          if (isDown) forceSyncCreditsToRam();
+        const keyId = code || String(kc);
+        if (isDown) {
+          if (forwardedKeyDownSet.has(keyId)) return;
+          forwardedKeyDownSet.add(keyId);
+        } else {
+          forwardedKeyDownSet.delete(keyId);
+        }
+
+        const btnIdx = resolveUniversalKey({ code, key, keyCode: kc, which: kc });
+        if (btnIdx === 2) {
+          if (isDown) {
+            pulseEmuButton(isNetplaySession ? 0 : myPort, 2, 70);
+            if (isNetplaySession) {
+              notifyParent('NETPLAY_LOCAL_BTN', { buttonIdx: 2, pressed: true });
+              setTimeout(() => notifyParent('NETPLAY_LOCAL_BTN', { buttonIdx: 2, pressed: false }), 70);
+            }
+            forceSyncCreditsToRam();
+          }
           return;
         }
         handleUniversalKeyboardBridge(code, kc, isDown);
-        const btnIdx = findLocalButtonIndex(kc);
         if (btnIdx >= 0) {
           simulateEmuInput(myPort, btnIdx, isDown);
+          if (btnIdx === 4) simulateEmuInput(myPort, 19, isDown);
+          else if (btnIdx === 5) simulateEmuInput(myPort, 18, isDown);
+          else if (btnIdx === 6) simulateEmuInput(myPort, 17, isDown);
+          else if (btnIdx === 7) simulateEmuInput(myPort, 16, isDown);
+          if (isNetplaySession) {
+            notifyParent('NETPLAY_LOCAL_BTN', { buttonIdx: btnIdx, pressed: isDown });
+          }
         }
         return;
       }
@@ -1178,12 +1274,7 @@
       }
 
       if (msg.type === 'LOAD_STATE' && msg.stateBase64) {
-        try {
-          const bin = atob(msg.stateBase64);
-          const bytes = new Uint8Array(bin.length);
-          for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-          window.EJS_emulator?.gameManager?.loadState?.(bytes);
-        } catch {}
+        applyLoadStateBase64(msg.stateBase64);
         return;
       }
 
@@ -1376,10 +1467,15 @@
           applyHardwareSettings(hw);
           window.EJS_onGameStart = () => {
             bootEl.hidden = true;
+            emuGameStarted = true;
             applyHardwareSettings(readHardwareSettings());
             try { window.focus(); } catch {}
             notifyParent('STAGE_STATUS', { status: 'playing', message: 'Émulateur démarré.' });
             startRamTelemetry(msg.gameName || targetFilename, msg.core);
+            startNetplayGamepadLoop();
+            if (pendingLoadStateBase64) {
+              setTimeout(() => applyLoadStateBase64(pendingLoadStateBase64), 250);
+            }
 
             if (isNetplaySession && netplayPlayerIndex === 0) {
               // Séquence Fightcade déterministe (exécutée uniquement par l'Hôte P1) :

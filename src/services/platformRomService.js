@@ -1,6 +1,8 @@
 /**
  * Service React unifié pour le cache IndexedDB, la recherche Archive.org et le téléchargement des ROMs.
  */
+import { NINTENDO_CATALOG, PLAYSTATION_CATALOG, SEGA_CATALOG } from '../data/platformCatalogs';
+import fbneoMapping from '../data/fbneoMapping.json';
 
 const PLATFORM_IDB_NAME = 'csw_platform_roms_db';
 const PLATFORM_IDB_STORE = 'rom_files';
@@ -258,26 +260,79 @@ export async function searchOnlineRoms(query, { system = 'nes', limit = 12 } = {
 }
 
 export async function downloadAndCacheRom(entry, { mode = 'retro', core = 'nes', extractExtensions = [], onProgress } = {}) {
-  const cached = await getCachedRom(entry.id);
+  const entryId = entry?.id || entry?.gameId || '';
+  const cached = (entryId && (await getCachedRom(entryId))) || null;
   if (cached?.data && isValidRomBuffer(cached.data)) {
-    verifiedRomIds.add(entry.id);
-    return new File([cached.data], cached.filename || entry.filename, { type: 'application/octet-stream' });
+    verifiedRomIds.add(entryId);
+    return new File([cached.data], cached.filename || entry.filename || `${entryId}.zip`, {
+      type: 'application/octet-stream',
+    });
   }
 
   let urls = Array.isArray(entry.urls) ? entry.urls.filter(Boolean) : [];
-  if (urls.length === 0 && (entry.filename || entry.id)) {
-    const rawFn = entry.filename || `${String(entry.id).replace(/^arc-neo-/, '')}.zip`;
-    const cleanFn = rawFn.endsWith('.zip') || rawFn.includes('.') ? rawFn : `${rawFn}.zip`;
-    const encoded = encodeURIComponent(cleanFn);
-    urls = [
-      `/api/rom-proxy?file=${encoded}`,
-      `https://archive.org/cors/neo-geo-mvs-romset/${encoded}`,
-      `/api/rom-proxy?url=${encodeURIComponent(`https://archive.org/download/neo-geo-mvs-romset/${encoded}`)}`,
-      `https://archive.org/download/neo-geo-mvs-romset/${encoded}`,
-    ];
-  }
   if (urls.length === 0) {
-    markRomAsDead(entry.id);
+    const staticCatalog = [...PLAYSTATION_CATALOG, ...SEGA_CATALOG, ...NINTENDO_CATALOG];
+    const lowerTitle = String(entry?.title || '').trim().toLowerCase();
+    const matchedStatic = staticCatalog.find(
+      (item) =>
+        item.id === entryId ||
+        (lowerTitle && String(item.title || '').trim().toLowerCase() === lowerTitle)
+    );
+    if (matchedStatic && Array.isArray(matchedStatic.urls) && matchedStatic.urls.length > 0) {
+      urls = [...matchedStatic.urls];
+    }
+  }
+
+  if (urls.length === 0 && (entry.filename || entryId)) {
+    const rawKey = String(entry.filename || entryId)
+      .replace(/\.(zip|bin|rom)$/i, '')
+      .replace(/^arc-(neo|mame)-/i, '')
+      .toLowerCase();
+    const mappedKey = fbneoMapping[rawKey] || rawKey;
+    const cleanFn = `${mappedKey}.zip`;
+    const encoded = encodeURIComponent(cleanFn);
+    const isMame =
+      /^arc-mame-/i.test(entryId) ||
+      String(entry.core || core || '').toLowerCase().includes('mame');
+
+    if (isMame) {
+      const mameDl = `https://archive.org/download/MAME_2003-Plus_Reference_Set_2018/roms/${encoded}`;
+      urls = [
+        `/api/rom-proxy?file=${encoded}`,
+        `/api/rom-proxy?url=${encodeURIComponent(mameDl)}`,
+        `https://archive.org/cors/MAME_2003-Plus_Reference_Set_2018/roms/${encoded}`,
+        mameDl,
+      ];
+    } else {
+      const neoDl = `https://archive.org/download/neo-geo-mvs-romset/${encoded}`;
+      urls = [
+        `/api/rom-proxy?file=${encoded}`,
+        `/api/rom-proxy?url=${encodeURIComponent(neoDl)}`,
+        `https://archive.org/cors/neo-geo-mvs-romset/${encoded}`,
+        neoDl,
+      ];
+    }
+  }
+
+  // Toujours ajouter un fallback /api/rom-proxy?url=... pour les liens directs archive.org/download/ (contourne CORS 302)
+  const expandedUrls = [];
+  const seenUrls = new Set();
+  for (const u of urls) {
+    if (!u || seenUrls.has(u)) continue;
+    seenUrls.add(u);
+    expandedUrls.push(u);
+    if (/^https?:\/\/archive\.org\/download\//i.test(u)) {
+      const proxied = `/api/rom-proxy?url=${encodeURIComponent(u)}`;
+      if (!seenUrls.has(proxied)) {
+        seenUrls.add(proxied);
+        expandedUrls.push(proxied);
+      }
+    }
+  }
+  urls = expandedUrls;
+
+  if (urls.length === 0) {
+    markRomAsDead(entryId);
     const err = new Error('ROM indisponible (aucune source)');
     err.isDeadRom = true;
     throw err;
@@ -326,15 +381,15 @@ export async function downloadAndCacheRom(entry, { mode = 'retro', core = 'nes',
   }
 
   if (!buffer) {
-    markRomAsDead(entry.id);
+    markRomAsDead(entryId);
     const err = lastErr || new Error('Impossible de télécharger cette ROM depuis Archive.org');
     err.isDeadRom = true;
     throw err;
   }
 
-  verifiedRomIds.add(entry.id);
+  verifiedRomIds.add(entryId);
 
-  let finalFilename = entry.filename || `${entry.id}.bin`;
+  let finalFilename = entry.filename || `${entryId || 'game'}.zip`;
   let finalBuffer = buffer;
 
   if (finalFilename.toLowerCase().endsWith('.zip') && Array.isArray(extractExtensions) && extractExtensions.length > 0) {
@@ -353,13 +408,15 @@ export async function downloadAndCacheRom(entry, { mode = 'retro', core = 'nes',
     }
   }
 
-  await saveCachedRom(entry.id, finalBuffer, {
-    title: entry.title,
-    filename: finalFilename,
-    mode,
-    platform: entry.platform || core,
-    core,
-  });
+  if (entryId) {
+    await saveCachedRom(entryId, finalBuffer, {
+      title: entry.title,
+      filename: finalFilename,
+      mode,
+      platform: entry.platform || core,
+      core,
+    });
+  }
 
   return new File([finalBuffer], finalFilename, { type: 'application/octet-stream' });
 }

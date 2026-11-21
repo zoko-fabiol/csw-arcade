@@ -292,6 +292,11 @@ export function UnifiedStageModal({
               const stream = iframeRef.current?.contentWindow?.captureStageStream?.(30);
               if (stream) p2pEngine.attachMediaStream(stream);
             }
+            if (session.isNetplay && !session.isHost) {
+              setTimeout(() => {
+                p2pEngine?.notifyGuestEmuReady?.();
+              }, 200);
+            }
           } catch {
             /* noop */
           }
@@ -640,6 +645,27 @@ export function UnifiedStageModal({
             <span className="hidden md:inline px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-950/80 border border-emerald-600/50 text-emerald-300 shrink-0">
               {p2pStats.pingMs}ms · RB {p2pStats.rollbackFrames}f
             </span>
+          )}
+          {session.isNetplay && session.kind !== 'j2me' && (
+            <button
+              type="button"
+              onClick={() => {
+                if (session.isHost) {
+                  iframeRef.current?.contentWindow?.postMessage(
+                    { type: 'EXPORT_STATE', slot: 'frame0' },
+                    window.location.origin
+                  );
+                } else {
+                  p2pEngine?.notifyGuestEmuReady?.();
+                }
+                showRamToast('record', '🔄 Resynchronisation P2P envoyée !');
+              }}
+              title="Resynchroniser la RAM entre les 2 joueurs"
+              className="flex items-center gap-1 px-2 py-1 rounded-lg bg-cyan-950/80 hover:bg-cyan-900/80 border border-cyan-500/50 text-cyan-200 text-[10px] font-mono font-bold transition-colors shrink-0"
+            >
+              <RotateCcw className="w-3 h-3" />
+              <span>Resync</span>
+            </button>
           )}
           <span className="hidden xl:inline text-xs font-mono text-neutral-400 truncate">{statusText}</span>
         </div>

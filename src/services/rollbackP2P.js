@@ -329,7 +329,7 @@ export class RollbackP2PEngine {
   attachReliableChannel(dc) {
     this.reliableChannel = dc;
     dc.onopen = () => {
-      if (!this.isHost) {
+      if (!this.isHost && this.guestEmuReady) {
         try {
           dc.send(JSON.stringify({ type: 'GUEST_READY' }));
         } catch {
@@ -354,6 +354,17 @@ export class RollbackP2PEngine {
         /* noop */
       }
     };
+  }
+
+  notifyGuestEmuReady() {
+    this.guestEmuReady = true;
+    if (this.reliableChannel?.readyState === 'open') {
+      try {
+        this.reliableChannel.send(JSON.stringify({ type: 'GUEST_READY' }));
+      } catch {
+        /* noop */
+      }
+    }
   }
 
   startPingLoop() {

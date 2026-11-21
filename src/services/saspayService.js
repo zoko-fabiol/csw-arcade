@@ -1,6 +1,7 @@
 /**
  * Service client pour la passerelle de paiement SasPay (via relais serveur sécurisé /api/saspay/*).
  */
+import fallbackNetworks from '../data/saspayNetworks.json';
 
 export const SASPAY_COIN_PACKS = [
   { id: 'pack_10', coins: 10, amount: 250, eurApprox: '0,38 €', currency: 'XOF', label: 'Pack Dépannage', popular: false },
@@ -34,9 +35,16 @@ export async function fetchSasPayCountries() {
 }
 
 export async function fetchSasPayNetworks() {
-  const res = await fetch('/api/saspay/networks');
-  const json = await res.json().catch(() => ({}));
-  return Array.isArray(json?.data) ? json.data : [];
+  try {
+    const res = await fetch('/api/saspay/networks');
+    const json = await res.json().catch(() => ({}));
+    if (Array.isArray(json?.data) && json.data.length > 0) {
+      return json.data;
+    }
+  } catch {
+    /* fallback below */
+  }
+  return Array.isArray(fallbackNetworks) ? fallbackNetworks : [];
 }
 
 export async function createSasPayCheckout({

@@ -390,18 +390,28 @@ class FirebaseFightcadeService {
 
   getActiveGamesSummary() {
     const list = this.activeChannels.map((c) => ({
+      id: c.entry?.id || c.gameId,
       gameId: c.gameId,
       title: c.title,
-      platformLabel: c.platformLabel || 'Arcade',
+      platformLabel: c.platformLabel || c.entry?.platformLabel || 'Arcade',
+      filename: c.filename || c.entry?.filename || '',
+      core: c.entry?.core || c.entry?.platform || 'fbneo',
+      platform: c.entry?.platform || c.entry?.core || 'fbneo',
+      urls: Array.isArray(c.entry?.urls) ? c.entry.urls.slice(0, 4) : [],
     }));
     if (
       this.currentPlayingGame &&
       !list.some((g) => g.gameId === this.currentPlayingGame.gameId)
     ) {
       list.unshift({
+        id: this.currentPlayingGame.id || this.currentPlayingGame.gameId,
         gameId: this.currentPlayingGame.gameId,
         title: this.currentPlayingGame.title,
         platformLabel: this.currentPlayingGame.platformLabel || 'Arcade',
+        filename: this.currentPlayingGame.filename || '',
+        core: this.currentPlayingGame.core || 'fbneo',
+        platform: this.currentPlayingGame.platform || this.currentPlayingGame.core || 'fbneo',
+        urls: Array.isArray(this.currentPlayingGame.urls) ? this.currentPlayingGame.urls.slice(0, 4) : [],
       });
     }
     return list;
@@ -501,9 +511,14 @@ class FirebaseFightcadeService {
     );
 
     this.currentPlayingGame = {
+      id: gameEntry.id || gameId,
       gameId,
       title,
       platformLabel,
+      filename: gameEntry.filename || '',
+      core: gameEntry.core || gameEntry.platform || 'fbneo',
+      platform: gameEntry.platform || gameEntry.core || 'fbneo',
+      urls: Array.isArray(gameEntry.urls) ? gameEntry.urls.slice(0, 4) : [],
       isNetplay: Boolean(isNetplay),
       opponentName: opponentName || null,
       startedAt: Date.now(),
@@ -827,19 +842,38 @@ class FirebaseFightcadeService {
   async sendChallenge(gameId, targetUser, gameEntry) {
     this.identity = getPlayerIdentity();
     const challengeId = `ch_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
-    const gameTitle = gameEntry?.title || targetUser?.currentGame?.title || gameId;
+    const fallbackTargetGame =
+      (targetUser?.currentGame?.gameId === gameId ? targetUser.currentGame : null) ||
+      (Array.isArray(targetUser?.activeGames)
+        ? targetUser.activeGames.find((g) => g.gameId === gameId || g.id === gameId)
+        : null) ||
+      this.activeChannels.find((c) => c.gameId === gameId)?.entry ||
+      null;
+    const mergedEntry = {
+      ...(fallbackTargetGame || {}),
+      ...(gameEntry || {}),
+      urls:
+        Array.isArray(gameEntry?.urls) && gameEntry.urls.length > 0
+          ? gameEntry.urls
+          : Array.isArray(fallbackTargetGame?.urls)
+          ? fallbackTargetGame.urls
+          : [],
+      filename: gameEntry?.filename || fallbackTargetGame?.filename || '',
+      core: gameEntry?.core || gameEntry?.platform || fallbackTargetGame?.core || 'fbneo',
+    };
+    const gameTitle = mergedEntry.title || targetUser?.currentGame?.title || gameId;
     const challengeObj = {
       challengeId,
       gameId,
       gameTitle,
-      gameEntry: gameEntry ? {
-        id: gameEntry.id || gameId,
-        title: gameEntry.title || gameTitle,
-        filename: gameEntry.filename || '',
-        core: gameEntry.core || 'fbneo',
-        urls: Array.isArray(gameEntry.urls) ? gameEntry.urls : [],
-        platformLabel: gameEntry.platformLabel || 'Arcade',
-      } : null,
+      gameEntry: {
+        id: mergedEntry.id || mergedEntry.gameId || gameId,
+        title: gameTitle,
+        filename: mergedEntry.filename || '',
+        core: mergedEntry.core || 'fbneo',
+        urls: Array.isArray(mergedEntry.urls) ? mergedEntry.urls : [],
+        platformLabel: mergedEntry.platformLabel || 'Arcade',
+      },
       fromUid: this.identity.uid,
       fromName: this.identity.name,
       fromRank: this.identity.rank || 'B',

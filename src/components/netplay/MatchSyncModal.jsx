@@ -53,6 +53,7 @@ export function MatchSyncModal({
   const waitTimerRef = useRef(null);
   const isLaunchingRef = useRef(false);
   const localBlobRef = useRef(null);
+  const acceptedRef = useRef(false);
 
   const opponentUid = isHost ? challenge?.toUid : challenge?.fromUid;
   const opponentName = isHost ? challenge?.toName : challenge?.fromName;
@@ -72,6 +73,7 @@ export function MatchSyncModal({
   useEffect(() => {
     if (!isOpen || !challenge) return;
     isLaunchingRef.current = false;
+    acceptedRef.current = !isHost || challenge.status === 'accepted';
     localBlobRef.current = null;
     setLocalBlob(null);
     setLocalRomPct(0);
@@ -122,8 +124,12 @@ export function MatchSyncModal({
       (ch) => {
         if (!ch) return;
         if (ch.status === 'accepted') {
+          acceptedRef.current = true;
           clearInterval(waitTimerRef.current);
           setPhase((prev) => (prev === 'waiting_opponent' ? 'syncing' : prev));
+        } else if (ch.status === 'declined' && (acceptedRef.current || !isHost)) {
+          // Réponse "declined" obsolète/tardive après acceptation : ignorée
+          console.warn('[MatchSync] statut declined ignoré (défi déjà accepté)', ch.challengeId);
         } else if (ch.status === 'declined' || ch.status === 'expired' || ch.status === 'cancelled') {
           clearInterval(waitTimerRef.current);
           setPhase((prev) => {
@@ -173,49 +179,60 @@ export function MatchSyncModal({
     const entry = challenge.gameEntry;
     const core = entry.core || entry.platform || 'fbneo';
 
-    downloadAndCacheRom(entry, {
-      mode: core,
-      core,
-      onProgress: ({ received, total }) => {
-        if (!isMounted) return;
-        const pct = total > 0
-          ? Math.min(99, Math.round((received / total) * 100))
-          : Math.min(95, Math.max(15, Math.round(received / (1024 * 50))));
-        setLocalRomPct(pct);
-        firebaseFightcadeService.sendMatchSyncUpdate(challenge.challengeId, opponentUid, {
-          romPct: pct,
-          romReady: false,
-          isReady: false,
-        });
-      },
-    })
-      .then((blob) => {
-        if (!isMounted) return;
-        localBlobRef.current = blob;
-        setLocalBlob(blob);
-        setLocalRomPct(100);
-        setLocalRomReady(true);
-        setLocalReady(true);
-
-        const notifyReady = () => {
+    const runDownload = (attempt = 1) => {
+      downloadAndCacheRom(entry, {
+        mode: core,
+        core,
+        onProgress: ({ received, total }) => {
+          if (!isMounted) return;
+          const pct =
+            total > 0
+              ? Math.min(99, Math.round((received / total) * 100))
+              : Math.min(95, Math.max(15, Math.round(received / (1024 * 50))));
+          setLocalRomPct(pct);
           firebaseFightcadeService.sendMatchSyncUpdate(challenge.challengeId, opponentUid, {
-            romPct: 100,
-            romReady: true,
-            isReady: true,
+            romPct: pct,
+            romReady: false,
+            isReady: false,
           });
-        };
-        notifyReady();
-        setTimeout(notifyReady, 500);
-        setTimeout(notifyReady, 1200);
+        },
       })
-      .catch((err) => {
-        if (!isMounted) return;
-        setPhase('cancelled');
-        setCancelReason(
-          `Échec du chargement de la ROM : ${err?.message || 'Fichier indisponible'}. Match annulé.`
-        );
-        firebaseFightcadeService.sendMatchCancel(challenge.challengeId, opponentUid);
-      });
+        .then((blob) => {
+          if (!isMounted) return;
+          localBlobRef.current = blob;
+          setLocalBlob(blob);
+          setLocalRomPct(100);
+          setLocalRomReady(true);
+          setLocalReady(true);
+
+          const notifyReady = () => {
+            firebaseFightcadeService.sendMatchSyncUpdate(challenge.challengeId, opponentUid, {
+              romPct: 100,
+              romReady: true,
+              isReady: true,
+            });
+          };
+          notifyReady();
+          setTimeout(notifyReady, 500);
+          setTimeout(notifyReady, 1200);
+        })
+        .catch((err) => {
+          if (!isMounted) return;
+          if (attempt < 2) {
+            setTimeout(() => {
+              if (isMounted) runDownload(attempt + 1);
+            }, 900);
+            return;
+          }
+          setPhase('cancelled');
+          setCancelReason(
+            `Échec du chargement de la ROM : ${err?.message || 'Fichier indisponible'}. Match annulé.`
+          );
+          firebaseFightcadeService.sendMatchCancel(challenge.challengeId, opponentUid);
+        });
+    };
+
+    runDownload(1);
 
     return () => {
       isMounted = false;
