@@ -97,10 +97,22 @@ function emitSyncBus(uid, patch) {
   }
 }
 
+function stripUndefinedDeep(val) {
+  if (Array.isArray(val)) return val.map(stripUndefinedDeep).filter((v) => v !== undefined);
+  if (val && typeof val === 'object' && Object.getPrototypeOf(val) === Object.prototype) {
+    const out = {};
+    for (const [k, v] of Object.entries(val)) {
+      if (v !== undefined) out[k] = stripUndefinedDeep(v);
+    }
+    return out;
+  }
+  return val;
+}
+
 async function postAccountPatch(uid, patch) {
   if (!uid) return;
   const now = Date.now();
-  const payload = { uid, ...patch, updatedAtMs: now };
+  const payload = stripUndefinedDeep({ uid, ...patch, updatedAtMs: now });
 
   // 1. Relais serveur / LAN + BroadcastChannel multi-onglets
   emitSyncBus(uid, payload);

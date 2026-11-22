@@ -1147,6 +1147,7 @@
         this.guestIsReady = true;
         if (this.hostWaitingForGuestEmu) {
           this.hostWaitingForGuestEmu = false;
+          try { window.EJS_emulator?.play?.(); } catch {}
           if (!this.hostSetupStarted && typeof window.__cswStartHostVersusSeq === 'function') {
             this.hostSetupStarted = true;
             window.__cswStartHostVersusSeq();
@@ -1194,6 +1195,7 @@
           this.resetAtFrame(syncFrame);
           this.waitingForFrame0Ack = true;
           this.waitingForFrame0AckSinceMs = performance.now();
+          try { window.EJS_emulator?.pause?.(); } catch {}
 
           gzipBytesToTaggedBase64(bytes).then((encodedState) => {
             notifyParent('STATE_EXPORTED', {
@@ -1223,6 +1225,7 @@
         } catch {}
         this.waitingForFrame0 = false;
         this.resetAtFrame(syncFrame);
+        try { window.EJS_emulator?.play?.(); } catch {}
         this.send0x5BAckPacket(syncFrame);
         notifyParent('NETPLAY_SYNC_COMPLETE', { syncFrame });
         console.log(`[CSW GGPO] État synchronisé chargé à la Frame ${syncFrame} ! ACK envoyé à l'Hôte.`);
@@ -1233,6 +1236,7 @@
           this.waitingForFrame0Ack = false;
           this.accumulatorMs = 0;
           this.lastTickMs = performance.now();
+          try { window.EJS_emulator?.play?.(); } catch {}
           notifyParent('NETPLAY_SYNC_COMPLETE', { syncFrame });
           console.log(`[CSW GGPO] ACK reçu de l'Invité (Frame ${syncFrame}) ! Départ simultané 60.00 FPS.`);
         }
@@ -1580,6 +1584,7 @@
 
         if (netplayPlayerIndex === 1) {
           this.waitingForFrame0 = true;
+          try { window.EJS_emulator?.pause?.(); } catch {}
           notifyParent('NETPLAY_GUEST_READY');
           if (this.guestReadyTimer) clearInterval(this.guestReadyTimer);
           this.guestReadyTimer = setInterval(() => {
@@ -1590,13 +1595,15 @@
               this.guestReadyTimer = null;
             }
           }, 600);
-          // Sécurité : débloquer au bout de 3s si l'Hôte n'a pas envoyé d'état
+          // Sécurité : débloquer au bout de 4s si l'Hôte n'a pas envoyé d'état
           setTimeout(() => {
             if (this.waitingForFrame0) {
               this.waitingForFrame0 = false;
               this.resetAtFrame(0);
+              try { window.EJS_emulator?.play?.(); } catch {}
+              notifyParent('NETPLAY_SYNC_COMPLETE', { syncFrame: 0 });
             }
-          }, 3000);
+          }, 4000);
         }
 
         const attachHook = () => {
@@ -2568,38 +2575,44 @@
             startRamTelemetry(msg.gameName || targetFilename, msg.core);
             startNetplayGamepadLoop();
 
-            if (isNetplaySession) {
-              window.__cswGgpoEngine?.start();
-              notifyParent('NETPLAY_EMU_READY', { isHost: netplayPlayerIndex === 0 });
-            }
-
             if (pendingLoadState) {
               const toLoad = pendingLoadState;
               pendingLoadState = null;
               setTimeout(() => applyLoadStateBase64(toLoad.b64, toLoad.syncFrame, toLoad.isNetplaySync), 150);
             }
 
-            if (isNetplaySession && netplayPlayerIndex === 0) {
-              const ggpo = window.__cswGgpoEngine;
-              if (ggpo && ggpo.guestIsReady) {
-                ggpo.hostWaitingForGuestEmu = false;
-                if (!ggpo.hostSetupStarted) {
-                  ggpo.hostSetupStarted = true;
-                  runHostVersusFrame0Sequence();
-                }
-              } else if (ggpo) {
-                ggpo.hostWaitingForGuestEmu = true;
-                // Garde-fou : démarrer après 8s max si le signal GUEST_READY a été retardé
-                setTimeout(() => {
-                  if (ggpo.hostWaitingForGuestEmu) {
+            if (isNetplaySession) {
+              // Laisser ~20 frames (~350ms) à RetroArch/WebGL/OpenAL pour s'initialiser
+              // avant d'engager la pause d'attente mutuelle ou la séquence Frame 0.
+              setTimeout(() => {
+                window.__cswGgpoEngine?.start();
+                notifyParent('NETPLAY_EMU_READY', { isHost: netplayPlayerIndex === 0 });
+
+                if (netplayPlayerIndex === 0) {
+                  const ggpo = window.__cswGgpoEngine;
+                  if (ggpo && ggpo.guestIsReady) {
                     ggpo.hostWaitingForGuestEmu = false;
                     if (!ggpo.hostSetupStarted) {
                       ggpo.hostSetupStarted = true;
                       runHostVersusFrame0Sequence();
                     }
+                  } else if (ggpo) {
+                    ggpo.hostWaitingForGuestEmu = true;
+                    try { window.EJS_emulator?.pause?.(); } catch {}
+                    // Garde-fou : démarrer après 8s max si le signal GUEST_READY a été retardé
+                    setTimeout(() => {
+                      if (ggpo.hostWaitingForGuestEmu) {
+                        ggpo.hostWaitingForGuestEmu = false;
+                        try { window.EJS_emulator?.play?.(); } catch {}
+                        if (!ggpo.hostSetupStarted) {
+                          ggpo.hostSetupStarted = true;
+                          runHostVersusFrame0Sequence();
+                        }
+                      }
+                    }, 8000);
                   }
-                }, 8000);
-              }
+                }
+              }, 350);
             }
           };
 
