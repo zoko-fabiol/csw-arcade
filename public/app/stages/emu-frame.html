@@ -154,11 +154,16 @@
       if (typeof CompressionStream === 'function') {
         try {
           const cs = new CompressionStream('gzip');
+          // IMPORTANT : démarrer la lecture AVANT d'écrire pour éviter le deadlock de backpressure (> 64 Ko)
+          const readPromise = new Response(cs.readable).arrayBuffer();
           const writer = cs.writable.getWriter();
           writer.write(bytes);
           writer.close();
-          const compressed = new Uint8Array(await new Response(cs.readable).arrayBuffer());
-          return 'GZ:' + bytesToBase64(compressed);
+          const timeoutPromise = new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('gzip_timeout')), 400)
+          );
+          const buf = await Promise.race([readPromise, timeoutPromise]);
+          return 'GZ:' + bytesToBase64(new Uint8Array(buf));
         } catch {}
       }
       return bytesToBase64(bytes);
@@ -171,10 +176,11 @@
         const compressed = new Uint8Array(bin.length);
         for (let i = 0; i < bin.length; i++) compressed[i] = bin.charCodeAt(i);
         const ds = new DecompressionStream('gzip');
+        const readPromise = new Response(ds.readable).arrayBuffer();
         const writer = ds.writable.getWriter();
         writer.write(compressed);
         writer.close();
-        return new Uint8Array(await new Response(ds.readable).arrayBuffer());
+        return new Uint8Array(await readPromise);
       }
       const bin = atob(b64);
       const bytes = new Uint8Array(bin.length);
@@ -198,6 +204,9 @@
         }
         return true;
       } catch {
+        if (isNetplaySession && isNetplaySync && window.__cswGgpoEngine) {
+          window.__cswGgpoEngine.waitingForFrame0 = false;
+        }
         return false;
       }
     }
@@ -1093,7 +1102,7 @@
 
       requestDesyncRecovery(frame) {
         const now = performance.now();
-        if (now - this.lastDesyncRequestMs < 2000) return;
+        if (now - this.lastDesyncRequestMs < 6000) return;
         this.lastDesyncRequestMs = now;
         this.stats.syncStatus = 'RESYNC...';
         const buf = new ArrayBuffer(5);
@@ -1148,7 +1157,7 @@
       exportAndLockSyncState(slot = 'frame0', force = false) {
         if (!isNetplaySession || netplayPlayerIndex !== 0) return false;
         const now = performance.now();
-        if (!force && now - this.lastHostResyncMs < 2200) return false;
+        if (!force && now - this.lastHostResyncMs < 6000) return false;
         this.lastHostResyncMs = now;
         this.initialFrame0Sent = true;
 
@@ -1483,13 +1492,13 @@
         // 1. Dépouiller les paquets réseau GGPO reçus (0x5A / 0x5B / 0xCB / 0xCC)
         this.processIncomingPackets();
 
-        // 2. Barrière Frame 0 : l'Invité attend FRAME0_STATE, l'Hôte attend FRAME0_ACK (max 3.5s)
+        // 2. Barrière Frame 0 : l'Invité attend FRAME0_STATE, l'Hôte attend FRAME0_ACK (max 1.8s)
         if (this.waitingForFrame0) {
           this.lastTickMs = now;
           return;
         }
         if (this.waitingForFrame0Ack) {
-          if (now - this.waitingForFrame0AckSinceMs < 3500) {
+          if (now - this.waitingForFrame0AckSinceMs < 1800) {
             this.lastTickMs = now;
             return;
           }
@@ -1507,15 +1516,17 @@
         }
         this.accumulatorMs -= this.FRAME_TIME_MS;
 
-        // 4. Time-Sync / Frame Advantage Pacing GGPO
+        // 4. Time-Sync / Frame Advantage Pacing GGPO (sans jamais geler la boucle indéfiniment)
         const peerActive = this.hasRemotePeer && now - this.lastRemotePacketMs < 3000;
         const advantage = peerActive ? this.currentFrame - this.remoteFrameAdvancement : 0;
 
         if (peerActive && advantage >= 8) {
-          // Trop en avance sur l'adversaire : patienter 1 tick pour ne jamais dépasser la fenêtre de Rollback (15 frames)
-          return;
-        }
-        if (peerActive && advantage >= 2) {
+          // Trop en avance : ralentissement borné à 50% (1 frame sur 2) pour ne jamais figer l'écran
+          this.throttleCounter += 1;
+          if (this.throttleCounter % 2 === 0) {
+            return;
+          }
+        } else if (peerActive && advantage >= 2) {
           // Légèrement en avance : micro-ralentissement (skip 1 frame sur 6) pour converger vers advantage = 0
           this.throttleCounter += 1;
           if (this.throttleCounter % 6 === 0) {
@@ -1557,14 +1568,14 @@
               clearInterval(this.guestReadyTimer);
               this.guestReadyTimer = null;
             }
-          }, 800);
-          // Sécurité : débloquer au bout de 7s si l'Hôte n'a pas envoyé d'état
+          }, 600);
+          // Sécurité : débloquer au bout de 3s si l'Hôte n'a pas envoyé d'état
           setTimeout(() => {
             if (this.waitingForFrame0) {
               this.waitingForFrame0 = false;
               this.resetAtFrame(0);
             }
-          }, 7000);
+          }, 3000);
         }
 
         const attachHook = () => {
