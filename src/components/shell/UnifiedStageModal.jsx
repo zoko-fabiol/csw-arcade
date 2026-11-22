@@ -363,11 +363,19 @@ export function UnifiedStageModal({
         }
       } else if (event.data.type === 'NETPLAY_LOCAL_BTN') {
         p2pEngine?.sendButtonEvent?.(event.data.buttonIdx, event.data.pressed);
+      } else if (event.data.type === 'NETPLAY_GGPO_PACKET' && event.data.buffer) {
+        p2pEngine?.sendGgpoPacket?.(event.data.buffer);
+      } else if (event.data.type === 'NETPLAY_GUEST_READY') {
+        p2pEngine?.notifyGuestEmuReady?.();
+      } else if (event.data.type === 'NETPLAY_FRAME0_ACK') {
+        p2pEngine?.sendFrame0Ack?.(Number(event.data.syncFrame || 0));
+      } else if (event.data.type === 'ROLLBACK_TELEMETRY' && event.data.stats) {
+        p2pEngine?.updateRollbackTelemetry?.(event.data.stats);
       } else if (event.data.type === 'STATE_EXPORTED' && event.data.stateBase64) {
         setSavedState(event.data.stateBase64);
         const slotName = event.data.slot || 'quick';
-        if (slotName === 'frame0') {
-          p2pEngine?.sendFrame0State?.(event.data.stateBase64);
+        if (slotName === 'frame0' || slotName === 'resync') {
+          p2pEngine?.sendFrame0State?.(event.data.stateBase64, Number(event.data.syncFrame || 0));
         } else if (slotName === 'cloud_handoff') {
           onCloudCheckpoint?.(event.data.stateBase64);
         } else {
@@ -436,28 +444,42 @@ export function UnifiedStageModal({
     return () => clearInterval(id);
   }, [session, bootKey]);
 
-  // Pont P2P entrant : répercuter les inputs distants et le savestate Frame 0 dans l'iframe de l'émulateur
+  // Pont P2P entrant : répercuter les paquets GGPO, inputs distants et le savestate Frame 0 dans l'iframe de l'émulateur
   useEffect(() => {
     if (!p2pEngine) return;
+    p2pEngine.onGgpoPacket = (buffer) => {
+      if (buffer) {
+        iframeRef.current?.contentWindow?.postMessage(
+          { type: 'NETPLAY_GGPO_PACKET', buffer },
+          window.location.origin
+        );
+      }
+    };
     p2pEngine.onRemoteButton = ({ buttonIdx, pressed }) => {
       iframeRef.current?.contentWindow?.postMessage(
         { type: 'NETPLAY_REMOTE_BTN', buttonIdx, pressed },
         window.location.origin
       );
     };
-    p2pEngine.onFrame0State = (stateBase64) => {
+    p2pEngine.onFrame0State = (stateBase64, syncFrame = 0) => {
       if (stateBase64) {
         iframeRef.current?.contentWindow?.postMessage(
-          { type: 'LOAD_STATE', stateBase64 },
+          { type: 'LOAD_STATE', stateBase64, syncFrame: Number(syncFrame || 0), isNetplaySync: true },
           window.location.origin
         );
       }
+    };
+    p2pEngine.onFrame0Ack = (syncFrame = 0) => {
+      iframeRef.current?.contentWindow?.postMessage(
+        { type: 'NETPLAY_FRAME0_ACK', syncFrame: Number(syncFrame || 0) },
+        window.location.origin
+      );
     };
     p2pEngine.onGuestReady = () => {
       if (session?.isNetplay && session?.isHost) {
         try {
           iframeRef.current?.contentWindow?.postMessage(
-            { type: 'EXPORT_STATE', slot: 'frame0' },
+            { type: 'EXPORT_NETPLAY_SYNC', slot: 'frame0' },
             window.location.origin
           );
         } catch {}
@@ -643,7 +665,7 @@ export function UnifiedStageModal({
           )}
           {p2pStats && session.kind !== 'j2me' && (
             <span className="hidden md:inline px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-950/80 border border-emerald-600/50 text-emerald-300 shrink-0">
-              {p2pStats.pingMs}ms · RB {p2pStats.rollbackFrames}f
+              {p2pStats.pingMs}ms · RB {p2pStats.rollbackFrames}f · GGPO {p2pStats.syncStatus || '100%'}
             </span>
           )}
           {session.isNetplay && session.kind !== 'j2me' && (
@@ -652,13 +674,13 @@ export function UnifiedStageModal({
               onClick={() => {
                 if (session.isHost) {
                   iframeRef.current?.contentWindow?.postMessage(
-                    { type: 'EXPORT_STATE', slot: 'frame0' },
+                    { type: 'EXPORT_NETPLAY_SYNC', slot: 'resync' },
                     window.location.origin
                   );
                 } else {
                   p2pEngine?.notifyGuestEmuReady?.();
                 }
-                showRamToast('record', '🔄 Resynchronisation P2P envoyée !');
+                showRamToast('record', '🔄 Resynchronisation GGPO 100% envoyée !');
               }}
               title="Resynchroniser la RAM entre les 2 joueurs"
               className="flex items-center gap-1 px-2 py-1 rounded-lg bg-cyan-950/80 hover:bg-cyan-900/80 border border-cyan-500/50 text-cyan-200 text-[10px] font-mono font-bold transition-colors shrink-0"

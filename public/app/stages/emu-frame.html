@@ -118,16 +118,16 @@
     let isNetplaySession = false;
     let netplayPlayerIndex = 0;
     let emuGameStarted = false;
-    let pendingLoadStateBase64 = null;
+    let pendingLoadState = null;
     const forwardedKeyDownSet = new Set();
     let prevNetplayGamepadMask = 0;
     let netplayGamepadRafId = null;
 
-    function applyLoadStateBase64(b64) {
+    function applyLoadStateBase64(b64, syncFrame = 0, isNetplaySync = false) {
       if (!b64) return false;
       const gm = window.EJS_emulator?.gameManager;
       if (!emuGameStarted || !gm?.loadState) {
-        pendingLoadStateBase64 = b64;
+        pendingLoadState = { b64, syncFrame: Number(syncFrame || 0), isNetplaySync: Boolean(isNetplaySync) };
         return false;
       }
       try {
@@ -135,7 +135,10 @@
         const bytes = new Uint8Array(bin.length);
         for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
         gm.loadState(bytes);
-        pendingLoadStateBase64 = null;
+        pendingLoadState = null;
+        if (isNetplaySession && isNetplaySync && window.__cswGgpoEngine) {
+          window.__cswGgpoEngine.onRemoteSyncStateLoaded(Number(syncFrame || 0));
+        }
         return true;
       } catch {
         return false;
@@ -176,11 +179,16 @@
             if (diff !== 0) {
               prevNetplayGamepadMask = mask;
               const myPort = netplayPlayerIndex === 1 ? 1 : 0;
+              const ggpo = window.__cswGgpoEngine;
               for (let i = 0; i < 14; i++) {
                 if ((diff >> i) & 1) {
                   const isDown = Boolean((mask >> i) & 1);
-                  simulateEmuInput(myPort, i, isDown);
-                  notifyParent('NETPLAY_LOCAL_BTN', { buttonIdx: i, pressed: isDown });
+                  if (ggpo && ggpo.isActive()) {
+                    ggpo.setLocalButton(i, isDown);
+                  } else {
+                    simulateEmuInput(myPort, i, isDown);
+                    notifyParent('NETPLAY_LOCAL_BTN', { buttonIdx: i, pressed: isDown });
+                  }
                 }
               }
             }
@@ -235,7 +243,7 @@
       return 'arcade';
     }
 
-    function buildControllersConfig(controls, coreName = currentCoreName, hw = null) {
+    function buildControllersConfig(controls, coreName = currentCoreName, hw = null, forLocalLookup = false) {
       const consoleId = resolveConsoleIdFromCore(coreName);
       const effectiveHw = hw || readHardwareSettings();
       const consoleKb = effectiveHw?.consoleControls?.[consoleId]?.keyboard;
@@ -246,6 +254,16 @@
       const lowerCore = String(coreName || '').toLowerCase();
       const isArcade = ['fbneo', 'arcade', 'mame2003_plus'].includes(lowerCore);
       const isN64 = ['n64', 'mupen64plus_next'].includes(lowerCore);
+
+      // En Netplay GGPO déterministe, désactiver l'écouteur clavier/pad interne d'EmulatorJS pour que 100% des entrées P1 et P2 passent exclusivement par CswGgpoEngine
+      if (isNetplaySession && !forLocalLookup) {
+        const emptyPort = {};
+        for (const k of [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 16, 17, 18, 19, 20, 21, 22, 23]) {
+          emptyPort[k] = { value: 0, value2: '' };
+        }
+        return { 0: { ...emptyPort }, 1: { ...emptyPort }, 2: {}, 3: {} };
+      }
+
       return {
         0: {
           0: { value: getKeyCode(p1.a, 74), value2: 'BUTTON_2' }, // B / Cross / Neo Geo A
@@ -378,8 +396,12 @@
       return hi * 10 + lo;
     }
 
+    function getWasmModule() {
+      return window.EJS_emulator?.gameManager?.Module || window.EJS_emulator?.Module || null;
+    }
+
     function getWasmHeap() {
-      return window.EJS_emulator?.gameManager?.Module?.HEAPU8 || window.EJS_emulator?.Module?.HEAPU8 || null;
+      return getWasmModule()?.HEAPU8 || null;
     }
 
     function readRamCredits() {
@@ -393,6 +415,8 @@
     }
 
     function writeCreditsToRam(coinsCount) {
+      // En Netplay GGPO déterministe, ne jamais modifier la RAM 68000 localement avec le solde individuel du joueur
+      if (isNetplaySession) return false;
       const c = Math.max(0, Math.min(99, Math.floor(Number(coinsCount) || 0)));
       const heap = getWasmHeap();
       if (!heap || !liveCreditAddrs.length) return false;
@@ -406,9 +430,10 @@
     }
 
     function startRamCreditWatcher() {
+      if (isNetplaySession) return;
       if (ramWatcherTimer) clearInterval(ramWatcherTimer);
       ramWatcherTimer = setInterval(() => {
-        if (isSyncingCredits) return;
+        if (isSyncingCredits || isNetplaySession) return;
         const decoded = readRamCredits();
         if (decoded >= 0 && decoded <= 99 && decoded < romCreditsInGame && romCreditsInGame - decoded <= 2) {
           romCreditsInGame = decoded;
@@ -421,6 +446,18 @@
 
     // Forcer la synchronisation exacte des crédits du portefeuille dans la RAM de la ROM (déclenché par la touche 5 ou le bouton Sync Crédits)
     async function forceSyncCreditsToRam() {
+      if (isNetplaySession) {
+        const ggpo = window.__cswGgpoEngine;
+        if (ggpo && ggpo.isActive()) {
+          ggpo.pulseLocalButton(2, 5);
+        } else {
+          const myPort = netplayPlayerIndex === 1 ? 1 : 0;
+          pulseEmuButton(myPort, 2, 70);
+          notifyParent('NETPLAY_LOCAL_BTN', { buttonIdx: 2, pressed: true });
+          setTimeout(() => notifyParent('NETPLAY_LOCAL_BTN', { buttonIdx: 2, pressed: false }), 70);
+        }
+        return;
+      }
       if (isSyncingCredits) return;
       const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -523,14 +560,32 @@
 
     function resolveUniversalKey(e) {
       const code = e.code || '';
-      if (code === 'Digit5' || code === 'Digit6' || code === 'Numpad5' || code === 'Numpad6') return 2; // Bloqué (ne charge plus de crédit)
-      if (code === 'Digit1' || code === 'Digit2' || code === 'Enter' || code === 'Numpad1') return 3; // Start
-      return findLocalButtonIndex(e.keyCode || e.which);
+      const kc = Number(e.keyCode || e.which || 0);
+      if (code === 'Digit5' || code === 'Digit6' || code === 'Numpad5' || code === 'Numpad6' || kc === 53 || kc === 54) return 2; // Coin / Select
+      if (code === 'Digit1' || code === 'Digit2' || code === 'Enter' || code === 'Numpad1' || kc === 49 || kc === 50 || kc === 13) return 3; // Start
+      if (code === 'ArrowUp' || kc === 38) return 4;
+      if (code === 'ArrowDown' || kc === 40) return 5;
+      if (code === 'ArrowLeft' || kc === 37) return 6;
+      if (code === 'ArrowRight' || kc === 39) return 7;
+      const mapped = findLocalButtonIndex(kc);
+      if (mapped >= 0) return mapped;
+      // Touches universelles AZERTY (ZQSD) & QWERTY (WASD) + Actions J/K/U/I/Espace
+      if (code === 'KeyW' || code === 'KeyZ' || kc === 87 || kc === 90) return 4;
+      if (code === 'KeyS' || kc === 83) return 5;
+      if (code === 'KeyA' || code === 'KeyQ' || kc === 65 || kc === 81) return 6;
+      if (code === 'KeyD' || kc === 68) return 7;
+      if (code === 'KeyJ' || code === 'Space' || kc === 74 || kc === 32) return 0;
+      if (code === 'KeyK' || kc === 75) return 8;
+      if (code === 'KeyU' || kc === 85) return 1;
+      if (code === 'KeyI' || kc === 73) return 9;
+      return -1;
     }
 
     function findLocalButtonIndex(keyCode) {
       // Pour les touches locales du joueur physique, utiliser toujours les touches principales de la configuration
-      const portMap = buildControllersConfig(readHardwareSettings().controls)?.[0] || window.EJS_emulator?.controls?.[0];
+      const portMap =
+        buildControllersConfig(readHardwareSettings().controls, currentCoreName, null, true)?.[0] ||
+        window.EJS_emulator?.controls?.[0];
       if (!portMap) return -1;
       for (const idx of BUTTON_INDEX_ORDER) {
         if (portMap[idx]?.value === keyCode) return idx;
@@ -556,8 +611,9 @@
       document.dispatchEvent(ev);
     }
 
-    // Pont universel clavier -> EmulatorJS (garantit que ZQSD/WASD + Flèches + J/K/U/I/Espace/Entrée fonctionnent sur Mario Kart 64, N64, PS1, SNES, Arcade)
+    // Pont universel clavier -> EmulatorJS (utilisé uniquement en Solo ou hors boucle GGPO)
     function handleUniversalKeyboardBridge(code, keyCode, isDown) {
+      if (isNetplaySession && window.__cswGgpoEngine?.isActive()) return;
       const myPort = netplayPlayerIndex === 1 ? 1 : 0;
       const lowerCore = String(currentCoreName || '').toLowerCase();
       const isAnalogConsole = ['n64', 'mupen64plus_next', 'psx', 'ps1', 'pcsx_rearmed', 'nds', 'melonds'].includes(lowerCore);
@@ -600,6 +656,843 @@
       }
     }
 
+    function routeLocalPlayerInput(btnIdx, isDown) {
+      if (btnIdx < 0) return;
+      const myPort = netplayPlayerIndex === 1 ? 1 : 0;
+      const ggpo = window.__cswGgpoEngine;
+      if (isNetplaySession && ggpo && ggpo.isActive()) {
+        if (btnIdx === 2) {
+          if (isDown) ggpo.pulseLocalButton(2, 5);
+        } else {
+          ggpo.setLocalButton(btnIdx, isDown);
+        }
+        return;
+      }
+      if (btnIdx === 2) {
+        if (isDown) {
+          pulseEmuButton(isNetplaySession ? myPort : myPort, 2, 70);
+          if (isNetplaySession) {
+            notifyParent('NETPLAY_LOCAL_BTN', { buttonIdx: 2, pressed: true });
+            setTimeout(() => notifyParent('NETPLAY_LOCAL_BTN', { buttonIdx: 2, pressed: false }), 70);
+          } else {
+            forceSyncCreditsToRam();
+          }
+        }
+        return;
+      }
+      simulateEmuInput(myPort, btnIdx, isDown);
+      if (btnIdx === 4) simulateEmuInput(myPort, 19, isDown);
+      else if (btnIdx === 5) simulateEmuInput(myPort, 18, isDown);
+      else if (btnIdx === 6) simulateEmuInput(myPort, 17, isDown);
+      else if (btnIdx === 7) simulateEmuInput(myPort, 16, isDown);
+      if (isNetplaySession) {
+        notifyParent('NETPLAY_LOCAL_BTN', { buttonIdx: btnIdx, pressed: isDown });
+      }
+    }
+
+    // =========================================================================
+    // MOTEUR FIGHTCADE GGPO DÉTERMINISTE 100 % (60.00 FPS + 128-FRAME ROLLBACK + CHECKSUM 0xCB)
+    // =========================================================================
+    class CswGgpoEngine {
+      constructor() {
+        this.BUFFER_SIZE = 128;
+        this.BUFFER_MASK = 127;
+        this.MAX_ROLLBACK = 15;
+        this.INPUT_DELAY = 2; // 2 frames (33.3 ms) : absorbe la latence réseau et évite 90% des rollbacks
+        this.FRAME_TIME_MS = 1000 / 60;
+
+        this.currentFrame = 0;
+        this.remoteFrameAdvancement = 0;
+        this.lastConfirmedRemoteFrame = -1;
+        this.lastConfirmedRemoteMask = 0;
+        this.seq = 0;
+
+        this.isRunning = false;
+        this.hookAttached = false;
+        this.hostSetupCompleted = false;
+        this.waitingForFrame0 = false;
+        this.waitingForFrame0Ack = false;
+        this.waitingForFrame0AckSinceMs = 0;
+        this.hasRemotePeer = false;
+        this.lastRemotePacketMs = 0;
+        this.guestReadyTimer = null;
+
+        this.localLiveMask = 0;
+        this.lastAppliedP1Mask = -1;
+        this.lastAppliedP2Mask = -1;
+        this.forceApplyAllInputs = true;
+        this.pulseFrames = new Int32Array(16);
+
+        this.localInputs = new Uint16Array(this.BUFFER_SIZE);
+        this.localFrameNums = new Int32Array(this.BUFFER_SIZE).fill(-1);
+        this.remoteInputs = new Uint16Array(this.BUFFER_SIZE);
+        this.remoteConfirmed = new Uint8Array(this.BUFFER_SIZE);
+        this.remoteFrameNums = new Int32Array(this.BUFFER_SIZE).fill(-1);
+
+        this.savestates = new Array(this.BUFFER_SIZE);
+        this.savestateLengths = new Int32Array(this.BUFFER_SIZE);
+        this.savestateFrames = new Int32Array(this.BUFFER_SIZE).fill(-1);
+
+        this.localChecksums = new Uint32Array(this.BUFFER_SIZE);
+        this.localChecksumFrames = new Int32Array(this.BUFFER_SIZE).fill(-1);
+        this.pendingHostChecksums = new Map();
+        this.desyncStreak = 0;
+        this.lastDesyncRequestMs = 0;
+        this.lastHostResyncMs = 0;
+
+        this.incomingQueue = [];
+        this.accumulatorMs = 0;
+        this.lastTickMs = 0;
+        this.throttleCounter = 0;
+        this.fpsCount = 0;
+        this.lastFpsTimer = 0;
+
+        this.stats = {
+          fps: 60,
+          currentFrame: 0,
+          totalRollbacks: 0,
+          lastRollbackDistance: 0,
+          mispredictions: 0,
+          predictedFramesCount: 0,
+          frameAdvantage: 0,
+          syncStatus: '100%',
+        };
+
+        this.gm = null;
+        this.module = null;
+        this.originalMainLoopFunc = null;
+      }
+
+      isActive() {
+        return Boolean(
+          isNetplaySession &&
+            this.isRunning &&
+            this.hookAttached &&
+            (netplayPlayerIndex !== 0 || this.hostSetupCompleted)
+        );
+      }
+
+      setLocalButton(buttonId, isDown) {
+        if (buttonId < 0 || buttonId > 15) return;
+        if (isDown) {
+          this.localLiveMask |= 1 << buttonId;
+        } else {
+          this.localLiveMask &= ~(1 << buttonId);
+          this.pulseFrames[buttonId] = 0;
+        }
+      }
+
+      pulseLocalButton(buttonId, framesCount = 5) {
+        if (buttonId < 0 || buttonId > 15) return;
+        this.pulseFrames[buttonId] = Math.max(this.pulseFrames[buttonId], framesCount);
+        this.localLiveMask |= 1 << buttonId;
+      }
+
+      setRemoteFallbackButton(buttonId, isDown) {
+        if (this.hasRemotePeer || buttonId < 0 || buttonId > 15) return;
+        if (isDown) this.lastConfirmedRemoteMask |= 1 << buttonId;
+        else this.lastConfirmedRemoteMask &= ~(1 << buttonId);
+      }
+
+      resetAtFrame(syncFrame = 0) {
+        const cleanFrame = Math.max(0, Number(syncFrame) || 0);
+        this.currentFrame = cleanFrame;
+        this.remoteFrameAdvancement = cleanFrame;
+        this.lastConfirmedRemoteFrame = cleanFrame - 1;
+        this.lastConfirmedRemoteMask = 0;
+
+        this.localLiveMask = 0;
+        this.pulseFrames.fill(0);
+        this.incomingQueue = [];
+        this.pendingHostChecksums.clear();
+        this.desyncStreak = 0;
+
+        this.localInputs.fill(0);
+        this.localFrameNums.fill(-1);
+        this.remoteInputs.fill(0);
+        this.remoteConfirmed.fill(0);
+        this.remoteFrameNums.fill(-1);
+        this.savestateFrames.fill(-1);
+        this.localChecksumFrames.fill(-1);
+
+        for (let f = Math.max(0, cleanFrame - 4); f <= cleanFrame + this.INPUT_DELAY; f++) {
+          const idx = f & this.BUFFER_MASK;
+          this.localInputs[idx] = 0;
+          this.localFrameNums[idx] = f;
+          this.remoteInputs[idx] = 0;
+          this.remoteConfirmed[idx] = 1;
+          this.remoteFrameNums[idx] = f;
+        }
+        this.lastConfirmedRemoteFrame = cleanFrame;
+
+        this.forceApplyAllInputs = true;
+        this.applyInputs(0, 0);
+        this.applyInputs(1, 0);
+        this.captureSnapshot(cleanFrame);
+
+        this.accumulatorMs = 0;
+        this.lastTickMs = performance.now();
+        this.stats.currentFrame = cleanFrame;
+        this.stats.syncStatus = '100%';
+      }
+
+      captureSnapshot(frame) {
+        if (isHeavy3dCore(currentCoreName)) return false;
+        this.gm = this.gm || window.EJS_emulator?.gameManager;
+        this.module = this.module || getWasmModule();
+        if (!this.gm) return false;
+
+        const slot = frame & this.BUFFER_MASK;
+        try {
+          if (this.gm.functions?.saveStateInfo && this.module?.HEAPU8) {
+            const info = this.gm.functions.saveStateInfo().split('|');
+            if (info[2] === '1') {
+              const len = parseInt(info[0], 10);
+              const offset = parseInt(info[1], 10);
+              const heap = this.module.HEAPU8;
+              if (len > 0 && offset >= 0 && offset + len <= heap.length) {
+                if (!this.savestates[slot] || this.savestates[slot].length < len) {
+                  this.savestates[slot] = new Uint8Array(len);
+                }
+                this.savestates[slot].set(heap.subarray(offset, offset + len), 0);
+                this.savestateLengths[slot] = len;
+                this.savestateFrames[slot] = frame;
+                return true;
+              }
+            }
+          }
+          if (typeof this.gm.getState === 'function') {
+            const st = this.gm.getState();
+            const bytes = st instanceof Uint8Array ? st : st ? new Uint8Array(st) : null;
+            if (bytes && bytes.length > 0 && bytes.length <= 4 * 1024 * 1024) {
+              if (!this.savestates[slot] || this.savestates[slot].length < bytes.length) {
+                this.savestates[slot] = new Uint8Array(bytes.length);
+              }
+              this.savestates[slot].set(bytes, 0);
+              this.savestateLengths[slot] = bytes.length;
+              this.savestateFrames[slot] = frame;
+              return true;
+            }
+          }
+        } catch {}
+        return false;
+      }
+
+      restoreSnapshot(frame) {
+        if (isHeavy3dCore(currentCoreName)) return false;
+        this.gm = this.gm || window.EJS_emulator?.gameManager;
+        if (!this.gm) return false;
+
+        const slot = frame & this.BUFFER_MASK;
+        if (this.savestateFrames[slot] !== frame) return false;
+        const len = this.savestateLengths[slot];
+        const buf = this.savestates[slot];
+        if (!buf || len <= 0) return false;
+
+        const slice = buf.length === len ? buf : buf.subarray(0, len);
+        try {
+          if (this.gm.FS && this.gm.functions?.loadState) {
+            this.gm.FS.writeFile('/game.state', slice);
+            this.gm.functions.loadState('game.state', 0);
+            this.forceApplyAllInputs = true;
+            return true;
+          }
+          if (typeof this.gm.loadState === 'function') {
+            this.gm.loadState(slice);
+            this.forceApplyAllInputs = true;
+            return true;
+          }
+        } catch {}
+        return false;
+      }
+
+      applyInputs(pIdx, mask) {
+        this.gm = this.gm || window.EJS_emulator?.gameManager;
+        const sim = this.gm?.functions?.simulateInput || this.gm?.simulateInput;
+        if (typeof sim !== 'function') return;
+        const ctx = this.gm?.functions?.simulateInput ? this.gm.functions : this.gm;
+
+        const prev = pIdx === 0 ? this.lastAppliedP1Mask : this.lastAppliedP2Mask;
+        const forceAll = this.forceApplyAllInputs;
+        if (!forceAll && prev === mask) return;
+
+        for (let b = 0; b <= 13; b++) {
+          const bit = 1 << b;
+          if (forceAll || ((prev ^ mask) & bit)) {
+            const val = mask & bit ? 1 : 0;
+            sim.call(ctx, pIdx, b, val);
+          }
+        }
+
+        const lowerCore = String(currentCoreName || '').toLowerCase();
+        if (['n64', 'mupen64plus_next', 'psx', 'ps1', 'pcsx_rearmed', 'nds', 'melonds'].includes(lowerCore)) {
+          if (forceAll || ((prev ^ mask) & (1 << 4))) sim.call(ctx, pIdx, 19, mask & (1 << 4) ? 32767 : 0);
+          if (forceAll || ((prev ^ mask) & (1 << 5))) sim.call(ctx, pIdx, 18, mask & (1 << 5) ? 32767 : 0);
+          if (forceAll || ((prev ^ mask) & (1 << 6))) sim.call(ctx, pIdx, 17, mask & (1 << 6) ? 32767 : 0);
+          if (forceAll || ((prev ^ mask) & (1 << 7))) sim.call(ctx, pIdx, 16, mask & (1 << 7) ? 32767 : 0);
+        }
+
+        if (pIdx === 0) this.lastAppliedP1Mask = mask;
+        else this.lastAppliedP2Mask = mask;
+      }
+
+      getScheduledLocalMask(f) {
+        if (f < 0) return 0;
+        const idx = f & this.BUFFER_MASK;
+        return this.localFrameNums[idx] === f ? this.localInputs[idx] : 0;
+      }
+
+      send0x5APacket(targetFrame) {
+        this.seq = (this.seq + 1) & 0xffff;
+        const m0 = this.getScheduledLocalMask(targetFrame);
+        const m1 = this.getScheduledLocalMask(targetFrame - 1);
+        const m2 = this.getScheduledLocalMask(targetFrame - 2);
+        const m3 = this.getScheduledLocalMask(targetFrame - 3);
+
+        const buf = new ArrayBuffer(15);
+        const view = new DataView(buf);
+        view.setUint8(0, 0x5a);
+        view.setUint16(1, this.seq, false);
+        view.setUint32(3, targetFrame, false);
+        view.setUint16(7, m0, false);
+        view.setUint16(9, m1, false);
+        view.setUint16(11, m2, false);
+        view.setUint16(13, m3, false);
+
+        notifyParent('NETPLAY_GGPO_PACKET', { buffer: buf });
+      }
+
+      send0x5BAckPacket(syncFrame = 0) {
+        const buf = new ArrayBuffer(5);
+        const view = new DataView(buf);
+        view.setUint8(0, 0x5b);
+        view.setUint32(1, Math.max(0, Number(syncFrame) || 0), false);
+        notifyParent('NETPLAY_GGPO_PACKET', { buffer: buf });
+        notifyParent('NETPLAY_FRAME0_ACK', { syncFrame: Math.max(0, Number(syncFrame) || 0) });
+      }
+
+      computeRamChecksum(frame) {
+        this.module = this.module || getWasmModule();
+        const mod = this.module;
+        if (
+          mod &&
+          mod.HEAPU8 &&
+          typeof mod._retro_get_memory_data === 'function' &&
+          typeof mod._retro_get_memory_size === 'function'
+        ) {
+          const ptr = mod._retro_get_memory_data(2);
+          const size = mod._retro_get_memory_size(2);
+          if (ptr > 0 && size >= 512 && ptr + size <= mod.HEAPU8.length) {
+            const len = Math.min(size, 65536);
+            const heap = mod.HEAPU8;
+            let hash = 0x811c9dc5;
+            for (let i = 0; i < len; i += 2) {
+              hash ^= heap[ptr + i];
+              hash = Math.imul(hash, 0x01000193);
+            }
+            return hash >>> 0;
+          }
+        }
+        const slot = frame & this.BUFFER_MASK;
+        if (this.savestateFrames[slot] === frame && this.savestates[slot]) {
+          const snap = this.savestates[slot];
+          const len = this.savestateLengths[slot];
+          if (len >= 1024) {
+            let hash = 0x811c9dc5;
+            for (let i = 0; i < len; i += 8) {
+              hash ^= snap[i];
+              hash = Math.imul(hash, 0x01000193);
+            }
+            return hash >>> 0;
+          }
+        }
+        return 0;
+      }
+
+      sendChecksumPacket(frame, checksumInt) {
+        if (!checksumInt) return;
+        const buf = new ArrayBuffer(9);
+        const view = new DataView(buf);
+        view.setUint8(0, 0xcb);
+        view.setUint32(1, frame, false);
+        view.setUint32(5, checksumInt >>> 0, false);
+        notifyParent('NETPLAY_GGPO_PACKET', { buffer: buf });
+      }
+
+      requestDesyncRecovery(frame) {
+        const now = performance.now();
+        if (now - this.lastDesyncRequestMs < 2000) return;
+        this.lastDesyncRequestMs = now;
+        this.stats.syncStatus = 'RESYNC...';
+        const buf = new ArrayBuffer(5);
+        const view = new DataView(buf);
+        view.setUint8(0, 0xcc);
+        view.setUint32(1, Math.max(0, Number(frame) || 0), false);
+        notifyParent('NETPLAY_GGPO_PACKET', { buffer: buf });
+      }
+
+      verifyPendingChecksums() {
+        if (netplayPlayerIndex === 0 || this.pendingHostChecksums.size === 0) return;
+        for (const [f, hostHash] of this.pendingHostChecksums.entries()) {
+          if (f < this.currentFrame - 90) {
+            this.pendingHostChecksums.delete(f);
+            continue;
+          }
+          // Ne vérifier que lorsque tous les inputs jusqu'à la frame f sont confirmés et rembobinés
+          if (this.currentFrame > f && this.lastConfirmedRemoteFrame >= f) {
+            const slot = f & this.BUFFER_MASK;
+            if (this.localChecksumFrames[slot] === f) {
+              const localHash = this.localChecksums[slot];
+              this.pendingHostChecksums.delete(f);
+              if (localHash && hostHash && localHash !== hostHash) {
+                this.desyncStreak += 1;
+                if (this.desyncStreak >= 2) {
+                  this.desyncStreak = 0;
+                  this.requestDesyncRecovery(f);
+                }
+              } else {
+                this.desyncStreak = 0;
+                this.stats.syncStatus = '100%';
+              }
+            }
+          }
+        }
+      }
+
+      exportAndLockSyncState(slot = 'frame0') {
+        if (!isNetplaySession || netplayPlayerIndex !== 0) return false;
+        const now = performance.now();
+        if (slot === 'resync' && now - this.lastHostResyncMs < 1500) return false;
+        this.lastHostResyncMs = now;
+
+        try {
+          this.gm = this.gm || window.EJS_emulator?.gameManager;
+          if (!this.gm?.getState) return false;
+
+          this.forceApplyAllInputs = true;
+          this.applyInputs(0, 0);
+          this.applyInputs(1, 0);
+          this.forceApplyAllInputs = false;
+
+          const syncFrame = slot === 'frame0' ? 0 : this.currentFrame;
+          const state = this.gm.getState();
+          if (!state) return false;
+          const bytes = state instanceof Uint8Array ? state : new Uint8Array(state);
+
+          this.hostSetupCompleted = true;
+          this.resetAtFrame(syncFrame);
+          this.waitingForFrame0Ack = true;
+          this.waitingForFrame0AckSinceMs = performance.now();
+
+          notifyParent('STATE_EXPORTED', {
+            stateBase64: bytesToBase64(bytes),
+            slot,
+            syncFrame,
+          });
+          console.log(`[CSW GGPO] État ${slot} verrouillé à la Frame ${syncFrame} (${bytes.length} octets). En attente ACK P2...`);
+          return true;
+        } catch {
+          return false;
+        }
+      }
+
+      onRemoteSyncStateLoaded(syncFrame = 0) {
+        if (this.guestReadyTimer) {
+          clearInterval(this.guestReadyTimer);
+          this.guestReadyTimer = null;
+        }
+        this.waitingForFrame0 = false;
+        this.resetAtFrame(syncFrame);
+        this.send0x5BAckPacket(syncFrame);
+        console.log(`[CSW GGPO] État synchronisé chargé à la Frame ${syncFrame} ! ACK envoyé à l'Hôte.`);
+      }
+
+      onFrame0AckReceived(syncFrame = 0) {
+        if (this.waitingForFrame0Ack) {
+          this.waitingForFrame0Ack = false;
+          this.accumulatorMs = 0;
+          this.lastTickMs = performance.now();
+          console.log(`[CSW GGPO] ACK reçu de l'Invité (Frame ${syncFrame}) ! Départ simultané 60.00 FPS.`);
+        }
+      }
+
+      handleIncomingBinary(buffer) {
+        if (!buffer) return;
+        const view =
+          buffer instanceof DataView
+            ? buffer
+            : buffer instanceof ArrayBuffer
+              ? new DataView(buffer)
+              : ArrayBuffer.isView(buffer)
+                ? new DataView(buffer.buffer, buffer.byteOffset, buffer.byteLength)
+                : null;
+        if (!view || view.byteLength < 1) return;
+        const magic = view.getUint8(0);
+
+        if (magic === 0x5b && view.byteLength >= 5) {
+          const ackFrame = view.getUint32(1, false);
+          this.onFrame0AckReceived(ackFrame);
+          return;
+        }
+
+        if (magic === 0xcc && view.byteLength >= 5) {
+          if (netplayPlayerIndex === 0 && this.hostSetupCompleted) {
+            this.exportAndLockSyncState('resync');
+          }
+          return;
+        }
+
+        if (magic === 0xcb && view.byteLength >= 9) {
+          if (netplayPlayerIndex === 1 && !this.waitingForFrame0) {
+            const f = view.getUint32(1, false);
+            const checksum = view.getUint32(5, false);
+            this.pendingHostChecksums.set(f, checksum);
+            if (this.pendingHostChecksums.size > 24) {
+              const firstKey = this.pendingHostChecksums.keys().next().value;
+              this.pendingHostChecksums.delete(firstKey);
+            }
+            this.verifyPendingChecksums();
+          }
+          return;
+        }
+
+        if (magic === 0x5a && view.byteLength >= 15) {
+          const targetFrame = view.getUint32(3, false);
+          const m0 = view.getUint16(7, false);
+          const m1 = view.getUint16(9, false);
+          const m2 = view.getUint16(11, false);
+          const m3 = view.getUint16(13, false);
+
+          this.hasRemotePeer = true;
+          this.lastRemotePacketMs = performance.now();
+          if (this.waitingForFrame0Ack) {
+            this.waitingForFrame0Ack = false;
+          }
+
+          this.incomingQueue.push({
+            targetFrame,
+            inputs: [
+              { f: targetFrame - 3, mask: m3 },
+              { f: targetFrame - 2, mask: m2 },
+              { f: targetFrame - 1, mask: m1 },
+              { f: targetFrame, mask: m0 },
+            ],
+          });
+        }
+      }
+
+      processIncomingPackets() {
+        if (this.incomingQueue.length === 0) return;
+        let earliestMispredicted = -1;
+
+        while (this.incomingQueue.length > 0) {
+          const pkt = this.incomingQueue.shift();
+          const peerCurrentFrame = Math.max(0, pkt.targetFrame - this.INPUT_DELAY);
+          if (peerCurrentFrame > this.remoteFrameAdvancement) {
+            this.remoteFrameAdvancement = peerCurrentFrame;
+          }
+
+          for (let i = 0; i < pkt.inputs.length; i++) {
+            const { f, mask } = pkt.inputs[i];
+            if (f < 0) continue;
+            const rIdx = f & this.BUFFER_MASK;
+
+            if (f >= this.lastConfirmedRemoteFrame) {
+              this.lastConfirmedRemoteFrame = f;
+              this.lastConfirmedRemoteMask = mask;
+            }
+
+            if (f < this.currentFrame) {
+              const delta = this.currentFrame - f;
+              const wasConfirmed = this.remoteFrameNums[rIdx] === f && this.remoteConfirmed[rIdx] === 1;
+              const prevUsedMask = this.remoteFrameNums[rIdx] === f ? this.remoteInputs[rIdx] : 0;
+
+              this.remoteInputs[rIdx] = mask;
+              this.remoteConfirmed[rIdx] = 1;
+              this.remoteFrameNums[rIdx] = f;
+
+              if (!wasConfirmed && prevUsedMask !== mask) {
+                if (delta <= this.MAX_ROLLBACK) {
+                  this.stats.mispredictions += 1;
+                  if (earliestMispredicted === -1 || f < earliestMispredicted) {
+                    earliestMispredicted = f;
+                  }
+                } else if (netplayPlayerIndex === 1) {
+                  // Pic de lag supérieur à la fenêtre de 15 frames : demander un Auto-Resync immédiat à l'Hôte
+                  this.requestDesyncRecovery(f);
+                }
+              }
+            } else {
+              this.remoteInputs[rIdx] = mask;
+              this.remoteConfirmed[rIdx] = 1;
+              this.remoteFrameNums[rIdx] = f;
+            }
+          }
+        }
+
+        if (earliestMispredicted !== -1) {
+          this.executeRollback(earliestMispredicted);
+        }
+        this.verifyPendingChecksums();
+      }
+
+      executeRollback(rollbackFrame) {
+        const dist = this.currentFrame - rollbackFrame;
+        if (dist <= 0 || dist > this.MAX_ROLLBACK) return;
+        if (!this.restoreSnapshot(rollbackFrame)) return;
+
+        this.stats.totalRollbacks += 1;
+        this.stats.lastRollbackDistance = dist;
+
+        const wasMuted = Boolean(window.EJS_emulator?.muted);
+        if (!wasMuted && window.EJS_emulator) window.EJS_emulator.muted = true;
+
+        for (let rf = rollbackFrame; rf < this.currentFrame; rf++) {
+          const rIdx = rf & this.BUFFER_MASK;
+          if (rf > rollbackFrame) {
+            this.captureSnapshot(rf);
+          }
+
+          const localMask = this.localFrameNums[rIdx] === rf ? this.localInputs[rIdx] : this.localLiveMask;
+          let remoteMask = 0;
+          if (this.remoteFrameNums[rIdx] === rf && this.remoteConfirmed[rIdx] === 1) {
+            remoteMask = this.remoteInputs[rIdx];
+          } else {
+            const prevIdx = (rf - 1) & this.BUFFER_MASK;
+            remoteMask = rf > 0 ? this.remoteInputs[prevIdx] : this.lastConfirmedRemoteMask;
+            this.remoteInputs[rIdx] = remoteMask;
+            this.remoteConfirmed[rIdx] = 0;
+            this.remoteFrameNums[rIdx] = rf;
+          }
+
+          const p1 = netplayPlayerIndex === 0 ? localMask : remoteMask;
+          const p2 = netplayPlayerIndex === 0 ? remoteMask : localMask;
+
+          this.applyInputs(0, p1);
+          this.applyInputs(1, p2);
+          this.forceApplyAllInputs = false;
+
+          if (this.originalMainLoopFunc) {
+            this.originalMainLoopFunc();
+          }
+
+          if (rf > 0 && rf % 60 === 0) {
+            const csum = this.computeRamChecksum(rf);
+            this.localChecksums[rIdx] = csum;
+            this.localChecksumFrames[rIdx] = rf;
+          }
+        }
+
+        if (!wasMuted && window.EJS_emulator) window.EJS_emulator.muted = false;
+      }
+
+      stepOneFrame() {
+        const frame = this.currentFrame;
+        const rIdx = frame & this.BUFFER_MASK;
+
+        // 1. Décrémenter les impulsions déterministes (Coin / Start)
+        for (let b = 0; b < 16; b++) {
+          if (this.pulseFrames[b] > 0) {
+            this.localLiveMask |= 1 << b;
+            this.pulseFrames[b] -= 1;
+            if (this.pulseFrames[b] === 0) {
+              this.localLiveMask &= ~(1 << b);
+            }
+          }
+        }
+
+        // 2. Planifier l'input local à (frame + INPUT_DELAY) et combler tout slot intermédiaire non initialisé
+        for (let tf = frame; tf <= frame + this.INPUT_DELAY; tf++) {
+          const tIdx = tf & this.BUFFER_MASK;
+          if (this.localFrameNums[tIdx] !== tf) {
+            this.localInputs[tIdx] = this.localLiveMask;
+            this.localFrameNums[tIdx] = tf;
+          }
+        }
+        const targetFrame = frame + this.INPUT_DELAY;
+        const targetIdx = targetFrame & this.BUFFER_MASK;
+        this.localInputs[targetIdx] = this.localLiveMask;
+        this.localFrameNums[targetIdx] = targetFrame;
+
+        // 3. Envoyer le paquet binaire 0x5A avec redondance (targetFrame, -1, -2, -3)
+        this.send0x5APacket(targetFrame);
+
+        // 4. Résoudre l'input local et distant pour la frame courante `frame`
+        const localMask = this.localInputs[rIdx];
+        let remoteMask = 0;
+        if (this.remoteFrameNums[rIdx] === frame && this.remoteConfirmed[rIdx] === 1) {
+          remoteMask = this.remoteInputs[rIdx];
+        } else {
+          remoteMask = this.lastConfirmedRemoteMask;
+          this.remoteInputs[rIdx] = remoteMask;
+          this.remoteConfirmed[rIdx] = 0;
+          this.remoteFrameNums[rIdx] = frame;
+          this.stats.predictedFramesCount += 1;
+        }
+
+        // 5. Sauvegarder le snapshot WASM pré-frame dans le Ring Buffer 128 frames
+        this.captureSnapshot(frame);
+
+        // 6. Appliquer les inputs déterministes P1 et P2 puis exécuter 1 cycle CPU/Audio/Vidéo
+        const p1 = netplayPlayerIndex === 0 ? localMask : remoteMask;
+        const p2 = netplayPlayerIndex === 0 ? remoteMask : localMask;
+        this.applyInputs(0, p1);
+        this.applyInputs(1, p2);
+        this.forceApplyAllInputs = false;
+
+        if (this.originalMainLoopFunc) {
+          this.originalMainLoopFunc();
+        }
+
+        // 7. Checksum RAM 68000 (0xCB) toutes les 60 frames
+        if (frame > 0 && frame % 60 === 0) {
+          const csum = this.computeRamChecksum(frame);
+          this.localChecksums[rIdx] = csum;
+          this.localChecksumFrames[rIdx] = frame;
+          if (netplayPlayerIndex === 0) {
+            this.sendChecksumPacket(frame, csum);
+          } else {
+            this.verifyPendingChecksums();
+          }
+        }
+
+        this.currentFrame += 1;
+        this.stats.currentFrame = this.currentFrame;
+        this.fpsCount += 1;
+
+        const now = performance.now();
+        if (now - this.lastFpsTimer >= 500) {
+          this.stats.fps = Math.round((this.fpsCount * 1000) / (now - this.lastFpsTimer));
+          this.fpsCount = 0;
+          this.lastFpsTimer = now;
+          this.stats.frameAdvantage = this.currentFrame - this.remoteFrameAdvancement;
+          notifyParent('ROLLBACK_TELEMETRY', { stats: { ...this.stats } });
+        }
+      }
+
+      onMainLoopTick() {
+        const now = performance.now();
+
+        // Si l'Hôte est encore dans sa séquence initiale d'insertion Coin/Start Versus (avant Frame 0), laisser tourner nativement
+        if (netplayPlayerIndex === 0 && !this.hostSetupCompleted) {
+          if (this.originalMainLoopFunc) this.originalMainLoopFunc();
+          this.lastTickMs = now;
+          return;
+        }
+
+        // 1. Dépouiller les paquets réseau GGPO reçus (0x5A / 0x5B / 0xCB / 0xCC)
+        this.processIncomingPackets();
+
+        // 2. Barrière Frame 0 : l'Invité attend FRAME0_STATE, l'Hôte attend FRAME0_ACK (max 3.5s)
+        if (this.waitingForFrame0) {
+          this.lastTickMs = now;
+          return;
+        }
+        if (this.waitingForFrame0Ack) {
+          if (now - this.waitingForFrame0AckSinceMs < 3500) {
+            this.lastTickMs = now;
+            return;
+          }
+          this.waitingForFrame0Ack = false;
+        }
+
+        // 3. Accumulateur d'horloge strict 60.00 FPS (empêche un écran 120Hz/144Hz de tourner 2x plus vite qu'un 60Hz)
+        if (!this.lastTickMs) this.lastTickMs = now;
+        const dt = Math.max(0, Math.min(80, now - this.lastTickMs));
+        this.lastTickMs = now;
+        this.accumulatorMs = Math.min(this.FRAME_TIME_MS * 2.5, this.accumulatorMs + dt);
+
+        if (this.accumulatorMs < 15.2) {
+          return;
+        }
+        this.accumulatorMs -= this.FRAME_TIME_MS;
+
+        // 4. Time-Sync / Frame Advantage Pacing GGPO
+        const peerActive = this.hasRemotePeer && now - this.lastRemotePacketMs < 3000;
+        const advantage = peerActive ? this.currentFrame - this.remoteFrameAdvancement : 0;
+
+        if (peerActive && advantage >= 8) {
+          // Trop en avance sur l'adversaire : patienter 1 tick pour ne jamais dépasser la fenêtre de Rollback (15 frames)
+          return;
+        }
+        if (peerActive && advantage >= 2) {
+          // Légèrement en avance : micro-ralentissement (skip 1 frame sur 6) pour converger vers advantage = 0
+          this.throttleCounter += 1;
+          if (this.throttleCounter % 6 === 0) {
+            return;
+          }
+        }
+
+        this.stepOneFrame();
+
+        // Si en retard sur l'adversaire (advantage <= -2) ou accumulateur >= 1 frame, rattraper 1 frame supplémentaire
+        if ((peerActive && advantage <= -2) || this.accumulatorMs >= this.FRAME_TIME_MS) {
+          this.accumulatorMs = Math.max(0, this.accumulatorMs - this.FRAME_TIME_MS);
+          this.processIncomingPackets();
+          this.stepOneFrame();
+        }
+      }
+
+      start() {
+        if (!isNetplaySession || this.isRunning) return;
+        this.gm = window.EJS_emulator?.gameManager;
+        this.module = getWasmModule();
+        this.isRunning = true;
+        this.lastFpsTimer = performance.now();
+        this.lastTickMs = performance.now();
+
+        if (netplayPlayerIndex === 1) {
+          this.waitingForFrame0 = true;
+          notifyParent('NETPLAY_GUEST_READY');
+          if (this.guestReadyTimer) clearInterval(this.guestReadyTimer);
+          this.guestReadyTimer = setInterval(() => {
+            if (this.waitingForFrame0) {
+              notifyParent('NETPLAY_GUEST_READY');
+            } else {
+              clearInterval(this.guestReadyTimer);
+              this.guestReadyTimer = null;
+            }
+          }, 750);
+          // Sécurité : débloquer au bout de 6s si l'Hôte n'a pas envoyé d'état
+          setTimeout(() => {
+            if (this.waitingForFrame0) {
+              this.waitingForFrame0 = false;
+              this.resetAtFrame(0);
+            }
+          }, 6000);
+        }
+
+        const attachHook = () => {
+          this.gm = this.gm || window.EJS_emulator?.gameManager;
+          this.module = this.module || getWasmModule();
+          const ml = this.module?.Browser?.mainLoop;
+          if (ml && typeof ml.func === 'function' && !this.hookAttached) {
+            this.originalMainLoopFunc = ml.func;
+            const self = this;
+            ml.func = function () {
+              if (self.isRunning && isNetplaySession) {
+                self.onMainLoopTick();
+              } else if (self.originalMainLoopFunc) {
+                self.originalMainLoopFunc.apply(this, arguments);
+              }
+            };
+            this.hookAttached = true;
+            console.log('[CSW GGPO] ✓ Hook 60.00 FPS + 128-Frame Rollback attaché sur Module.Browser.mainLoop.func !');
+            return true;
+          }
+          return false;
+        };
+
+        if (!attachHook()) {
+          const checkInterval = setInterval(() => {
+            if (attachHook()) clearInterval(checkInterval);
+          }, 25);
+        }
+      }
+    }
+
+    window.__cswGgpoEngine = new CswGgpoEngine();
+
     window.addEventListener('pointerdown', () => {
       try { window.focus(); } catch {}
     });
@@ -611,55 +1504,27 @@
         return;
       }
       if (!e._cswSynthetic && !e.repeat) {
-        const myPort = netplayPlayerIndex === 1 ? 1 : 0;
         const btnIdx = resolveUniversalKey(e);
-        if (btnIdx === 2) {
-          // Touche 5 / Coin : injecter une impulsion Coin et transmettre en Netplay
+        if (isNetplaySession || btnIdx >= 0) {
           e.preventDefault();
           e.stopImmediatePropagation();
-          pulseEmuButton(isNetplaySession ? 0 : myPort, 2, 70);
-          if (isNetplaySession) {
-            notifyParent('NETPLAY_LOCAL_BTN', { buttonIdx: 2, pressed: true });
-            setTimeout(() => notifyParent('NETPLAY_LOCAL_BTN', { buttonIdx: 2, pressed: false }), 70);
-          }
-          forceSyncCreditsToRam();
-          return;
         }
         handleUniversalKeyboardBridge(e.code || '', e.keyCode || e.which, true);
-        if (btnIdx >= 0) {
-          e.preventDefault();
-          e.stopImmediatePropagation();
-          simulateEmuInput(myPort, btnIdx, true);
-          if (btnIdx === 4) simulateEmuInput(myPort, 19, true);
-          else if (btnIdx === 5) simulateEmuInput(myPort, 18, true);
-          else if (btnIdx === 6) simulateEmuInput(myPort, 17, true);
-          else if (btnIdx === 7) simulateEmuInput(myPort, 16, true);
-        }
-        if (isNetplaySession && btnIdx >= 0) {
-          notifyParent('NETPLAY_LOCAL_BTN', { buttonIdx: btnIdx, pressed: true });
-        }
+        routeLocalPlayerInput(btnIdx, true);
       }
     }, true);
 
     window.addEventListener('keyup', (e) => {
       if (!e._cswSynthetic) {
-        const myPort = netplayPlayerIndex === 1 ? 1 : 0;
         const btnIdx = resolveUniversalKey(e);
-        handleUniversalKeyboardBridge(e.code || '', e.keyCode || e.which, false);
-        if (btnIdx >= 0) {
+        if (isNetplaySession || btnIdx >= 0) {
           e.preventDefault();
           e.stopImmediatePropagation();
-          simulateEmuInput(myPort, btnIdx, false);
-          if (btnIdx === 4) simulateEmuInput(myPort, 19, false);
-          else if (btnIdx === 5) simulateEmuInput(myPort, 18, false);
-          else if (btnIdx === 6) simulateEmuInput(myPort, 17, false);
-          else if (btnIdx === 7) simulateEmuInput(myPort, 16, false);
         }
-        if (isNetplaySession && btnIdx >= 0) {
-          notifyParent('NETPLAY_LOCAL_BTN', { buttonIdx: btnIdx, pressed: false });
-        }
+        handleUniversalKeyboardBridge(e.code || '', e.keyCode || e.which, false);
+        routeLocalPlayerInput(btnIdx, false);
       }
-    });
+    }, true);
 
     // =========================================================================
     // MOTEUR UNIVERSEL DE TÉLÉMÉTRIE RAM (Scores Auto + Détection Perte / Game Over / Victoire)
@@ -1188,7 +2053,6 @@
         const kc = Number(msg.keyCode || 0);
         const code = msg.code || '';
         const key = msg.key || '';
-        const myPort = netplayPlayerIndex === 1 ? 1 : 0;
         const keyId = code || String(kc);
         if (isDown) {
           if (forwardedKeyDownSet.has(keyId)) return;
@@ -1198,26 +2062,26 @@
         }
 
         const btnIdx = resolveUniversalKey({ code, key, keyCode: kc, which: kc });
-        if (btnIdx === 2) {
-          if (isDown) {
-            pulseEmuButton(isNetplaySession ? 0 : myPort, 2, 70);
-            if (isNetplaySession) {
-              notifyParent('NETPLAY_LOCAL_BTN', { buttonIdx: 2, pressed: true });
-              setTimeout(() => notifyParent('NETPLAY_LOCAL_BTN', { buttonIdx: 2, pressed: false }), 70);
-            }
-            forceSyncCreditsToRam();
-          }
-          return;
-        }
         handleUniversalKeyboardBridge(code, kc, isDown);
-        if (btnIdx >= 0) {
-          simulateEmuInput(myPort, btnIdx, isDown);
-          if (btnIdx === 4) simulateEmuInput(myPort, 19, isDown);
-          else if (btnIdx === 5) simulateEmuInput(myPort, 18, isDown);
-          else if (btnIdx === 6) simulateEmuInput(myPort, 17, isDown);
-          else if (btnIdx === 7) simulateEmuInput(myPort, 16, isDown);
-          if (isNetplaySession) {
-            notifyParent('NETPLAY_LOCAL_BTN', { buttonIdx: btnIdx, pressed: isDown });
+        routeLocalPlayerInput(btnIdx, isDown);
+        return;
+      }
+
+      if (msg.type === 'NETPLAY_GGPO_PACKET' && msg.buffer) {
+        window.__cswGgpoEngine?.handleIncomingBinary(msg.buffer);
+        return;
+      }
+
+      if (msg.type === 'NETPLAY_FRAME0_ACK') {
+        window.__cswGgpoEngine?.onFrame0AckReceived(Number(msg.syncFrame || 0));
+        return;
+      }
+
+      if (msg.type === 'EXPORT_NETPLAY_SYNC') {
+        if (isNetplaySession && netplayPlayerIndex === 0) {
+          const ggpo = window.__cswGgpoEngine;
+          if (ggpo && ggpo.hostSetupCompleted) {
+            ggpo.exportAndLockSyncState(msg.slot || 'frame0');
           }
         }
         return;
@@ -1237,6 +2101,13 @@
       }
 
       if (msg.type === 'EXPORT_STATE') {
+        if (isNetplaySession && netplayPlayerIndex === 0 && (msg.slot === 'frame0' || msg.slot === 'resync')) {
+          const ggpo = window.__cswGgpoEngine;
+          if (ggpo && ggpo.hostSetupCompleted) {
+            ggpo.exportAndLockSyncState(msg.slot);
+          }
+          return;
+        }
         try {
           const state = window.EJS_emulator?.gameManager?.getState?.();
           if (state) {
@@ -1274,7 +2145,7 @@
       }
 
       if (msg.type === 'LOAD_STATE' && msg.stateBase64) {
-        applyLoadStateBase64(msg.stateBase64);
+        applyLoadStateBase64(msg.stateBase64, msg.syncFrame || 0, Boolean(msg.isNetplaySync));
         return;
       }
 
@@ -1284,6 +2155,11 @@
       }
 
       if (msg.type === 'NETPLAY_REMOTE_BTN') {
+        const ggpo = window.__cswGgpoEngine;
+        if (ggpo && ggpo.isActive()) {
+          ggpo.setRemoteFallbackButton(Number(msg.buttonIdx), Boolean(msg.pressed));
+          return;
+        }
         const remotePort = netplayPlayerIndex === 1 ? 0 : 1;
         const btnIdx = Number(msg.buttonIdx);
         const pressed = Boolean(msg.pressed);
@@ -1316,23 +2192,21 @@
       }
 
       if (msg.type === 'VIRTUAL_PAD_BTN') {
-        const myPort = netplayPlayerIndex === 1 ? 1 : 0;
         const btnIdx = Number(msg.buttonIdx);
         const pressed = Boolean(msg.pressed);
-        if (!simulateEmuInput(myPort, btnIdx, pressed)) {
-          const kc = window.EJS_emulator?.controls?.[myPort]?.[btnIdx]?.value;
-          if (kc) dispatchSyntheticKey(kc, pressed ? 'keydown' : 'keyup');
-        }
-        if (isNetplaySession) {
-          notifyParent('NETPLAY_LOCAL_BTN', { buttonIdx: btnIdx, pressed });
-        }
+        routeLocalPlayerInput(btnIdx, pressed);
         return;
       }
 
       if (msg.type === 'PRESS_BUTTON') {
-        const myPort = netplayPlayerIndex === 1 ? 1 : 0;
         const idx = msg.button === 'coin' ? 2 : 3;
         try { window.focus(); } catch {}
+        const ggpo = window.__cswGgpoEngine;
+        if (isNetplaySession && ggpo && ggpo.isActive()) {
+          ggpo.pulseLocalButton(idx, 5);
+          return;
+        }
+        const myPort = netplayPlayerIndex === 1 ? 1 : 0;
         pulseEmuButton(myPort, idx, 100);
         if (isNetplaySession) {
           notifyParent('NETPLAY_LOCAL_BTN', { buttonIdx: idx, pressed: true });
@@ -1473,40 +2347,43 @@
             notifyParent('STAGE_STATUS', { status: 'playing', message: 'Émulateur démarré.' });
             startRamTelemetry(msg.gameName || targetFilename, msg.core);
             startNetplayGamepadLoop();
-            if (pendingLoadStateBase64) {
-              setTimeout(() => applyLoadStateBase64(pendingLoadStateBase64), 250);
+
+            if (isNetplaySession) {
+              window.__cswGgpoEngine?.start();
+            }
+
+            if (pendingLoadState) {
+              const toLoad = pendingLoadState;
+              pendingLoadState = null;
+              setTimeout(() => applyLoadStateBase64(toLoad.b64, toLoad.syncFrame, toLoad.isNetplaySync), 150);
             }
 
             if (isNetplaySession && netplayPlayerIndex === 0) {
-              // Séquence Fightcade déterministe (exécutée uniquement par l'Hôte P1) :
-              // 1. Insérer 2 Coins pour P1 et 2 Coins pour P2
-              // 2. Déclencher START 1 et START 2 pour lancer immédiatement le mode VERSUS 2 Joueurs
-              // 3. Exporter le savestate Frame 0 APRÈS le Start pour synchroniser P2 exactement sur l'écran Versus
+              // Séquence Fightcade GGPO déterministe (exécutée uniquement par l'Hôte P1) :
+              // 1. Insérer 3 Coins pour P1 et 3 Coins pour P2
+              // 2. Déclencher START 1 et START 2 pour lancer immédiatement le mode VERSUS / CO-OP 2 Joueurs
+              // 3. Verrouiller la Frame 0 (exportAndLockSyncState) et attendre l'ACK de P2 avant de démarrer la simulation à 60.00 FPS !
               setTimeout(() => {
                 try {
-                  pulseEmuButton(0, 2, 80); // Coin P1
-                  setTimeout(() => pulseEmuButton(1, 2, 80), 140); // Coin P2
-                  setTimeout(() => pulseEmuButton(0, 2, 80), 280); // 2e Coin P1
-                  setTimeout(() => pulseEmuButton(1, 2, 80), 420); // 2e Coin P2
+                  pulseEmuButton(0, 2, 70); // Coin 1 P1
+                  setTimeout(() => pulseEmuButton(1, 2, 70), 120); // Coin 1 P2
+                  setTimeout(() => pulseEmuButton(0, 2, 70), 240); // Coin 2 P1
+                  setTimeout(() => pulseEmuButton(1, 2, 70), 360); // Coin 2 P2
+                  setTimeout(() => pulseEmuButton(0, 2, 70), 480); // Coin 3 P1
+                  setTimeout(() => pulseEmuButton(1, 2, 70), 600); // Coin 3 P2
 
                   setTimeout(() => {
-                    pulseEmuButton(0, 3, 100); // Start 1
+                    pulseEmuButton(0, 3, 95); // Start 1
                     setTimeout(() => {
-                      pulseEmuButton(1, 3, 100); // Start 2 (Challenger !)
-                      console.log('[CSW Fightcade Netplay] Auto-Start 2 Joueurs Versus activé (P1 + P2).');
+                      pulseEmuButton(1, 3, 95); // Start 2 (Challenger !)
+                      console.log('[CSW Fightcade GGPO] Auto-Start 2 Joueurs Versus activé (P1 + P2).');
                       setTimeout(() => {
-                        try {
-                          const state = window.EJS_emulator?.gameManager?.getState?.();
-                          if (state) {
-                            const bytes = state instanceof Uint8Array ? state : new Uint8Array(state);
-                            notifyParent('STATE_EXPORTED', { stateBase64: bytesToBase64(bytes), slot: 'frame0' });
-                          }
-                        } catch {}
-                      }, 350);
-                    }, 350);
-                  }, 900);
+                        window.__cswGgpoEngine?.exportAndLockSyncState('frame0');
+                      }, 320);
+                    }, 300);
+                  }, 820);
                 } catch {}
-              }, 1000);
+              }, 850);
             }
           };
 

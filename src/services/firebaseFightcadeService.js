@@ -326,13 +326,11 @@ class FirebaseFightcadeService {
     };
   }
 
-  sendRelayInput(targetUid, { buttonIdx, pressed, frame = 0 } = {}) {
+  sendRelayInput(targetUid, payload = {}) {
     this.sendWs({
       type: 'RELAY_INPUT',
       targetUid,
-      buttonIdx,
-      pressed,
-      frame,
+      ...payload,
     });
   }
 

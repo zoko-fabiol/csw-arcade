@@ -81,10 +81,19 @@ export class RollbackP2PEngine {
     this.remoteInputs = new Map(); // frame -> bitmask
     this.localInputs = new Map(); // frame -> bitmask
     this.lastConfirmedRemoteFrame = -1;
+    this.incomingStateTransfers = new Map(); // transferId -> { total, syncFrame, chunks: Map }
+    this.lastDeliveredTransferId = null;
+
+    this.onGgpoPacket = null;
+    this.onFrame0Ack = null;
 
     this.stats = {
       pingMs: 0,
       rollbackFrames: 0,
+      totalRollbacks: 0,
+      frameAdvantage: 0,
+      currentFrame: 0,
+      syncStatus: '100%',
       p2pState: 'connecting',
       inputDelay: this.inputDelay,
     };
@@ -337,18 +346,39 @@ export class RollbackP2PEngine {
         }
       }
       if (this.pendingFrame0State) {
-        const { stateBase64, romHash } = this.pendingFrame0State;
+        const { stateBase64, syncFrame } = this.pendingFrame0State;
         this.pendingFrame0State = null;
-        this.sendFrame0State(stateBase64, romHash);
+        this.sendFrame0State(stateBase64, syncFrame);
       }
     };
     dc.onmessage = (e) => {
       try {
         const msg = JSON.parse(e.data);
-        if (msg.type === 'FRAME0_STATE') {
-          this.onFrame0State?.(msg.stateBase64, msg.romHash);
+        if (msg.type === 'FRAME0_STATE' && msg.stateBase64) {
+          this.onFrame0State?.(msg.stateBase64, Number(msg.syncFrame || 0));
+        } else if (msg.type === 'FRAME0_CHUNK') {
+          const { transferId, index, total, chunk, syncFrame = 0 } = msg;
+          if (!transferId || typeof index !== 'number' || !total || !chunk) return;
+          if (this.lastDeliveredTransferId === transferId) return;
+          let entry = this.incomingStateTransfers.get(transferId);
+          if (!entry) {
+            entry = { total, syncFrame: Number(syncFrame || 0), chunks: new Map() };
+            this.incomingStateTransfers.set(transferId, entry);
+          }
+          entry.chunks.set(index, chunk);
+          if (entry.chunks.size === entry.total) {
+            const parts = [];
+            for (let i = 0; i < entry.total; i++) {
+              parts.push(entry.chunks.get(i) || '');
+            }
+            this.incomingStateTransfers.delete(transferId);
+            this.lastDeliveredTransferId = transferId;
+            this.onFrame0State?.(parts.join(''), entry.syncFrame);
+          }
         } else if (msg.type === 'GUEST_READY') {
           this.onGuestReady?.();
+        } else if (msg.type === 'FRAME0_ACK') {
+          this.onFrame0Ack?.(Number(msg.syncFrame || 0));
         }
       } catch {
         /* noop */
@@ -364,6 +394,111 @@ export class RollbackP2PEngine {
       } catch {
         /* noop */
       }
+    }
+    this.onRelayButtonFallback?.({ syncType: 'GUEST_READY' });
+  }
+
+  sendFrame0Ack(syncFrame = 0) {
+    if (this.reliableChannel?.readyState === 'open') {
+      try {
+        this.reliableChannel.send(JSON.stringify({ type: 'FRAME0_ACK', syncFrame }));
+      } catch {
+        /* noop */
+      }
+    }
+    this.onRelayButtonFallback?.({ syncType: 'FRAME0_ACK', syncFrame });
+  }
+
+  updateRollbackTelemetry(emuStats = {}) {
+    if (typeof emuStats.lastRollbackDistance === 'number') {
+      this.stats.rollbackFrames = emuStats.lastRollbackDistance;
+    }
+    if (typeof emuStats.totalRollbacks === 'number') {
+      this.stats.totalRollbacks = emuStats.totalRollbacks;
+    }
+    if (typeof emuStats.frameAdvantage === 'number') {
+      this.stats.frameAdvantage = emuStats.frameAdvantage;
+    }
+    if (typeof emuStats.currentFrame === 'number') {
+      this.stats.currentFrame = emuStats.currentFrame;
+    }
+    if (emuStats.syncStatus) {
+      this.stats.syncStatus = emuStats.syncStatus;
+    }
+    this.emitStats();
+  }
+
+  sendGgpoPacket(buffer) {
+    if (!buffer) return;
+    const rawBuf =
+      buffer instanceof ArrayBuffer
+        ? buffer
+        : ArrayBuffer.isView(buffer)
+          ? buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength)
+          : null;
+    if (!rawBuf || rawBuf.byteLength < 1) return;
+
+    const bytes = new Uint8Array(rawBuf);
+    const magic = bytes[0];
+    let sentUdp = false;
+
+    if (this.udpChannel?.readyState === 'open') {
+      try {
+        this.udpChannel.send(rawBuf);
+        sentUdp = true;
+      } catch {
+        /* noop */
+      }
+    }
+
+    // Pour les paquets de contrôle critiques (0x5B = FRAME0_ACK, 0xCC = DESYNC_REQ) ou si l'UDP WebRTC n'est pas encore ouvert
+    if (!sentUdp || magic === 0x5b || magic === 0xcc) {
+      if (this.onRelayButtonFallback) {
+        let hex = '';
+        for (let i = 0; i < bytes.length; i++) {
+          hex += bytes[i].toString(16).padStart(2, '0');
+        }
+        try {
+          this.onRelayButtonFallback({ packetHex: hex });
+        } catch {
+          /* noop */
+        }
+      }
+    }
+  }
+
+  handleRelayData(data) {
+    if (!data) return;
+    if (data.syncType === 'GUEST_READY') {
+      this.onGuestReady?.();
+      return;
+    }
+    if (data.syncType === 'FRAME0_ACK') {
+      this.onFrame0Ack?.(Number(data.syncFrame || 0));
+      return;
+    }
+    if (data.syncType === 'FRAME0_STATE' && data.stateBase64) {
+      if (data.transferId && this.lastDeliveredTransferId === data.transferId) return;
+      if (data.transferId) this.lastDeliveredTransferId = data.transferId;
+      this.onFrame0State?.(data.stateBase64, Number(data.syncFrame || 0));
+      return;
+    }
+    if (typeof data.packetHex === 'string' && data.packetHex.length >= 2) {
+      const hex = data.packetHex;
+      const len = hex.length >> 1;
+      const bytes = new Uint8Array(len);
+      for (let i = 0; i < len; i++) {
+        bytes[i] = parseInt(hex.slice(i * 2, i * 2 + 2), 16) || 0;
+      }
+      this.handleBinaryPacket(bytes.buffer);
+      return;
+    }
+    if (typeof data.buttonIdx === 'number') {
+      this.onRemoteButton?.({
+        buttonIdx: data.buttonIdx,
+        pressed: Boolean(data.pressed),
+        frame: Number(data.frame || 0),
+      });
     }
   }
 
@@ -463,16 +598,49 @@ export class RollbackP2PEngine {
     }
   }
 
-  sendFrame0State(stateBase64, romHash = '') {
+  sendFrame0State(stateBase64, syncFrame = 0) {
     if (!stateBase64) return;
+    const cleanSyncFrame = Number(syncFrame || 0);
+    const transferId = `f0_${Date.now()}_${cleanSyncFrame}`;
+    let sentOverRtc = false;
+
     if (this.reliableChannel?.readyState === 'open') {
       try {
-        this.reliableChannel.send(JSON.stringify({ type: 'FRAME0_STATE', stateBase64, romHash }));
+        const CHUNK_SIZE = 32768; // 32 KB par paquet SCTP (< 64 KB maxMessageSize universel WebRTC)
+        const total = Math.ceil(stateBase64.length / CHUNK_SIZE);
+        for (let i = 0; i < total; i++) {
+          const chunk = stateBase64.slice(i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE);
+          this.reliableChannel.send(
+            JSON.stringify({
+              type: 'FRAME0_CHUNK',
+              transferId,
+              index: i,
+              total,
+              chunk,
+              syncFrame: cleanSyncFrame,
+            })
+          );
+        }
+        sentOverRtc = true;
       } catch {
-        this.pendingFrame0State = { stateBase64, romHash };
+        this.pendingFrame0State = { stateBase64, syncFrame: cleanSyncFrame };
       }
     } else {
-      this.pendingFrame0State = { stateBase64, romHash };
+      this.pendingFrame0State = { stateBase64, syncFrame: cleanSyncFrame };
+    }
+
+    // Double canal de sécurité (WebRTC SCTP 32KB Chunks + Relais WebSocket VPS dédupliqué par transferId)
+    if (this.onRelayButtonFallback && (!sentOverRtc || stateBase64.length <= 1600000)) {
+      try {
+        this.onRelayButtonFallback({
+          syncType: 'FRAME0_STATE',
+          transferId,
+          stateBase64,
+          syncFrame: cleanSyncFrame,
+        });
+      } catch {
+        /* noop */
+      }
     }
   }
 
@@ -488,31 +656,45 @@ export class RollbackP2PEngine {
   }
 
   handleBinaryPacket(buffer) {
-    if (buffer.byteLength === 7) {
-      const view = new DataView(buffer);
-      if (view.getUint8(0) === PACKET_BTN_MASK_SYNC) {
-        const seq = view.getUint32(1, false);
-        const mask = view.getUint16(5, false);
-        if (seq < this.lastRemoteSeq) return; // Ignorer les paquets UDP hors-ordre obsolètes
-        this.lastRemoteSeq = seq;
-        const diff = mask ^ this.remoteBtnMask;
-        if (diff !== 0) {
-          this.remoteBtnMask = mask;
-          for (let i = 0; i < 16; i++) {
-            if ((diff >> i) & 1) {
-              this.onRemoteButton?.({
-                buttonIdx: i,
-                pressed: Boolean((mask >> i) & 1),
-                frame: seq,
-              });
-            }
+    if (!buffer || buffer.byteLength < 1) return;
+    const view = new DataView(buffer);
+    const magic = view.getUint8(0);
+
+    // Paquets binaires GGPO Fightcade :
+    // 0x5A = Input Frame + Redondance N-3 (15 octets)
+    // 0x5B = Frame-0 / Sync ACK (5 octets)
+    // 0xCB = Checksum RAM 68000 (9 octets)
+    // 0xCC = Demande d'Auto-Resync sur divergence checksum (5 octets)
+    if (magic === 0x5a || magic === 0x5b || magic === 0xcb || magic === 0xcc) {
+      if (magic === 0x5b && buffer.byteLength >= 5) {
+        const ackFrame = view.getUint32(1, false);
+        this.onFrame0Ack?.(ackFrame);
+      }
+      this.onGgpoPacket?.(buffer);
+      return;
+    }
+
+    if (buffer.byteLength === 7 && magic === PACKET_BTN_MASK_SYNC) {
+      const seq = view.getUint32(1, false);
+      const mask = view.getUint16(5, false);
+      if (seq < this.lastRemoteSeq) return; // Ignorer les paquets UDP hors-ordre obsolètes
+      this.lastRemoteSeq = seq;
+      const diff = mask ^ this.remoteBtnMask;
+      if (diff !== 0) {
+        this.remoteBtnMask = mask;
+        for (let i = 0; i < 16; i++) {
+          if ((diff >> i) & 1) {
+            this.onRemoteButton?.({
+              buttonIdx: i,
+              pressed: Boolean((mask >> i) & 1),
+              frame: seq,
+            });
           }
         }
-        return;
       }
+      return;
     }
     if (buffer.byteLength < 6) return;
-    const view = new DataView(buffer);
     const frame = view.getUint32(0, false);
     const bitmask = view.getUint16(4, false);
 
@@ -559,7 +741,10 @@ export class RollbackP2PEngine {
 
     this.onRemoteButton = null;
     this.onRemoteInput = null;
+    this.onGgpoPacket = null;
     this.onFrame0State = null;
+    this.onFrame0Ack = null;
+    this.onGuestReady = null;
     this.onRelayButtonFallback = null;
     this.onStats = null;
     this.onStateChange = null;
@@ -575,6 +760,7 @@ export class RollbackP2PEngine {
     this.udpChannel = null;
     this.reliableChannel = null;
     this.pendingFrame0State = null;
+    this.incomingStateTransfers.clear();
     this.localInputs.clear();
     this.remoteInputs.clear();
     this.stateRing.clear();

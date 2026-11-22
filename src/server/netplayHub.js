@@ -1178,10 +1178,20 @@ export function setupNetplayHub(server) {
           }
 
           case 'RELAY_INPUT': {
-            const { targetUid, buttonIdx, pressed, frame } = data;
+            const { targetUid, buttonIdx, pressed, frame, packetHex, syncType, transferId, stateBase64, syncFrame } = data;
             const sockets = connectedUsers.get(targetUid);
             if (sockets) {
-              const msg = JSON.stringify({ type: 'REMOTE_BTN_RELAY', buttonIdx, pressed, frame });
+              const msg = JSON.stringify({
+                type: 'REMOTE_BTN_RELAY',
+                buttonIdx,
+                pressed,
+                frame,
+                packetHex,
+                syncType,
+                transferId,
+                stateBase64,
+                syncFrame,
+              });
               for (const s of sockets) {
                 if (s !== ws && s.readyState === WebSocket.OPEN) s.send(msg);
               }

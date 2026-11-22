@@ -317,18 +317,14 @@ export default function App() {
       onStats: (st) => setP2pStats(st),
     });
 
-    // Secours WebSocket VPS en cas de filtrage NAT / Box
-    engine.onRelayButtonFallback = ({ buttonIdx, pressed, frame }) => {
-      if (opponentUid) {
-        firebaseFightcadeService.sendRelayInput(opponentUid, { buttonIdx, pressed, frame });
+    // Secours WebSocket VPS en cas de filtrage NAT / Box (supporte les paquets binaires GGPO 0x5A/0xCB et les savestates Frame 0)
+    engine.onRelayButtonFallback = (payload) => {
+      if (opponentUid && payload) {
+        firebaseFightcadeService.sendRelayInput(opponentUid, payload);
       }
     };
     firebaseFightcadeService.onRelayInput((data) => {
-      engine.onRemoteButton?.({
-        buttonIdx: data.buttonIdx,
-        pressed: data.pressed,
-        frame: data.frame,
-      });
+      engine.handleRelayData(data);
     });
     engine.addCleanup(() => firebaseFightcadeService.onRelayInput(null));
 
