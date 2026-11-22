@@ -503,6 +503,11 @@ export function UnifiedStageModal({
         );
       }
     };
+    if (p2pEngine.pendingIncomingFrame0?.stateBase64) {
+      const { stateBase64, syncFrame } = p2pEngine.pendingIncomingFrame0;
+      p2pEngine.pendingIncomingFrame0 = null;
+      p2pEngine.onFrame0State(stateBase64, syncFrame);
+    }
     p2pEngine.onFrame0Ack = (syncFrame = 0) => {
       iframeRef.current?.contentWindow?.postMessage(
         { type: 'NETPLAY_FRAME0_ACK', syncFrame: Number(syncFrame || 0) },

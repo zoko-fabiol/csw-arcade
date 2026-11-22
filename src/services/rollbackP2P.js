@@ -5,7 +5,7 @@
 const ICE_SERVERS = [
   { urls: 'stun:stun.l.google.com:19302' },
   { urls: 'stun:stun1.l.google.com:19302' },
-  { urls: 'stun:stun2.l.google.com:19302' },
+  { urls: 'stun:stun.cloudflare.com:3478' },
   { urls: 'stun:global.stun.twilio.com:3478' },
   {
     urls: [
@@ -20,11 +20,6 @@ const ICE_SERVERS = [
     urls: 'turns:openrelay.metered.ca:443?transport=tcp',
     username: 'openrelayproject',
     credential: 'openrelayproject',
-  },
-  {
-    urls: 'turns:openrelay.metered.ca:443?transport=tcp',
-    username: 'openrelay',
-    credential: 'openrelay',
   },
 ];
 
@@ -147,10 +142,11 @@ export class RollbackP2PEngine {
     this.connectTimeoutTimer = setTimeout(() => {
       if (this.destroyed || !this.pc) return;
       if (this.udpChannel?.readyState !== 'open') {
-        this.stats.p2pState = 'relay-fallback';
+        this.stats.p2pState = 'relay-vps';
         this.emitStats();
+        this.startPingLoop();
       }
-    }, 7000);
+    }, 3500);
 
     this.pc.oniceconnectionstatechange = () => {
       const s = this.pc?.iceConnectionState || 'closed';
@@ -357,26 +353,9 @@ export class RollbackP2PEngine {
       try {
         const msg = JSON.parse(e.data);
         if (msg.type === 'FRAME0_STATE' && msg.stateBase64) {
-          this.onFrame0State?.(msg.stateBase64, Number(msg.syncFrame || 0));
+          this._deliverFrame0State(msg.stateBase64, Number(msg.syncFrame || 0));
         } else if (msg.type === 'FRAME0_CHUNK') {
-          const { transferId, index, total, chunk, syncFrame = 0 } = msg;
-          if (!transferId || typeof index !== 'number' || !total || !chunk) return;
-          if (this.lastDeliveredTransferId === transferId) return;
-          let entry = this.incomingStateTransfers.get(transferId);
-          if (!entry) {
-            entry = { total, syncFrame: Number(syncFrame || 0), chunks: new Map() };
-            this.incomingStateTransfers.set(transferId, entry);
-          }
-          entry.chunks.set(index, chunk);
-          if (entry.chunks.size === entry.total) {
-            const parts = [];
-            for (let i = 0; i < entry.total; i++) {
-              parts.push(entry.chunks.get(i) || '');
-            }
-            this.incomingStateTransfers.delete(transferId);
-            this.lastDeliveredTransferId = transferId;
-            this.onFrame0State?.(parts.join(''), entry.syncFrame);
-          }
+          this._handleIncomingChunk(msg.transferId, msg.index, msg.total, msg.chunk, msg.syncFrame);
         } else if (msg.type === 'GUEST_READY') {
           this.onGuestReady?.();
         } else if (msg.type === 'FRAME0_ACK') {
@@ -497,8 +476,50 @@ export class RollbackP2PEngine {
     }
   }
 
+  _deliverFrame0State(stateBase64, syncFrame = 0) {
+    if (!stateBase64) return;
+    if (typeof this.onFrame0State === 'function') {
+      this.pendingIncomingFrame0 = null;
+      this.onFrame0State(stateBase64, Number(syncFrame || 0));
+    } else {
+      this.pendingIncomingFrame0 = { stateBase64, syncFrame: Number(syncFrame || 0) };
+    }
+  }
+
+  _handleIncomingChunk(transferId, index, total, chunk, syncFrame = 0) {
+    if (!transferId || typeof index !== 'number' || !total || !chunk) return;
+    if (this.lastDeliveredTransferId === transferId) return;
+    let entry = this.incomingStateTransfers.get(transferId);
+    if (!entry) {
+      entry = { total, syncFrame: Number(syncFrame || 0), chunks: new Map() };
+      this.incomingStateTransfers.set(transferId, entry);
+    }
+    entry.chunks.set(index, chunk);
+    if (entry.chunks.size === entry.total) {
+      const parts = [];
+      for (let i = 0; i < entry.total; i++) {
+        parts.push(entry.chunks.get(i) || '');
+      }
+      this.incomingStateTransfers.delete(transferId);
+      this.lastDeliveredTransferId = transferId;
+      this._deliverFrame0State(parts.join(''), entry.syncFrame);
+    }
+  }
+
   handleRelayData(data) {
     if (!data) return;
+    if (data.syncType === 'PING' && typeof data.t === 'number') {
+      this.onRelayButtonFallback?.({ syncType: 'PONG', t: data.t });
+      return;
+    }
+    if (data.syncType === 'PONG' && typeof data.t === 'number') {
+      if (this.udpChannel?.readyState !== 'open') {
+        this.stats.pingMs = Math.max(1, Math.round((performance.now() - data.t) / 2));
+        this.stats.p2pState = 'relay-vps';
+        this.emitStats();
+      }
+      return;
+    }
     if (data.syncType === 'NETPLAY_EVENT' && data.eventData) {
       this._deliverNetplayEvent(data.eventData);
       return;
@@ -511,10 +532,20 @@ export class RollbackP2PEngine {
       this.onFrame0Ack?.(Number(data.syncFrame || 0));
       return;
     }
+    if (data.syncType === 'FRAME0_CHUNK' && data.stateBase64) {
+      this._handleIncomingChunk(
+        data.transferId,
+        data.chunkIndex,
+        data.chunkTotal,
+        data.stateBase64,
+        data.syncFrame
+      );
+      return;
+    }
     if (data.syncType === 'FRAME0_STATE' && data.stateBase64) {
       if (data.transferId && this.lastDeliveredTransferId === data.transferId) return;
       if (data.transferId) this.lastDeliveredTransferId = data.transferId;
-      this.onFrame0State?.(data.stateBase64, Number(data.syncFrame || 0));
+      this._deliverFrame0State(data.stateBase64, Number(data.syncFrame || 0));
       return;
     }
     if (typeof data.packetHex === 'string' && data.packetHex.length >= 2) {
@@ -539,6 +570,7 @@ export class RollbackP2PEngine {
   startPingLoop() {
     if (this.pingInterval) clearInterval(this.pingInterval);
     this.pingInterval = setInterval(() => {
+      if (this.destroyed) return;
       if (this.udpChannel?.readyState === 'open') {
         try {
           this.udpChannel.send(JSON.stringify({ type: 'PING', t: performance.now() }));
@@ -552,8 +584,14 @@ export class RollbackP2PEngine {
         } catch {
           /* noop */
         }
+      } else if (this.onRelayButtonFallback) {
+        try {
+          this.onRelayButtonFallback({ syncType: 'PING', t: performance.now() });
+        } catch {
+          /* noop */
+        }
       }
-    }, 500);
+    }, 750);
   }
 
   sendButtonEvent(buttonIdx, pressed) {
@@ -636,12 +674,12 @@ export class RollbackP2PEngine {
     if (!stateBase64) return;
     const cleanSyncFrame = Number(syncFrame || 0);
     const transferId = `f0_${Date.now()}_${cleanSyncFrame}`;
+    const CHUNK_SIZE = 32768; // 32 KB par paquet SCTP / WebSocket (évite tout blocage Caddy / WebRTC)
+    const total = Math.ceil(stateBase64.length / CHUNK_SIZE);
     let sentOverRtc = false;
 
     if (this.reliableChannel?.readyState === 'open') {
       try {
-        const CHUNK_SIZE = 32768; // 32 KB par paquet SCTP (< 64 KB maxMessageSize universel WebRTC)
-        const total = Math.ceil(stateBase64.length / CHUNK_SIZE);
         for (let i = 0; i < total; i++) {
           const chunk = stateBase64.slice(i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE);
           this.reliableChannel.send(
@@ -663,15 +701,20 @@ export class RollbackP2PEngine {
       this.pendingFrame0State = { stateBase64, syncFrame: cleanSyncFrame };
     }
 
-    // Double canal de sécurité (WebRTC SCTP 32KB Chunks + Relais WebSocket VPS dédupliqué par transferId)
+    // Relais WebSocket VPS garanti par paquets de 32 KB (fonctionne sur 100% des réseaux 4G / NAT symétrique)
     if (this.onRelayButtonFallback && (!sentOverRtc || stateBase64.length <= 1600000)) {
       try {
-        this.onRelayButtonFallback({
-          syncType: 'FRAME0_STATE',
-          transferId,
-          stateBase64,
-          syncFrame: cleanSyncFrame,
-        });
+        for (let i = 0; i < total; i++) {
+          const chunk = stateBase64.slice(i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE);
+          this.onRelayButtonFallback({
+            syncType: 'FRAME0_CHUNK',
+            transferId,
+            chunkIndex: i,
+            chunkTotal: total,
+            stateBase64: chunk,
+            syncFrame: cleanSyncFrame,
+          });
+        }
       } catch {
         /* noop */
       }

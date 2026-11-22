@@ -120,6 +120,14 @@ class FirebaseFightcadeService {
           deleteDoc(doc(db, 'fc_lobbies', ch.gameId, 'users', prevUid)).catch(() => {});
         });
       }
+      if (this.ws && this.ws.readyState === WebSocket.OPEN && this.identity?.uid) {
+        this.sendWs({
+          type: 'IDENTIFY',
+          uid: this.identity.uid,
+          name: this.identity.name,
+          region: this.identity.region || 'FR',
+        });
+      }
       this.refreshAllPresences();
     });
 

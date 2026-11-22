@@ -1259,7 +1259,21 @@ export function setupNetplayHub(server) {
           }
 
           case 'RELAY_INPUT': {
-            const { targetUid, buttonIdx, pressed, frame, packetHex, syncType, transferId, stateBase64, syncFrame, eventData } = data;
+            const {
+              targetUid,
+              buttonIdx,
+              pressed,
+              frame,
+              packetHex,
+              syncType,
+              transferId,
+              chunkIndex,
+              chunkTotal,
+              stateBase64,
+              syncFrame,
+              eventData,
+              t,
+            } = data;
             const sockets = connectedUsers.get(targetUid);
             if (sockets) {
               const msg = JSON.stringify({
@@ -1270,9 +1284,12 @@ export function setupNetplayHub(server) {
                 packetHex,
                 syncType,
                 transferId,
+                chunkIndex,
+                chunkTotal,
                 stateBase64,
                 syncFrame,
                 eventData,
+                t,
               });
               for (const s of sockets) {
                 if (s !== ws && s.readyState === WebSocket.OPEN) s.send(msg);
