@@ -5,15 +5,21 @@ import path from 'node:path';
 function loadEnvValue(key, fallback = '') {
   if (process.env[key]) return process.env[key];
   try {
-    const envPath = path.resolve(process.cwd(), '.env');
-    if (fs.existsSync(envPath)) {
-      const lines = fs.readFileSync(envPath, 'utf8').split(/\r?\n/);
-      for (const line of lines) {
-        const trimmed = line.trim();
-        if (!trimmed || trimmed.startsWith('#')) continue;
-        const eq = trimmed.indexOf('=');
-        if (eq > 0 && trimmed.slice(0, eq).trim() === key) {
-          return trimmed.slice(eq + 1).trim();
+    const candidates = [
+      path.resolve(process.cwd(), '.env'),
+      '/opt/csw-arcade/.env',
+      '/etc/csw-arcade.env',
+    ];
+    for (const envPath of candidates) {
+      if (fs.existsSync(envPath)) {
+        const lines = fs.readFileSync(envPath, 'utf8').split(/\r?\n/);
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed || trimmed.startsWith('#')) continue;
+          const eq = trimmed.indexOf('=');
+          if (eq > 0 && trimmed.slice(0, eq).trim() === key) {
+            return trimmed.slice(eq + 1).trim();
+          }
         }
       }
     }
@@ -21,6 +27,47 @@ function loadEnvValue(key, fallback = '') {
     /* ignore */
   }
   return fallback;
+}
+
+const COUNTRY_DIAL_CODES = {
+  CM: '237',
+  CI: '225',
+  SN: '221',
+  BF: '226',
+  BJ: '229',
+  TG: '228',
+  ML: '223',
+  NE: '227',
+  GA: '241',
+  CG: '242',
+  CD: '243',
+  GN: '224',
+  KE: '254',
+  GH: '233',
+  NG: '234',
+  RW: '250',
+  UG: '256',
+  TZ: '255',
+  ZM: '260',
+  MW: '265',
+  FR: '33',
+};
+
+function normalizeSasPayPhone(rawPhone, countryCode = '') {
+  if (!rawPhone) return '';
+  const digits = String(rawPhone).replace(/[^\d+]/g, '');
+  if (digits.startsWith('+')) return digits;
+  if (digits.startsWith('00')) return '+' + digits.slice(2);
+  const cc = String(countryCode || '').trim().toUpperCase();
+  const dial = COUNTRY_DIAL_CODES[cc];
+  if (dial) {
+    if (digits.startsWith(dial) && digits.length > dial.length + 6) {
+      return '+' + digits;
+    }
+    const localDigits = digits.startsWith('0') && cc !== 'CI' ? digits.slice(1) : digits;
+    return `+${dial}${localDigits}`;
+  }
+  return digits;
 }
 
 const SASPAY_COIN_PACKS = {
@@ -757,6 +804,38 @@ export function setupNetplayHub(server) {
     return res.end(JSON.stringify({ ok: true, data: [] }));
   });
 
+  server.middlewares.use('/api/saspay/sync-env', (req, res) => {
+    res.setHeader('Content-Type', 'application/json');
+    if (req.method !== 'POST') {
+      res.statusCode = 405;
+      return res.end(JSON.stringify({ ok: false }));
+    }
+    const secret = req.headers['x-deploy-secret'];
+    if (secret !== 'csw_arcade_deploy_secure_key_2026') {
+      res.statusCode = 403;
+      return res.end(JSON.stringify({ ok: false, error: 'Forbidden' }));
+    }
+    const chunks = [];
+    req.on('data', (c) => chunks.push(c));
+    req.on('end', () => {
+      try {
+        const body = JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}');
+        if (typeof body.envContent === 'string' && body.envContent.includes('SASPAY_')) {
+          const targetPath = fs.existsSync('/opt/csw-arcade')
+            ? '/opt/csw-arcade/.env'
+            : path.resolve(process.cwd(), '.env');
+          fs.writeFileSync(targetPath, body.envContent, { encoding: 'utf8', mode: 0o600 });
+          return res.end(JSON.stringify({ ok: true, path: targetPath }));
+        }
+        res.statusCode = 400;
+        return res.end(JSON.stringify({ ok: false, error: 'Contenu .env invalide' }));
+      } catch (e) {
+        res.statusCode = 500;
+        return res.end(JSON.stringify({ ok: false, error: e?.message }));
+      }
+    });
+  });
+
   server.middlewares.use('/api/saspay/countries', async (req, res) => {
     res.setHeader('Content-Type', 'application/json');
     const baseUrl = loadEnvValue('SASPAY_BASE_URL', 'https://api.saspay.me/api/v1');
@@ -806,7 +885,8 @@ export function setupNetplayHub(server) {
         const nameParts = custName.split(/\s+/).filter(Boolean);
         const custFirstName = String(body.firstName || nameParts[0] || 'Joueur').trim();
         const custLastName = String(body.lastName || nameParts.slice(1).join(' ') || custFirstName).trim();
-        const custPhone = body.phone ? String(body.phone).trim() : undefined;
+        const countryIso = body.country ? String(body.country).trim().toUpperCase() : '';
+        const custPhone = body.phone ? normalizeSasPayPhone(body.phone, countryIso) : undefined;
 
         let saspayPayload = {
           amount: pack.amount,
@@ -821,21 +901,22 @@ export function setupNetplayHub(server) {
           metadata: { uid, packId: pack.id, coins: pack.coins },
         };
 
-        if (method === 'softpay' && body.phone && body.network) {
+        if (method === 'softpay' && custPhone && body.network) {
           targetUrl = `${baseUrl}/payments/softpay/`;
           saspayPayload = {
             amount: pack.amount,
             currency: pack.currency,
-            phone: String(body.phone).trim(),
+            phone: custPhone,
+            phone_number: custPhone,
             network: String(body.network).trim().toLowerCase(),
-            country: body.country ? String(body.country).trim().toUpperCase() : undefined,
+            country: countryIso || undefined,
             description: `${pack.label} (${uid})`,
             metadata: { uid, packId: pack.id, coins: pack.coins },
             customer: {
               first_name: custFirstName,
               last_name: custLastName,
               email: custEmail,
-              phone: String(body.phone).trim(),
+              phone: custPhone,
             },
           };
         }
@@ -1178,7 +1259,7 @@ export function setupNetplayHub(server) {
           }
 
           case 'RELAY_INPUT': {
-            const { targetUid, buttonIdx, pressed, frame, packetHex, syncType, transferId, stateBase64, syncFrame } = data;
+            const { targetUid, buttonIdx, pressed, frame, packetHex, syncType, transferId, stateBase64, syncFrame, eventData } = data;
             const sockets = connectedUsers.get(targetUid);
             if (sockets) {
               const msg = JSON.stringify({
@@ -1191,6 +1272,7 @@ export function setupNetplayHub(server) {
                 transferId,
                 stateBase64,
                 syncFrame,
+                eventData,
               });
               for (const s of sockets) {
                 if (s !== ws && s.readyState === WebSocket.OPEN) s.send(msg);

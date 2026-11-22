@@ -83,9 +83,11 @@ export class RollbackP2PEngine {
     this.lastConfirmedRemoteFrame = -1;
     this.incomingStateTransfers = new Map(); // transferId -> { total, syncFrame, chunks: Map }
     this.lastDeliveredTransferId = null;
+    this.deliveredEventIds = new Set();
 
     this.onGgpoPacket = null;
     this.onFrame0Ack = null;
+    this.onNetplayEvent = null;
 
     this.stats = {
       pingMs: 0,
@@ -379,11 +381,39 @@ export class RollbackP2PEngine {
           this.onGuestReady?.();
         } else if (msg.type === 'FRAME0_ACK') {
           this.onFrame0Ack?.(Number(msg.syncFrame || 0));
+        } else if (msg.type === 'NETPLAY_EVENT' && msg.eventData) {
+          this._deliverNetplayEvent(msg.eventData);
         }
       } catch {
         /* noop */
       }
     };
+  }
+
+  _deliverNetplayEvent(eventData) {
+    if (!eventData || !eventData.event) return;
+    if (eventData.eventId) {
+      if (this.deliveredEventIds.has(eventData.eventId)) return;
+      this.deliveredEventIds.add(eventData.eventId);
+    }
+    this.onNetplayEvent?.(eventData);
+  }
+
+  sendNetplayEvent(eventData = {}) {
+    if (!eventData || !eventData.event) return;
+    const payload = {
+      ...eventData,
+      eventId: eventData.eventId || `ev_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+      ts: Date.now(),
+    };
+    if (this.reliableChannel?.readyState === 'open') {
+      try {
+        this.reliableChannel.send(JSON.stringify({ type: 'NETPLAY_EVENT', eventData: payload }));
+      } catch {
+        /* noop */
+      }
+    }
+    this.onRelayButtonFallback?.({ syncType: 'NETPLAY_EVENT', eventData: payload });
   }
 
   notifyGuestEmuReady() {
@@ -469,6 +499,10 @@ export class RollbackP2PEngine {
 
   handleRelayData(data) {
     if (!data) return;
+    if (data.syncType === 'NETPLAY_EVENT' && data.eventData) {
+      this._deliverNetplayEvent(data.eventData);
+      return;
+    }
     if (data.syncType === 'GUEST_READY') {
       this.onGuestReady?.();
       return;

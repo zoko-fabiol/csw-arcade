@@ -113,6 +113,33 @@
   <div id="boot-msg"><strong>Initialisation du moteur…</strong><span>En attente des paramètres de lancement.</span></div>
   <div id="game"></div>
   <script>
+    // Intercepteur Emscripten Core JS : expose Module["MainLoop"] = MainLoop dans fbneo_libretro.js et tous les cœurs EmulatorJS
+    (function () {
+      const _OrigBlob = window.Blob;
+      window.Blob = function (parts, options) {
+        if (options && options.type === 'application/javascript' && parts && parts.length === 1) {
+          try {
+            const raw = parts[0];
+            let text =
+              typeof raw === 'string'
+                ? raw
+                : raw instanceof ArrayBuffer || ArrayBuffer.isView(raw)
+                  ? new TextDecoder('utf-8').decode(raw)
+                  : null;
+            if (text && text.includes('MainLoop.resume')) {
+              text = text.replace(
+                'Module["resumeMainLoop"]=MainLoop.resume;',
+                'Module["resumeMainLoop"]=MainLoop.resume;Module["MainLoop"]=MainLoop;'
+              );
+              return new _OrigBlob([text], options);
+            }
+          } catch {}
+        }
+        return new _OrigBlob(parts, options);
+      };
+      window.Blob.prototype = _OrigBlob.prototype;
+    })();
+
     const CDN_DATA = 'https://cdn.emulatorjs.org/stable/data/';
     let started = false;
     let isNetplaySession = false;
@@ -710,6 +737,9 @@
         this.isRunning = false;
         this.hookAttached = false;
         this.hostSetupCompleted = false;
+        this.guestIsReady = false;
+        this.initialFrame0Sent = false;
+        this.autoHealEnabled = true;
         this.waitingForFrame0 = false;
         this.waitingForFrame0Ack = false;
         this.waitingForFrame0AckSinceMs = 0;
@@ -878,6 +908,15 @@
         return false;
       }
 
+      setInputDelay(delayFrames) {
+        const clean = Math.max(0, Math.min(4, Math.floor(Number(delayFrames) || 0)));
+        this.INPUT_DELAY = clean;
+      }
+
+      setAutoHeal(enabled) {
+        this.autoHealEnabled = Boolean(enabled);
+      }
+
       restoreSnapshot(frame) {
         if (isHeavy3dCore(currentCoreName)) return false;
         this.gm = this.gm || window.EJS_emulator?.gameManager;
@@ -892,8 +931,11 @@
         const slice = buf.length === len ? buf : buf.subarray(0, len);
         try {
           if (this.gm.FS && this.gm.functions?.loadState) {
-            this.gm.FS.writeFile('/game.state', slice);
-            this.gm.functions.loadState('game.state', 0);
+            try {
+              this.gm.FS.unlink('csw_rb.state');
+            } catch {}
+            this.gm.FS.writeFile('/csw_rb.state', slice);
+            this.gm.functions.loadState('csw_rb.state', 0);
             this.forceApplyAllInputs = true;
             return true;
           }
@@ -1032,7 +1074,7 @@
       }
 
       verifyPendingChecksums() {
-        if (netplayPlayerIndex === 0 || this.pendingHostChecksums.size === 0) return;
+        if (!this.autoHealEnabled || netplayPlayerIndex === 0 || this.pendingHostChecksums.size === 0) return;
         for (const [f, hostHash] of this.pendingHostChecksums.entries()) {
           if (f < this.currentFrame - 90) {
             this.pendingHostChecksums.delete(f);
@@ -1059,15 +1101,34 @@
         }
       }
 
-      exportAndLockSyncState(slot = 'frame0') {
+      onGuestReadySignal(slot = 'frame0') {
+        this.guestIsReady = true;
+        if (this.hostSetupCompleted) {
+          this.exportAndLockSyncState(slot);
+        }
+      }
+
+      onHostSetupFinished() {
+        this.hostSetupCompleted = true;
+        if (this.guestIsReady || !this.initialFrame0Sent) {
+          this.exportAndLockSyncState('frame0');
+        }
+      }
+
+      exportAndLockSyncState(slot = 'frame0', force = false) {
         if (!isNetplaySession || netplayPlayerIndex !== 0) return false;
         const now = performance.now();
-        if (slot === 'resync' && now - this.lastHostResyncMs < 1500) return false;
+        if (!force && now - this.lastHostResyncMs < 2200) return false;
         this.lastHostResyncMs = now;
+        this.initialFrame0Sent = true;
 
         try {
           this.gm = this.gm || window.EJS_emulator?.gameManager;
           if (!this.gm?.getState) return false;
+          try {
+            this.gm.setKeyboardEnabled?.(false);
+            this.gm.functions?.setKeyboardEnabled?.(0);
+          } catch {}
 
           this.forceApplyAllInputs = true;
           this.applyInputs(0, 0);
@@ -1101,6 +1162,11 @@
           clearInterval(this.guestReadyTimer);
           this.guestReadyTimer = null;
         }
+        try {
+          this.gm = this.gm || window.EJS_emulator?.gameManager;
+          this.gm?.setKeyboardEnabled?.(false);
+          this.gm?.functions?.setKeyboardEnabled?.(0);
+        } catch {}
         this.waitingForFrame0 = false;
         this.resetAtFrame(syncFrame);
         this.send0x5BAckPacket(syncFrame);
@@ -1441,6 +1507,11 @@
         this.lastFpsTimer = performance.now();
         this.lastTickMs = performance.now();
 
+        try {
+          this.gm?.setKeyboardEnabled?.(false);
+          this.gm?.functions?.setKeyboardEnabled?.(0);
+        } catch {}
+
         if (netplayPlayerIndex === 1) {
           this.waitingForFrame0 = true;
           notifyParent('NETPLAY_GUEST_READY');
@@ -1452,19 +1523,46 @@
               clearInterval(this.guestReadyTimer);
               this.guestReadyTimer = null;
             }
-          }, 750);
-          // Sécurité : débloquer au bout de 6s si l'Hôte n'a pas envoyé d'état
+          }, 800);
+          // Sécurité : débloquer au bout de 7s si l'Hôte n'a pas envoyé d'état
           setTimeout(() => {
             if (this.waitingForFrame0) {
               this.waitingForFrame0 = false;
               this.resetAtFrame(0);
             }
-          }, 6000);
+          }, 7000);
         }
 
         const attachHook = () => {
           this.gm = this.gm || window.EJS_emulator?.gameManager;
           this.module = this.module || getWasmModule();
+          try {
+            this.gm?.setKeyboardEnabled?.(false);
+            this.gm?.functions?.setKeyboardEnabled?.(0);
+          } catch {}
+
+          // 1. Cœur moderne Emscripten 3.1+ (fbneo_libretro.js) où MainLoop est exposé par l'intercepteur Blob
+          const mainLoopObj = this.module?.MainLoop;
+          if (mainLoopObj && typeof mainLoopObj.runIter === 'function' && !this.hookAttached) {
+            const origRunIter = mainLoopObj.runIter.bind(mainLoopObj);
+            this.originalMainLoopFunc = () => {
+              if (mainLoopObj.func) origRunIter(mainLoopObj.func);
+            };
+            const self = this;
+            mainLoopObj.runIter = function (func) {
+              if (!mainLoopObj.func && func) mainLoopObj.func = func;
+              if (self.isRunning && isNetplaySession) {
+                self.onMainLoopTick();
+              } else {
+                origRunIter(func);
+              }
+            };
+            this.hookAttached = true;
+            console.log('[CSW GGPO] ✓ Hook 60.00 FPS + 128-Frame Rollback attaché sur Module.MainLoop.runIter !');
+            return true;
+          }
+
+          // 2. Cœur Emscripten legacy avec Module.Browser.mainLoop
           const ml = this.module?.Browser?.mainLoop;
           if (ml && typeof ml.func === 'function' && !this.hookAttached) {
             this.originalMainLoopFunc = ml.func;
@@ -2080,9 +2178,37 @@
       if (msg.type === 'EXPORT_NETPLAY_SYNC') {
         if (isNetplaySession && netplayPlayerIndex === 0) {
           const ggpo = window.__cswGgpoEngine;
-          if (ggpo && ggpo.hostSetupCompleted) {
-            ggpo.exportAndLockSyncState(msg.slot || 'frame0');
+          if (ggpo) {
+            if (msg.force) {
+              ggpo.exportAndLockSyncState(msg.slot || 'resync', true);
+            } else {
+              ggpo.onGuestReadySignal(msg.slot || 'frame0');
+            }
           }
+        }
+        return;
+      }
+
+      if (msg.type === 'SET_GGPO_OPTIONS') {
+        const ggpo = window.__cswGgpoEngine;
+        if (ggpo) {
+          if (typeof msg.inputDelay === 'number') ggpo.setInputDelay(msg.inputDelay);
+          if (typeof msg.autoHeal === 'boolean') ggpo.setAutoHeal(msg.autoHeal);
+        }
+        return;
+      }
+
+      if (msg.type === 'NETPLAY_REMATCH_RESET') {
+        if (isNetplaySession && netplayPlayerIndex === 0) {
+          const ggpo = window.__cswGgpoEngine;
+          if (ggpo) {
+            ggpo.hostSetupCompleted = false;
+            ggpo.initialFrame0Sent = false;
+          }
+          try {
+            window.EJS_emulator?.gameManager?.restart?.();
+          } catch {}
+          runHostVersusFrame0Sequence();
         }
         return;
       }
@@ -2339,6 +2465,31 @@
           const effectiveVol = typeof msg.volume === 'number' ? msg.volume : (hw.audio?.volume ?? 80);
           window.EJS_volume = effectiveMuted ? 0 : effectiveVol / 100;
           applyHardwareSettings(hw);
+          function runHostVersusFrame0Sequence() {
+            if (!isNetplaySession || netplayPlayerIndex !== 0) return;
+            setTimeout(() => {
+              try {
+                pulseEmuButton(0, 2, 70); // Coin 1 P1
+                setTimeout(() => pulseEmuButton(1, 2, 70), 120); // Coin 1 P2
+                setTimeout(() => pulseEmuButton(0, 2, 70), 240); // Coin 2 P1
+                setTimeout(() => pulseEmuButton(1, 2, 70), 360); // Coin 2 P2
+                setTimeout(() => pulseEmuButton(0, 2, 70), 480); // Coin 3 P1
+                setTimeout(() => pulseEmuButton(1, 2, 70), 600); // Coin 3 P2
+
+                setTimeout(() => {
+                  pulseEmuButton(0, 3, 95); // Start 1
+                  setTimeout(() => {
+                    pulseEmuButton(1, 3, 95); // Start 2 (Challenger !)
+                    console.log('[CSW Fightcade GGPO] Auto-Start 2 Joueurs Versus activé (P1 + P2).');
+                    setTimeout(() => {
+                      window.__cswGgpoEngine?.onHostSetupFinished();
+                    }, 320);
+                  }, 300);
+                }, 820);
+              } catch {}
+            }, 850);
+          }
+
           window.EJS_onGameStart = () => {
             bootEl.hidden = true;
             emuGameStarted = true;
@@ -2359,31 +2510,7 @@
             }
 
             if (isNetplaySession && netplayPlayerIndex === 0) {
-              // Séquence Fightcade GGPO déterministe (exécutée uniquement par l'Hôte P1) :
-              // 1. Insérer 3 Coins pour P1 et 3 Coins pour P2
-              // 2. Déclencher START 1 et START 2 pour lancer immédiatement le mode VERSUS / CO-OP 2 Joueurs
-              // 3. Verrouiller la Frame 0 (exportAndLockSyncState) et attendre l'ACK de P2 avant de démarrer la simulation à 60.00 FPS !
-              setTimeout(() => {
-                try {
-                  pulseEmuButton(0, 2, 70); // Coin 1 P1
-                  setTimeout(() => pulseEmuButton(1, 2, 70), 120); // Coin 1 P2
-                  setTimeout(() => pulseEmuButton(0, 2, 70), 240); // Coin 2 P1
-                  setTimeout(() => pulseEmuButton(1, 2, 70), 360); // Coin 2 P2
-                  setTimeout(() => pulseEmuButton(0, 2, 70), 480); // Coin 3 P1
-                  setTimeout(() => pulseEmuButton(1, 2, 70), 600); // Coin 3 P2
-
-                  setTimeout(() => {
-                    pulseEmuButton(0, 3, 95); // Start 1
-                    setTimeout(() => {
-                      pulseEmuButton(1, 3, 95); // Start 2 (Challenger !)
-                      console.log('[CSW Fightcade GGPO] Auto-Start 2 Joueurs Versus activé (P1 + P2).');
-                      setTimeout(() => {
-                        window.__cswGgpoEngine?.exportAndLockSyncState('frame0');
-                      }, 320);
-                    }, 300);
-                  }, 820);
-                } catch {}
-              }, 850);
+              runHostVersusFrame0Sequence();
             }
           };
 

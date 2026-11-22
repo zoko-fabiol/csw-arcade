@@ -12,6 +12,7 @@
     "build:web": "vite build && node scripts/postbuild-vps.cjs",
     "build:hostinger": "node scripts/build-hostinger.cjs",
     "build:electron": "vite build && electron-builder --win",
+    "sync:env": "node scripts/sync-env-vps.cjs",
     "preview": "vite preview"
   },
   "build": {

@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
-  X, Maximize2, Minimize2, RotateCcw, Settings, Coins, Play, Pause, Sliders, Save, UploadCloud, Trophy, Award, Gamepad2, Trash2
+  X, Maximize2, Minimize2, RotateCcw, Settings, Coins, Play, Pause, Sliders, Save, UploadCloud, Trophy, Award, Gamepad2, Trash2, Swords, MessageSquare, ShieldAlert, Radio, Send
 } from 'lucide-react';
 import { addCoins, consumeCoin, hasCoins, setWalletCoins, subscribeWallet } from '../../services/walletService';
 import { getCurrentUserProfile, subscribeAuthProfile } from '../../services/authService';
@@ -62,8 +62,28 @@ export function UnifiedStageModal({
   const sessionActivityLoggedRef = useRef(false);
   const [savedState, setSavedState] = useState(null);
   const [savedSlots, setSavedSlots] = useState([]);
-  const [inputDelay, setInputDelay] = useState(p2pStats?.inputDelay ?? 1);
+  const [inputDelay, setInputDelay] = useState(p2pStats?.inputDelay ?? 2);
+  const [autoHealSync, setAutoHealSync] = useState(true);
   const [touchPadVisible, setTouchPadVisible] = useState(() => detectDefaultTouchPad());
+  const [netplayPanelOpen, setNetplayPanelOpen] = useState(false);
+  const [opponentLeftModal, setOpponentLeftModal] = useState(null); // { name, reason }
+  const [rematchInviteFrom, setRematchInviteFrom] = useState(null); // string senderName
+  const [rematchPending, setRematchPending] = useState(false);
+  const [remotePausedBy, setRemotePausedBy] = useState(null); // string senderName
+  const [netplayChatBubble, setNetplayChatBubble] = useState(null); // { sender, text }
+  const [quickChatInput, setQuickChatInput] = useState('');
+  const chatBubbleTimerRef = useRef(null);
+
+  const getMyDisplayName = () =>
+    userProfileRef.current?.displayName ||
+    userProfileRef.current?.name ||
+    (session?.isHost ? 'Joueur 1 (Hôte)' : 'Joueur 2 (Invité)');
+
+  const showNetplayBubble = (sender, text) => {
+    setNetplayChatBubble({ sender, text });
+    if (chatBubbleTimerRef.current) clearTimeout(chatBubbleTimerRef.current);
+    chatBubbleTimerRef.current = setTimeout(() => setNetplayChatBubble(null), 5000);
+  };
 
   const showRamToast = (tone, text) => {
     setRamToast({ tone, text });
@@ -71,21 +91,35 @@ export function UnifiedStageModal({
     toastTimerRef.current = setTimeout(() => setRamToast(null), 4800);
   };
 
-  const openPauseMenu = () => {
+  const openPauseMenu = (fromRemote = false) => {
     setQuickMenuOpen(false);
     setScorePanelOpen(false);
+    setNetplayPanelOpen(false);
     setPauseMenuOpen(true);
     try {
       iframeRef.current?.contentWindow?.postMessage({ type: 'PAUSE_EMU' }, window.location.origin);
     } catch {}
+    if (!fromRemote && session?.isNetplay && !opponentLeftModal) {
+      p2pEngine?.sendNetplayEvent?.({
+        event: 'SYNC_PAUSE',
+        senderName: getMyDisplayName(),
+      });
+    }
   };
 
-  const closePauseMenuAndResume = () => {
+  const closePauseMenuAndResume = (fromRemote = false) => {
     setPauseMenuOpen(false);
+    setRemotePausedBy(null);
     try {
       iframeRef.current?.focus();
       iframeRef.current?.contentWindow?.postMessage({ type: 'RESUME_EMU' }, window.location.origin);
     } catch {}
+    if (!fromRemote && session?.isNetplay && !opponentLeftModal) {
+      p2pEngine?.sendNetplayEvent?.({
+        event: 'SYNC_RESUME',
+        senderName: getMyDisplayName(),
+      });
+    }
   };
 
   useEffect(() => subscribeWallet(setCoins), []);
@@ -444,7 +478,7 @@ export function UnifiedStageModal({
     return () => clearInterval(id);
   }, [session, bootKey]);
 
-  // Pont P2P entrant : répercuter les paquets GGPO, inputs distants et le savestate Frame 0 dans l'iframe de l'émulateur
+  // Pont P2P entrant : répercuter les paquets GGPO, inputs distants, événements multijoueur et le savestate Frame 0 dans l'iframe de l'émulateur
   useEffect(() => {
     if (!p2pEngine) return;
     p2pEngine.onGgpoPacket = (buffer) => {
@@ -485,7 +519,84 @@ export function UnifiedStageModal({
         } catch {}
       }
     };
-  }, [p2pEngine, session?.isNetplay, session?.isHost]);
+    p2pEngine.onNetplayEvent = (ev) => {
+      if (!ev || !ev.event) return;
+      const peerName = ev.senderName || session?.opponentName || 'Votre adversaire';
+      if (ev.event === 'MATCH_LEAVE') {
+        try {
+          iframeRef.current?.contentWindow?.postMessage({ type: 'PAUSE_EMU' }, window.location.origin);
+        } catch {}
+        setPauseMenuOpen(false);
+        setQuickMenuOpen(false);
+        setNetplayPanelOpen(false);
+        setOpponentLeftModal({
+          name: peerName,
+          reason: ev.reason || 'quit',
+        });
+      } else if (ev.event === 'SYNC_PAUSE') {
+        setRemotePausedBy(peerName);
+        try {
+          iframeRef.current?.contentWindow?.postMessage({ type: 'PAUSE_EMU' }, window.location.origin);
+        } catch {}
+        showRamToast('record', `⏸️ ${peerName} a mis le match en pause.`);
+      } else if (ev.event === 'SYNC_RESUME') {
+        setRemotePausedBy(null);
+        setPauseMenuOpen(false);
+        try {
+          iframeRef.current?.focus();
+          iframeRef.current?.contentWindow?.postMessage({ type: 'RESUME_EMU' }, window.location.origin);
+        } catch {}
+        showRamToast('record', `▶️ ${peerName} a repris le match !`);
+      } else if (ev.event === 'REMATCH_REQUEST') {
+        setRematchInviteFrom(peerName);
+        showRamToast('record', `⚔️ ${peerName} demande une REVANCHE !`);
+      } else if (ev.event === 'REMATCH_ACCEPT') {
+        setRematchPending(false);
+        setRematchInviteFrom(null);
+        setRemotePausedBy(null);
+        setPauseMenuOpen(false);
+        showRamToast('record', `🔥 Revanche acceptée ! Redémarrage synchronisé…`);
+        if (session?.isHost) {
+          iframeRef.current?.contentWindow?.postMessage(
+            { type: 'NETPLAY_REMATCH_RESET' },
+            window.location.origin
+          );
+        }
+      } else if (ev.event === 'QUICK_CHAT' && ev.text) {
+        showNetplayBubble(peerName, ev.text);
+      } else if (ev.event === 'SET_INPUT_DELAY' && typeof ev.inputDelay === 'number') {
+        setInputDelay(ev.inputDelay);
+        p2pEngine?.setInputDelay?.(ev.inputDelay);
+        iframeRef.current?.contentWindow?.postMessage(
+          { type: 'SET_GGPO_OPTIONS', inputDelay: ev.inputDelay },
+          window.location.origin
+        );
+        showRamToast('record', `⚡ Délai GGPO ajusté à ${ev.inputDelay} frame(s) par ${peerName}`);
+      } else if (ev.event === 'SHARED_COIN') {
+        iframeRef.current?.contentWindow?.postMessage(
+          { type: 'PRESS_BUTTON', button: 'coin' },
+          window.location.origin
+        );
+        showRamToast('record', `🪙 +1 Crédit partagé inséré par ${peerName} !`);
+      }
+    };
+  }, [p2pEngine, session?.isNetplay, session?.isHost, session?.opponentName]);
+
+  // Si l'utilisateur ferme l'onglet ou recharge la page en plein match Multijoueur, prévenir immédiatement l'adversaire pour arrêter sa partie
+  useEffect(() => {
+    if (!session?.isNetplay || !p2pEngine) return;
+    const onBeforeUnload = () => {
+      try {
+        p2pEngine.sendNetplayEvent({
+          event: 'MATCH_LEAVE',
+          senderName: getMyDisplayName(),
+          reason: 'disconnect',
+        });
+      } catch {}
+    };
+    window.addEventListener('beforeunload', onBeforeUnload);
+    return () => window.removeEventListener('beforeunload', onBeforeUnload);
+  }, [session?.isNetplay, p2pEngine]);
 
   useEffect(() => {
     if (!session || !iframeRef.current?.contentWindow) return;
@@ -550,8 +661,106 @@ export function UnifiedStageModal({
     setBootKey((k) => k + 1);
   };
 
+  const handleForceResync = () => {
+    if (!session?.isNetplay) return;
+    if (session.isHost) {
+      iframeRef.current?.contentWindow?.postMessage(
+        { type: 'EXPORT_NETPLAY_SYNC', slot: 'resync', force: true },
+        window.location.origin
+      );
+    } else {
+      p2pEngine?.notifyGuestEmuReady?.();
+    }
+    showRamToast('record', '🔄 Resynchronisation GGPO 100% envoyée !');
+  };
+
+  const handleRequestRematch = () => {
+    if (!session?.isNetplay || !p2pEngine) return;
+    setRematchPending(true);
+    p2pEngine.sendNetplayEvent({
+      event: 'REMATCH_REQUEST',
+      senderName: getMyDisplayName(),
+    });
+    showRamToast('record', '⚔️ Demande de revanche envoyée à votre adversaire…');
+  };
+
+  const handleAcceptRematch = () => {
+    if (!session?.isNetplay || !p2pEngine) return;
+    setRematchInviteFrom(null);
+    setRematchPending(false);
+    setRemotePausedBy(null);
+    setPauseMenuOpen(false);
+    p2pEngine.sendNetplayEvent({
+      event: 'REMATCH_ACCEPT',
+      senderName: getMyDisplayName(),
+    });
+    showRamToast('record', '🔥 Revanche lancée ! Synchronisation Frame 0…');
+    if (session.isHost) {
+      iframeRef.current?.contentWindow?.postMessage(
+        { type: 'NETPLAY_REMATCH_RESET' },
+        window.location.origin
+      );
+    }
+  };
+
+  const handleSendQuickChat = (text) => {
+    const clean = String(text || '').trim().slice(0, 80);
+    if (!clean || !session?.isNetplay || !p2pEngine) return;
+    const myName = getMyDisplayName();
+    p2pEngine.sendNetplayEvent({
+      event: 'QUICK_CHAT',
+      senderName: myName,
+      text: clean,
+    });
+    showNetplayBubble(myName, clean);
+    setQuickChatInput('');
+  };
+
+  const handleChangeNetplayDelay = (d) => {
+    const clean = Math.max(0, Math.min(4, Number(d) || 0));
+    setInputDelay(clean);
+    onInputDelayChange?.(clean);
+    p2pEngine?.setInputDelay?.(clean);
+    iframeRef.current?.contentWindow?.postMessage(
+      { type: 'SET_GGPO_OPTIONS', inputDelay: clean },
+      window.location.origin
+    );
+    if (session?.isNetplay && p2pEngine) {
+      p2pEngine.sendNetplayEvent({
+        event: 'SET_INPUT_DELAY',
+        senderName: getMyDisplayName(),
+        inputDelay: clean,
+      });
+    }
+  };
+
+  const handleToggleAutoHeal = (enabled) => {
+    setAutoHealSync(enabled);
+    iframeRef.current?.contentWindow?.postMessage(
+      { type: 'SET_GGPO_OPTIONS', autoHeal: enabled },
+      window.location.origin
+    );
+  };
+
+  const handleSharedCoin = () => {
+    if (!session?.isNetplay) return;
+    sendButton('coin');
+    p2pEngine?.sendNetplayEvent?.({
+      event: 'SHARED_COIN',
+      senderName: getMyDisplayName(),
+    });
+    showRamToast('record', '🪙 +1 Crédit partagé envoyé aux 2 joueurs !');
+  };
+
   const handleCloseStage = () => {
     try {
+      if (session?.isNetplay && p2pEngine && !opponentLeftModal) {
+        p2pEngine.sendNetplayEvent({
+          event: 'MATCH_LEAVE',
+          senderName: getMyDisplayName(),
+          reason: 'quit',
+        });
+      }
       iframeRef.current?.contentWindow?.postMessage(
         { type: 'FLUSH_RAM_SCORE', reason: 'session_end' },
         window.location.origin
@@ -566,7 +775,7 @@ export function UnifiedStageModal({
     setTimeout(() => onClose?.(), 180);
   };
 
-  const showFsBar = !isFullscreen || fsBarVisible || pauseMenuOpen || quickMenuOpen || scorePanelOpen;
+  const showFsBar = !isFullscreen || fsBarVisible || pauseMenuOpen || quickMenuOpen || scorePanelOpen || netplayPanelOpen;
 
   return (
     <div
@@ -669,25 +878,44 @@ export function UnifiedStageModal({
             </span>
           )}
           {session.isNetplay && session.kind !== 'j2me' && (
-            <button
-              type="button"
-              onClick={() => {
-                if (session.isHost) {
-                  iframeRef.current?.contentWindow?.postMessage(
-                    { type: 'EXPORT_NETPLAY_SYNC', slot: 'resync' },
-                    window.location.origin
-                  );
-                } else {
-                  p2pEngine?.notifyGuestEmuReady?.();
-                }
-                showRamToast('record', '🔄 Resynchronisation GGPO 100% envoyée !');
-              }}
-              title="Resynchroniser la RAM entre les 2 joueurs"
-              className="flex items-center gap-1 px-2 py-1 rounded-lg bg-cyan-950/80 hover:bg-cyan-900/80 border border-cyan-500/50 text-cyan-200 text-[10px] font-mono font-bold transition-colors shrink-0"
-            >
-              <RotateCcw className="w-3 h-3" />
-              <span>Resync</span>
-            </button>
+            <>
+              <button
+                type="button"
+                onClick={handleForceResync}
+                title="Resynchroniser la RAM entre les 2 joueurs"
+                className="flex items-center gap-1 px-2 py-1 rounded-lg bg-cyan-950/80 hover:bg-cyan-900/80 border border-cyan-500/50 text-cyan-200 text-[10px] font-mono font-bold transition-colors shrink-0"
+              >
+                <RotateCcw className="w-3 h-3" />
+                <span>Resync</span>
+              </button>
+              <button
+                type="button"
+                onClick={handleRequestRematch}
+                disabled={rematchPending}
+                title="Proposer une revanche immédiate à votre adversaire"
+                className="flex items-center gap-1 px-2 py-1 rounded-lg bg-rose-950/80 hover:bg-rose-900/80 disabled:opacity-50 border border-rose-500/50 text-rose-200 text-[10px] font-mono font-bold transition-colors shrink-0"
+              >
+                <Swords className="w-3 h-3" />
+                <span className="hidden sm:inline">{rematchPending ? 'Revanche…' : 'Revanche'}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setQuickMenuOpen(false);
+                  setScorePanelOpen(false);
+                  setNetplayPanelOpen((v) => !v);
+                }}
+                title="Ouvrir le panneau des Options Multijoueur Fightcade (GGPO, Chat Rapide, Revanche, Crédits)"
+                className={`flex items-center gap-1 px-2 py-1 rounded-lg border text-[10px] font-mono font-bold transition-colors shrink-0 ${
+                  netplayPanelOpen
+                    ? 'bg-cyan-500 text-black border-cyan-400'
+                    : 'bg-indigo-950/80 hover:bg-indigo-900/80 border-indigo-500/50 text-indigo-200'
+                }`}
+              >
+                <Radio className="w-3 h-3" />
+                <span>Options 2P</span>
+              </button>
+            </>
           )}
           <span className="hidden xl:inline text-xs font-mono text-neutral-400 truncate">{statusText}</span>
         </div>
@@ -875,6 +1103,311 @@ export function UnifiedStageModal({
           >
             {ramToast.text}
           </div>
+        )}
+
+        {/* Bulle de Chat Rapide / Provocation Arcade en direct (Multijoueur) */}
+        {netplayChatBubble && (
+          <div className="absolute top-14 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-2xl bg-neutral-900/95 border-2 border-cyan-400 text-white text-xs font-bold shadow-2xl flex items-center gap-2 pointer-events-none animate-bounce">
+            <MessageSquare className="w-4 h-4 text-cyan-400 shrink-0" />
+            <span className="text-cyan-300 font-black">{netplayChatBubble.sender} :</span>
+            <span>{netplayChatBubble.text}</span>
+          </div>
+        )}
+
+        {/* Bannière Proposition de Revanche Entrante */}
+        {rematchInviteFrom && !opponentLeftModal && (
+          <div className="absolute top-14 left-1/2 -translate-x-1/2 z-50 w-full max-w-md mx-auto px-4 py-3 rounded-2xl bg-neutral-900/95 backdrop-blur-xl border-2 border-rose-500 shadow-2xl flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2 min-w-0">
+              <Swords className="w-5 h-5 text-rose-400 animate-pulse shrink-0" />
+              <div className="text-xs">
+                <div className="font-black text-white truncate">{rematchInviteFrom} veut une REVANCHE !</div>
+                <div className="text-[11px] text-neutral-300">Relancer le match à zéro maintenant ?</div>
+              </div>
+            </div>
+            <div className="flex items-center gap-1.5 shrink-0">
+              <button
+                type="button"
+                onClick={handleAcceptRematch}
+                className="px-3 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-black transition-colors"
+              >
+                Accepter
+              </button>
+              <button
+                type="button"
+                onClick={() => setRematchInviteFrom(null)}
+                className="px-2.5 py-1.5 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-xs font-bold"
+              >
+                Non
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Overlay Pause Réseau Synchronisée déclenchée par l'adversaire */}
+        {remotePausedBy && !pauseMenuOpen && !opponentLeftModal && (
+          <div className="absolute inset-0 z-40 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
+            <div className="max-w-md w-full rounded-2xl bg-neutral-900 border-2 border-amber-500/60 p-6 text-center space-y-4 shadow-2xl">
+              <Pause className="w-10 h-10 text-amber-400 mx-auto animate-pulse" />
+              <div>
+                <h3 className="text-base font-black text-white uppercase">Match mis en pause par {remotePausedBy}</h3>
+                <p className="text-xs text-neutral-300 mt-1">
+                  La simulation GGPO est figée sur les deux écrans pour conserver une synchronisation à 100 %.
+                </p>
+              </div>
+              <div className="flex items-center justify-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => closePauseMenuAndResume(false)}
+                  className="px-4 py-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-black text-xs font-black flex items-center gap-1.5"
+                >
+                  <Play className="w-4 h-4" />
+                  <span>Reprendre pour les 2 joueurs</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCloseStage}
+                  className="px-4 py-2.5 rounded-xl bg-neutral-800 hover:bg-rose-950 text-neutral-200 text-xs font-bold"
+                >
+                  Quitter le match
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* MODALE ARRÊT AUTOMATIQUE DU MATCH QUAND UN JOUEUR QUITTE LA PARTIE */}
+        {opponentLeftModal && (
+          <div className="absolute inset-0 z-[70] bg-black/88 backdrop-blur-md flex items-center justify-center p-4">
+            <div className="max-w-md w-full rounded-2xl bg-neutral-900 border-2 border-rose-500/70 p-6 text-center space-y-4 shadow-2xl">
+              <div className="w-14 h-14 rounded-full bg-rose-500/20 border-2 border-rose-400 flex items-center justify-center mx-auto">
+                <Trophy className="w-7 h-7 text-amber-400" />
+              </div>
+              <div className="space-y-1.5">
+                <span className="inline-block px-2.5 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-400/50 text-emerald-300 text-[10px] font-mono font-black uppercase">
+                  🏆 Victoire par Forfait · Partie Arrêtée
+                </span>
+                <h3 className="text-lg font-black text-white">
+                  {opponentLeftModal.name} a quitté la partie
+                </h3>
+                <p className="text-xs text-neutral-300 leading-relaxed">
+                  Le match multijoueur a été arrêté automatiquement car votre adversaire a quitté la session.
+                </p>
+              </div>
+              <div className="flex flex-col sm:flex-row gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setOpponentLeftModal(null);
+                    onOpenSalon?.();
+                  }}
+                  className="flex-1 py-2.5 px-4 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-black text-xs font-black transition-colors"
+                >
+                  Retourner au Salon Fightcade
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setOpponentLeftModal(null);
+                    try {
+                      iframeRef.current?.focus();
+                      iframeRef.current?.contentWindow?.postMessage({ type: 'RESUME_EMU' }, window.location.origin);
+                    } catch {}
+                  }}
+                  className="py-2.5 px-4 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-neutral-200 text-xs font-bold transition-colors"
+                >
+                  Continuer en Solo
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* PANNEAU OPTIONS MULTIJOUEUR FIGHTCADE GGPO (Options 2P) */}
+        {netplayPanelOpen && session.isNetplay && (
+          <aside className="absolute inset-y-0 right-0 w-96 max-w-full bg-neutral-950/95 backdrop-blur-xl border-l border-cyan-500/40 p-4 flex flex-col gap-3.5 z-40 shadow-2xl overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-neutral-800 pb-3">
+              <div className="flex items-center gap-2">
+                <Radio className="w-5 h-5 text-cyan-400 animate-pulse" />
+                <div>
+                  <h3 className="text-sm font-black text-white">OPTIONS MULTIJOUEUR · GGPO</h3>
+                  <p className="text-[11px] font-mono text-cyan-300 truncate max-w-[230px]">
+                    VS {session.opponentName || 'Adversaire'} · {session.isHost ? 'P1 Hôte' : 'P2 Invité'}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setNetplayPanelOpen(false)}
+                className="p-1.5 rounded-lg bg-neutral-800 text-neutral-300 hover:text-white"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Télémétrie GGPO temps réel */}
+            <div className="p-3 rounded-xl bg-neutral-900 border border-cyan-500/30 space-y-2">
+              <div className="flex items-center justify-between text-[11px] font-mono">
+                <span className="text-neutral-400 font-bold uppercase">Moteur Rollback 60.00 FPS</span>
+                <span className="px-2 py-0.5 rounded bg-emerald-950 border border-emerald-500/50 text-emerald-300 font-black">
+                  SYNC {p2pStats?.syncStatus || '100%'}
+                </span>
+              </div>
+              <div className="grid grid-cols-3 gap-2 text-center">
+                <div className="p-2 rounded-lg bg-neutral-950 border border-neutral-800">
+                  <div className="text-[9px] font-mono text-neutral-400">PING RTT</div>
+                  <div className="text-xs font-mono font-black text-emerald-300">{p2pStats?.pingMs ?? 0} ms</div>
+                </div>
+                <div className="p-2 rounded-lg bg-neutral-950 border border-neutral-800">
+                  <div className="text-[9px] font-mono text-neutral-400">ROLLBACK</div>
+                  <div className="text-xs font-mono font-black text-cyan-300">
+                    {p2pStats?.rollbackFrames ?? 0}f ({p2pStats?.totalRollbacks ?? 0})
+                  </div>
+                </div>
+                <div className="p-2 rounded-lg bg-neutral-950 border border-neutral-800">
+                  <div className="text-[9px] font-mono text-neutral-400">FRAME #</div>
+                  <div className="text-xs font-mono font-black text-amber-300">{p2pStats?.currentFrame ?? 0}</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Actions Rapides de Match */}
+            <div className="space-y-2">
+              <div className="text-[11px] font-mono uppercase text-neutral-400 font-bold">Actions de Match</div>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={handleForceResync}
+                  className="p-2.5 rounded-xl bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-500/50 text-cyan-200 text-xs font-bold flex items-center justify-center gap-1.5 transition-colors"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  <span>Resync RAM 100%</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleRequestRematch}
+                  disabled={rematchPending}
+                  className="p-2.5 rounded-xl bg-rose-500/20 hover:bg-rose-500/30 disabled:opacity-50 border border-rose-500/50 text-rose-200 text-xs font-bold flex items-center justify-center gap-1.5 transition-colors"
+                >
+                  <Swords className="w-3.5 h-3.5" />
+                  <span>{rematchPending ? 'Envoyé…' : 'Revanche 2P'}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSharedCoin}
+                  className="p-2.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/50 text-amber-200 text-xs font-bold flex items-center justify-center gap-1.5 transition-colors"
+                >
+                  <Coins className="w-3.5 h-3.5" />
+                  <span>+1 Crédit Partagé</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => (pauseMenuOpen ? closePauseMenuAndResume(false) : openPauseMenu(false))}
+                  className="p-2.5 rounded-xl bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/50 text-purple-200 text-xs font-bold flex items-center justify-center gap-1.5 transition-colors"
+                >
+                  <Pause className="w-3.5 h-3.5" />
+                  <span>Pause Sync 2P</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Réglage du Délai d'Entrée GGPO (0f à 4f) synchronisé */}
+            <div className="p-3 rounded-xl bg-neutral-900 border border-neutral-800 space-y-2">
+              <div className="flex items-center justify-between text-xs">
+                <span className="font-bold text-white">Délai d&apos;entrée GGPO (Input Delay)</span>
+                <span className="font-mono font-black text-cyan-300">{inputDelay} frame(s)</span>
+              </div>
+              <div className="grid grid-cols-5 gap-1.5">
+                {[
+                  { f: 0, label: '0f LAN' },
+                  { f: 1, label: '1f Fast' },
+                  { f: 2, label: '2f Auto' },
+                  { f: 3, label: '3f WiFi' },
+                  { f: 4, label: '4f 4G' },
+                ].map((opt) => (
+                  <button
+                    key={opt.f}
+                    type="button"
+                    onClick={() => handleChangeNetplayDelay(opt.f)}
+                    className={`py-1.5 rounded-lg border text-[10px] font-mono font-bold transition-colors ${
+                      inputDelay === opt.f
+                        ? 'bg-cyan-500 text-black border-cyan-400 font-black'
+                        : 'bg-neutral-950 border-neutral-800 text-neutral-300 hover:border-neutral-600'
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+              <label className="flex items-center justify-between pt-2 border-t border-neutral-800 text-xs cursor-pointer">
+                <span className="text-neutral-300">Auto-Resync Checksum RAM (0xCB)</span>
+                <input
+                  type="checkbox"
+                  checked={autoHealSync}
+                  onChange={(e) => handleToggleAutoHeal(e.target.checked)}
+                  className="accent-cyan-400 w-4 h-4"
+                />
+              </label>
+            </div>
+
+            {/* Chat Rapide & Provocations Arcade en Direct */}
+            <div className="p-3 rounded-xl bg-neutral-900 border border-neutral-800 space-y-2.5 flex-1">
+              <div className="text-[11px] font-mono uppercase text-cyan-300 font-bold flex items-center gap-1.5">
+                <MessageSquare className="w-3.5 h-3.5" />
+                <span>Chat Rapide &amp; Emotes En Jeu</span>
+              </div>
+              <div className="grid grid-cols-2 gap-1.5">
+                {[
+                  '🔥 GG !',
+                  '👏 Bien joué !',
+                  '⚔️ Revanche ?',
+                  '⚡ Prêt !',
+                  '😎 Trop fort !',
+                  '😱 Quel match !',
+                  '🪙 +1 Crédit !',
+                  '📡 Petit lag',
+                ].map((emote) => (
+                  <button
+                    key={emote}
+                    type="button"
+                    onClick={() => handleSendQuickChat(emote)}
+                    className="px-2.5 py-1.5 rounded-lg bg-neutral-950 hover:bg-cyan-950/60 border border-neutral-800 hover:border-cyan-500/50 text-left text-xs text-neutral-200 font-semibold transition-colors"
+                  >
+                    {emote}
+                  </button>
+                ))}
+              </div>
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  handleSendQuickChat(quickChatInput);
+                }}
+                className="flex gap-1.5 pt-1"
+              >
+                <input
+                  type="text"
+                  value={quickChatInput}
+                  onChange={(e) => setQuickChatInput(e.target.value)}
+                  placeholder="Message rapide à l'écran…"
+                  maxLength={60}
+                  className="flex-1 px-2.5 py-1.5 rounded-lg bg-neutral-950 border border-neutral-800 text-xs text-white focus:outline-none focus:border-cyan-400"
+                />
+                <button
+                  type="submit"
+                  className="px-3 py-1.5 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-black text-xs font-black flex items-center gap-1"
+                >
+                  <Send className="w-3.5 h-3.5" />
+                </button>
+              </form>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleCloseStage}
+              className="w-full py-2.5 rounded-xl bg-rose-950/80 hover:bg-rose-900 border border-rose-500/50 text-rose-200 text-xs font-black transition-colors"
+            >
+              🏳️ Abandonner &amp; Quitter le Match
+            </button>
+          </aside>
         )}
 
         {/* Panneau Télémétrie RAM Automatique & Classement du Jeu (AUCUNE saisie manuelle autorisée) */}
