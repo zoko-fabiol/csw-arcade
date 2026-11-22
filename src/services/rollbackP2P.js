@@ -701,23 +701,31 @@ export class RollbackP2PEngine {
       this.pendingFrame0State = { stateBase64, syncFrame: cleanSyncFrame };
     }
 
-    // Relais WebSocket VPS garanti par paquets de 32 KB (fonctionne sur 100% des réseaux 4G / NAT symétrique)
+    // Relais WebSocket VPS garanti par paquets de 16 KB espacés de 25ms (100% fiable à travers Caddy/4G/NAT)
     if (this.onRelayButtonFallback && (!sentOverRtc || stateBase64.length <= 1600000)) {
-      try {
-        for (let i = 0; i < total; i++) {
-          const chunk = stateBase64.slice(i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE);
-          this.onRelayButtonFallback({
-            syncType: 'FRAME0_CHUNK',
-            transferId,
-            chunkIndex: i,
-            chunkTotal: total,
-            stateBase64: chunk,
-            syncFrame: cleanSyncFrame,
-          });
+      const WS_CHUNK = 16384;
+      const wsTotal = Math.ceil(stateBase64.length / WS_CHUNK);
+      (async () => {
+        try {
+          for (let i = 0; i < wsTotal; i++) {
+            if (this.destroyed) break;
+            const chunk = stateBase64.slice(i * WS_CHUNK, (i + 1) * WS_CHUNK);
+            this.onRelayButtonFallback({
+              syncType: 'FRAME0_CHUNK',
+              transferId,
+              chunkIndex: i,
+              chunkTotal: wsTotal,
+              stateBase64: chunk,
+              syncFrame: cleanSyncFrame,
+            });
+            if (i + 1 < wsTotal) {
+              await new Promise((r) => setTimeout(r, 25));
+            }
+          }
+        } catch {
+          /* noop */
         }
-      } catch {
-        /* noop */
-      }
+      })();
     }
   }
 

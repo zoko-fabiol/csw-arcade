@@ -150,7 +150,39 @@
     let prevNetplayGamepadMask = 0;
     let netplayGamepadRafId = null;
 
-    function applyLoadStateBase64(b64, syncFrame = 0, isNetplaySync = false) {
+    async function gzipBytesToTaggedBase64(bytes) {
+      if (typeof CompressionStream === 'function') {
+        try {
+          const cs = new CompressionStream('gzip');
+          const writer = cs.writable.getWriter();
+          writer.write(bytes);
+          writer.close();
+          const compressed = new Uint8Array(await new Response(cs.readable).arrayBuffer());
+          return 'GZ:' + bytesToBase64(compressed);
+        } catch {}
+      }
+      return bytesToBase64(bytes);
+    }
+
+    async function decodeStateBase64ToBytes(b64) {
+      if (typeof b64 === 'string' && b64.startsWith('GZ:') && typeof DecompressionStream === 'function') {
+        const rawB64 = b64.slice(3);
+        const bin = atob(rawB64);
+        const compressed = new Uint8Array(bin.length);
+        for (let i = 0; i < bin.length; i++) compressed[i] = bin.charCodeAt(i);
+        const ds = new DecompressionStream('gzip');
+        const writer = ds.writable.getWriter();
+        writer.write(compressed);
+        writer.close();
+        return new Uint8Array(await new Response(ds.readable).arrayBuffer());
+      }
+      const bin = atob(b64);
+      const bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      return bytes;
+    }
+
+    async function applyLoadStateBase64(b64, syncFrame = 0, isNetplaySync = false) {
       if (!b64) return false;
       const gm = window.EJS_emulator?.gameManager;
       if (!emuGameStarted || !gm?.loadState) {
@@ -158,9 +190,7 @@
         return false;
       }
       try {
-        const bin = atob(b64);
-        const bytes = new Uint8Array(bin.length);
-        for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+        const bytes = await decodeStateBase64ToBytes(b64);
         gm.loadState(bytes);
         pendingLoadState = null;
         if (isNetplaySession && isNetplaySync && window.__cswGgpoEngine) {
@@ -1145,12 +1175,16 @@
           this.waitingForFrame0Ack = true;
           this.waitingForFrame0AckSinceMs = performance.now();
 
-          notifyParent('STATE_EXPORTED', {
-            stateBase64: bytesToBase64(bytes),
-            slot,
-            syncFrame,
+          gzipBytesToTaggedBase64(bytes).then((encodedState) => {
+            notifyParent('STATE_EXPORTED', {
+              stateBase64: encodedState,
+              slot,
+              syncFrame,
+            });
+            console.log(
+              `[CSW GGPO] État ${slot} verrouillé à la Frame ${syncFrame} (${bytes.length} -> ${encodedState.length} chars). En attente ACK P2...`
+            );
           });
-          console.log(`[CSW GGPO] État ${slot} verrouillé à la Frame ${syncFrame} (${bytes.length} octets). En attente ACK P2...`);
           return true;
         } catch {
           return false;
