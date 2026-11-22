@@ -776,8 +776,11 @@
         this.isRunning = false;
         this.hookAttached = false;
         this.hostSetupCompleted = false;
+        this.hostSetupStarted = false;
+        this.hostWaitingForGuestEmu = false;
         this.guestIsReady = false;
         this.initialFrame0Sent = false;
+        this.lastSentMask = -1;
         this.autoHealEnabled = true;
         this.waitingForFrame0 = false;
         this.waitingForFrame0Ack = false;
@@ -1142,6 +1145,14 @@
 
       onGuestReadySignal(slot = 'frame0') {
         this.guestIsReady = true;
+        if (this.hostWaitingForGuestEmu) {
+          this.hostWaitingForGuestEmu = false;
+          if (!this.hostSetupStarted && typeof window.__cswStartHostVersusSeq === 'function') {
+            this.hostSetupStarted = true;
+            window.__cswStartHostVersusSeq();
+          }
+          return;
+        }
         if (this.hostSetupCompleted) {
           this.exportAndLockSyncState(slot);
         }
@@ -1213,6 +1224,7 @@
         this.waitingForFrame0 = false;
         this.resetAtFrame(syncFrame);
         this.send0x5BAckPacket(syncFrame);
+        notifyParent('NETPLAY_SYNC_COMPLETE', { syncFrame });
         console.log(`[CSW GGPO] État synchronisé chargé à la Frame ${syncFrame} ! ACK envoyé à l'Hôte.`);
       }
 
@@ -1221,6 +1233,7 @@
           this.waitingForFrame0Ack = false;
           this.accumulatorMs = 0;
           this.lastTickMs = performance.now();
+          notifyParent('NETPLAY_SYNC_COMPLETE', { syncFrame });
           console.log(`[CSW GGPO] ACK reçu de l'Invité (Frame ${syncFrame}) ! Départ simultané 60.00 FPS.`);
         }
       }
@@ -1340,7 +1353,9 @@
         }
 
         if (earliestMispredicted !== -1) {
-          this.executeRollback(earliestMispredicted);
+          // Mode déterministe sans ré-entrance WASM : on ne rappelle pas loadState() en boucle dans runIter
+          this.stats.totalRollbacks += 1;
+          this.stats.lastRollbackDistance = Math.min(this.MAX_ROLLBACK, this.currentFrame - earliestMispredicted);
         }
         this.verifyPendingChecksums();
       }
@@ -1423,8 +1438,11 @@
         this.localInputs[targetIdx] = this.localLiveMask;
         this.localFrameNums[targetIdx] = targetFrame;
 
-        // 3. Envoyer le paquet binaire 0x5A avec redondance (targetFrame, -1, -2, -3)
-        this.send0x5APacket(targetFrame);
+        // 3. Envoyer le paquet binaire 0x5A dès qu'une touche change ou toutes les 6 frames (keepalive)
+        if (this.localLiveMask !== this.lastSentMask || frame % 6 === 0) {
+          this.lastSentMask = this.localLiveMask;
+          this.send0x5APacket(targetFrame);
+        }
 
         // 4. Résoudre l'input local et distant pour la frame courante `frame`
         const localMask = this.localInputs[rIdx];
@@ -1439,10 +1457,7 @@
           this.stats.predictedFramesCount += 1;
         }
 
-        // 5. Sauvegarder le snapshot WASM pré-frame dans le Ring Buffer 128 frames
-        this.captureSnapshot(frame);
-
-        // 6. Appliquer les inputs déterministes P1 et P2 puis exécuter 1 cycle CPU/Audio/Vidéo
+        // 5. Appliquer les inputs déterministes P1 et P2 puis exécuter 1 cycle CPU/Audio/Vidéo
         const p1 = netplayPlayerIndex === 0 ? localMask : remoteMask;
         const p2 = netplayPlayerIndex === 0 ? remoteMask : localMask;
         this.applyInputs(0, p1);
@@ -1453,8 +1468,8 @@
           this.originalMainLoopFunc();
         }
 
-        // 7. Checksum RAM 68000 (0xCB) toutes les 60 frames
-        if (frame > 0 && frame % 60 === 0) {
+        // 6. Checksum RAM 68000 (0xCB) toutes les 120 frames (lecture directe sans savestate)
+        if (frame > 0 && frame % 120 === 0) {
           const csum = this.computeRamChecksum(frame);
           this.localChecksums[rIdx] = csum;
           this.localChecksumFrames[rIdx] = frame;
@@ -1481,6 +1496,12 @@
 
       onMainLoopTick() {
         const now = performance.now();
+
+        // Si l'Hôte attend que le moteur WASM de l'Invité ait fini de charger, patienter sans avancer la partie
+        if (netplayPlayerIndex === 0 && this.hostWaitingForGuestEmu) {
+          this.lastTickMs = now;
+          return;
+        }
 
         // Si l'Hôte est encore dans sa séquence initiale d'insertion Coin/Start Versus (avant Frame 0), laisser tourner nativement
         if (netplayPlayerIndex === 0 && !this.hostSetupCompleted) {
@@ -2533,8 +2554,10 @@
                   }, 300);
                 }, 820);
               } catch {}
-            }, 850);
+            }, 650);
           }
+
+          window.__cswStartHostVersusSeq = runHostVersusFrame0Sequence;
 
           window.EJS_onGameStart = () => {
             bootEl.hidden = true;
@@ -2547,6 +2570,7 @@
 
             if (isNetplaySession) {
               window.__cswGgpoEngine?.start();
+              notifyParent('NETPLAY_EMU_READY', { isHost: netplayPlayerIndex === 0 });
             }
 
             if (pendingLoadState) {
@@ -2556,7 +2580,26 @@
             }
 
             if (isNetplaySession && netplayPlayerIndex === 0) {
-              runHostVersusFrame0Sequence();
+              const ggpo = window.__cswGgpoEngine;
+              if (ggpo && ggpo.guestIsReady) {
+                ggpo.hostWaitingForGuestEmu = false;
+                if (!ggpo.hostSetupStarted) {
+                  ggpo.hostSetupStarted = true;
+                  runHostVersusFrame0Sequence();
+                }
+              } else if (ggpo) {
+                ggpo.hostWaitingForGuestEmu = true;
+                // Garde-fou : démarrer après 8s max si le signal GUEST_READY a été retardé
+                setTimeout(() => {
+                  if (ggpo.hostWaitingForGuestEmu) {
+                    ggpo.hostWaitingForGuestEmu = false;
+                    if (!ggpo.hostSetupStarted) {
+                      ggpo.hostSetupStarted = true;
+                      runHostVersusFrame0Sequence();
+                    }
+                  }
+                }, 8000);
+              }
             }
           };
 

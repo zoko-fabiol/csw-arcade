@@ -358,6 +358,8 @@ export class RollbackP2PEngine {
           this._handleIncomingChunk(msg.transferId, msg.index, msg.total, msg.chunk, msg.syncFrame);
         } else if (msg.type === 'GUEST_READY') {
           this.onGuestReady?.();
+        } else if (msg.type === 'EMU_READY') {
+          this.onPeerEmuReady?.(Boolean(msg.isHost));
         } else if (msg.type === 'FRAME0_ACK') {
           this.onFrame0Ack?.(Number(msg.syncFrame || 0));
         } else if (msg.type === 'NETPLAY_EVENT' && msg.eventData) {
@@ -395,8 +397,22 @@ export class RollbackP2PEngine {
     this.onRelayButtonFallback?.({ syncType: 'NETPLAY_EVENT', eventData: payload });
   }
 
+  notifyEmuReady(isHost) {
+    this.localEmuReady = true;
+    const payload = { type: 'EMU_READY', isHost: Boolean(isHost) };
+    if (this.reliableChannel?.readyState === 'open') {
+      try {
+        this.reliableChannel.send(JSON.stringify(payload));
+      } catch {
+        /* noop */
+      }
+    }
+    this.onRelayButtonFallback?.({ syncType: 'EMU_READY', isHost: Boolean(isHost) });
+  }
+
   notifyGuestEmuReady() {
     this.guestEmuReady = true;
+    this.notifyEmuReady(false);
     if (this.reliableChannel?.readyState === 'open') {
       try {
         this.reliableChannel.send(JSON.stringify({ type: 'GUEST_READY' }));
@@ -522,6 +538,10 @@ export class RollbackP2PEngine {
     }
     if (data.syncType === 'NETPLAY_EVENT' && data.eventData) {
       this._deliverNetplayEvent(data.eventData);
+      return;
+    }
+    if (data.syncType === 'EMU_READY') {
+      this.onPeerEmuReady?.(Boolean(data.isHost));
       return;
     }
     if (data.syncType === 'GUEST_READY') {

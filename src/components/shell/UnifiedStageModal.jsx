@@ -73,6 +73,20 @@ export function UnifiedStageModal({
   const [netplayChatBubble, setNetplayChatBubble] = useState(null); // { sender, text }
   const [quickChatInput, setQuickChatInput] = useState('');
   const chatBubbleTimerRef = useRef(null);
+  const [localEmuReady, setLocalEmuReady] = useState(false);
+  const [remoteEmuReady, setRemoteEmuReady] = useState(false);
+  const [netplaySyncReady, setNetplaySyncReady] = useState(() => !session?.isNetplay);
+
+  useEffect(() => {
+    if (!session) return;
+    setLocalEmuReady(false);
+    setRemoteEmuReady(false);
+    setNetplaySyncReady(!session.isNetplay);
+    if (session.isNetplay) {
+      const safetyTimer = setTimeout(() => setNetplaySyncReady(true), 12000);
+      return () => clearTimeout(safetyTimer);
+    }
+  }, [session?.gameId, session?.title, session?.isNetplay, bootKey]);
 
   const getMyDisplayName = () =>
     userProfileRef.current?.displayName ||
@@ -400,10 +414,16 @@ export function UnifiedStageModal({
         p2pEngine?.sendButtonEvent?.(event.data.buttonIdx, event.data.pressed);
       } else if (event.data.type === 'NETPLAY_GGPO_PACKET' && event.data.buffer) {
         p2pEngine?.sendGgpoPacket?.(event.data.buffer);
+      } else if (event.data.type === 'NETPLAY_EMU_READY') {
+        setLocalEmuReady(true);
+        p2pEngine?.notifyEmuReady?.(Boolean(session?.isHost));
       } else if (event.data.type === 'NETPLAY_GUEST_READY') {
+        setLocalEmuReady(true);
         p2pEngine?.notifyGuestEmuReady?.();
       } else if (event.data.type === 'NETPLAY_FRAME0_ACK') {
         p2pEngine?.sendFrame0Ack?.(Number(event.data.syncFrame || 0));
+      } else if (event.data.type === 'NETPLAY_SYNC_COMPLETE') {
+        setNetplaySyncReady(true);
       } else if (event.data.type === 'ROLLBACK_TELEMETRY' && event.data.stats) {
         p2pEngine?.updateRollbackTelemetry?.(event.data.stats);
       } else if (event.data.type === 'STATE_EXPORTED' && event.data.stateBase64) {
@@ -516,6 +536,7 @@ export function UnifiedStageModal({
       );
     };
     p2pEngine.onGuestReady = () => {
+      setRemoteEmuReady(true);
       if (session?.isNetplay && session?.isHost) {
         try {
           iframeRef.current?.contentWindow?.postMessage(
@@ -524,6 +545,9 @@ export function UnifiedStageModal({
           );
         } catch {}
       }
+    };
+    p2pEngine.onPeerEmuReady = () => {
+      setRemoteEmuReady(true);
     };
     p2pEngine.onNetplayEvent = (ev) => {
       if (!ev || !ev.event) return;
@@ -962,6 +986,50 @@ export function UnifiedStageModal({
           allow="autoplay; fullscreen; gamepad"
           className="w-full h-full border-0"
         />
+
+        {/* Sas d'attente mutuel Netplay : les 2 joueurs entrent au même instant dès que les 2 moteurs WASM + Frame 0 sont prêts */}
+        {session.isNetplay && !netplaySyncReady && !opponentLeftModal && (
+          <div className="absolute inset-0 z-[55] bg-neutral-950/92 backdrop-blur-md flex items-center justify-center p-4">
+            <div className="max-w-md w-full rounded-2xl bg-neutral-900 border-2 border-cyan-500/50 p-6 text-center space-y-4 shadow-2xl">
+              <div className="w-12 h-12 rounded-full bg-cyan-500/15 border-2 border-cyan-400 flex items-center justify-center mx-auto">
+                <Radio className="w-6 h-6 text-cyan-300 animate-pulse" />
+              </div>
+              <div className="space-y-1">
+                <h3 className="text-base font-black text-white uppercase tracking-wide">
+                  Synchronisation des 2 joueurs…
+                </h3>
+                <p className="text-xs text-neutral-300">
+                  Le premier joueur prêt patiente pour un départ simultané à la même milliseconde.
+                </p>
+              </div>
+              <div className="grid grid-cols-2 gap-2.5 text-xs">
+                <div className="p-3 rounded-xl bg-neutral-950 border border-neutral-800 space-y-1">
+                  <div className="text-[10px] font-mono text-cyan-300 font-bold">
+                    {session.isHost ? 'VOUS (P1 HÔTE)' : 'ADVERSAIRE (P1)'}
+                  </div>
+                  <div className={`font-black ${(session.isHost ? localEmuReady : remoteEmuReady) ? 'text-emerald-400' : 'text-amber-300 animate-pulse'}`}>
+                    {(session.isHost ? localEmuReady : remoteEmuReady) ? 'Moteur prêt ✅' : 'Chargement… ⏳'}
+                  </div>
+                </div>
+                <div className="p-3 rounded-xl bg-neutral-950 border border-neutral-800 space-y-1">
+                  <div className="text-[10px] font-mono text-rose-300 font-bold">
+                    {!session.isHost ? 'VOUS (P2 INVITÉ)' : 'ADVERSAIRE (P2)'}
+                  </div>
+                  <div className={`font-black ${(!session.isHost ? localEmuReady : remoteEmuReady) ? 'text-emerald-400' : 'text-amber-300 animate-pulse'}`}>
+                    {(!session.isHost ? localEmuReady : remoteEmuReady) ? 'Moteur prêt ✅' : 'Chargement… ⏳'}
+                  </div>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={handleCloseStage}
+                className="px-4 py-2 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-xs font-bold text-neutral-300 transition-colors"
+              >
+                Annuler &amp; Quitter
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Notification RAM temps réel (Défaite -1 Crédit ou Nouveau Record Auto RAM) */}
         {ramToast && (
