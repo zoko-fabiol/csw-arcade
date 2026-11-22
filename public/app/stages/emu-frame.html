@@ -2043,6 +2043,7 @@
     }
 
     function emitRamLossCreditSignal(reason) {
+      if (isNetplaySession || !cswRamTelemetry.profile) return;
       const now = Date.now();
       // Anti-rebond 5 secondes pour ne décompter qu'un seul crédit par partie perdue
       if (now - cswRamTelemetry.lastLossSignalMs < 5000) return;

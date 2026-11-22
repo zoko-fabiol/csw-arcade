@@ -383,7 +383,8 @@ export function UnifiedStageModal({
           })
           .catch(() => {});
       } else if (event.data.type === 'RAM_LOSS_CONSUME_CREDIT') {
-        // Signal RAM de défaite / Game Over / Restart sur TOUTES les consoles (Arcade, Sega, PS1, Nintendo, Java)
+        if (session?.isNetplay) return;
+        // Signal RAM de défaite / Game Over / Restart sur les profils vérifiés en Solo
         const res = consumeCoin(1);
         const remaining = res.coins;
         if (remaining <= 0) {
