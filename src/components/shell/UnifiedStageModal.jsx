@@ -483,7 +483,7 @@ export function UnifiedStageModal({
 
   // Sauvegarde automatique Cloud Handoff en arrière-plan (espacée sur les cœurs 3D lourds pour éviter tout freeze)
   useEffect(() => {
-    if (!session || session.kind === 'j2me') return;
+    if (!session || session.kind === 'j2me' || session.isNetplay) return;
     const isHeavy = ['n64', 'mupen64plus_next', 'psx', 'ps1', 'pcsx_rearmed', 'nds', 'melonds'].includes(
       String(session.core || '').toLowerCase()
     );

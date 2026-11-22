@@ -504,7 +504,8 @@ export class RollbackP2PEngine {
 
   _handleIncomingChunk(transferId, index, total, chunk, syncFrame = 0) {
     if (!transferId || typeof index !== 'number' || !total || !chunk) return;
-    if (this.lastDeliveredTransferId === transferId) return;
+    const baseId = String(transferId).replace(/_(rtc|ws)$/, '');
+    if (this.lastDeliveredTransferId === baseId) return;
     let entry = this.incomingStateTransfers.get(transferId);
     if (!entry) {
       entry = { total, syncFrame: Number(syncFrame || 0), chunks: new Map() };
@@ -514,10 +515,13 @@ export class RollbackP2PEngine {
     if (entry.chunks.size === entry.total) {
       const parts = [];
       for (let i = 0; i < entry.total; i++) {
-        parts.push(entry.chunks.get(i) || '');
+        if (!entry.chunks.has(i)) return;
+        parts.push(entry.chunks.get(i));
       }
       this.incomingStateTransfers.delete(transferId);
-      this.lastDeliveredTransferId = transferId;
+      this.incomingStateTransfers.delete(`${baseId}_rtc`);
+      this.incomingStateTransfers.delete(`${baseId}_ws`);
+      this.lastDeliveredTransferId = baseId;
       this._deliverFrame0State(parts.join(''), entry.syncFrame);
     }
   }
@@ -700,12 +704,13 @@ export class RollbackP2PEngine {
 
     if (this.reliableChannel?.readyState === 'open') {
       try {
+        const rtcTransferId = `${transferId}_rtc`;
         for (let i = 0; i < total; i++) {
           const chunk = stateBase64.slice(i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE);
           this.reliableChannel.send(
             JSON.stringify({
               type: 'FRAME0_CHUNK',
-              transferId,
+              transferId: rtcTransferId,
               index: i,
               total,
               chunk,
@@ -725,6 +730,7 @@ export class RollbackP2PEngine {
     if (this.onRelayButtonFallback && (!sentOverRtc || stateBase64.length <= 1600000)) {
       const WS_CHUNK = 16384;
       const wsTotal = Math.ceil(stateBase64.length / WS_CHUNK);
+      const wsTransferId = `${transferId}_ws`;
       (async () => {
         try {
           for (let i = 0; i < wsTotal; i++) {
@@ -732,7 +738,7 @@ export class RollbackP2PEngine {
             const chunk = stateBase64.slice(i * WS_CHUNK, (i + 1) * WS_CHUNK);
             this.onRelayButtonFallback({
               syncType: 'FRAME0_CHUNK',
-              transferId,
+              transferId: wsTransferId,
               chunkIndex: i,
               chunkTotal: wsTotal,
               stateBase64: chunk,

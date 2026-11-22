@@ -203,9 +203,12 @@
           window.__cswGgpoEngine.onRemoteSyncStateLoaded(Number(syncFrame || 0));
         }
         return true;
-      } catch {
+      } catch (err) {
+        console.warn('[CSW GGPO] Erreur applyLoadStateBase64:', err);
         if (isNetplaySession && isNetplaySync && window.__cswGgpoEngine) {
           window.__cswGgpoEngine.waitingForFrame0 = false;
+          try { window.EJS_emulator?.play?.(); } catch {}
+          notifyParent('NETPLAY_SYNC_COMPLETE', { syncFrame: 0 });
         }
         return false;
       }
@@ -1595,7 +1598,7 @@
               this.guestReadyTimer = null;
             }
           }, 600);
-          // Sécurité : débloquer au bout de 4s si l'Hôte n'a pas envoyé d'état
+          // Sécurité : débloquer au bout de 10s si l'Hôte n'a pas envoyé d'état
           setTimeout(() => {
             if (this.waitingForFrame0) {
               this.waitingForFrame0 = false;
@@ -1603,7 +1606,7 @@
               try { window.EJS_emulator?.play?.(); } catch {}
               notifyParent('NETPLAY_SYNC_COMPLETE', { syncFrame: 0 });
             }
-          }, 4000);
+          }, 10000);
         }
 
         const attachHook = () => {
