@@ -842,94 +842,37 @@ export function UnifiedStageModal({
                   : '-translate-y-full opacity-0 pointer-events-none'
               }`
             : 'relative shrink-0'
-        } flex items-center justify-between gap-1.5 md:gap-2 px-2 md:px-3 py-1.5 md:py-2 bg-neutral-900/95 backdrop-blur-md border-b border-neutral-800`}
+        } h-12 flex items-center justify-between gap-2 px-2.5 sm:px-3.5 bg-neutral-950/95 backdrop-blur-md border-b border-white/10`}
       >
-        <div className="flex items-center gap-1.5 md:gap-2.5 min-w-0">
+        {/* Gauche : Quitter + Titre lisible + Badge discret */}
+        <div className="flex items-center gap-2 min-w-0 flex-1">
           <button
             type="button"
             onClick={handleCloseStage}
             title="Quitter le jeu"
-            className="flex items-center gap-1 px-2 md:px-2.5 py-1.5 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-xs font-bold text-neutral-200 transition-colors shrink-0"
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-neutral-800/90 hover:bg-neutral-700 text-xs font-bold text-neutral-100 transition-colors shrink-0"
           >
-            <X className="w-3.5 h-3.5" />
+            <X className="w-4 h-4" />
             <span className="hidden sm:inline">Quitter</span>
           </button>
-          <span className="font-bold text-xs sm:text-sm text-white truncate max-w-[110px] sm:max-w-[200px]">
-            {session.title}
-          </span>
-          <span className="hidden lg:inline px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-cyan-950 border border-cyan-700/60 text-cyan-300 shrink-0">
-            {session.badge}
-          </span>
-          {session.kind !== 'j2me' && (
-            <button
-              type="button"
-              onClick={() => onOpenSalon?.()}
-              title="Cliquez pour afficher le salon Fightcade 2"
-              className="flex items-center gap-1 px-2 py-1 rounded-lg bg-emerald-950/70 hover:bg-emerald-900/70 border border-emerald-500/50 text-emerald-300 text-[10px] sm:text-[11px] font-mono font-bold transition-colors truncate max-w-[90px] sm:max-w-xs lg:max-w-md"
-            >
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0" />
-              <span className="sm:hidden">Salon</span>
-              <span className="hidden sm:inline truncate">
-                AU SALON · Actif sur :{' '}
-                {activeChannels.length > 0
-                  ? activeChannels.map((c) => c.title).join(' · ')
-                  : session.title}
-              </span>
-            </button>
-          )}
-          {p2pStats && session.kind !== 'j2me' && (
-            <span className="hidden md:inline px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-950/80 border border-emerald-600/50 text-emerald-300 shrink-0">
-              {p2pStats.pingMs}ms · RB {p2pStats.rollbackFrames}f · GGPO {p2pStats.syncStatus || '100%'}
+
+          <div className="min-w-0 flex items-center gap-2">
+            <span className="font-black text-xs sm:text-sm text-white truncate">
+              {session.title}
             </span>
-          )}
-          {session.isNetplay && session.kind !== 'j2me' && (
-            <>
-              <button
-                type="button"
-                onClick={handleForceResync}
-                title="Resynchroniser la RAM entre les 2 joueurs"
-                className="flex items-center gap-1 px-2 py-1 rounded-lg bg-cyan-950/80 hover:bg-cyan-900/80 border border-cyan-500/50 text-cyan-200 text-[10px] font-mono font-bold transition-colors shrink-0"
-              >
-                <RotateCcw className="w-3 h-3" />
-                <span>Resync</span>
-              </button>
-              <button
-                type="button"
-                onClick={handleRequestRematch}
-                disabled={rematchPending}
-                title="Proposer une revanche immédiate à votre adversaire"
-                className="flex items-center gap-1 px-2 py-1 rounded-lg bg-rose-950/80 hover:bg-rose-900/80 disabled:opacity-50 border border-rose-500/50 text-rose-200 text-[10px] font-mono font-bold transition-colors shrink-0"
-              >
-                <Swords className="w-3 h-3" />
-                <span className="hidden sm:inline">{rematchPending ? 'Revanche…' : 'Revanche'}</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setQuickMenuOpen(false);
-                  setScorePanelOpen(false);
-                  setNetplayPanelOpen((v) => !v);
-                }}
-                title="Ouvrir le panneau des Options Multijoueur Fightcade (GGPO, Chat Rapide, Revanche, Crédits)"
-                className={`flex items-center gap-1 px-2 py-1 rounded-lg border text-[10px] font-mono font-bold transition-colors shrink-0 ${
-                  netplayPanelOpen
-                    ? 'bg-cyan-500 text-black border-cyan-400'
-                    : 'bg-indigo-950/80 hover:bg-indigo-900/80 border-indigo-500/50 text-indigo-200'
-                }`}
-              >
-                <Radio className="w-3 h-3" />
-                <span>Options 2P</span>
-              </button>
-            </>
-          )}
-          <span className="hidden xl:inline text-xs font-mono text-neutral-400 truncate">{statusText}</span>
+            <span className="hidden md:inline-flex px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-cyan-950/80 border border-cyan-700/50 text-cyan-300 shrink-0">
+              {session.badge}
+            </span>
+          </div>
         </div>
 
-        <div className="flex items-center gap-1 md:gap-1.5 shrink-0">
+        {/* Droite : Uniquement les 3 contrôles essentiels (Crédits, Options 2P si Netplay, Menu Unifié) */}
+        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
           {session.kind !== 'j2me' && (
-            <span className="px-2 md:px-2.5 py-1 rounded-lg bg-amber-950/50 border border-amber-500/40 text-amber-300 text-[11px] md:text-xs font-mono font-bold flex items-center gap-1.5">
-              <span className="lg:hidden">{String(coins).padStart(2, '0')}</span>
-              <span className="hidden lg:inline">CRÉDITS : {String(coins).padStart(2, '0')}/99</span>
+            <div className="px-2 py-1 rounded-xl bg-amber-950/50 border border-amber-500/40 text-amber-300 text-[11px] font-mono font-bold flex items-center gap-1.5">
+              <Coins className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+              <span>{String(coins).padStart(2, '0')}</span>
+              <span className="hidden lg:inline text-amber-400/70">/99</span>
               <button
                 type="button"
                 onClick={(e) => {
@@ -937,152 +880,74 @@ export function UnifiedStageModal({
                   addCoins(10);
                 }}
                 title="Mode Test : Ajouter +10 Coins gratuitement"
-                className="px-1.5 py-0.5 rounded bg-emerald-500 hover:bg-emerald-400 text-black text-[10px] font-black transition-all active:scale-95"
+                className="px-1.5 py-0.5 rounded-md bg-emerald-500 hover:bg-emerald-400 text-black text-[10px] font-black transition-all active:scale-95"
               >
                 +10
               </button>
-            </span>
+            </div>
           )}
-          <button
-            type="button"
-            onClick={() => setTouchPadVisible((v) => !v)}
-            title="Afficher / Masquer le contrôleur tactile adapté à cette console"
-            className={`flex items-center gap-1 px-2 md:px-2.5 py-1.5 rounded-lg border text-xs font-bold transition-colors ${
-              touchPadVisible
-                ? 'bg-cyan-500/25 border-cyan-400 text-cyan-200'
-                : 'bg-neutral-800 border-neutral-700 text-neutral-300 hover:text-white'
-            }`}
-          >
-            <Gamepad2 className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Pad</span>
-          </button>
-          {session.kind !== 'j2me' && (
-            <>
+
+          {session.isNetplay && session.kind !== 'j2me' && (() => {
+            const ping = Number(p2pStats?.pingMs || 0);
+            const pingColor =
+              ping === 0
+                ? 'text-cyan-300'
+                : ping < 90
+                  ? 'text-emerald-300'
+                  : ping < 200
+                    ? 'text-amber-300'
+                    : 'text-rose-300';
+            return (
               <button
                 type="button"
                 onClick={() => {
-                  if (iframeRef.current?.contentWindow) {
-                    iframeRef.current.focus();
-                    iframeRef.current.contentWindow.postMessage({ type: 'FORCE_SYNC_CREDITS' }, window.location.origin);
-                  }
+                  setQuickMenuOpen(false);
+                  setScorePanelOpen(false);
+                  setPauseMenuOpen(false);
+                  setNetplayPanelOpen((v) => !v);
                 }}
-                title="Forcer la synchronisation des crédits dans la RAM (Touche 5)"
-                className="flex items-center gap-1 px-2 md:px-2.5 py-1.5 rounded-lg bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/40 text-amber-300 text-xs font-bold transition-colors"
+                title="Options Multijoueur 2P (Resync, Revanche, Chat, GGPO)"
+                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border text-xs font-bold transition-colors ${
+                  netplayPanelOpen
+                    ? 'bg-cyan-500 text-black border-cyan-400'
+                    : 'bg-indigo-950/80 hover:bg-indigo-900/80 border-indigo-500/50 text-indigo-100'
+                }`}
               >
-                <Coins className="w-3.5 h-3.5" />
-                <span className="hidden md:inline">Sync Crédits (5)</span>
+                <Radio className="w-3.5 h-3.5 shrink-0" />
+                <span>2P</span>
+                {p2pStats && (
+                  <span className={`font-mono text-[10px] font-black ${netplayPanelOpen ? 'text-black' : pingColor}`}>
+                    {ping}ms
+                  </span>
+                )}
               </button>
-              <button
-                type="button"
-                onClick={() => sendButton('start')}
-                title="Démarrer / Start (Touche 1)"
-                className="flex items-center gap-1 px-2 md:px-2.5 py-1.5 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/40 text-emerald-300 text-xs font-bold transition-colors"
-              >
-                <Play className="w-3.5 h-3.5" />
-                <span className="hidden md:inline">Start (1)</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setFilter((f) => (f === 'smooth' ? 'sharp' : 'smooth'))}
-                className="hidden lg:inline-flex px-2.5 py-1.5 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-xs font-medium text-neutral-200 transition-colors"
-              >
-                {filter === 'smooth' ? 'Lissé' : 'Pixel net'}
-              </button>
-              <button
-                type="button"
-                onClick={() => setRatio((r) => (r === 'stretch' ? 'fit' : 'stretch'))}
-                className="hidden lg:inline-flex px-2.5 py-1.5 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-xs font-medium text-neutral-200 transition-colors"
-              >
-                {ratio === 'stretch' ? 'Étiré' : '4:3'}
-              </button>
-            </>
+            );
+          })()}
+
+          {session.kind !== 'j2me' && !session.isNetplay && (
+            <button
+              type="button"
+              onClick={() => sendButton('start')}
+              title="Démarrer / Start (Touche 1)"
+              className="hidden sm:flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/40 text-emerald-300 text-xs font-bold transition-colors"
+            >
+              <Play className="w-3.5 h-3.5" />
+              <span>Start</span>
+            </button>
           )}
+
           <button
             type="button"
             onClick={() => (pauseMenuOpen ? closePauseMenuAndResume() : openPauseMenu())}
-            title="Mettre en pause et ouvrir le menu PPSSPP (5 états de sauvegarde + Paramètres)"
-            className={`flex items-center gap-1 px-2.5 md:px-3 py-1.5 rounded-lg border text-xs font-bold transition-colors ${
+            title="Menu du jeu (Pause, Affichage, Pad, Sauvegardes, Score RAM, Paramètres)"
+            className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl border text-xs font-bold transition-colors ${
               pauseMenuOpen
                 ? 'bg-cyan-500 text-black border-cyan-400'
-                : 'bg-cyan-500/20 hover:bg-cyan-500/30 border-cyan-500/50 text-cyan-200'
+                : 'bg-cyan-500/20 hover:bg-cyan-500/30 border-cyan-500/50 text-cyan-100'
             }`}
           >
-            {pauseMenuOpen ? <Play className="w-3.5 h-3.5" /> : <Pause className="w-3.5 h-3.5" />}
-            <span>{pauseMenuOpen ? 'Reprendre' : 'Pause'}</span>
-          </button>
-          {session.kind !== 'j2me' && savedSlots.length > 0 && (
-            <button
-              type="button"
-              onClick={async () => {
-                const gid = normalizeScoreGameId(session.gameId || session.title);
-                const b64 = await loadGameSlot(userProfileRef.current?.uid, gid, savedSlots[0].slot);
-                if (b64) {
-                  iframeRef.current?.focus();
-                  iframeRef.current?.contentWindow?.postMessage(
-                    { type: 'LOAD_STATE', stateBase64: b64 },
-                    window.location.origin
-                  );
-                  showRamToast('record', `📂 État ${savedSlots[0].slot} chargé !`);
-                }
-              }}
-              title={`Charger la dernière sauvegarde (État ${savedSlots[0].slot})`}
-              className="hidden sm:flex items-center gap-1 px-2 md:px-2.5 py-1.5 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/50 text-emerald-200 text-xs font-bold transition-colors"
-            >
-              <UploadCloud className="w-3.5 h-3.5" />
-              <span>Reprendre État</span>
-            </button>
-          )}
-          <button
-            type="button"
-            onClick={() => {
-              setQuickMenuOpen(false);
-              setScorePanelOpen((v) => !v);
-            }}
-            title="Score détecté automatiquement depuis la RAM & Classement du jeu"
-            className="flex items-center gap-1 px-2 md:px-2.5 py-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/50 text-amber-200 text-xs font-bold transition-colors"
-          >
-            <Trophy className="w-3.5 h-3.5 text-amber-400" />
-            <span className="hidden md:inline font-mono">
-              {liveRamTelemetry.score > 0
-                ? `${liveRamTelemetry.score.toLocaleString('fr-FR')} pts`
-                : 'Score RAM'}
-            </span>
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setScorePanelOpen(false);
-              setQuickMenuOpen((v) => !v);
-            }}
-            title="Quick Menu (Tab)"
-            className="flex items-center gap-1 px-2 md:px-2.5 py-1.5 rounded-lg bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/40 text-purple-200 text-xs font-bold transition-colors"
-          >
-            <Sliders className="w-3.5 h-3.5" />
-            <span className="hidden md:inline">Quick Menu (Tab)</span>
-          </button>
-          <button
-            type="button"
-            onClick={handleRestartGame}
-            className="hidden md:inline-flex p-1.5 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-neutral-200 transition-colors"
-            title="Recommencer la partie (-1 Crédit)"
-          >
-            <RotateCcw className="w-4 h-4" />
-          </button>
-          <button
-            type="button"
-            onClick={toggleFullscreen}
-            className="hidden md:inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-black text-xs font-bold transition-colors"
-          >
-            {isFullscreen ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
-            <span className="hidden xl:inline">{isFullscreen ? 'Fenêtré' : 'Plein écran'}</span>
-          </button>
-          <button
-            type="button"
-            onClick={onOpenSettings}
-            title="Paramètres"
-            className="hidden md:inline-flex p-1.5 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-neutral-300 transition-colors"
-          >
-            <Settings className="w-4 h-4" />
+            {pauseMenuOpen ? <Play className="w-3.5 h-3.5" /> : <Sliders className="w-3.5 h-3.5" />}
+            <span>{pauseMenuOpen ? 'Reprendre' : 'Menu'}</span>
           </button>
         </div>
       </div>
@@ -1577,6 +1442,76 @@ export function UnifiedStageModal({
                 >
                   <Play className="w-4 h-4" />
                   <span>Reprendre la partie</span>
+                </button>
+              </div>
+
+              {/* Barre d'outils rapide (Pad, Affichage, Plein écran, Score RAM, Start/Crédits, Salon) */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setTouchPadVisible((v) => !v)}
+                  className={`px-3 py-2 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 transition-colors ${
+                    touchPadVisible
+                      ? 'bg-cyan-500/20 border-cyan-400 text-cyan-200'
+                      : 'bg-neutral-900 border-neutral-800 text-neutral-300 hover:text-white'
+                  }`}
+                >
+                  <Gamepad2 className="w-3.5 h-3.5" />
+                  <span>Pad : {touchPadVisible ? 'ON' : 'OFF'}</span>
+                </button>
+                {session.kind !== 'j2me' && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => setFilter((f) => (f === 'smooth' ? 'sharp' : 'smooth'))}
+                      className="px-3 py-2 rounded-xl bg-neutral-900 hover:bg-neutral-800 border border-neutral-800 text-xs font-bold text-neutral-200 transition-colors"
+                    >
+                      {filter === 'smooth' ? '✨ Lissé' : '🟦 Pixel net'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setRatio((r) => (r === 'stretch' ? 'fit' : 'stretch'))}
+                      className="px-3 py-2 rounded-xl bg-neutral-900 hover:bg-neutral-800 border border-neutral-800 text-xs font-bold text-neutral-200 transition-colors"
+                    >
+                      {ratio === 'stretch' ? '📐 16:9 Étiré' : '📺 4:3 Origine'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPauseMenuOpen(false);
+                        setScorePanelOpen(true);
+                      }}
+                      className="px-3 py-2 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/40 text-amber-200 text-xs font-bold flex items-center justify-center gap-1.5 transition-colors"
+                    >
+                      <Trophy className="w-3.5 h-3.5 text-amber-400" />
+                      <span>
+                        {liveRamTelemetry.score > 0
+                          ? `${liveRamTelemetry.score.toLocaleString('fr-FR')} pts`
+                          : 'Score RAM'}
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        closePauseMenuAndResume();
+                        if (iframeRef.current?.contentWindow) {
+                          iframeRef.current.contentWindow.postMessage({ type: 'FORCE_SYNC_CREDITS' }, window.location.origin);
+                        }
+                      }}
+                      className="px-3 py-2 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/40 text-emerald-200 text-xs font-bold flex items-center justify-center gap-1.5 transition-colors"
+                    >
+                      <Coins className="w-3.5 h-3.5" />
+                      <span>Sync Crédits (5)</span>
+                    </button>
+                  </>
+                )}
+                <button
+                  type="button"
+                  onClick={toggleFullscreen}
+                  className="px-3 py-2 rounded-xl bg-neutral-900 hover:bg-neutral-800 border border-neutral-800 text-xs font-bold text-cyan-200 flex items-center justify-center gap-1.5 transition-colors"
+                >
+                  {isFullscreen ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
+                  <span>{isFullscreen ? 'Fenêtré' : 'Plein écran'}</span>
                 </button>
               </div>
 
