@@ -21,7 +21,8 @@ import {
   where,
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
-import { getCurrentUserProfile, subscribeAuthProfile, updateUserProfile } from './authService';
+import { getCurrentUserProfile, getPlayerFriendCode, getPlayerFriendTag, subscribeAuthProfile, updateUserProfile } from './authService';
+import { isJ2meGame, supportsOnlineMultiplayer } from '../utils/gameCapabilities';
 
 const MAX_ACTIVE_CHANNELS = 3;
 const CHANNELS_KEY = 'csw_fc_channels_v1';
@@ -37,9 +38,12 @@ export const GLOBAL_CHANNEL = {
 
 export function getPlayerIdentity() {
   const p = getCurrentUserProfile();
+  const displayName = p.displayName || p.name || 'Joueur';
   return {
     uid: p.uid,
-    name: p.displayName || p.name || 'Joueur',
+    name: displayName,
+    friendCode: p.friendCode || getPlayerFriendCode(p.uid),
+    friendTag: p.friendTag || getPlayerFriendTag(displayName, p.uid),
     region: p.region || 'FR',
     rank: p.rank || 'B',
     photoURL: p.photoURL || null,
@@ -98,6 +102,7 @@ class FirebaseFightcadeService {
     this.rtcSignalListeners = new Map();
     this.spectateListeners = new Set();
     this.spectateChunks = new Map();
+    this.friendEventListeners = new Set();
     this.relayInputListener = null;
 
     // Toujours maintenir la présence dans le salon global + les salons actifs
@@ -110,9 +115,12 @@ class FirebaseFightcadeService {
 
     subscribeAuthProfile((profile) => {
       const prevUid = this.identity?.uid;
+      const displayName = profile.displayName || profile.name || 'Joueur';
       this.identity = {
         uid: profile.uid,
-        name: profile.displayName || profile.name || 'Joueur',
+        name: displayName,
+        friendCode: profile.friendCode || getPlayerFriendCode(profile.uid),
+        friendTag: profile.friendTag || getPlayerFriendTag(displayName, profile.uid),
         region: profile.region || 'FR',
         rank: profile.rank || 'B',
         photoURL: profile.photoURL || null,
@@ -259,6 +267,13 @@ class FirebaseFightcadeService {
       this.relayInputListener?.(data);
     } else if (data.type === 'SPECTATE_STATE_CHUNK') {
       this._handleSpectateStateChunk(data);
+    } else if (data.type === 'FRIEND_EVENT') {
+      this.friendEventListeners.forEach((cb) => {
+        try { cb(data); } catch {}
+      });
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('csw-friend-event', { detail: data }));
+      }
     } else if (
       data.type === 'SPECTATE_COUNT_UPDATE' ||
       data.type === 'SPECTATE_SNAPSHOT_REQ' ||
@@ -508,7 +523,18 @@ class FirebaseFightcadeService {
     try {
       const raw = localStorage.getItem(CHANNELS_KEY);
       const parsed = raw ? JSON.parse(raw) : [];
-      return Array.isArray(parsed) ? parsed.slice(0, MAX_ACTIVE_CHANNELS) : [];
+      if (!Array.isArray(parsed)) return [];
+      const clean = parsed
+        .filter((c) => c && c.gameId && !isJ2meGame(c.entry || c) && supportsOnlineMultiplayer(c.entry || c))
+        .slice(0, MAX_ACTIVE_CHANNELS);
+      if (clean.length !== parsed.length) {
+        try {
+          localStorage.setItem(CHANNELS_KEY, JSON.stringify(clean));
+        } catch {
+          /* noop */
+        }
+      }
+      return clean;
     } catch {
       return [];
     }
@@ -535,7 +561,9 @@ class FirebaseFightcadeService {
 
   applySyncedChannels(remoteChannels) {
     if (!Array.isArray(remoteChannels)) return false;
-    const clean = remoteChannels.slice(0, MAX_ACTIVE_CHANNELS).filter((c) => c && c.gameId);
+    const clean = remoteChannels
+      .filter((c) => c && c.gameId && !isJ2meGame(c.entry || c) && supportsOnlineMultiplayer(c.entry || c))
+      .slice(0, MAX_ACTIVE_CHANNELS);
     const curIds = this.activeChannels.map((c) => c.gameId).join(',');
     const nextIds = clean.map((c) => c.gameId).join(',');
     if (curIds === nextIds) return false;
@@ -552,19 +580,59 @@ class FirebaseFightcadeService {
     return true;
   }
 
+  revalidateChannelsWithCatalog(catalogItems = []) {
+    if (!Array.isArray(catalogItems) || catalogItems.length === 0 || this.activeChannels.length === 0) return;
+    const byId = new Map();
+    const byChannelId = new Map();
+    for (const item of catalogItems) {
+      if (!item) continue;
+      if (item.id) byId.set(item.id, item);
+      byChannelId.set(normalizeGameChannelId(item), item);
+    }
+
+    let changed = false;
+    const kept = [];
+    for (const ch of this.activeChannels) {
+      const matched = byId.get(ch.entry?.id) || byChannelId.get(ch.gameId) || null;
+      const candidate = matched ? { ...(ch.entry || {}), ...matched } : ch.entry || ch;
+      if (isJ2meGame(candidate) || !supportsOnlineMultiplayer(candidate)) {
+        this.stopHeartbeat(ch.gameId);
+        deleteDoc(doc(db, 'fc_lobbies', ch.gameId, 'users', this.identity.uid)).catch(() => {});
+        changed = true;
+      } else {
+        const updatedEntry = matched ? { ...(ch.entry || {}), ...matched } : ch.entry;
+        if (matched && ch.entry?.supportsMultiplayer !== matched.supportsMultiplayer) {
+          changed = true;
+        }
+        kept.push({ ...ch, entry: updatedEntry });
+      }
+    }
+
+    if (changed) {
+      this.activeChannels = kept;
+      this.saveChannels();
+      this.refreshAllPresences();
+    }
+  }
+
   getActiveGamesSummary() {
-    const list = this.activeChannels.map((c) => ({
-      id: c.entry?.id || c.gameId,
-      gameId: c.gameId,
-      title: c.title,
-      platformLabel: c.platformLabel || c.entry?.platformLabel || 'Arcade',
-      filename: c.filename || c.entry?.filename || '',
-      core: c.entry?.core || c.entry?.platform || 'fbneo',
-      platform: c.entry?.platform || c.entry?.core || 'fbneo',
-      urls: Array.isArray(c.entry?.urls) ? c.entry.urls.slice(0, 4) : [],
-    }));
+    const list = this.activeChannels
+      .filter((c) => c && !isJ2meGame(c.entry || c) && supportsOnlineMultiplayer(c.entry || c))
+      .map((c) => ({
+        id: c.entry?.id || c.gameId,
+        gameId: c.gameId,
+        title: c.title,
+        platformLabel: c.platformLabel || c.entry?.platformLabel || 'Arcade',
+        filename: c.filename || c.entry?.filename || '',
+        core: c.entry?.core || c.entry?.platform || 'fbneo',
+        platform: c.entry?.platform || c.entry?.core || 'fbneo',
+        players: c.entry?.players || '1–2J',
+        supportsMultiplayer: true,
+        urls: Array.isArray(c.entry?.urls) ? c.entry.urls.slice(0, 4) : [],
+      }));
     if (
       this.currentPlayingGame &&
+      supportsOnlineMultiplayer(this.currentPlayingGame) &&
       !list.some((g) => g.gameId === this.currentPlayingGame.gameId)
     ) {
       list.unshift({
@@ -575,6 +643,8 @@ class FirebaseFightcadeService {
         filename: this.currentPlayingGame.filename || '',
         core: this.currentPlayingGame.core || 'fbneo',
         platform: this.currentPlayingGame.platform || this.currentPlayingGame.core || 'fbneo',
+        players: this.currentPlayingGame.players || '1–2J',
+        supportsMultiplayer: true,
         urls: Array.isArray(this.currentPlayingGame.urls) ? this.currentPlayingGame.urls.slice(0, 4) : [],
       });
     }
@@ -600,6 +670,9 @@ class FirebaseFightcadeService {
     if (gameEntry.gameId === GLOBAL_CHANNEL_ID || gameEntry.id === GLOBAL_CHANNEL_ID) {
       await this.upsertPresence(GLOBAL_CHANNEL_ID);
       return { ok: true, channel: GLOBAL_CHANNEL };
+    }
+    if (isJ2meGame(gameEntry) || !supportsOnlineMultiplayer(gameEntry)) {
+      return { ok: false, reason: 'SOLO_ONLY' };
     }
 
     const gameId = normalizeGameChannelId(gameEntry);
@@ -666,14 +739,17 @@ class FirebaseFightcadeService {
     gameEntry,
     { isNetplay = false, opponentName = null, opponentUid = null, challengeId = null, hostUid = null } = {}
   ) {
-    if (!gameEntry) return;
+    if (!gameEntry || isJ2meGame(gameEntry) || !supportsOnlineMultiplayer(gameEntry)) {
+      await this.clearActivePlayingGame();
+      return { ok: false, reason: 'SOLO_ONLY' };
+    }
     const gameId = normalizeGameChannelId(gameEntry);
     const title = gameEntry.title || gameId;
     const platformLabel = gameEntry.platformLabel || gameEntry.core?.toUpperCase() || 'Arcade';
 
     // Rejoindre automatiquement le salon du jeu lancé (en remplaçant le plus ancien si 3 salons sont déjà pleins)
     await this.joinChannel(
-      { ...gameEntry, id: gameId, title, platformLabel },
+      { ...gameEntry, id: gameId, title, platformLabel, supportsMultiplayer: true },
       { silent: true, autoReplaceOldest: true }
     );
 
@@ -685,6 +761,8 @@ class FirebaseFightcadeService {
       filename: gameEntry.filename || '',
       core: gameEntry.core || gameEntry.platform || 'fbneo',
       platform: gameEntry.platform || gameEntry.core || 'fbneo',
+      players: gameEntry.players || '1–2J',
+      supportsMultiplayer: true,
       urls: Array.isArray(gameEntry.urls) ? gameEntry.urls.slice(0, 4) : [],
       isNetplay: Boolean(isNetplay),
       opponentName: opponentName || null,
@@ -762,6 +840,9 @@ class FirebaseFightcadeService {
     const userPayload = {
       uid: this.identity.uid,
       name: this.identity.name,
+      displayName: this.identity.name,
+      friendCode: this.identity.friendCode || getPlayerFriendCode(this.identity.uid),
+      friendTag: this.identity.friendTag || getPlayerFriendTag(this.identity.name, this.identity.uid),
       region: this.identity.region,
       rank: this.identity.rank || 'D',
       photoURL: this.identity.photoURL || null,
@@ -1031,6 +1112,9 @@ class FirebaseFightcadeService {
       filename: gameEntry?.filename || fallbackTargetGame?.filename || '',
       core: gameEntry?.core || gameEntry?.platform || fallbackTargetGame?.core || 'fbneo',
     };
+    if (isJ2meGame(mergedEntry) || !supportsOnlineMultiplayer(mergedEntry)) {
+      return null;
+    }
     const gameTitle = mergedEntry.title || targetUser?.currentGame?.title || gameId;
     const challengeObj = {
       challengeId,
@@ -1041,6 +1125,9 @@ class FirebaseFightcadeService {
         title: gameTitle,
         filename: mergedEntry.filename || '',
         core: mergedEntry.core || 'fbneo',
+        platform: mergedEntry.platform || mergedEntry.core || 'fbneo',
+        players: mergedEntry.players || '1–2J',
+        supportsMultiplayer: true,
         urls: Array.isArray(mergedEntry.urls) ? mergedEntry.urls : [],
         platformLabel: mergedEntry.platformLabel || 'Arcade',
       },

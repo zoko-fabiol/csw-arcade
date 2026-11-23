@@ -11,6 +11,7 @@ import {
   AlertCircle 
 } from 'lucide-react';
 import { NetplayService } from '../../services/NetplayService';
+import { supportsOnlineMultiplayer } from '../../utils/gameCapabilities';
 
 export function NetplayLobbyModal({ 
   isOpen, 
@@ -18,8 +19,12 @@ export function NetplayLobbyModal({
   games, 
   onStartNetplayGame 
 }) {
+  const multiplayerGames = React.useMemo(
+    () => (games || []).filter((g) => supportsOnlineMultiplayer(g)),
+    [games]
+  );
   const [activeTab, setActiveTab] = useState('create'); // 'create' | 'join'
-  const [selectedGameId, setSelectedGameId] = useState(games[0]?.id || 'mslug');
+  const [selectedGameId, setSelectedGameId] = useState(multiplayerGames[0]?.id || 'mslug');
   const [playerName, setPlayerName] = useState('Arcade Warrior');
   const [joinRoomId, setJoinRoomId] = useState('');
   
@@ -33,6 +38,11 @@ export function NetplayLobbyModal({
 
   // Créer un salon (Hôte - Joueur 1)
   const handleCreateRoom = async () => {
+    const selectedGame = multiplayerGames.find(g => g.id === selectedGameId);
+    if (!selectedGame) {
+      setErrorMessage('Ce jeu est compatible mode Solo uniquement (multijoueur désactivé).');
+      return;
+    }
     setIsProcessing(true);
     setErrorMessage(null);
     setStatusMessage('Génération du salon & configuration STUN...');
@@ -43,7 +53,7 @@ export function NetplayLobbyModal({
       netplayService.onStatusChange = (status) => {
         console.log('[Lobby] Statut connexion Hôte:', status);
         if (status === 'connected') {
-          const game = games.find(g => g.id === selectedGameId);
+          const game = multiplayerGames.find(g => g.id === selectedGameId);
           onStartNetplayGame({
             game,
             isHost: true,
@@ -76,7 +86,8 @@ export function NetplayLobbyModal({
         console.log('[Lobby] Statut connexion Client:', status);
         if (status === 'connected') {
           // Trouver le jeu sélectionné par la room
-          const game = games.find(g => g.id === selectedGameId) || games[0];
+          const game = multiplayerGames.find(g => g.id === selectedGameId) || multiplayerGames[0];
+          if (!game) return;
           onStartNetplayGame({
             game,
             isHost: false,
@@ -86,7 +97,14 @@ export function NetplayLobbyModal({
       };
 
       const roomData = await netplayService.joinRoom(joinRoomId.trim(), playerName);
-      const targetGame = games.find(g => g.id === roomData.gameId) || games[0];
+      const rawTargetGame = (games || []).find(g => g.id === roomData.gameId);
+      if (rawTargetGame && !supportsOnlineMultiplayer(rawTargetGame)) {
+        throw new Error('Ce jeu est compatible mode Solo uniquement (multijoueur désactivé).');
+      }
+      const targetGame = multiplayerGames.find(g => g.id === roomData.gameId) || multiplayerGames[0];
+      if (!targetGame) {
+        throw new Error('Aucun jeu multijoueur compatible disponible.');
+      }
       setSelectedGameId(targetGame.id);
       setStatusMessage('Handshake ICE réussi. Initialisation du match...');
     } catch (err) {
@@ -176,7 +194,7 @@ export function NetplayLobbyModal({
                   disabled={!!createdRoomId}
                   className="w-full px-3.5 py-2.5 bg-neutral-950 border border-neutral-800 rounded-xl text-white focus:outline-none focus:border-cyan-500 transition-colors"
                 >
-                  {games.map((g) => (
+                  {multiplayerGames.map((g) => (
                     <option key={g.id} value={g.id}>
                       {g.title} ({g.year})
                     </option>

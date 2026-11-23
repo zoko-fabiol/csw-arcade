@@ -28,8 +28,66 @@ const FIRST_NAME_KEY = 'csw_player_first_name_v1';
 const LAST_NAME_KEY = 'csw_player_last_name_v1';
 const REGION_KEY = 'csw_player_region_v1';
 const RANK_KEY = 'csw_player_rank_v1';
+const PHOTO_PREFIX = 'csw_player_photo_v1_';
 
 const authListeners = new Set();
+
+export function getPlayerFriendCode(uid) {
+  const clean = String(uid || '0000').replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+  return (clean.slice(-4) || '0000').padStart(4, '0');
+}
+
+export function getPlayerFriendTag(displayName, uid) {
+  const base = String(displayName || 'Joueur').trim().replace(/#[a-zA-Z0-9]+$/, '') || 'Joueur';
+  return `${base}#${getPlayerFriendCode(uid)}`;
+}
+
+function getStoredPhoto(uid) {
+  if (!uid) return undefined;
+  try {
+    const val = localStorage.getItem(PHOTO_PREFIX + uid);
+    if (val === null) return undefined;
+    return val === '' ? null : val;
+  } catch {
+    return undefined;
+  }
+}
+
+function setStoredPhoto(uid, photoURL) {
+  if (!uid) return;
+  try {
+    if (photoURL === undefined) return;
+    localStorage.setItem(PHOTO_PREFIX + uid, photoURL ? String(photoURL) : '');
+  } catch {
+    /* noop */
+  }
+}
+
+function pushDirectoryProfile(profile) {
+  if (!profile?.uid || typeof fetch !== 'function') return;
+  fetch('/api/friends', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      action: 'register_profile',
+      user: {
+        uid: profile.uid,
+        name: profile.displayName || profile.name,
+        displayName: profile.displayName || profile.name,
+        firstName: profile.firstName || '',
+        lastName: profile.lastName || '',
+        email: profile.email || null,
+        friendCode: getPlayerFriendCode(profile.uid),
+        friendTag: getPlayerFriendTag(profile.displayName || profile.name, profile.uid),
+        region: profile.region || 'FR',
+        rank: profile.rank || 'D',
+        ratingPoints: Number(profile.ratingPoints || 0),
+        photoURL: profile.photoURL || null,
+        isAuthenticated: Boolean(profile.isAuthenticated),
+      },
+    }),
+  }).catch(() => {});
+}
 
 function getDefaultRegion() {
   try {
@@ -50,6 +108,7 @@ function getFallbackGuestProfile() {
   let lastName = '';
   let region = getDefaultRegion();
   let rank = 'D';
+  let photoURL = null;
   try {
     uid = localStorage.getItem(UID_KEY) || uid;
     localStorage.setItem(UID_KEY, uid);
@@ -58,18 +117,23 @@ function getFallbackGuestProfile() {
     firstName = localStorage.getItem(FIRST_NAME_KEY) || '';
     lastName = localStorage.getItem(LAST_NAME_KEY) || '';
     rank = localStorage.getItem(RANK_KEY) || 'D';
+    const stored = getStoredPhoto(uid);
+    if (stored !== undefined) photoURL = stored;
   } catch {
     /* noop */
   }
   const baseEval = evaluatePlayerRank([]);
+  const friendCode = getPlayerFriendCode(uid);
   return {
     uid,
     name,
     displayName: name,
+    friendCode,
+    friendTag: getPlayerFriendTag(name, uid),
     firstName,
     lastName,
     email: null,
-    photoURL: null,
+    photoURL,
     region,
     rank,
     rankLabel: baseEval.rankLabel,
@@ -124,6 +188,7 @@ async function hydrateProfileStats(uid) {
     progressPercent: evaluation.progressPercent,
     gameStats: stats,
   };
+  pushDirectoryProfile(currentUserProfile);
   notifyAuthListeners();
 }
 
@@ -148,6 +213,7 @@ subscribeLocalStatsUpdates(({ uid, stats, evaluation }) => {
     progressPercent: evaluation.progressPercent,
     gameStats: stats,
   };
+  pushDirectoryProfile(currentUserProfile);
   notifyAuthListeners();
 });
 
@@ -181,6 +247,15 @@ async function syncFirestoreUserProfile(firebaseUser, overrides = {}) {
       ? overrides.lastName
       : remoteData.lastName || localStorage.getItem(LAST_NAME_KEY) || '';
   const region = (overrides.region || remoteData.region || getDefaultRegion()).toUpperCase();
+  const storedPhoto = getStoredPhoto(uid);
+  const photoURL =
+    overrides.photoURL !== undefined
+      ? overrides.photoURL
+      : remoteData.photoURL !== undefined
+      ? remoteData.photoURL
+      : storedPhoto !== undefined
+      ? storedPhoto
+      : firebaseUser.photoURL || null;
 
   // Évaluer le rang automatiquement à partir des meilleurs scores enregistrés
   const { stats, evaluation } = await loadPlayerGameStats(uid);
@@ -195,18 +270,23 @@ async function syncFirestoreUserProfile(firebaseUser, overrides = {}) {
     localStorage.setItem(LAST_NAME_KEY, lastName);
     localStorage.setItem(REGION_KEY, region);
     localStorage.setItem(RANK_KEY, rank);
+    setStoredPhoto(uid, photoURL);
   } catch {
     /* noop */
   }
 
+  const friendCode = getPlayerFriendCode(uid);
+  const friendTag = getPlayerFriendTag(displayName, uid);
   const profilePayload = {
     uid,
     name: displayName,
     displayName,
+    friendCode,
+    friendTag,
     firstName,
     lastName,
     email: firebaseUser.email || remoteData.email || null,
-    photoURL: firebaseUser.photoURL || remoteData.photoURL || null,
+    photoURL,
     region,
     rank,
     rankLabel: evaluation.rankLabel,
@@ -234,9 +314,13 @@ async function syncFirestoreUserProfile(firebaseUser, overrides = {}) {
 
   const firestoreDoc = { ...profilePayload, updatedAt: serverTimestamp() };
   delete firestoreDoc.gameStats;
-  setDoc(ref, firestoreDoc, { merge: true }).catch(() => {});
+  const fsWrite = setDoc(ref, firestoreDoc, { merge: true }).catch(() => {});
+  if (overrides && Object.keys(overrides).length > 0) {
+    await fsWrite;
+  }
 
   currentUserProfile = profilePayload;
+  pushDirectoryProfile(currentUserProfile);
   notifyAuthListeners();
   return currentUserProfile;
 }
@@ -344,7 +428,7 @@ export async function loginAsGuest({ firstName = '', lastName = '', displayName,
   }
 }
 
-export async function updateUserProfile({ firstName, lastName, displayName, region }) {
+export async function updateUserProfile({ firstName, lastName, displayName, region, photoURL }) {
   const cleanName = String(displayName || currentUserProfile.name || 'Joueur').trim().slice(0, 24);
   const cleanFirst = String(
     firstName !== undefined ? firstName : currentUserProfile.firstName || ''
@@ -353,42 +437,60 @@ export async function updateUserProfile({ firstName, lastName, displayName, regi
     lastName !== undefined ? lastName : currentUserProfile.lastName || ''
   ).trim().slice(0, 40);
   const cleanRegion = String(region || currentUserProfile.region || 'FR').trim().toUpperCase().slice(0, 2);
+  const nextPhoto = photoURL !== undefined ? photoURL : (currentUserProfile.photoURL || null);
 
   try {
     localStorage.setItem(NAME_KEY, cleanName);
     localStorage.setItem(FIRST_NAME_KEY, cleanFirst);
     localStorage.setItem(LAST_NAME_KEY, cleanLast);
     localStorage.setItem(REGION_KEY, cleanRegion);
+    setStoredPhoto(currentUserProfile.uid, nextPhoto);
   } catch {
     /* noop */
   }
 
   if (auth.currentUser) {
-    await updateProfile(auth.currentUser, { displayName: cleanName }).catch(() => {});
+    const authPatch = { displayName: cleanName };
+    if (
+      nextPhoto === null ||
+      (typeof nextPhoto === 'string' && !nextPhoto.startsWith('data:') && nextPhoto.length < 1800)
+    ) {
+      authPatch.photoURL = nextPhoto || '';
+    }
+    await updateProfile(auth.currentUser, authPatch).catch(() => {});
     return await syncFirestoreUserProfile(auth.currentUser, {
       firstName: cleanFirst,
       lastName: cleanLast,
       displayName: cleanName,
       region: cleanRegion,
+      photoURL: nextPhoto,
     });
   }
 
+  const friendCode = getPlayerFriendCode(currentUserProfile.uid);
+  const friendTag = getPlayerFriendTag(cleanName, currentUserProfile.uid);
   currentUserProfile = {
     ...currentUserProfile,
     name: cleanName,
     displayName: cleanName,
+    friendCode,
+    friendTag,
     firstName: cleanFirst,
     lastName: cleanLast,
     region: cleanRegion,
+    photoURL: nextPhoto,
   };
-  setDoc(
+  const fsGuestWrite = setDoc(
     doc(db, 'users', currentUserProfile.uid),
     {
       uid: currentUserProfile.uid,
       displayName: cleanName,
+      friendCode,
+      friendTag,
       firstName: cleanFirst,
       lastName: cleanLast,
       region: cleanRegion,
+      photoURL: nextPhoto,
       rank: currentUserProfile.rank,
       ratingPoints: currentUserProfile.ratingPoints || 0,
       coins: getCoins(),
@@ -396,6 +498,10 @@ export async function updateUserProfile({ firstName, lastName, displayName, regi
     },
     { merge: true }
   ).catch(() => {});
+  if (photoURL !== undefined) {
+    await fsGuestWrite;
+  }
+  pushDirectoryProfile(currentUserProfile);
   notifyAuthListeners();
   return currentUserProfile;
 }

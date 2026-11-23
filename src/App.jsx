@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useSettings } from './hooks/useSettings';
 import { SettingsModal } from './components/settings/SettingsModal';
 import { useMobileNavigation, useOnlineStatus } from './hooks/useMobileNavigation';
@@ -35,8 +35,12 @@ import {
   subscribeAccountSync,
 } from './services/accountSyncService';
 import { applyRemoteSyncedStats, getRankTierMeta } from './services/scoreRankingService';
+import { subscribeFriendsState } from './services/friendsService';
+import { PlayerAvatar } from './components/common/PlayerAvatar';
+import { FriendsDrawer } from './components/social/FriendsDrawer';
 import { countryCodeToFlag } from './data/countries';
 import { RollbackP2PEngine } from './services/rollbackP2P';
+import { isJ2meGame, supportsOnlineMultiplayer } from './utils/gameCapabilities';
 import {
   Gamepad2, Disc, Cpu, Coffee, Settings, Joystick, Coins, Layers, Swords, UserCheck, Cloud, Play, X, Plus, Wifi, WifiOff, Database, Users
 } from 'lucide-react';
@@ -76,7 +80,9 @@ export default function App() {
   const isOnline = useOnlineStatus();
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isAuthOpen, setIsAuthOpen] = useState(false);
+  const [isFriendsOpen, setIsFriendsOpen] = useState(false);
   const [userProfile, setUserProfile] = useState(() => getCurrentUserProfile());
+  const [friendsState, setFriendsState] = useState({ friends: [], incomingRequests: [], outgoingRequests: [] });
 
   const [platformMode, setPlatformMode] = useState(() => {
     if (typeof window === 'undefined') return 'arcade';
@@ -119,11 +125,9 @@ export default function App() {
     setStageSession(sessionObj);
     activeGameEntryRef.current = gameEntry;
     sessionStartedAtRef.current = Date.now();
-    const isJ2me =
-      sessionObj?.kind === 'j2me' ||
-      sessionObj?.core === 'j2me' ||
-      gameEntry?.core === 'j2me' ||
-      gameEntry?.platform === 'j2me';
+    const targetEntry = gameEntry || sessionObj;
+    const isJ2me = isJ2meGame(targetEntry);
+    const canOnlineMulti = !isJ2me && supportsOnlineMultiplayer(targetEntry);
 
     if (sessionObj && !sessionObj.isSpectator) {
       const uid = userProfileRef.current?.uid;
@@ -136,12 +140,12 @@ export default function App() {
           platformLabel: gameEntry?.platformLabel || sessionObj.core?.toUpperCase() || 'Arcade',
           filename: sessionObj.filename,
           gameEntry,
-          inSalon: !isJ2me,
+          inSalon: canOnlineMulti,
           status: 'playing',
           hasSavestate: Boolean(sessionObj.initialStateBase64),
         });
       }
-      if (!isJ2me) {
+      if (canOnlineMulti) {
         firebaseFightcadeService.setActivePlayingGame(
           gameEntry || {
             id: sessionObj.gameId || sessionObj.title,
@@ -149,6 +153,8 @@ export default function App() {
             platformLabel: sessionObj.core?.toUpperCase() || 'Arcade',
             core: sessionObj.core,
             filename: sessionObj.filename,
+            players: sessionObj.players,
+            supportsMultiplayer: sessionObj.supportsMultiplayer,
           },
           {
             isNetplay: Boolean(sessionObj.isNetplay),
@@ -158,6 +164,8 @@ export default function App() {
             hostUid: sessionObj.isNetplay ? (sessionObj.isHost ? uid : sessionObj.opponentUid) : null,
           }
         );
+      } else {
+        firebaseFightcadeService.clearActivePlayingGame();
       }
     }
   };
@@ -213,6 +221,8 @@ export default function App() {
           core,
           fileBlob,
           gameUrl: gameEntry.urls?.[0] || '',
+          players: gameEntry.players || (isNetplay ? '1–2J' : '1J'),
+          supportsMultiplayer: supportsOnlineMultiplayer(gameEntry),
           isNetplay,
           isHost,
           isSpectator: Boolean(isSpectator),
@@ -286,6 +296,11 @@ export default function App() {
   };
 
   const handleJoinFightcadeChannel = async (gameEntry) => {
+    if (!supportsOnlineMultiplayer(gameEntry)) {
+      setBootNotice(`« ${gameEntry?.title || 'Ce jeu'} » est uniquement disponible en mode Solo.`);
+      setTimeout(() => setBootNotice(''), 3500);
+      return;
+    }
     const res = await firebaseFightcadeService.joinChannel(gameEntry);
     if (!res.ok && res.reason === 'MAX_3_CHANNELS') {
       setLimitModalGame(gameEntry);
@@ -463,12 +478,19 @@ export default function App() {
   };
 
   const handleChallengePlayer = async (channel, targetUser) => {
+    const targetEntry = channel?.entry || channel;
+    if (!supportsOnlineMultiplayer(targetEntry)) {
+      setBootNotice(`« ${channel?.title || targetEntry?.title || 'Ce jeu'} » est uniquement jouable en Solo.`);
+      setTimeout(() => setBootNotice(''), 3500);
+      return;
+    }
     // Règle CSW-Arcade : L'hôte doit disposer de 2 Coins pour inviter
     if (!hasCoins(2)) {
       setNoCoinsModalOpen(true);
       return;
     }
     const challengeId = await firebaseFightcadeService.sendChallenge(channel.gameId, targetUser, channel.entry);
+    if (!challengeId) return;
     setActiveMatchSync({
       challengeId,
       challenge: {
@@ -489,12 +511,13 @@ export default function App() {
   const handleRespondChallenge = async (accept) => {
     if (!incomingChallenge) return;
     const ch = incomingChallenge;
+    const channel = activeChannels.find((c) => c.gameId === ch.gameId);
+    const resolvedGameEntry = ch.gameEntry || channel?.entry || { id: ch.gameId, title: ch.gameTitle };
+    const allowAccept = Boolean(accept) && supportsOnlineMultiplayer(resolvedGameEntry);
     // L'invité NE PAIE RIEN : 0 Coin débité chez l'invité (l'hôte a payé pour les deux)
     setIncomingChallenge(null);
-    await firebaseFightcadeService.respondChallenge(ch.challengeId, accept, ch.fromUid);
-    if (accept) {
-      const channel = activeChannels.find((c) => c.gameId === ch.gameId);
-      const resolvedGameEntry = ch.gameEntry || channel?.entry || { id: ch.gameId, title: ch.gameTitle };
+    await firebaseFightcadeService.respondChallenge(ch.challengeId, allowAccept, ch.fromUid);
+    if (allowAccept) {
       setActiveMatchSync({
         challengeId: ch.challengeId,
         challenge: {
@@ -506,6 +529,37 @@ export default function App() {
     }
   };
 
+  const handleCatalogLoaded = useCallback((items) => {
+    firebaseFightcadeService.revalidateChannelsWithCatalog(items);
+  }, []);
+
+  const handleSpectateTarget = useCallback((channel, targetUser) => {
+    const targetEntry = !channel?.isGlobal && channel?.entry
+      ? { ...(targetUser?.currentGame || {}), ...channel.entry }
+      : targetUser?.currentGame || channel?.entry;
+    if (!targetEntry || !supportsOnlineMultiplayer(targetEntry)) return;
+    const cg = targetUser?.currentGame || {};
+    const mm = targetUser?.matchMeta || {};
+    const challengeId = mm.challengeId || cg.challengeId || null;
+    const hostUid = mm.hostUid || cg.hostUid || (mm.isHost === true ? targetUser.uid : null);
+    const vsName = cg.opponentName ? ` vs ${cg.opponentName}` : '';
+    p2pEngineRef.current?.destroy();
+    p2pEngineRef.current = null;
+    setP2pStats(null);
+    launchEntryWithRom(targetEntry, {
+      isNetplay: true,
+      isHost: false,
+      isSpectator: true,
+      playerIndex: 2,
+      badgeSuffix: `SPECTATEUR LIVE (${targetUser.name || targetUser.displayName}${vsName})`,
+      refundCoinOnFail: false,
+      opponentName: targetUser.name || targetUser.displayName,
+      opponentUid: targetUser.uid,
+      hostUid,
+      challengeId,
+    });
+  }, []);
+
   const refreshPlatformCache = () => {
     getPlatformCacheStats().then(setCacheStats).catch(() => {});
   };
@@ -515,8 +569,17 @@ export default function App() {
     const unsubW = subscribeWallet(setCoins);
     const unsubC = firebaseFightcadeService.subscribeActiveChannels(setActiveChannels);
     const unsubCh = firebaseFightcadeService.subscribeIncomingChallenges((list) => {
-      if (list.length > 0) {
-        setIncomingChallenge(list[0]);
+      const validList = [];
+      for (const ch of list) {
+        const entry = ch?.gameEntry || { id: ch?.gameId, title: ch?.gameTitle };
+        if (supportsOnlineMultiplayer(entry)) {
+          validList.push(ch);
+        } else if (ch?.challengeId) {
+          firebaseFightcadeService.respondChallenge(ch.challengeId, false, ch.fromUid);
+        }
+      }
+      if (validList.length > 0) {
+        setIncomingChallenge(validList[0]);
         if (settings?.netplay?.challengeSound ?? true) playChallengeSound();
       }
     });
@@ -544,6 +607,12 @@ export default function App() {
       window.removeEventListener('keydown', onKey);
     };
   }, [isSettingsOpen, settings?.netplay?.challengeSound]);
+
+  // Écoute temps-réel du système d'amitié (amis en ligne, demandes reçues/envoyées)
+  useEffect(() => {
+    const unsub = subscribeFriendsState(userProfile, setFriendsState);
+    return () => unsub?.();
+  }, [userProfile?.uid, userProfile?.displayName, userProfile?.photoURL, userProfile?.rank, userProfile?.region]);
 
   // Écoute temps-réel du nombre de joueurs connectés aux Salons Fightcade 2
   useEffect(() => {
@@ -643,6 +712,8 @@ export default function App() {
       const curSess = stageSessionRef.current;
       if (uid && curSess) {
         const gid = normalizeGameChannelId(activeGameEntryRef.current || { id: curSess.gameId, title: curSess.title });
+        const targetEntry = activeGameEntryRef.current || curSess;
+        const canMulti = !isJ2meGame(targetEntry) && supportsOnlineMultiplayer(targetEntry);
         pushActiveSession(uid, {
           gameId: gid,
           title: curSess.title,
@@ -651,7 +722,7 @@ export default function App() {
           platformLabel: activeGameEntryRef.current?.platformLabel || curSess.core?.toUpperCase() || 'Arcade',
           filename: curSess.filename,
           gameEntry: activeGameEntryRef.current,
-          inSalon: curSess.kind !== 'j2me',
+          inSalon: canMulti,
           status: 'playing',
           hasSavestate: curSess.kind !== 'j2me',
         });
@@ -760,6 +831,23 @@ export default function App() {
 
             <button
               type="button"
+              onClick={() => setIsFriendsOpen(true)}
+              aria-label="Amis & Social"
+              title="Amis & Social (style Fortnite)"
+              className="arcade-focus-ring relative flex items-center justify-center w-9 h-9 rounded-xl bg-neutral-900 hover:bg-neutral-800 border border-white/10 text-cyan-300 transition-colors"
+            >
+              <Users className="w-4 h-4" aria-hidden="true" />
+              {friendsState.incomingRequests.length > 0 ? (
+                <span className="absolute -top-1 -right-1 px-1 rounded-full bg-amber-500 text-black text-[9px] font-black leading-tight">
+                  {friendsState.incomingRequests.length}
+                </span>
+              ) : friendsState.friends.some((f) => f.isOnline) ? (
+                <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-emerald-400" aria-hidden="true" />
+              ) : null}
+            </button>
+
+            <button
+              type="button"
               onClick={() => setIsSettingsOpen(true)}
               aria-label="Paramètres unifiés"
               title="Paramètres"
@@ -781,6 +869,11 @@ export default function App() {
                   : 'bg-cyan-950/40 border-cyan-500/40 text-cyan-200 hover:bg-cyan-950/70'
               }`}
             >
+              <PlayerAvatar
+                photoURL={userProfile?.photoURL}
+                name={userProfile?.displayName || 'Joueur'}
+                size="xs"
+              />
               <span
                 className={`px-1.5 py-0.5 rounded border text-[10px] font-mono font-black ${
                   getRankTierMeta(userProfile?.rank || 'D').color
@@ -792,7 +885,24 @@ export default function App() {
               <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-white/10 text-neutral-200">
                 {userProfile?.region || 'FR'}
               </span>
-              <UserCheck className="w-3.5 h-3.5 text-emerald-400" aria-hidden="true" />
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setIsFriendsOpen(true)}
+              title="Amis & Social — Trouver vos amis et jouer ensemble"
+              className="arcade-focus-ring relative flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-neutral-900 hover:bg-neutral-800 border border-cyan-500/35 text-xs font-bold text-cyan-200 transition-colors"
+            >
+              <Users className="w-3.5 h-3.5 text-cyan-400" aria-hidden="true" />
+              <span>Amis</span>
+              <span className="px-1.5 py-0.2 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-[10px] font-mono tabular-nums">
+                {friendsState.friends.filter((f) => f.isOnline).length}
+              </span>
+              {friendsState.incomingRequests.length > 0 && (
+                <span className="px-1.5 py-0.2 rounded-full bg-amber-500 text-black text-[10px] font-mono font-black">
+                  +{friendsState.incomingRequests.length}
+                </span>
+              )}
             </button>
 
             <div className="flex items-center gap-1.5">
@@ -866,6 +976,11 @@ export default function App() {
             }`}
           >
             <span className="flex items-center gap-1.5 min-w-0">
+              <PlayerAvatar
+                photoURL={userProfile?.photoURL}
+                name={userProfile?.displayName || 'Joueur'}
+                size="xs"
+              />
               <span
                 className={`px-1 rounded border text-[10px] font-mono font-black shrink-0 ${
                   getRankTierMeta(userProfile?.rank || 'D').color
@@ -1014,6 +1129,8 @@ export default function App() {
           <FightcadeLobbyView
             channel={resolvedSelectedChannel}
             activeChannels={activeChannels}
+            userProfile={userProfile}
+            friendsState={friendsState}
             onChallengePlayer={handleChallengePlayer}
             onSelectChannel={(id) => setSelectedChannelId(id)}
             onOpenAuth={() => setIsAuthOpen(true)}
@@ -1026,32 +1143,7 @@ export default function App() {
                 badgeSuffix: 'TRAINING · AU SALON',
               });
             }}
-            onSpectateMatch={(channel, targetUser) => {
-              const targetEntry = !channel?.isGlobal && channel?.entry
-                ? { ...(targetUser?.currentGame || {}), ...channel.entry }
-                : targetUser?.currentGame || channel?.entry;
-              if (!targetEntry) return;
-              const cg = targetUser?.currentGame || {};
-              const mm = targetUser?.matchMeta || {};
-              const challengeId = mm.challengeId || cg.challengeId || null;
-              const hostUid = mm.hostUid || cg.hostUid || (mm.isHost === true ? targetUser.uid : null);
-              const vsName = cg.opponentName ? ` vs ${cg.opponentName}` : '';
-              p2pEngineRef.current?.destroy();
-              p2pEngineRef.current = null;
-              setP2pStats(null);
-              launchEntryWithRom(targetEntry, {
-                isNetplay: true,
-                isHost: false,
-                isSpectator: true,
-                playerIndex: 2,
-                badgeSuffix: `SPECTATEUR LIVE (${targetUser.name}${vsName})`,
-                refundCoinOnFail: false,
-                opponentName: targetUser.name,
-                opponentUid: targetUser.uid,
-                hostUid,
-                challengeId,
-              });
-            }}
+            onSpectateMatch={handleSpectateTarget}
             onLeaveChannel={handleLeaveFightcadeChannel}
           />
         ) : (
@@ -1061,6 +1153,7 @@ export default function App() {
             onCacheChanged={refreshPlatformCache}
             onJoinChannel={handleJoinFightcadeChannel}
             onRequireCoin={requireAndConsumeCoin}
+            onCatalogLoaded={handleCatalogLoaded}
           />
         )}
       </div>
@@ -1071,6 +1164,38 @@ export default function App() {
         onClose={() => setIsAuthOpen(false)}
         userProfile={userProfile}
         activeChannels={activeChannels}
+      />
+
+      {/* Panneau Amis & Social style Fortnite */}
+      <FriendsDrawer
+        isOpen={isFriendsOpen}
+        onClose={() => setIsFriendsOpen(false)}
+        userProfile={userProfile}
+        friendsState={friendsState}
+        activeChannels={activeChannels}
+        onChallengeFriend={(friend, gameCandidate) => {
+          const entry = gameCandidate?.entry || gameCandidate;
+          if (!entry) return;
+          setIsFriendsOpen(false);
+          handleChallengePlayer(
+            {
+              gameId: normalizeGameChannelId(entry),
+              title: entry.title || gameCandidate?.title || 'Jeu Arcade',
+              entry,
+            },
+            { ...friend, name: friend.displayName || friend.name }
+          );
+        }}
+        onJoinFriendGameChannel={(gameCandidate) => {
+          const entry = gameCandidate?.entry || gameCandidate;
+          if (!entry) return;
+          setIsFriendsOpen(false);
+          handleJoinFightcadeChannel(entry);
+        }}
+        onSpectateFriend={(friend) => {
+          setIsFriendsOpen(false);
+          handleSpectateTarget({ isGlobal: true }, friend);
+        }}
       />
 
       {/* Sas de Synchronisation Multijoueur (Match Room) */}
@@ -1279,6 +1404,8 @@ export default function App() {
           const curSess = stageSessionRef.current;
           if (!uid || !curSess) return;
           const gid = normalizeGameChannelId(activeGameEntryRef.current || { id: curSess.gameId, title: curSess.title });
+          const targetEntry = activeGameEntryRef.current || curSess;
+          const canMulti = !isJ2meGame(targetEntry) && supportsOnlineMultiplayer(targetEntry);
           pushCloudSavestate(uid, gid, stateBase64).then((ok) => {
             if (ok) {
               pushActiveSession(uid, {
@@ -1289,7 +1416,7 @@ export default function App() {
                 platformLabel: activeGameEntryRef.current?.platformLabel || curSess.core?.toUpperCase() || 'Arcade',
                 filename: curSess.filename,
                 gameEntry: activeGameEntryRef.current,
-                inSalon: curSess.kind !== 'j2me',
+                inSalon: canMulti,
                 status: 'playing',
                 hasSavestate: true,
               });
@@ -1297,7 +1424,10 @@ export default function App() {
           });
         }}
         onOpenSalon={() => {
-          const targetId = stageSession?.gameId || activeChannels[0]?.gameId || GLOBAL_CHANNEL_ID;
+          const currentEntry = activeGameEntryRef.current || stageSession;
+          const targetId = supportsOnlineMultiplayer(currentEntry)
+            ? stageSession?.gameId || activeChannels[0]?.gameId || GLOBAL_CHANNEL_ID
+            : GLOBAL_CHANNEL_ID;
           handleCloseStage();
           setSelectedChannelId(targetId);
         }}

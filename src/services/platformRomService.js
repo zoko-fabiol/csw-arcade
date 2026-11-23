@@ -133,6 +133,8 @@ export async function saveCachedRom(id, buffer, meta = {}) {
         mode: meta.mode || 'retro',
         platform: meta.platform || 'retro',
         core: meta.core || 'nes',
+        players: meta.players || null,
+        supportsMultiplayer: typeof meta.supportsMultiplayer === 'boolean' ? meta.supportsMultiplayer : null,
         size: buffer.byteLength,
         data: buffer,
         cachedAt: Date.now(),
@@ -163,6 +165,8 @@ export async function listCachedRoms(mode = null) {
               mode: r.mode,
               platform: r.platform,
               core: r.core,
+              players: r.players || null,
+              supportsMultiplayer: typeof r.supportsMultiplayer === 'boolean' ? r.supportsMultiplayer : null,
               size: r.size || r.data?.byteLength || 0,
               cachedAt: r.cachedAt || 0,
             }))
@@ -415,6 +419,8 @@ export async function downloadAndCacheRom(entry, { mode = 'retro', core = 'nes',
       mode,
       platform: entry.platform || core,
       core,
+      players: entry.players || null,
+      supportsMultiplayer: typeof entry.supportsMultiplayer === 'boolean' ? entry.supportsMultiplayer : null,
     });
   }
 

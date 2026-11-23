@@ -10,7 +10,8 @@
     "rating": "4.8",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par SNK / Pallas (1991). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/2020superbaseball.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "3countbout",
@@ -23,7 +24,8 @@
     "rating": "4.6",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par SNK (1993). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/3countbout.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "aggressorsofdarkkombat",
@@ -36,7 +38,8 @@
     "rating": "4.8",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par ADK / SNK (1994). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/aggressorsofdarkkombat.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "alphamission2",
@@ -49,7 +52,8 @@
     "rating": "4.9",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par SNK (1991). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/alphamission2.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "androdunos",
@@ -62,7 +66,8 @@
     "rating": "4.6",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par Visco / SNK (1992). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/androdunos.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "artoffighting1",
@@ -75,7 +80,8 @@
     "rating": "5.0",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par SNK (1992). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/artoffighting1.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "artoffighting2",
@@ -88,7 +94,8 @@
     "rating": "5.0",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par SNK (1994). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/artoffighting2.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "artoffighting3",
@@ -101,20 +108,22 @@
     "rating": "5.0",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par SNK (1996). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/artoffighting3.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "bakatonosmahjong",
     "title": "Bakatonos Mahjong Manyuki",
     "filename": "bakatonosmahjong.zip",
-    "players": 2,
+    "players": 1,
     "year": 1991,
     "genre": "Board / Mahjong",
     "publisher": "Monolith",
     "rating": "4.7",
-    "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par Monolith (1991). Compatible solo et Netplay 1v1 P2P.",
+    "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par Monolith (1991). Compatible mode Solo uniquement.",
     "coverUrl": "/previews/bakatonosmahjong.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": false
   },
   {
     "id": "bangbead",
@@ -127,7 +136,8 @@
     "rating": "4.9",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par Visco (2000). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/bangbead.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "baseballstars2",
@@ -140,7 +150,8 @@
     "rating": "5.0",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par SNK (1992). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/baseballstars2.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "baseballstarsprofessional",
@@ -153,7 +164,8 @@
     "rating": "4.6",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par SNK (1990). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/baseballstarsprofessional.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "battleflipshot",
@@ -166,7 +178,8 @@
     "rating": "5.0",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par Visco (1998). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/battleflipshot.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "blazingstar",
@@ -179,7 +192,8 @@
     "rating": "4.7",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par Yumekobo / SNK (1998). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/blazingstar.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "bluesjourney",
@@ -192,7 +206,8 @@
     "rating": "4.8",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par Alpha Denshi / SNK (1991). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/bluesjourney.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "breakers",
@@ -205,7 +220,8 @@
     "rating": "4.9",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par Visco (1996). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/breakers.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "breakersrevenge",
@@ -218,7 +234,8 @@
     "rating": "4.6",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par Visco (1998). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/breakersrevenge.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "burningfight",
@@ -231,7 +248,8 @@
     "rating": "4.8",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par SNK (1991). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/burningfight.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "captaintomaday",
@@ -244,7 +262,8 @@
     "rating": "5.0",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par Visco (1999). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/captaintomaday.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "columns",
@@ -257,7 +276,8 @@
     "rating": "4.8",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par Sega / SNK (1990). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/columns.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "crossedswords",
@@ -270,7 +290,8 @@
     "rating": "4.9",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par Alpha Denshi / SNK (1991). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/crossedswords.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "cthd2003",
@@ -283,7 +304,8 @@
     "rating": "4.9",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par Bootleg / Hack (2003). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/cthd2003.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "cthd2003s2",
@@ -296,7 +318,8 @@
     "rating": "4.6",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par Bootleg / Hack (2003). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/cthd2003s2.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "cthd2003superplus",
@@ -309,7 +332,8 @@
     "rating": "4.8",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par Bootleg / Hack (2003). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/cthd2003superplus.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "cyberlip",
@@ -322,7 +346,8 @@
     "rating": "4.9",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par SNK (1990). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/cyberlip.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "doubledragon",
@@ -335,7 +360,8 @@
     "rating": "4.8",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par Technos / SNK (1995). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/doubledragon.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "eightman",
@@ -348,7 +374,8 @@
     "rating": "4.9",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par Pallas / SNK (1991). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/eightman.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "fatalfury1",
@@ -361,7 +388,8 @@
     "rating": "4.6",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par SNK (1991). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/fatalfury1.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "fatalfury2",
@@ -374,7 +402,8 @@
     "rating": "4.6",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par SNK (1992). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/fatalfury2.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "fatalfury3",
@@ -387,7 +416,8 @@
     "rating": "4.6",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par SNK (1995). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/fatalfury3.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "fatalfuryspecial",
@@ -400,7 +430,8 @@
     "rating": "4.7",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par SNK (1993). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/fatalfuryspecial.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "fightfever",
@@ -413,7 +444,8 @@
     "rating": "4.6",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par Viccom (1994). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/fightfever.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "footballfrenzy",
@@ -426,7 +458,8 @@
     "rating": "5.0",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par SNK (1992). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/footballfrenzy.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "galaxyfight",
@@ -439,7 +472,8 @@
     "rating": "4.7",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par Sunsoft (1995). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/galaxyfight.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "ganryu",
@@ -452,7 +486,8 @@
     "rating": "4.7",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par Visco (1999). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/ganryu.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "garou",
@@ -465,7 +500,8 @@
     "rating": "4.6",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par SNK (1999). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/garou.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "ghostlop",
@@ -478,7 +514,8 @@
     "rating": "4.9",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par Data East (1996). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/ghostlop.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "ghostpilots",
@@ -491,7 +528,8 @@
     "rating": "4.7",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par SNK (1991). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/ghostpilots.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "goalgoalgoal",
@@ -504,7 +542,8 @@
     "rating": "4.8",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par Visco (1995). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/goalgoalgoal.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "gururin",
@@ -517,7 +556,8 @@
     "rating": "4.8",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par Action (1994). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/gururin.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "jonasindiana",
@@ -530,20 +570,22 @@
     "rating": "4.8",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par Homebrew (2005). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/jonasindiana.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "jyanshindensetsu",
     "title": "Jyanshin Densetsu: Quest of Jongmaster",
     "filename": "jyanshindensetsu.zip",
-    "players": 2,
+    "players": 1,
     "year": 1994,
     "genre": "Board / Mahjong",
     "publisher": "Aicom / Yuga",
     "rating": "4.7",
-    "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par Aicom / Yuga (1994). Compatible solo et Netplay 1v1 P2P.",
+    "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par Aicom / Yuga (1994). Compatible mode Solo uniquement.",
     "coverUrl": "/previews/jyanshindensetsu.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": false
   },
   {
     "id": "kabukiklash",
@@ -556,7 +598,8 @@
     "rating": "4.7",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par Hudson Soft (1995). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/kabukiklash.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "karnovsrevenge",
@@ -569,7 +612,8 @@
     "rating": "5.0",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par Data East (1994). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/karnovsrevenge.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "kingofgladiator",
@@ -582,7 +626,8 @@
     "rating": "4.6",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par Bootleg / Hack (2003). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/kingofgladiator.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "kingofthemonsters1",
@@ -595,7 +640,8 @@
     "rating": "4.9",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par SNK (1991). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/kingofthemonsters1.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "kingofthemonsters2",
@@ -608,7 +654,8 @@
     "rating": "4.9",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par SNK (1992). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/kingofthemonsters2.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "kizunaencounter",
@@ -621,7 +668,8 @@
     "rating": "4.6",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par SNK (1996). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/kizunaencounter.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "kof10th",
@@ -634,7 +682,8 @@
     "rating": "4.8",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par Bootleg / Hack (2004). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/kof10th.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "kof10thextraplus",
@@ -647,7 +696,8 @@
     "rating": "4.7",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par Bootleg / Hack (2004). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/kof10thextraplus.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "kof10thunique",
@@ -660,7 +710,8 @@
     "rating": "4.9",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par Bootleg / Hack (2004). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/kof10thunique.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "kof2000",
@@ -673,7 +724,8 @@
     "rating": "4.8",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par SNK (2000). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/kof2000.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "kof2001",
@@ -686,7 +738,8 @@
     "rating": "4.8",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par Eolith / SNK (2001). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/kof2001.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "kof2001plus",
@@ -699,7 +752,8 @@
     "rating": "4.7",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par Bootleg / Hack (2001). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/kof2001plus.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "kof2001pluss2",
@@ -712,7 +766,8 @@
     "rating": "4.9",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par Bootleg / Hack (2001). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/kof2001pluss2.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "kof2002",
@@ -725,7 +780,8 @@
     "rating": "4.8",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par Eolith / Playmore (2002). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/kof2002.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "kof2002magicplus",
@@ -738,7 +794,8 @@
     "rating": "4.7",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par Bootleg / Hack (2002). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/kof2002magicplus.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "kof2002magicplus2",
@@ -751,7 +808,8 @@
     "rating": "4.8",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par Bootleg / Hack (2002). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/kof2002magicplus2.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "kof2002plus",
@@ -764,7 +822,8 @@
     "rating": "4.7",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par Bootleg / Hack (2002). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/kof2002plus.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "kof2002pluss2",
@@ -777,7 +836,8 @@
     "rating": "4.9",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par Bootleg / Hack (2002). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/kof2002pluss2.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "kof2002pluss3",
@@ -790,7 +850,8 @@
     "rating": "4.9",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par Bootleg / Hack (2002). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/kof2002pluss3.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "kof2003",
@@ -803,7 +864,8 @@
     "rating": "4.8",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par SNK Playmore (2003). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/kof2003.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "kof2004hero",
@@ -816,7 +878,8 @@
     "rating": "4.7",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par Bootleg / Hack (2004). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/kof2004hero.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "kof2004ultraplus",
@@ -829,7 +892,8 @@
     "rating": "4.7",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par Bootleg / Hack (2004). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/kof2004ultraplus.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "kof94",
@@ -842,7 +906,8 @@
     "rating": "4.6",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par SNK (1994). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/kof94.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "kof95",
@@ -855,7 +920,8 @@
     "rating": "4.6",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par SNK (1995). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/kof95.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "kof96",
@@ -868,7 +934,8 @@
     "rating": "4.6",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par SNK (1996). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/kof96.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "kof96bootleg",
@@ -881,7 +948,8 @@
     "rating": "4.8",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par Bootleg (1996). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/kof96bootleg.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "kof97",
@@ -894,7 +962,8 @@
     "rating": "4.6",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par SNK (1997). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/kof97.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "kof97plus",
@@ -907,7 +976,8 @@
     "rating": "5.0",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par Bootleg / Hack (1997). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/kof97plus.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "kof97pluss2",
@@ -920,7 +990,8 @@
     "rating": "4.7",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par Bootleg / Hack (1997). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/kof97pluss2.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "kof98",
@@ -933,7 +1004,8 @@
     "rating": "4.6",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par SNK (1998). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/kof98.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "kof99",
@@ -946,7 +1018,8 @@
     "rating": "4.6",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par SNK (1999). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/kof99.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "kofspecial2004",
@@ -959,7 +1032,8 @@
     "rating": "5.0",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par Bootleg / Hack (2004). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/kofspecial2004.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "kofspecial2004plus",
@@ -972,7 +1046,8 @@
     "rating": "4.9",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par Bootleg / Hack (2004). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/kofspecial2004plus.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "lansquenet2004",
@@ -985,7 +1060,8 @@
     "rating": "5.0",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par Bootleg / Hack (2004). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/lansquenet2004.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "lastresort",
@@ -998,7 +1074,8 @@
     "rating": "4.6",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par SNK (1992). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/lastresort.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "leaguebowling",
@@ -1011,20 +1088,22 @@
     "rating": "4.9",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par SNK (1990). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/leaguebowling.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "legendofsuccessjoe",
     "title": "Legend of Success Joe",
     "filename": "legendofsuccessjoe.zip",
-    "players": 2,
+    "players": 1,
     "year": 1991,
     "genre": "Beat 'em up",
     "publisher": "Wave Corp / SNK",
     "rating": "4.9",
-    "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par Wave Corp / SNK (1991). Compatible solo et Netplay 1v1 P2P.",
+    "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par Wave Corp / SNK (1991). Compatible mode Solo uniquement.",
     "coverUrl": "/previews/legendofsuccessjoe.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": false
   },
   {
     "id": "magicaldrop2",
@@ -1037,7 +1116,8 @@
     "rating": "4.8",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par Data East (1996). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/magicaldrop2.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "magicaldrop3",
@@ -1050,33 +1130,36 @@
     "rating": "4.8",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par Data East (1997). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/magicaldrop3.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "magicianlord",
     "title": "Magician Lord",
     "filename": "magicianlord.zip",
-    "players": 2,
+    "players": 1,
     "year": 1990,
     "genre": "Platformer / Action",
     "publisher": "Alpha Denshi / SNK",
     "rating": "4.8",
-    "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par Alpha Denshi / SNK (1990). Compatible solo et Netplay 1v1 P2P.",
+    "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par Alpha Denshi / SNK (1990). Compatible mode Solo uniquement.",
     "coverUrl": "/previews/magicianlord.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": false
   },
   {
     "id": "mahjongkyoretsuden",
     "title": "Mahjong Kyouretsuden",
     "filename": "mahjongkyoretsuden.zip",
-    "players": 2,
+    "players": 1,
     "year": 1990,
     "genre": "Board / Mahjong",
     "publisher": "SNK",
     "rating": "4.9",
-    "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par SNK (1990). Compatible solo et Netplay 1v1 P2P.",
+    "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par SNK (1990). Compatible mode Solo uniquement.",
     "coverUrl": "/previews/mahjongkyoretsuden.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": false
   },
   {
     "id": "marukosdeluxequiz",
@@ -1089,7 +1172,8 @@
     "rating": "4.8",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par Takara / SNK (1995). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/marukosdeluxequiz.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "metalslug1",
@@ -1102,7 +1186,8 @@
     "rating": "4.6",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par Nazca / SNK (1996). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/metalslug1.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "metalslug2",
@@ -1115,7 +1200,8 @@
     "rating": "4.6",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par SNK (1998). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/metalslug2.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "metalslug3",
@@ -1128,7 +1214,8 @@
     "rating": "4.6",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par SNK (2000). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/metalslug3.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "metalslug4",
@@ -1141,7 +1228,8 @@
     "rating": "4.6",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par Mega Enterprise / Playmore (2002). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/metalslug4.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "metalslug4plus",
@@ -1154,7 +1242,8 @@
     "rating": "5.0",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par Bootleg / Hack (2002). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/metalslug4plus.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "metalslug5",
@@ -1167,7 +1256,8 @@
     "rating": "4.6",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par SNK Playmore (2003). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/metalslug5.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "metalslug5plus",
@@ -1180,7 +1270,8 @@
     "rating": "5.0",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par Bootleg / Hack (2003). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/metalslug5plus.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "metalslugx",
@@ -1193,20 +1284,22 @@
     "rating": "4.6",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par SNK (1999). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/metalslugx.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "minnasanookagesa",
     "title": "Minna-san no Okagesama Desu",
     "filename": "minnasanookagesa.zip",
-    "players": 2,
+    "players": 1,
     "year": 1990,
     "genre": "Board / Mahjong",
     "publisher": "Monolith",
     "rating": "4.7",
-    "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par Monolith (1990). Compatible solo et Netplay 1v1 P2P.",
+    "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par Monolith (1990). Compatible mode Solo uniquement.",
     "coverUrl": "/previews/minnasanookagesa.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": false
   },
   {
     "id": "moneyidolexchanger",
@@ -1219,7 +1312,8 @@
     "rating": "4.9",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par Face (1997). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/moneyidolexchanger.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "mutationnation",
@@ -1232,7 +1326,8 @@
     "rating": "5.0",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par SNK (1992). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/mutationnation.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "nam1975",
@@ -1245,7 +1340,8 @@
     "rating": "4.8",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par SNK (1990). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/nam1975.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "neobomberman",
@@ -1258,20 +1354,22 @@
     "rating": "4.8",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par Hudson Soft (1997). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/neobomberman.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "neodriftout",
     "title": "Neo Drift Out: New Technology",
     "filename": "neodriftout.zip",
-    "players": 2,
+    "players": 1,
     "year": 1996,
     "genre": "Racing / Arcade",
     "publisher": "Visco",
     "rating": "4.7",
-    "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par Visco (1996). Compatible solo et Netplay 1v1 P2P.",
+    "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par Visco (1996). Compatible mode Solo uniquement.",
     "coverUrl": "/previews/neodriftout.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": false
   },
   {
     "id": "neogeocup98",
@@ -1284,20 +1382,22 @@
     "rating": "4.7",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par SNK (1998). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/neogeocup98.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "neomr.do",
     "title": "Neo Mr. Do!",
     "filename": "neomr.do.zip",
-    "players": 2,
+    "players": 1,
     "year": 1996,
     "genre": "Puzzle / Maze",
     "publisher": "Visco",
     "rating": "4.9",
-    "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par Visco (1996). Compatible solo et Netplay 1v1 P2P.",
+    "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par Visco (1996). Compatible mode Solo uniquement.",
     "coverUrl": "/previews/neomr.do.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": false
   },
   {
     "id": "neonopanepon",
@@ -1310,7 +1410,8 @@
     "rating": "4.8",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par Homebrew (2002). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/neonopanepon.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "neopong",
@@ -1323,7 +1424,8 @@
     "rating": "4.8",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par Homebrew (2002). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/neopong.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "neoturfmasters",
@@ -1336,7 +1438,8 @@
     "rating": "5.0",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par Nazca / SNK (1996). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/neoturfmasters.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "nightmareinthedark",
@@ -1349,7 +1452,8 @@
     "rating": "4.9",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par Eleven / Gavaking (2000). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/nightmareinthedark.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "ninjacombat",
@@ -1362,7 +1466,8 @@
     "rating": "4.7",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par Alpha Denshi / SNK (1990). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/ninjacombat.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "ninjacommando",
@@ -1375,7 +1480,8 @@
     "rating": "4.9",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par Alpha Denshi / SNK (1992). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/ninjacommando.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "ninjamasters",
@@ -1388,20 +1494,22 @@
     "rating": "4.8",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par ADK / SNK (1996). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/ninjamasters.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "overtop",
     "title": "Over Top",
     "filename": "overtop.zip",
-    "players": 2,
+    "players": 1,
     "year": 1996,
     "genre": "Racing / Arcade",
     "publisher": "ADK / SNK",
     "rating": "4.8",
-    "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par ADK / SNK (1996). Compatible solo et Netplay 1v1 P2P.",
+    "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par ADK / SNK (1996). Compatible mode Solo uniquement.",
     "coverUrl": "/previews/overtop.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": false
   },
   {
     "id": "panicbomber",
@@ -1414,7 +1522,8 @@
     "rating": "4.7",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par Hudson Soft (1994). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/panicbomber.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "pleasuregoal",
@@ -1427,7 +1536,8 @@
     "rating": "4.8",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par Saurus (1996). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/pleasuregoal.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "pochi&nyaa",
@@ -1440,20 +1550,22 @@
     "rating": "4.6",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par Aiky / Taito (2003). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/pochi&nyaa.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "pokernight",
     "title": "Poker Night",
     "filename": "pokernight.zip",
-    "players": 2,
+    "players": 1,
     "year": 2003,
     "genre": "Board / Mahjong",
     "publisher": "Homebrew",
     "rating": "4.6",
-    "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par Homebrew (2003). Compatible solo et Netplay 1v1 P2P.",
+    "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par Homebrew (2003). Compatible mode Solo uniquement.",
     "coverUrl": "/previews/pokernight.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": false
   },
   {
     "id": "popnbounce",
@@ -1466,7 +1578,8 @@
     "rating": "4.6",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par Video System (1997). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/popnbounce.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "powerinstinctmatrimelee",
@@ -1479,7 +1592,8 @@
     "rating": "4.9",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par Noise Factory / Atlus (2003). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/powerinstinctmatrimelee.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "powerspikes2",
@@ -1492,7 +1606,8 @@
     "rating": "4.8",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par Video System (1994). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/powerspikes2.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "prehistoricisle2",
@@ -1505,20 +1620,22 @@
     "rating": "4.7",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par Yumekobo / SNK (1999). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/prehistoricisle2.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "pulstar",
     "title": "Pulstar",
     "filename": "pulstar.zip",
-    "players": 2,
+    "players": 1,
     "year": 1995,
     "genre": "Shoot 'em up",
     "publisher": "Aicom / SNK",
     "rating": "4.8",
-    "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par Aicom / SNK (1995). Compatible solo et Netplay 1v1 P2P.",
+    "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par Aicom / SNK (1995). Compatible mode Solo uniquement.",
     "coverUrl": "/previews/pulstar.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": false
   },
   {
     "id": "puzzlebobble1",
@@ -1531,7 +1648,8 @@
     "rating": "4.9",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par Taito (1994). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/puzzlebobble1.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "puzzlebobble2",
@@ -1544,7 +1662,8 @@
     "rating": "4.9",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par Taito / SNK (1999). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/puzzlebobble2.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "puzzled",
@@ -1557,7 +1676,8 @@
     "rating": "4.8",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par SNK (1990). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/puzzled.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "puzzledepon",
@@ -1570,7 +1690,8 @@
     "rating": "4.7",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par Visco (1995). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/puzzledepon.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "puzzledeponr",
@@ -1583,7 +1704,8 @@
     "rating": "4.8",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par Visco (1997). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/puzzledeponr.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "quizdaisousasen1",
@@ -1596,7 +1718,8 @@
     "rating": "4.7",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par SNK (1991). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/quizdaisousasen1.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "quizdaisousasen2",
@@ -1609,7 +1732,8 @@
     "rating": "4.7",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par SNK (1992). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/quizdaisousasen2.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "quizkingoffighters",
@@ -1622,7 +1746,8 @@
     "rating": "4.9",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par Saurus / SNK (1995). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/quizkingoffighters.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "rageofthedragons",
@@ -1635,7 +1760,8 @@
     "rating": "4.7",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par Evoga / Playmore (2002). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/rageofthedragons.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "ragnagard",
@@ -1648,7 +1774,8 @@
     "rating": "5.0",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par Saurus / System Vision (1996). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/ragnagard.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "realboutfatalfury1",
@@ -1661,7 +1788,8 @@
     "rating": "4.9",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par SNK (1995). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/realboutfatalfury1.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "realboutfatalfury2",
@@ -1674,7 +1802,8 @@
     "rating": "4.9",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par SNK (1998). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/realboutfatalfury2.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "realboutfatalfuryspecial",
@@ -1687,7 +1816,8 @@
     "rating": "5.0",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par SNK (1997). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/realboutfatalfuryspecial.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "ridinghero",
@@ -1700,7 +1830,8 @@
     "rating": "4.6",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par SNK (1990). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/ridinghero.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "roboarmy",
@@ -1713,7 +1844,8 @@
     "rating": "4.9",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par SNK (1991). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/roboarmy.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "samuraishodown1",
@@ -1726,7 +1858,8 @@
     "rating": "4.6",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par SNK (1993). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/samuraishodown1.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "samuraishodown2",
@@ -1739,7 +1872,8 @@
     "rating": "4.6",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par SNK (1994). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/samuraishodown2.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "samuraishodown3",
@@ -1752,7 +1886,8 @@
     "rating": "4.6",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par SNK (1995). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/samuraishodown3.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "samuraishodown4",
@@ -1765,7 +1900,8 @@
     "rating": "4.6",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par SNK (1996). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/samuraishodown4.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "samuraishodown5",
@@ -1778,7 +1914,8 @@
     "rating": "4.6",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par Yuki Enterprise / SNK (2003). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/samuraishodown5.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "samuraishodown5special",
@@ -1791,7 +1928,8 @@
     "rating": "4.8",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par Yuki Enterprise / SNK (2004). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/samuraishodown5special.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "savagereign",
@@ -1804,7 +1942,8 @@
     "rating": "4.7",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par SNK (1995). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/savagereign.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "sengoku1",
@@ -1817,7 +1956,8 @@
     "rating": "4.9",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par SNK (1991). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/sengoku1.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "sengoku2",
@@ -1830,7 +1970,8 @@
     "rating": "4.9",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par SNK (1993). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/sengoku2.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "sengoku3",
@@ -1843,7 +1984,8 @@
     "rating": "4.9",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par Noise Factory / SNK (2001). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/sengoku3.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "shocktroopers1",
@@ -1856,7 +1998,8 @@
     "rating": "5.0",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par Saurus / SNK (1997). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/shocktroopers1.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "shocktroopers2",
@@ -1869,7 +2012,8 @@
     "rating": "5.0",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par Saurus / SNK (1998). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/shocktroopers2.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "snkvscapcom",
@@ -1882,7 +2026,8 @@
     "rating": "4.7",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par SNK Playmore / Capcom (2003). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/snkvscapcom.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "snkvscapcomplus",
@@ -1895,7 +2040,8 @@
     "rating": "4.6",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par Bootleg / Hack (2003). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/snkvscapcomplus.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "snkvscapcompluss2",
@@ -1908,7 +2054,8 @@
     "rating": "4.8",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par Bootleg / Hack (2003). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/snkvscapcompluss2.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "snkvscapcomsuperplus",
@@ -1921,7 +2068,8 @@
     "rating": "4.6",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par Bootleg / Hack (2003). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/snkvscapcomsuperplus.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "soccerbrawl",
@@ -1934,7 +2082,8 @@
     "rating": "4.7",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par SNK (1992). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/soccerbrawl.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "sonicwings2",
@@ -1947,7 +2096,8 @@
     "rating": "4.7",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par Video System (1994). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/sonicwings2.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "sonicwings3",
@@ -1960,7 +2110,8 @@
     "rating": "4.7",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par Video System (1995). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/sonicwings3.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "spinmaster",
@@ -1973,7 +2124,8 @@
     "rating": "4.6",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par Data East (1993). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/spinmaster.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "stakeswinner1",
@@ -1986,7 +2138,8 @@
     "rating": "4.9",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par Saurus (1995). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/stakeswinner1.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "stakeswinner2",
@@ -1999,7 +2152,8 @@
     "rating": "4.9",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par Saurus (1996). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/stakeswinner2.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "streethoop",
@@ -2012,7 +2166,8 @@
     "rating": "4.6",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par Data East (1994). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/streethoop.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "strikers1945plus",
@@ -2025,7 +2180,8 @@
     "rating": "4.7",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par Psikyo (1999). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/strikers1945plus.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "superdodgeball",
@@ -2038,7 +2194,8 @@
     "rating": "5.0",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par Technos (1996). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/superdodgeball.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "supersidekicks1",
@@ -2051,7 +2208,8 @@
     "rating": "4.6",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par SNK (1992). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/supersidekicks1.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "supersidekicks2",
@@ -2064,7 +2222,8 @@
     "rating": "4.6",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par SNK (1994). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/supersidekicks2.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "supersidekicks3",
@@ -2077,7 +2236,8 @@
     "rating": "4.6",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par SNK (1995). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/supersidekicks3.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "syouginotatsujin",
@@ -2090,7 +2250,8 @@
     "rating": "4.7",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par ADK / SNK (1995). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/syouginotatsujin.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "tecmoworldsoccer96",
@@ -2103,7 +2264,8 @@
     "rating": "4.9",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par Tecmo (1996). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/tecmoworldsoccer96.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "thelastblade1",
@@ -2116,7 +2278,8 @@
     "rating": "4.9",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par SNK (1997). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/thelastblade1.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "thelastblade2",
@@ -2129,20 +2292,22 @@
     "rating": "4.9",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par SNK (1998). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/thelastblade2.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "thesuperspy",
     "title": "The Super Spy",
     "filename": "thesuperspy.zip",
-    "players": 2,
+    "players": 1,
     "year": 1990,
     "genre": "Action / Shooter",
     "publisher": "SNK",
     "rating": "4.7",
-    "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par SNK (1990). Compatible solo et Netplay 1v1 P2P.",
+    "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par SNK (1990). Compatible mode Solo uniquement.",
     "coverUrl": "/previews/thesuperspy.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": false
   },
   {
     "id": "theultimate2",
@@ -2155,20 +2320,22 @@
     "rating": "4.8",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par SNK (1996). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/theultimate2.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "thrashrally",
     "title": "Thrash Rally",
     "filename": "thrashrally.zip",
-    "players": 2,
+    "players": 1,
     "year": 1991,
     "genre": "Racing / Arcade",
     "publisher": "Alpha Denshi / SNK",
     "rating": "4.7",
-    "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par Alpha Denshi / SNK (1991). Compatible solo et Netplay 1v1 P2P.",
+    "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par Alpha Denshi / SNK (1991). Compatible mode Solo uniquement.",
     "coverUrl": "/previews/thrashrally.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": false
   },
   {
     "id": "tophunter",
@@ -2181,7 +2348,8 @@
     "rating": "5.0",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par SNK (1994). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/tophunter.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "topplayersgolf",
@@ -2194,7 +2362,8 @@
     "rating": "5.0",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par SNK (1990). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/topplayersgolf.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "twinklestarsprites",
@@ -2207,20 +2376,22 @@
     "rating": "4.9",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par ADK / SNK (1996). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/twinklestarsprites.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "viewpoint",
     "title": "Viewpoint",
     "filename": "viewpoint.zip",
-    "players": 2,
+    "players": 1,
     "year": 1992,
     "genre": "Shoot 'em up",
     "publisher": "Sammy / Aicom",
     "rating": "5.0",
-    "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par Sammy / Aicom (1992). Compatible solo et Netplay 1v1 P2P.",
+    "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par Sammy / Aicom (1992). Compatible mode Solo uniquement.",
     "coverUrl": "/previews/viewpoint.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": false
   },
   {
     "id": "voltagefightergowcaizer",
@@ -2233,7 +2404,8 @@
     "rating": "4.9",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par Technos (1995). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/voltagefightergowcaizer.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "wakuwaku7",
@@ -2246,7 +2418,8 @@
     "rating": "5.0",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par Sunsoft (1996). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/wakuwaku7.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "windjammers",
@@ -2259,7 +2432,8 @@
     "rating": "4.7",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par Data East / SNK (1994). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/windjammers.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "worldheroes1",
@@ -2272,7 +2446,8 @@
     "rating": "4.8",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par Alpha Denshi / SNK (1992). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/worldheroes1.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "worldheroes2",
@@ -2285,7 +2460,8 @@
     "rating": "4.8",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par ADK / SNK (1993). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/worldheroes2.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "worldheroes2jet",
@@ -2298,7 +2474,8 @@
     "rating": "4.6",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par ADK / SNK (1994). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/worldheroes2jet.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "worldheroesperfect",
@@ -2311,7 +2488,8 @@
     "rating": "4.9",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par ADK / SNK (1995). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/worldheroesperfect.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "zedblade",
@@ -2324,7 +2502,8 @@
     "rating": "4.9",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par NMK (1994). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/zedblade.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "zintrick",
@@ -2337,7 +2516,8 @@
     "rating": "4.9",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par SNK (1996). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/zintrick.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   },
   {
     "id": "zupapa",
@@ -2350,6 +2530,7 @@
     "rating": "4.7",
     "description": "Chef-d'œuvre arcade Neo Geo MVS / AES par SNK / Face (2001). Compatible solo et Netplay 1v1 P2P.",
     "coverUrl": "/previews/zupapa.bmp",
-    "bios": "mvs"
+    "bios": "mvs",
+    "supportsMultiplayer": true
   }
 ]

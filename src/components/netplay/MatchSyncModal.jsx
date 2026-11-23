@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { firebaseFightcadeService } from '../../services/firebaseFightcadeService';
 import { downloadAndCacheRom, formatBytes } from '../../services/platformRomService';
+import { supportsOnlineMultiplayer } from '../../utils/gameCapabilities';
 
 /**
  * Sas de Synchronisation Multijoueur CSW-Arcade
@@ -84,6 +85,15 @@ export function MatchSyncModal({
     setRemoteReady(false);
     setCountdown(null);
     setCancelReason('');
+
+    if (challenge?.gameEntry && !supportsOnlineMultiplayer(challenge.gameEntry)) {
+      setPhase('cancelled');
+      setCancelReason('Ce jeu est compatible mode Solo uniquement (multijoueur en ligne désactivé).');
+      if (opponentUid) {
+        firebaseFightcadeService.sendMatchCancel(challenge.challengeId, opponentUid);
+      }
+      return;
+    }
 
     if (isHost) {
       if (challenge.status === 'accepted') {

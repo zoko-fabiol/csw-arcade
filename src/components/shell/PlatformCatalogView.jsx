@@ -24,6 +24,7 @@ import {
 } from '../../services/platformRomService';
 import { addCoins } from '../../services/walletService';
 import { GameCover } from './GameCover';
+import { getMultiplayerBadgeMeta, supportsOnlineMultiplayer } from '../../utils/gameCapabilities';
 
 const PAGE_SIZE = 48;
 
@@ -42,6 +43,7 @@ const MODE_CONFIG = {
     onlinePlaceholder: 'Rechercher n’importe quelle ROM sur Archive.org…',
     filters: [
       { id: 'all', label: 'Tous les univers' },
+      { id: 'multiplayer', label: 'Multijoueur en ligne' },
       { id: 'fbneo', label: 'Neo Geo MVS' },
       { id: 'mame2003_plus', label: 'MAME 2003-Plus' },
       { id: 'ps1', label: 'PlayStation' },
@@ -63,6 +65,7 @@ const MODE_CONFIG = {
     onlinePlaceholder: 'Rechercher une ROM Arcade / MAME / Console sur Archive.org…',
     filters: [
       { id: 'all', label: 'Tout le catalogue' },
+      { id: 'multiplayer', label: 'Multijoueur en ligne' },
       { id: 'fbneo', label: 'Neo Geo MVS (Auto-DL)' },
       { id: 'mame2003_plus', label: 'MAME 2003-Plus (32/16-bit)' },
       { id: 'n64', label: 'Nintendo 64 (64-bit)' },
@@ -81,6 +84,7 @@ const MODE_CONFIG = {
     onlinePlaceholder: 'Rechercher un jeu PS1 sur Archive.org (ex: Tekken, Crash)…',
     filters: [
       { id: 'all', label: 'Tout le catalogue' },
+      { id: 'multiplayer', label: 'Multijoueur en ligne' },
       { id: 'ps1', label: 'PlayStation (PS1)' },
       { id: 'local', label: 'En cache IndexedDB' },
     ],
@@ -96,6 +100,7 @@ const MODE_CONFIG = {
     onlinePlaceholder: 'Rechercher un jeu Sega sur Archive.org (ex: Sonic, Aladdin)…',
     filters: [
       { id: 'all', label: 'Tout le catalogue' },
+      { id: 'multiplayer', label: 'Multijoueur en ligne' },
       { id: 'segaMD', label: 'Mega Drive / Genesis' },
       { id: 'segaMS', label: 'Master System' },
       { id: 'segaGG', label: 'Game Gear' },
@@ -113,6 +118,7 @@ const MODE_CONFIG = {
     onlinePlaceholder: 'Rechercher un jeu Nintendo sur Archive.org (ex: Mario, Zelda)…',
     filters: [
       { id: 'all', label: 'Tout le catalogue' },
+      { id: 'multiplayer', label: 'Multijoueur en ligne' },
       { id: 'nes', label: 'NES' },
       { id: 'snes', label: 'Super Nintendo (SNES)' },
       { id: 'n64', label: 'Nintendo 64' },
@@ -182,6 +188,15 @@ function buildMergedArcade(arcJson) {
       const mapped = fbneoMapping[rawKey] || rawKey;
       const fn = `${mapped}.zip`;
       const encoded = encodeURIComponent(fn);
+      const supportsMulti =
+        typeof g.supportsMultiplayer === 'boolean'
+          ? g.supportsMultiplayer
+          : Number(g.players || 2) >= 2;
+      const playersLabel = supportsMulti
+        ? Number(g.players) > 2
+          ? `1–${g.players}J`
+          : '1–2J'
+        : '1J';
       return {
         id: `arc-neo-${mapped}`,
         title: g.title || g.name,
@@ -190,7 +205,8 @@ function buildMergedArcade(arcJson) {
         core: 'fbneo',
         year: g.year || null,
         genre: g.genre || 'Neo Geo Arcade',
-        players: '1–2J',
+        players: playersLabel,
+        supportsMultiplayer: supportsMulti,
         estimatedSize: g.size || 'Auto',
         filename: fn,
         imageUrl: g.coverUrl || null,
@@ -200,7 +216,9 @@ function buildMergedArcade(arcJson) {
           `/api/rom-proxy?url=${encodeURIComponent(`https://archive.org/download/neo-geo-mvs-romset/${encoded}`)}`,
           `https://archive.org/download/neo-geo-mvs-romset/${encoded}`,
         ],
-        description: g.description || 'ROM Neo Geo MVS — Lancement direct FBNeo.',
+        description:
+          g.description ||
+          (supportsMulti ? 'ROM Neo Geo MVS — Lancement direct FBNeo.' : 'ROM Neo Geo MVS (Mode Solo).'),
       };
     });
   return {
@@ -210,7 +228,7 @@ function buildMergedArcade(arcJson) {
   };
 }
 
-export function PlatformCatalogView({ mode, onLaunchStage, onCacheChanged, onJoinChannel, onRequireCoin }) {
+export function PlatformCatalogView({ mode, onLaunchStage, onCacheChanged, onJoinChannel, onRequireCoin, onCatalogLoaded }) {
   const cfg = MODE_CONFIG[mode] || MODE_CONFIG.arcade;
 
   const [catalog, setCatalog] = useState([]);
@@ -333,6 +351,12 @@ export function PlatformCatalogView({ mode, onLaunchStage, onCacheChanged, onJoi
     };
   }, [mode]);
 
+  useEffect(() => {
+    if (catalog.length > 0) {
+      onCatalogLoaded?.(catalog);
+    }
+  }, [catalog, onCatalogLoaded]);
+
   const cachedIds = useMemo(() => new Set(cachedRoms.map((c) => c.id)), [cachedRoms]);
 
   const liveCatalog = useMemo(
@@ -344,13 +368,17 @@ export function PlatformCatalogView({ mode, onLaunchStage, onCacheChanged, onJoi
     if (activeFilter === 'local') return [];
     const q = search.trim().toLowerCase();
     return liveCatalog.filter((item) => {
-      if (activeFilter !== 'all' && item.core !== activeFilter && item.platform !== activeFilter) return false;
+      if (activeFilter === 'multiplayer') {
+        if (!supportsOnlineMultiplayer(item, { mode })) return false;
+      } else if (activeFilter !== 'all' && item.core !== activeFilter && item.platform !== activeFilter) {
+        return false;
+      }
       if (!q) return true;
       return `${item.title || ''} ${item.platformLabel || ''} ${item.genre || ''} ${item.filename || ''}`
         .toLowerCase()
         .includes(q);
     });
-  }, [liveCatalog, activeFilter, search]);
+  }, [liveCatalog, activeFilter, search, mode]);
 
   const filteredCached = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -362,15 +390,25 @@ export function PlatformCatalogView({ mode, onLaunchStage, onCacheChanged, onJoi
   const launchFile = (file, coreOverride, titleOverride, entryOverride = null) => {
     const ext = file.name.split('.').pop()?.toLowerCase() || '';
     const resolvedCore = coreOverride || (ext === 'jar' ? 'j2me' : RETRO_EXT_CORE_MAP[ext] || cfg.defaultCore);
+    const isLocalImport = !entryOverride;
+    const isJ2me = resolvedCore === 'j2me' || mode === 'java' || ext === 'jar';
+    const canMulti =
+      !isLocalImport &&
+      !isJ2me &&
+      supportsOnlineMultiplayer(entryOverride, { core: resolvedCore, mode });
     onLaunchStage(
       {
-        kind: resolvedCore === 'j2me' || mode === 'java' ? 'j2me' : 'emu',
+        kind: isJ2me ? 'j2me' : 'emu',
         gameId: entryOverride?.id || titleOverride || file.name,
         title: titleOverride || file.name,
         filename: file.name,
-        badge: `${resolvedCore.toUpperCase()} · ${resolvedCore === 'j2me' ? 'J2ME' : 'EmulatorJS'}`,
+        badge: `${resolvedCore.toUpperCase()} · ${isJ2me ? 'J2ME' : 'EmulatorJS'}`,
         core: resolvedCore,
         fileBlob: file,
+        gameUrl: entryOverride?.urls?.[0] || '',
+        isLocalImport,
+        players: entryOverride?.players || (canMulti ? '1–2J' : '1J'),
+        supportsMultiplayer: canMulti,
         accent: cfg.accent,
       },
       entryOverride
@@ -421,8 +459,21 @@ export function PlatformCatalogView({ mode, onLaunchStage, onCacheChanged, onJoi
       refreshCache();
       return;
     }
+    const matchedEntry =
+      catalog.find((c) => c.id === item.id || (item.filename && c.filename === item.filename)) || null;
+    const resolvedCore = matchedEntry?.core || matchedEntry?.platform || item.core || cfg.defaultCore;
+    const resolvedEntry = matchedEntry || {
+      id: item.id,
+      title: item.title,
+      filename: cached.filename || item.filename,
+      core: resolvedCore,
+      platform: item.platform || resolvedCore,
+      players: item.players || null,
+      supportsMultiplayer:
+        typeof item.supportsMultiplayer === 'boolean' ? item.supportsMultiplayer : undefined,
+    };
     const f = new File([cached.data], cached.filename || item.filename, { type: 'application/octet-stream' });
-    launchFile(f, item.core || cfg.defaultCore, item.title);
+    launchFile(f, resolvedCore, matchedEntry?.title || item.title, resolvedEntry);
   };
 
   const handleOnlineSearch = async (e) => {
@@ -431,7 +482,10 @@ export function PlatformCatalogView({ mode, onLaunchStage, onCacheChanged, onJoi
     setOnlineSearching(true);
     setErrorMsg('');
     try {
-      const targetSys = activeFilter !== 'all' && activeFilter !== 'local' ? activeFilter : cfg.defaultCore;
+      const targetSys =
+        activeFilter !== 'all' && activeFilter !== 'local' && activeFilter !== 'multiplayer'
+          ? activeFilter
+          : cfg.defaultCore;
       const res = await searchOnlineRoms(onlineQuery, { system: targetSys, limit: 12 });
       setOnlineResults(res);
       if (!res.length) setErrorMsg(`Aucune ROM trouvée en ligne pour « ${onlineQuery} ».`);
@@ -455,7 +509,9 @@ export function PlatformCatalogView({ mode, onLaunchStage, onCacheChanged, onJoi
             ? total
             : f.id === 'local'
               ? cachedRoms.length
-              : liveCatalog.filter((g) => g.core === f.id || g.platform === f.id).length;
+              : f.id === 'multiplayer'
+                ? liveCatalog.filter((g) => supportsOnlineMultiplayer(g, { mode })).length
+                : liveCatalog.filter((g) => g.core === f.id || g.platform === f.id).length;
         return { ...f, count };
       })
       .filter((f) => {
@@ -466,7 +522,7 @@ export function PlatformCatalogView({ mode, onLaunchStage, onCacheChanged, onJoi
         if (total > 0 && f.count === total) return false;
         return true;
       });
-  }, [cfg.filters, liveCatalog, cachedRoms.length]);
+  }, [cfg.filters, liveCatalog, cachedRoms.length, mode]);
 
   // Sur mobile, quand on est dans "Tous les jeux", la barre d'univers en haut propose déjà PlayStation/Sega/Nintendo/Java :
   // on cache donc ces doublons de la barre de sous-filtres mobile !
@@ -759,7 +815,7 @@ export function PlatformCatalogView({ mode, onLaunchStage, onCacheChanged, onJoi
                       <button
                         type="button"
                         disabled={Boolean(downloadingId)}
-                        onClick={() => handleLaunchCatalogEntry({ ...item, core: guessedCore })}
+                        onClick={() => handleLaunchCatalogEntry({ ...item, core: guessedCore, supportsMultiplayer: false })}
                         className="arcade-focus-ring px-3 py-2 min-h-[40px] rounded-xl bg-cyan-500 hover:bg-cyan-400 disabled:opacity-50 text-black text-xs font-bold flex items-center justify-center gap-1.5 shrink-0 transition-all active:scale-[0.98]"
                       >
                         <Download className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
@@ -785,6 +841,7 @@ export function PlatformCatalogView({ mode, onLaunchStage, onCacheChanged, onJoi
                 {filteredCached.map((item) => {
                   const matchedEntry = catalog.find((c) => c.id === item.id || c.filename === item.filename);
                   const displayTitle = matchedEntry?.title || item.title;
+                  const cachedBadge = getMultiplayerBadgeMeta(matchedEntry || item, { mode });
                   return (
                     <article
                       key={item.id}
@@ -800,7 +857,18 @@ export function PlatformCatalogView({ mode, onLaunchStage, onCacheChanged, onJoi
                         compact={viewMode === 'list'}
                       />
                       <div className="flex-1 min-w-0 space-y-1">
-                        <div className="font-bold text-sm text-white line-clamp-2 leading-snug">{displayTitle}</div>
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="font-bold text-sm text-white line-clamp-2 leading-snug">{displayTitle}</div>
+                          <span
+                            className={`text-[10px] font-mono px-1.5 py-0.5 rounded border shrink-0 ${
+                              cachedBadge.isMultiplayer
+                                ? 'bg-purple-950/80 text-purple-200 border-purple-500/40'
+                                : 'bg-neutral-900 text-neutral-400 border-white/10'
+                            }`}
+                          >
+                            {cachedBadge.shortLabel}
+                          </span>
+                        </div>
                         <div className="text-[11px] font-mono text-neutral-300 truncate tabular-nums">
                           {item.filename} · {formatBytes(item.size)}
                         </div>
@@ -814,6 +882,17 @@ export function PlatformCatalogView({ mode, onLaunchStage, onCacheChanged, onJoi
                           <Play className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
                           <span>Lancer</span>
                         </button>
+                        {onJoinChannel && matchedEntry && cachedBadge.isMultiplayer && (
+                          <button
+                            type="button"
+                            onClick={() => onJoinChannel(matchedEntry)}
+                            title="Rejoindre le salon Fightcade 2"
+                            className="arcade-focus-ring px-3 py-2 min-h-[40px] rounded-xl bg-purple-500/20 hover:bg-purple-500/35 border border-purple-500/40 text-purple-200 text-xs font-bold flex items-center gap-1.5 transition-colors"
+                          >
+                            <Swords className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+                            <span>Salon</span>
+                          </button>
+                        )}
                         <button
                           type="button"
                           onClick={async () => {
@@ -859,6 +938,7 @@ export function PlatformCatalogView({ mode, onLaunchStage, onCacheChanged, onJoi
                     const isBusy = downloadingId === entry.id;
                     const isFocused = focusedIdx === idx;
                     const showPlatformBadge = mode === 'all' || mode === 'arcade' || mode === 'nintendo' || mode === 'sega';
+                    const badgeMeta = getMultiplayerBadgeMeta(entry, { mode });
                     return (
                       <article
                         key={entry.id}
@@ -881,11 +961,23 @@ export function PlatformCatalogView({ mode, onLaunchStage, onCacheChanged, onJoi
                             <span className="font-bold text-sm text-white line-clamp-2 leading-snug">
                               {entry.title}
                             </span>
-                            {showPlatformBadge && (
-                              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-cyan-950/90 text-cyan-300 border border-cyan-500/30 shrink-0">
-                                {entry.platformLabel}
+                            <div className="flex items-center gap-1 shrink-0">
+                              <span
+                                title={badgeMeta.detailLabel}
+                                className={`text-[10px] font-mono px-1.5 py-0.5 rounded border shrink-0 ${
+                                  badgeMeta.isMultiplayer
+                                    ? 'bg-purple-950/80 text-purple-200 border-purple-500/40'
+                                    : 'bg-neutral-900 text-neutral-400 border-white/10'
+                                }`}
+                              >
+                                {badgeMeta.shortLabel}
                               </span>
-                            )}
+                              {showPlatformBadge && (
+                                <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-cyan-950/90 text-cyan-300 border border-cyan-500/30 shrink-0">
+                                  {entry.platformLabel}
+                                </span>
+                              )}
+                            </div>
                           </div>
                           <div className="text-[11px] font-mono text-neutral-300 truncate">
                             {showPlatformBadge
@@ -910,7 +1002,7 @@ export function PlatformCatalogView({ mode, onLaunchStage, onCacheChanged, onJoi
                             {isCached ? <Play className="w-3.5 h-3.5 shrink-0" aria-hidden="true" /> : <Download className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />}
                             <span className="truncate">{isBusy ? downloadProgress : 'Jouer'}</span>
                           </button>
-                          {onJoinChannel && entry.core !== 'j2me' && entry.platform !== 'j2me' && mode !== 'java' && (
+                          {onJoinChannel && badgeMeta.isMultiplayer && (
                             <button
                               type="button"
                               onClick={() => onJoinChannel(entry)}
@@ -947,7 +1039,9 @@ export function PlatformCatalogView({ mode, onLaunchStage, onCacheChanged, onJoi
         <footer className="flex px-3 md:px-4 py-1.5 bg-neutral-900/95 border-t border-white/10 items-center justify-between gap-3 text-[11px] font-mono text-neutral-300 shrink-0 overflow-x-auto no-scrollbar pb-16 md:pb-1.5">
           <div className="flex items-center gap-3 shrink-0">
             <span><strong className="text-emerald-400">[A / Entrée]</strong> Jouer Local (1 Coin)</span>
-            <span><strong className="text-purple-400">[X]</strong> Rejoindre Salon En Ligne</span>
+            {mode !== 'java' && (!visibleItems[focusedIdx] || supportsOnlineMultiplayer(visibleItems[focusedIdx], { mode })) && (
+              <span><strong className="text-purple-400">[X]</strong> Rejoindre Salon En Ligne</span>
+            )}
             <span><strong className="text-amber-400">[Y]</strong> Acheter / Insérer Coin</span>
             <span><strong className="text-neutral-200">[Tab]</strong> Quick Menu</span>
           </div>

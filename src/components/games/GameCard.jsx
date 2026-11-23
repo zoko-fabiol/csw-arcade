@@ -1,5 +1,6 @@
 import React from 'react';
 import { Play, Users, CheckCircle, Cloud, Download, Star } from 'lucide-react';
+import { supportsOnlineMultiplayer } from '../../utils/gameCapabilities';
 
 export function GameCard({ game, isAvailable, isBiosReady, onLaunchSolo, onLaunchNetplay }) {
   const getShortGenre = (genre) => {
@@ -77,7 +78,7 @@ export function GameCard({ game, isAvailable, isBiosReady, onLaunchSolo, onLaunc
         </div>
 
         {/* Actions Toolbar */}
-        <div className="grid grid-cols-2 gap-1 sm:gap-2 pt-1.5 sm:pt-2 border-t border-neutral-800/80">
+        <div className={`grid ${supportsOnlineMultiplayer(game) ? 'grid-cols-2' : 'grid-cols-1'} gap-1 sm:gap-2 pt-1.5 sm:pt-2 border-t border-neutral-800/80`}>
           {isAvailable ? (
             <button
               onClick={() => onLaunchSolo(game)}
@@ -97,14 +98,16 @@ export function GameCard({ game, isAvailable, isBiosReady, onLaunchSolo, onLaunc
             </button>
           )}
 
-          <button
-            onClick={() => onLaunchNetplay(game)}
-            title={`Créer ou rejoindre une partie réseau local (${game.players || 2} Joueurs)`}
-            className="flex items-center justify-center gap-1 py-1.5 sm:py-2 px-1 sm:px-3 rounded-lg text-[10px] sm:text-xs font-bold font-mono uppercase tracking-wider transition-all bg-neutral-800 hover:bg-neutral-700 text-rose-400 border border-rose-500/30 hover:border-rose-500/60 active:scale-95 min-w-0"
-          >
-            <Users className="w-2.5 h-2.5 sm:w-3.5 sm:h-3.5 shrink-0" />
-            <span className="truncate">{game.players === 4 ? '4P LAN' : '2P LAN'}</span>
-          </button>
+          {supportsOnlineMultiplayer(game) && (
+            <button
+              onClick={() => onLaunchNetplay(game)}
+              title={`Créer ou rejoindre une partie réseau local (${game.players || 2} Joueurs)`}
+              className="flex items-center justify-center gap-1 py-1.5 sm:py-2 px-1 sm:px-3 rounded-lg text-[10px] sm:text-xs font-bold font-mono uppercase tracking-wider transition-all bg-neutral-800 hover:bg-neutral-700 text-rose-400 border border-rose-500/30 hover:border-rose-500/60 active:scale-95 min-w-0"
+            >
+              <Users className="w-2.5 h-2.5 sm:w-3.5 sm:h-3.5 shrink-0" />
+              <span className="truncate">{game.players === 4 ? '4P LAN' : '2P LAN'}</span>
+            </button>
+          )}
         </div>
       </div>
     </div>

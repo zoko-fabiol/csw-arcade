@@ -15,6 +15,7 @@ import { firebaseFightcadeService, GLOBAL_CHANNEL_ID } from '../../services/fire
 import { deleteGameSlot, listGameSlots, loadGameSlot, saveGameSlot } from '../../services/gameSaveService';
 import { countryCodeToFlag } from '../../data/countries';
 import { MobilePlatformController } from './MobilePlatformController';
+import { supportsOnlineMultiplayer } from '../../utils/gameCapabilities';
 
 function detectDefaultTouchPad() {
   if (typeof window === 'undefined') return false;
@@ -389,6 +390,7 @@ export function UnifiedStageModal({
           source: `ram_${event.data.reason || 'auto'}`,
         })
           .then((res) => {
+            if (!res) return;
             if (res.rankChanged) {
               showRamToast(
                 'record',
@@ -1991,8 +1993,8 @@ export function UnifiedStageModal({
               </button>
             </div>
 
-            {/* Réseau & Input Delay (Hors Java J2ME solo) */}
-            {session.kind !== 'j2me' && (
+            {/* Réseau & Input Delay (Hors Java J2ME et jeux Solo uniquement) */}
+            {session.kind !== 'j2me' && (session.isNetplay || supportsOnlineMultiplayer(session)) && (
               <div className="p-3 rounded-xl bg-neutral-900 border border-neutral-800 space-y-2">
                 <div className="text-xs font-bold text-cyan-300">Réseau &amp; Rollback P2P</div>
                 <div className="text-xs font-mono text-neutral-300">
@@ -2147,7 +2149,7 @@ export function UnifiedStageModal({
               onClick={handleCloseStage}
               className="mt-auto w-full py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold transition-colors"
             >
-              {session.kind === 'j2me' ? 'Quitter le jeu' : 'Quitter vers le salon'}
+              {session.kind === 'j2me' || !supportsOnlineMultiplayer(session) ? 'Quitter le jeu' : 'Quitter vers le salon'}
             </button>
           </aside>
         )}

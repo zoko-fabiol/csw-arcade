@@ -378,7 +378,7 @@ export default defineConfig({
     port: 3003,
     strictPort: true,
     watch: {
-      ignored: ['**/public/**', '**/release/**', '**/dist/**', '**/dist-electron/**']
+      ignored: ['**/public/**', '**/release/**', '**/dist/**', '**/dist-electron/**', '**/.csw-data/**']
     },
     proxy: {
       '/api/archive-rom': {

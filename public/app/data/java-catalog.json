@@ -14,7 +14,10 @@
       "https://archive.org/download/320x240JavaGames/Diamond%20Rush%20320x240.jar"
     ],
     "description": "Aventure & réflexion culte de Gameloft (320x240).",
-    "genre": "Gameloft · Aventure / Puzzle"
+    "genre": "Gameloft · Aventure / Puzzle",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-assassinscreed-s40v6",
@@ -30,7 +33,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/AssassinsCreed_s40v6-C3-00.jar"
     ],
     "description": "Jeu mobile Java J2ME (AssassinsCreed_s40v6-C3-00.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft · Action / Aventure"
+    "genre": "Gameloft · Action / Aventure",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-assassinscreed2-s40v6",
@@ -46,7 +52,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/AssassinsCreed2_s40v6-C3-00.jar"
     ],
     "description": "Jeu mobile Java J2ME (AssassinsCreed2_s40v6-C3-00.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft · Action / Aventure"
+    "genre": "Gameloft · Action / Aventure",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-asbr-nokia-e71-en-igp-eu-127-c3",
@@ -62,7 +71,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/ASBR_Nokia_E71_EN_IGP_EU_127_C3.jar"
     ],
     "description": "Jeu mobile Java J2ME (ASBR_Nokia_E71_EN_IGP_EU_127_C3.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft · Action / Aventure"
+    "genre": "Gameloft · Action / Aventure",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-assassinscreedrevelations-s40v6",
@@ -78,7 +90,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/AssassinsCreedRevelations_s40v6-C3-00.jar"
     ],
     "description": "Jeu mobile Java J2ME (AssassinsCreedRevelations_s40v6-C3-00.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft · Action / Aventure"
+    "genre": "Gameloft · Action / Aventure",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-assassins-creed-iii-nokia-c3-00-en-igp-eu-uncensored-101",
@@ -94,7 +109,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/Assassins_Creed_III_Nokia_C3_00_EN_IGP_EU_UNCENSORED_101.jar"
     ],
     "description": "Jeu mobile Java J2ME (Assassins_Creed_III_Nokia_C3_00_EN_IGP_EU_UNCENSORED_101.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft · Action / Aventure"
+    "genre": "Gameloft · Action / Aventure",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-asphalt4-eliteracing-s40v6",
@@ -110,7 +128,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/Asphalt4-EliteRacing_s40v6-C3-00.jar"
     ],
     "description": "Jeu mobile Java J2ME (Asphalt4-EliteRacing_s40v6-C3-00.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft · Course Arcade"
+    "genre": "Gameloft · Course Arcade",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-asphalt3-streetrules-s40v6",
@@ -126,7 +147,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/Asphalt3-StreetRules_s40v6-C3-00.jar"
     ],
     "description": "Jeu mobile Java J2ME (Asphalt3-StreetRules_s40v6-C3-00.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft · Course Arcade"
+    "genre": "Gameloft · Course Arcade",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-gangstarcrimecity-s40v6",
@@ -142,7 +166,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/GangstarCrimeCity_s40v6-C3-00.jar"
     ],
     "description": "Jeu mobile Java J2ME (GangstarCrimeCity_s40v6-C3-00.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft · Action / Open World"
+    "genre": "Gameloft · Action / Open World",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-gangstar2-kingsofl-a-s40v6",
@@ -158,7 +185,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/Gangstar2-KingsOfL.A_s40v6-C3-00.jar"
     ],
     "description": "Jeu mobile Java J2ME (Gangstar2-KingsOfL.A_s40v6-C3-00.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft · Action / Open World"
+    "genre": "Gameloft · Action / Open World",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-gangstar3-miamivindication-s40v6",
@@ -174,7 +204,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/Gangstar3-MiamiVindication_s40v6-C3-00.jar"
     ],
     "description": "Jeu mobile Java J2ME (Gangstar3-MiamiVindication_s40v6-C3-00.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft · Action / Open World"
+    "genre": "Gameloft · Action / Open World",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-n-o-v-a-nearorbitvanguardalliance-s40v6",
@@ -190,7 +223,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/N.O.V.A.NearOrbitVanguardAlliance_s40v6-C3-00.jar"
     ],
     "description": "Jeu mobile Java J2ME (N.O.V.A.NearOrbitVanguardAlliance_s40v6-C3-00.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft · Sci-Fi Action"
+    "genre": "Gameloft · Sci-Fi Action",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-nova3-nokia-c3-00-en-igp-us-att-114",
@@ -206,7 +242,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/NOVA3_Nokia_C3_00_EN_IGP_US_ATT_114.jar"
     ],
     "description": "Jeu mobile Java J2ME (NOVA3_Nokia_C3_00_EN_IGP_US_ATT_114.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft · Sci-Fi Action"
+    "genre": "Gameloft · Sci-Fi Action",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-dungeonhuntercurseofheaven-nokia-c3-00-en-igp-eu-101",
@@ -222,7 +261,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/DungeonHunterCurseOfHeaven_Nokia_C3_00_EN_IGP_EU_101.jar"
     ],
     "description": "Jeu mobile Java J2ME (DungeonHunterCurseOfHeaven_Nokia_C3_00_EN_IGP_EU_101.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft · Action RPG"
+    "genre": "Gameloft · Action RPG",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-heroofsparta-s40v6",
@@ -238,7 +280,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/HeroOfSparta_s40v6-C3-00.jar"
     ],
     "description": "Jeu mobile Java J2ME (HeroOfSparta_s40v6-C3-00.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft · Hack & Slash"
+    "genre": "Gameloft · Hack & Slash",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-driverl-a-undercover-s40v6",
@@ -254,7 +299,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/DriverL.A.Undercover_s40v6-C3-00.jar"
     ],
     "description": "Jeu mobile Java J2ME (DriverL.A.Undercover_s40v6-C3-00.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft · Course / Action"
+    "genre": "Gameloft · Course / Action",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-devil-may-cry-320x240",
@@ -270,7 +318,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/Devil_May_Cry_320x240.jar"
     ],
     "description": "Jeu mobile Java J2ME (Devil_May_Cry_320x240.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Capcom · Action 3D"
+    "genre": "Capcom · Action 3D",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-the-dark-knight-rises",
@@ -286,7 +337,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/the-dark-knight-rises-320x240-s60-namobilu.com.jar"
     ],
     "description": "Jeu mobile Java J2ME (the-dark-knight-rises-320x240-s60-namobilu.com.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft · Action"
+    "genre": "Gameloft · Action",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-the-avengers",
@@ -302,7 +356,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/the-avengers-320x240-s60-namobilu.com.jar"
     ],
     "description": "Jeu mobile Java J2ME (the-avengers-320x240-s60-namobilu.com.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft · Action"
+    "genre": "Gameloft · Action",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-spider-man-ultimate-power",
@@ -318,7 +375,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/spider-man-ultimate-power-320x240-s60-namobilu.com.jar"
     ],
     "description": "Jeu mobile Java J2ME (spider-man-ultimate-power-320x240-s60-namobilu.com.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft · Action"
+    "genre": "Gameloft · Action",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-commandconquerredalert-c3",
@@ -334,7 +394,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/CommandConquerREDALERT_C3.jar"
     ],
     "description": "Jeu mobile Java J2ME (CommandConquerREDALERT_C3.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "EA Mobile · Stratégie RTS"
+    "genre": "EA Mobile · Stratégie RTS",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-ferrarigt-evolution-s40v6",
@@ -350,7 +413,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/FerrariGT-Evolution_s40v6-C3-00.jar"
     ],
     "description": "Jeu mobile Java J2ME (FerrariGT-Evolution_s40v6-C3-00.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft · Course"
+    "genre": "Gameloft · Course",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-ferrarigt3-worldtrack-s40v6",
@@ -366,7 +432,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/FerrariGT3-WorldTrack_s40v6-C3-00.jar"
     ],
     "description": "Jeu mobile Java J2ME (FerrariGT3-WorldTrack_s40v6-C3-00.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft · Course"
+    "genre": "Gameloft · Course",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-blockbreakerdeluxe2-s40v6",
@@ -382,7 +451,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/BlockBreakerDeluxe2_s40v6-C3-00.jar"
     ],
     "description": "Jeu mobile Java J2ME (BlockBreakerDeluxe2_s40v6-C3-00.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft · Arcade"
+    "genre": "Gameloft · Arcade",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-blockbreaker3unlimited-s40v6",
@@ -398,7 +470,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/BlockBreaker3Unlimited_s40v6-C3-00.jar"
     ],
     "description": "Jeu mobile Java J2ME (BlockBreaker3Unlimited_s40v6-C3-00.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft · Arcade"
+    "genre": "Gameloft · Arcade",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-miaminights2-thecityisyours-s40v6",
@@ -414,7 +489,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/MiamiNights2-TheCityIsYours%21_s40v6-C3-00.jar"
     ],
     "description": "Jeu mobile Java J2ME (MiamiNights2-TheCityIsYours!_s40v6-C3-00.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft · Simulation"
+    "genre": "Gameloft · Simulation",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-midnightpool3-s40v6",
@@ -430,7 +508,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/MidnightPool3_s40v6-C3-00.jar"
     ],
     "description": "Jeu mobile Java J2ME (MidnightPool3_s40v6-C3-00.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft · Sport / Billard"
+    "genre": "Gameloft · Sport / Billard",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-3drollercoasterrush-nok-e61-en",
@@ -446,7 +527,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/3drollercoasterrush_nok_e61_en.jar"
     ],
     "description": "Jeu mobile Java J2ME (3drollercoasterrush_nok_e61_en.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Digital Chocolate · Arcade"
+    "genre": "Digital Chocolate · Arcade",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-kingdomsandlords-nokia-c3-00-en-igp-iap-eu-120",
@@ -462,7 +546,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/KingdomsAndLords_Nokia_C3_00_EN_IGP_IAP_EU_120.jar"
     ],
     "description": "Jeu mobile Java J2ME (KingdomsAndLords_Nokia_C3_00_EN_IGP_IAP_EU_120.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft · Stratégie / RPG"
+    "genre": "Gameloft · Stratégie / RPG",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-mightandmagicii-s40v6",
@@ -478,7 +565,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/MightAndMagicII_s40v6-C3-00.jar"
     ],
     "description": "Jeu mobile Java J2ME (MightAndMagicII_s40v6-C3-00.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft · Action RPG"
+    "genre": "Gameloft · Action RPG",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-lostplanet2-s40v6",
@@ -494,7 +584,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/LostPlanet2_s40v6-C3-00.jar"
     ],
     "description": "Jeu mobile Java J2ME (LostPlanet2_s40v6-C3-00.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Capcom · Action"
+    "genre": "Capcom · Action",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-24-special-ops",
@@ -510,7 +603,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/24-special-ops-320x240-s60-namobilu.com.jar"
     ],
     "description": "Jeu mobile Java J2ME (24-special-ops-320x240-s60-namobilu.com.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-365-casino-deluxe",
@@ -526,7 +622,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/365-casino-deluxe-320x240-namobilu.com.jar"
     ],
     "description": "Jeu mobile Java J2ME (365-casino-deluxe-320x240-namobilu.com.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-365-mahjong-master",
@@ -542,7 +641,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/365-mahjong-master-320x240-namobilu.com.jar"
     ],
     "description": "Jeu mobile Java J2ME (365-mahjong-master-320x240-namobilu.com.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-365-solitaire-gold-2",
@@ -558,7 +660,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/365-solitaire-gold-2-320x240-s60-namobilu.com.jar"
     ],
     "description": "Jeu mobile Java J2ME (365-solitaire-gold-2-320x240-s60-namobilu.com.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-365boardgames2-10in1-s40v6",
@@ -574,7 +679,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/365BoardGames2-10in1_s40v6-C3-00.jar"
     ],
     "description": "Jeu mobile Java J2ME (365BoardGames2-10in1_s40v6-C3-00.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-ah6-en-noke61",
@@ -590,7 +698,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/AH6_EN_NokE61.jar"
     ],
     "description": "Jeu mobile Java J2ME (AH6_EN_NokE61.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-absolute-minesweeper-320x240",
@@ -606,7 +717,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/Absolute_Minesweeper_320x240-95063.jar"
     ],
     "description": "Jeu mobile Java J2ME (Absolute_Minesweeper_320x240-95063.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-absolute-summer-sports",
@@ -622,7 +736,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/absolute-summer-sports-320x240-s60-namobilu.com.jar"
     ],
     "description": "Jeu mobile Java J2ME (absolute-summer-sports-320x240-s60-namobilu.com.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-agooddaytodiehard-nokia-c3-00-en-igp-eu-uncensored-105",
@@ -638,7 +755,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/AGoodDayToDieHard_Nokia_C3_00_EN_IGP_EU_UNCENSORED_105.jar"
     ],
     "description": "Jeu mobile Java J2ME (AGoodDayToDieHard_Nokia_C3_00_EN_IGP_EU_UNCENSORED_105.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-alien-quarantine",
@@ -654,7 +774,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/alien-quarantine-320x240-s40-namobilu.com.jar"
     ],
     "description": "Jeu mobile Java J2ME (alien-quarantine-320x240-s40-namobilu.com.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-ama-tna-wrestling-320x240",
@@ -670,7 +793,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/ama_tna_wrestling_320x240-285580.jar"
     ],
     "description": "Jeu mobile Java J2ME (ama_tna_wrestling_320x240-285580.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-amafarmtycoon-nokia-c3-en-fr-es-1-0-0",
@@ -686,7 +812,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/AMAFarmTycoon_Nokia_C3_EN_FR_ES_1_0_0.jar"
     ],
     "description": "Jeu mobile Java J2ME (AMAFarmTycoon_Nokia_C3_EN_FR_ES_1_0_0.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-americangangster-nokiae62-en-igp-101-c3-00",
@@ -702,7 +831,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/AmericanGangster_NokiaE62_EN_IGP_101_C3-00.jar"
     ],
     "description": "Jeu mobile Java J2ME (AmericanGangster_NokiaE62_EN_IGP_101_C3-00.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-arcadius-2-puzzle-adventure",
@@ -718,7 +850,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/arcadius-2-puzzle-adventure-320x240-s60-namobilu.com.jar"
     ],
     "description": "Jeu mobile Java J2ME (arcadius-2-puzzle-adventure-320x240-s60-namobilu.com.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-arkanoiddeluxe-nokia-e61-efigs-pt-v1-7-4",
@@ -734,7 +869,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/ArkanoidDeluxe_nokia_e61_efigs_pt_v1_7_4.jar"
     ],
     "description": "Jeu mobile Java J2ME (ArkanoidDeluxe_nokia_e61_efigs_pt_v1_7_4.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-asterix-and-obelix-mission-cleopatra",
@@ -750,7 +888,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/asterix-and-obelix-mission-cleopatra-320x240-s60-namobilu.com.jar"
     ],
     "description": "Jeu mobile Java J2ME (asterix-and-obelix-mission-cleopatra-320x240-s60-namobilu.com.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-batman-guardian-of-gotham",
@@ -766,7 +907,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/batman-guardian-of-gotham-320x240-s60-namobilu.com.jar"
     ],
     "description": "Jeu mobile Java J2ME (batman-guardian-of-gotham-320x240-s60-namobilu.com.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-ben10-omnitrix-320x240",
@@ -782,7 +926,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/ben10-omnitrix_320x240.jar"
     ],
     "description": "Jeu mobile Java J2ME (ben10-omnitrix_320x240.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-beach-games-12-pack",
@@ -798,7 +945,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/beach-games-12-pack-320x240-s60-namobilu.com.jar"
     ],
     "description": "Jeu mobile Java J2ME (beach-games-12-pack-320x240-s60-namobilu.com.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-beach-ping-pong-3d",
@@ -814,7 +964,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/beach-ping-pong-3d-320x240-s60-namobilu.com.jar"
     ],
     "description": "Jeu mobile Java J2ME (beach-ping-pong-3d-320x240-s60-namobilu.com.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-beowulf-s40v6",
@@ -830,7 +983,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/Beowulf_s40v6-C3-00.jar"
     ],
     "description": "Jeu mobile Java J2ME (Beowulf_s40v6-C3-00.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-blockbreakerdeluxe-s40v6",
@@ -846,7 +1002,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/BlockBreakerDeluxe_s40v6-C3-00.jar"
     ],
     "description": "Jeu mobile Java J2ME (BlockBreakerDeluxe_s40v6-C3-00.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-blokus-s40v6",
@@ -862,7 +1021,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/Blokus_s40v6-C3-00.jar"
     ],
     "description": "Jeu mobile Java J2ME (Blokus_s40v6-C3-00.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-boardgamesmaster-en-nokiae61",
@@ -878,7 +1040,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/boardgamesmaster_en_nokiae61.jar"
     ],
     "description": "Jeu mobile Java J2ME (boardgamesmaster_en_nokiae61.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-bobbleblastdeluxe-de-en-es-fr-it-pt-nokia-e71",
@@ -894,7 +1059,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/bobbleblastdeluxe_de_en_es_fr_it_pt_Nokia_E71.jar"
     ],
     "description": "Jeu mobile Java J2ME (bobbleblastdeluxe_de_en_es_fr_it_pt_Nokia_E71.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-bonanza-320x240-nokia",
@@ -910,7 +1078,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/bonanza_320x240_Nokia.jar"
     ],
     "description": "Jeu mobile Java J2ME (bonanza_320x240_Nokia.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-bonks-return-320x240-s60v3",
@@ -926,7 +1097,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/Bonks_Return_320x240_S60v3-443097.jar"
     ],
     "description": "Jeu mobile Java J2ME (Bonks_Return_320x240_S60v3-443097.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-boulder-dash-rocks",
@@ -942,7 +1116,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/boulder-dash-rocks-320x240-s60-namobilu.com.jar"
     ],
     "description": "Jeu mobile Java J2ME (boulder-dash-rocks-320x240-s60-namobilu.com.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-bounce-out-ball-o-rama-320x240-nokia-e71",
@@ -958,7 +1135,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/Bounce_Out_Ball-o-Rama_320x240_Nokia_E71-445875.jar"
     ],
     "description": "Jeu mobile Java J2ME (Bounce_Out_Ball-o-Rama_320x240_Nokia_E71-445875.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-bounce-tales-all",
@@ -974,7 +1154,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/bounce-tales-1240994286-all.jar"
     ],
     "description": "Jeu mobile Java J2ME (bounce-tales-1240994286-all.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-box-it-2-320x240-s60v3",
@@ -990,7 +1173,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/Box_It_2_320x240_S60v3-542965.jar"
     ],
     "description": "Jeu mobile Java J2ME (Box_It_2_320x240_S60v3-542965.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-brainchallenge4-breakinglimits-s40v6",
@@ -1006,7 +1192,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/BrainChallenge4-BreakingLimits_s40v6-C3-00.jar"
     ],
     "description": "Jeu mobile Java J2ME (BrainChallenge4-BreakingLimits_s40v6-C3-00.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-brainchallengevol-3-thinkagain-s40v6",
@@ -1022,7 +1211,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/BrainChallengeVol.3-ThinkAgain%21_s40v6-C3-00.jar"
     ],
     "description": "Jeu mobile Java J2ME (BrainChallengeVol.3-ThinkAgain!_s40v6-C3-00.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-brainchallenge-s40v6",
@@ -1038,7 +1230,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/BrainChallenge_s40v6-C3-00.jar"
     ],
     "description": "Jeu mobile Java J2ME (BrainChallenge_s40v6-C3-00.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-brick-breaker-revolution-multiscreen",
@@ -1054,7 +1249,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/Brick_Breaker_Revolution_Multiscreen-94207.jar"
     ],
     "description": "Jeu mobile Java J2ME (Brick_Breaker_Revolution_Multiscreen-94207.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-brick-breaker-revolution-2",
@@ -1070,7 +1268,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/brick-breaker-revolution-2-320x240-s60-namobilu.com.jar"
     ],
     "description": "Jeu mobile Java J2ME (brick-breaker-revolution-2-320x240-s60-namobilu.com.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-brick-breaker-revolution-2-3d-mot",
@@ -1086,7 +1287,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/brick-breaker-revolution-2-3d-320x240-mot-namobilu.com.jar"
     ],
     "description": "Jeu mobile Java J2ME (brick-breaker-revolution-2-3d-320x240-mot-namobilu.com.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-brick-breaker-revolution-3d",
@@ -1102,7 +1306,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/brick-breaker-revolution-3d-320x240-s60-namobilu.com.jar"
     ],
     "description": "Jeu mobile Java J2ME (brick-breaker-revolution-3d-320x240-s60-namobilu.com.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-bridge-bloxx-multiscreen",
@@ -1118,7 +1325,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/Bridge_Bloxx_Multiscreen-124497.jar"
     ],
     "description": "Jeu mobile Java J2ME (Bridge_Bloxx_Multiscreen-124497.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-budspencerpoker-javagamenokiae71",
@@ -1134,7 +1344,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/BudSpencerPoker-EN_JavaGameNokiaE71.jar"
     ],
     "description": "Jeu mobile Java J2ME (BudSpencerPoker-EN_JavaGameNokiaE71.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-bubblebash2-s40v6",
@@ -1150,7 +1363,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/BubbleBash2_s40v6-C3-00.jar"
     ],
     "description": "Jeu mobile Java J2ME (BubbleBash2_s40v6-C3-00.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-bubblebash-s40v6",
@@ -1166,7 +1382,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/BubbleBash_s40v6-C3-00.jar"
     ],
     "description": "Jeu mobile Java J2ME (BubbleBash_s40v6-C3-00.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-bubbletrouble-s40v6",
@@ -1182,7 +1401,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/BubbleTrouble_s40v6-C3-00.jar"
     ],
     "description": "Jeu mobile Java J2ME (BubbleTrouble_s40v6-C3-00.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-s40-kiev-ua-2639-bubble-bash-mania",
@@ -1198,7 +1420,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/s40.kiev.ua_2639_bubble_bash_mania.jar"
     ],
     "description": "Jeu mobile Java J2ME (s40.kiev.ua_2639_bubble_bash_mania.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-bubble-ducky-3-in-1",
@@ -1214,7 +1439,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/bubble-ducky-3-in-1-320x240-s60-namobilu.com.jar"
     ],
     "description": "Jeu mobile Java J2ME (bubble-ducky-3-in-1-320x240-s60-namobilu.com.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-bubble-revolution",
@@ -1230,7 +1458,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/bubble-revolution-320x240-s60-namobilu.com.jar"
     ],
     "description": "Jeu mobile Java J2ME (bubble-revolution-320x240-s60-namobilu.com.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-buildlot2-de-en-es-fr-it-pt-nokia-e71",
@@ -1246,7 +1477,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/buildlot2_de_en_es_fr_it_pt_Nokia_E71.jar"
     ],
     "description": "Jeu mobile Java J2ME (buildlot2_de_en_es_fr_it_pt_Nokia_E71.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-burger-time-delight",
@@ -1262,7 +1496,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/burger-time-delight-320x240-s60-namobilu.com.jar"
     ],
     "description": "Jeu mobile Java J2ME (burger-time-delight-320x240-s60-namobilu.com.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-thq-f-nokia-s60dp3e61-en-capturetheflag-114",
@@ -1278,7 +1515,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/thq_f_nokia_s60dp3e61_en_capturetheflag_114.jar"
     ],
     "description": "Jeu mobile Java J2ME (thq_f_nokia_s60dp3e61_en_capturetheflag_114.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-carnivalland-s40v6",
@@ -1294,7 +1534,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/CarnivalLand_s40v6-C3-00.jar"
     ],
     "description": "Jeu mobile Java J2ME (CarnivalLand_s40v6-C3-00.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-cars-hotshot-racing",
@@ -1310,7 +1553,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/cars-hotshot-racing-320x240-s60-namobilu.com.jar"
     ],
     "description": "Jeu mobile Java J2ME (cars-hotshot-racing-320x240-s60-namobilu.com.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-gogamz-catan-the-first-island",
@@ -1326,7 +1572,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/GoGamz-catan-the-first-island.jar"
     ],
     "description": "Jeu mobile Java J2ME (GoGamz-catan-the-first-island.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-cbnk-nokiae61-v5-0-5-en-fr-de-it-es",
@@ -1342,7 +1591,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/cbnk_nokiae61_v5_0_5_en_fr_de_it_es.jar"
     ],
     "description": "Jeu mobile Java J2ME (cbnk_nokiae61_v5_0_5_en_fr_de_it_es.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-championship-racing",
@@ -1358,7 +1610,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/championship-racing-2010-320x240-s60-namobilu.com.jar"
     ],
     "description": "Jeu mobile Java J2ME (championship-racing-2010-320x240-s60-namobilu.com.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-chessmaster-s40v6",
@@ -1374,7 +1629,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/Chessmaster_s40v6-C3-00.jar"
     ],
     "description": "Jeu mobile Java J2ME (Chessmaster_s40v6-C3-00.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-zed-f-nokia-e61-e71-en-commandos-v1-2-3",
@@ -1390,7 +1648,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/zed_f_Nokia_E61_E71_en_commandos_v1_2_3.jar"
     ],
     "description": "Jeu mobile Java J2ME (zed_f_Nokia_E61_E71_en_commandos_v1_2_3.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-connect2media-f-nokia-c3-en-365boardgames-v1-2-5",
@@ -1406,7 +1667,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/connect2media_f_Nokia_C3_en_365boardgames_v1_2_5.jar"
     ],
     "description": "Jeu mobile Java J2ME (connect2media_f_Nokia_C3_en_365boardgames_v1_2_5.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-connect2media-f-nokia-c3-en-mafia2-v1-0-0",
@@ -1422,7 +1686,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/connect2media_f_Nokia_C3_en_mafia2_v1_0_0.jar"
     ],
     "description": "Jeu mobile Java J2ME (connect2media_f_Nokia_C3_en_mafia2_v1_0_0.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-connect2media-f-nokia-e61-en-365puzzleclub-v1-5-0",
@@ -1438,7 +1705,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/connect2media_f_Nokia_E61_en_365puzzleclub_v1_5_0.jar"
     ],
     "description": "Jeu mobile Java J2ME (connect2media_f_Nokia_E61_en_365puzzleclub_v1_5_0.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-connect2media-f-nokia-e61-en-braintester24pack-v1-0-23",
@@ -1454,7 +1724,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/connect2media_f_Nokia_E61_en_braintester24pack_v1_0_23.jar"
     ],
     "description": "Jeu mobile Java J2ME (connect2media_f_Nokia_E61_en_braintester24pack_v1_0_23.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-connect2media-f-nokia-e61-en-californiagoldrush-v1-0-27",
@@ -1470,7 +1743,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/connect2media_f_Nokia_E61_en_californiagoldrush_v1_0_27.jar"
     ],
     "description": "Jeu mobile Java J2ME (connect2media_f_Nokia_E61_en_californiagoldrush_v1_0_27.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-connect2media-f-nokia-e61-en-dancedancerevolutionmobius-v6-2-0",
@@ -1486,7 +1762,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/connect2media_f_Nokia_E61_en_dancedancerevolutionmobius_v6_2_0.jar"
     ],
     "description": "Jeu mobile Java J2ME (connect2media_f_Nokia_E61_en_dancedancerevolutionmobius_v6_2_0.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-connect2media-f-nokia-e61-en-sidmeierscivilizationivwaroftwocities-v0-0-4",
@@ -1502,7 +1781,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/connect2media_f_Nokia_E61_en_sidmeierscivilizationivwaroftwocities_v0_0_4.jar"
     ],
     "description": "Jeu mobile Java J2ME (connect2media_f_Nokia_E61_en_sidmeierscivilizationivwaroftwocities_v0_0_4.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-copsl-a-police-s40v6",
@@ -1518,7 +1800,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/CopsL.A.Police_s40v6-C3-00.jar"
     ],
     "description": "Jeu mobile Java J2ME (CopsL.A.Police_s40v6-C3-00.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-cowboys-aliens",
@@ -1534,7 +1819,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/cowboys-aliens-320x240-s60-namobilu.com.jar"
     ],
     "description": "Jeu mobile Java J2ME (cowboys-aliens-320x240-s60-namobilu.com.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-crashtestdummies2-s40v6",
@@ -1550,7 +1838,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/CrashTestDummies2%21_s40v6-C3-00.jar"
     ],
     "description": "Jeu mobile Java J2ME (CrashTestDummies2!_s40v6-C3-00.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-crazy-monkey-spin",
@@ -1566,7 +1857,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/crazy-monkey-spin-320x240-s60-namobilu.com.jar"
     ],
     "description": "Jeu mobile Java J2ME (crazy-monkey-spin-320x240-s60-namobilu.com.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-crazy-penguin-catapult-2",
@@ -1582,7 +1876,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/crazy-penguin-catapult-2-320x240-s60-namobilu.com.jar"
     ],
     "description": "Jeu mobile Java J2ME (crazy-penguin-catapult-2-320x240-s60-namobilu.com.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-crazy-penguin-party",
@@ -1598,7 +1895,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/crazy-penguin-party-320x240-s60-namobilu.com.jar"
     ],
     "description": "Jeu mobile Java J2ME (crazy-penguin-party-320x240-s60-namobilu.com.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-crazy-quest-express",
@@ -1614,7 +1914,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/crazy-quest-express-320x240-s60-namobilu.com.jar"
     ],
     "description": "Jeu mobile Java J2ME (crazy-quest-express-320x240-s60-namobilu.com.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-gogamz-crazy-window-cleaners",
@@ -1630,7 +1933,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/GoGamz-crazy-window-cleaners.jar"
     ],
     "description": "Jeu mobile Java J2ME (GoGamz-crazy-window-cleaners.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-crazypenguin-320x240sym",
@@ -1646,7 +1952,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/crazypenguin_320x240sym.jar"
     ],
     "description": "Jeu mobile Java J2ME (crazypenguin_320x240sym.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-crazypenguinassault-nok-e61-en",
@@ -1662,7 +1971,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/crazypenguinassault_nok_e61_en.jar"
     ],
     "description": "Jeu mobile Java J2ME (crazypenguinassault_nok_e61_en.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-crime-files-2-the-templar-knight",
@@ -1678,7 +1990,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/crime-files-2-the-templar-knight-320x240-s60-namobilu.com.jar"
     ],
     "description": "Jeu mobile Java J2ME (crime-files-2-the-templar-knight-320x240-s60-namobilu.com.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-crime-files-3-the-mafias-war",
@@ -1694,7 +2009,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/crime-files-3-the-mafias-war-320x240-s60-namobilu.com.jar"
     ],
     "description": "Jeu mobile Java J2ME (crime-files-3-the-mafias-war-320x240-s60-namobilu.com.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-crime-files-the-cursed-hotel",
@@ -1710,7 +2028,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/crime-files-the-cursed-hotel-320x240-s60-namobilu.com.jar"
     ],
     "description": "Jeu mobile Java J2ME (crime-files-the-cursed-hotel-320x240-s60-namobilu.com.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-csi-lasvegas-s40v6",
@@ -1726,7 +2047,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/CSI-LasVegas_s40v6-C3-00.jar"
     ],
     "description": "Jeu mobile Java J2ME (CSI-LasVegas_s40v6-C3-00.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-csi-miami-episode-2",
@@ -1742,7 +2066,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/csi-miami-episode-2-320x240-s60-namobilu.com.jar"
     ],
     "description": "Jeu mobile Java J2ME (csi-miami-episode-2-320x240-s60-namobilu.com.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-cube-smashers",
@@ -1758,7 +2085,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/cube-smashers-320x240-s60-namobilu.com.jar"
     ],
     "description": "Jeu mobile Java J2ME (cube-smashers-320x240-s60-namobilu.com.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-danger-dash",
@@ -1774,7 +2104,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/danger-dash-320x240-s60-namobilu.com.jar"
     ],
     "description": "Jeu mobile Java J2ME (danger-dash-320x240-s60-namobilu.com.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-zed-f-nokia-c3-en-dangermouse-v0-4-5",
@@ -1790,7 +2123,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/zed_f_Nokia_C3_en_dangermouse_v0_4_5.jar"
     ],
     "description": "Jeu mobile Java J2ME (zed_f_Nokia_C3_en_dangermouse_v0_4_5.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-dateorditch-s40v6",
@@ -1806,7 +2142,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/DateOrDitch_s40v6-C3-00.jar"
     ],
     "description": "Jeu mobile Java J2ME (DateOrDitch_s40v6-C3-00.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-dchoc-cafe-blackjack-320x240",
@@ -1822,7 +2161,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/Dchoc_Cafe_Blackjack_320x240-368338.jar"
     ],
     "description": "Jeu mobile Java J2ME (Dchoc_Cafe_Blackjack_320x240-368338.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-dchoc-cafe-dominos-multiscreen",
@@ -1838,7 +2180,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/Dchoc_Cafe_Dominos_Multiscreen-82056.jar"
     ],
     "description": "Jeu mobile Java J2ME (Dchoc_Cafe_Dominos_Multiscreen-82056.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-dchoc-cafe-hold-em-poker-320x240",
@@ -1854,7 +2199,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/Dchoc_Cafe_Hold_Em_Poker_320x240-495571.jar"
     ],
     "description": "Jeu mobile Java J2ME (Dchoc_Cafe_Hold_Em_Poker_320x240-495571.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-desperatehousewives-s40v6",
@@ -1870,7 +2218,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/DesperateHousewives_s40v6-C3-00.jar"
     ],
     "description": "Jeu mobile Java J2ME (DesperateHousewives_s40v6-C3-00.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-destroyallhumans3-en-nokiac3",
@@ -1886,7 +2237,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/destroyallhumans3_en_nokiac3.jar"
     ],
     "description": "Jeu mobile Java J2ME (destroyallhumans3_en_nokiac3.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-detectiveridleyandthemysteriousenigmaa-s40v6",
@@ -1902,7 +2256,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/DetectiveRidleyAndTheMysteriousEnigmaa_s40v6-C3-00.jar"
     ],
     "description": "Jeu mobile Java J2ME (DetectiveRidleyAndTheMysteriousEnigmaa_s40v6-C3-00.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-devilsanddemons-blackberry8800-8320-500k-en-1-0",
@@ -1918,7 +2275,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/DevilsAndDemons_BlackBerry8800_8320_500k_EN_1_0.jar"
     ],
     "description": "Jeu mobile Java J2ME (DevilsAndDemons_BlackBerry8800_8320_500k_EN_1_0.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-diehard4-0-s40v6",
@@ -1934,7 +2294,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/DieHard4.0_s40v6-C3-00.jar"
     ],
     "description": "Jeu mobile Java J2ME (DieHard4.0_s40v6-C3-00.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-diamondtwister2-s40v6",
@@ -1950,7 +2313,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/DiamondTwister2_s40v6-C3-00.jar"
     ],
     "description": "Jeu mobile Java J2ME (DiamondTwister2_s40v6-C3-00.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-diamondtwister-s40v6",
@@ -1966,7 +2332,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/DiamondTwister_s40v6-C3-00.jar"
     ],
     "description": "Jeu mobile Java J2ME (DiamondTwister_s40v6-C3-00.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-diamond-islands-multiscreen",
@@ -1982,7 +2351,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/Diamond_Islands_Multiscreen-103494.jar"
     ],
     "description": "Jeu mobile Java J2ME (Diamond_Islands_Multiscreen-103494.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-diamond-islands-2",
@@ -1998,7 +2370,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/diamond-islands-2-320x240-s60-namobilu.com.jar"
     ],
     "description": "Jeu mobile Java J2ME (diamond-islands-2-320x240-s60-namobilu.com.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-diamond-tumble",
@@ -2014,7 +2389,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/diamond-tumble-320x240-s60-namobilu.com.jar"
     ],
     "description": "Jeu mobile Java J2ME (diamond-tumble-320x240-s60-namobilu.com.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-disney-solitaire-master-320x240-nokia-e71",
@@ -2030,7 +2408,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/Disney_Solitaire_Master_320x240_Nokia_E71-295108.jar"
     ],
     "description": "Jeu mobile Java J2ME (Disney_Solitaire_Master_320x240_Nokia_E71-295108.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-gogamz-disney-summer-games",
@@ -2046,7 +2427,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/GoGamz-disney-summer-games.jar"
     ],
     "description": "Jeu mobile Java J2ME (GoGamz-disney-summer-games.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-disneyland-kart-racer-320x240-nokia",
@@ -2062,7 +2446,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/Disneyland_Kart_Racer_320x240_Nokia-295037.jar"
     ],
     "description": "Jeu mobile Java J2ME (Disneyland_Kart_Racer_320x240_Nokia-295037.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-disneys-wizards-320x240",
@@ -2078,7 +2465,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/Disneys_Wizards_320x240-184607.jar"
     ],
     "description": "Jeu mobile Java J2ME (Disneys_Wizards_320x240-184607.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-dogz2-s40v6",
@@ -2094,7 +2484,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/Dogz2_s40v6-C3-00.jar"
     ],
     "description": "Jeu mobile Java J2ME (Dogz2_s40v6-C3-00.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-dont-pull-320x240",
@@ -2110,7 +2503,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/Dont_Pull_320x240-418698.jar"
     ],
     "description": "Jeu mobile Java J2ME (Dont_Pull_320x240-418698.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-easportsfifamanager12-nokiac3",
@@ -2126,7 +2522,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/EASPORTSFIFAManager12_NokiaC3.jar"
     ],
     "description": "Jeu mobile Java J2ME (EASPORTSFIFAManager12_NokiaC3.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-edge",
@@ -2142,7 +2541,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/edge-320x240-s60-namobilu.com.jar"
     ],
     "description": "Jeu mobile Java J2ME (edge-320x240-s60-namobilu.com.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-el-che",
@@ -2158,7 +2560,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/el-che-320x240-s60-namobilu.com.jar"
     ],
     "description": "Jeu mobile Java J2ME (el-che-320x240-s60-namobilu.com.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-electronicarts-f-nokia-e61-efigs-en-braincoach-v1-0-0",
@@ -2174,7 +2579,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/electronicarts_f_Nokia_E61_efigs_en_braincoach_v1_0_0.jar"
     ],
     "description": "Jeu mobile Java J2ME (electronicarts_f_Nokia_E61_efigs_en_braincoach_v1_0_0.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-electronicarts-f-nokia-e71-en-cookingmama-v1-0-22",
@@ -2190,7 +2598,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/electronicarts_f_nokia_e71_en_cookingmama_v1_0_22.jar"
     ],
     "description": "Jeu mobile Java J2ME (electronicarts_f_nokia_e71_en_cookingmama_v1_0_22.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-farm-rescue",
@@ -2206,7 +2617,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/farm-rescue-320x240-s60-namobilu.com.jar"
     ],
     "description": "Jeu mobile Java J2ME (farm-rescue-320x240-s60-namobilu.com.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-ferrariworldchampionship-s40v6",
@@ -2222,7 +2636,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/FerrariWorldChampionship_s40v6-C3-00.jar"
     ],
     "description": "Jeu mobile Java J2ME (FerrariWorldChampionship_s40v6-C3-00.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-final-fantasy",
@@ -2238,7 +2655,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/final-fantasy-320x240-s60-namobilu.com.jar"
     ],
     "description": "Jeu mobile Java J2ME (final-fantasy-320x240-s60-namobilu.com.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-fingerbowling2-7wondersedition-s40v6",
@@ -2254,7 +2674,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/FingerBowling2-7WondersEdition_s40v6-C3-00.jar"
     ],
     "description": "Jeu mobile Java J2ME (FingerBowling2-7WondersEdition_s40v6-C3-00.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-fishing-2-off-the-hook",
@@ -2270,7 +2693,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/fishing-2-off-the-hook-320x240-s60-namobilu.com.jar"
     ],
     "description": "Jeu mobile Java J2ME (fishing-2-off-the-hook-320x240-s60-namobilu.com.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-fishing-legend",
@@ -2286,7 +2712,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/fishing-legend-320x240-s60-namobilu.com.jar"
     ],
     "description": "Jeu mobile Java J2ME (fishing-legend-320x240-s60-namobilu.com.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-gogamz-fishing-off-the-hook",
@@ -2302,7 +2731,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/GoGamz-fishing-off-the-hook.jar"
     ],
     "description": "Jeu mobile Java J2ME (GoGamz-fishing-off-the-hook.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-gogamz-fishing-off-the-hook-2",
@@ -2318,7 +2750,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/GoGamz-fishing-off-the-hook-2.jar"
     ],
     "description": "Jeu mobile Java J2ME (GoGamz-fishing-off-the-hook-2.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-flowershopstar-nok-e61-en",
@@ -2334,7 +2769,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/flowershopstar_nok_e61_en.jar"
     ],
     "description": "Jeu mobile Java J2ME (flowershopstar_nok_e61_en.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-football-manager-quiz",
@@ -2350,7 +2788,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/football-manager-quiz-320x240-s60-namobilu.com.jar"
     ],
     "description": "Jeu mobile Java J2ME (football-manager-quiz-320x240-s60-namobilu.com.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-formularace-no-e72-1-0-0",
@@ -2366,7 +2807,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/formularace_no_e72_1_0_0.jar"
     ],
     "description": "Jeu mobile Java J2ME (formularace_no_e72_1_0_0.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-gogo-island-rescue-5",
@@ -2382,7 +2826,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/GoGo%20Island%20Rescue-5.jar"
     ],
     "description": "Jeu mobile Java J2ME (GoGo Island Rescue-5.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-gogamz-garfield-train-your-brain",
@@ -2398,7 +2845,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/GoGamz-garfield-train-your-brain.jar"
     ],
     "description": "Jeu mobile Java J2ME (GoGamz-garfield-train-your-brain.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-generator-rex",
@@ -2414,7 +2864,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/generator-rex-320x240-s60-namobilu.com.jar"
     ],
     "description": "Jeu mobile Java J2ME (generator-rex-320x240-s60-namobilu.com.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-gf-clarence-v1-0-2-en-es-de-fr-it-pt-nok-e61",
@@ -2430,7 +2883,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/gf_clarence_v1_0_2_en_es_de_fr_it_pt_nok_e61.jar"
     ],
     "description": "Jeu mobile Java J2ME (gf_clarence_v1_0_2_en_es_de_fr_it_pt_nok_e61.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-gf-johnnybravo-v1-0-2-en-es-de-fr-it-pt-nok-e61-x201",
@@ -2446,7 +2902,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/gf_johnnybravo_v1_0_2_en_es_de_fr_it_pt_nok_e61_x201.jar"
     ],
     "description": "Jeu mobile Java J2ME (gf_johnnybravo_v1_0_2_en_es_de_fr_it_pt_nok_e61_x201.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-gf-tom-and-jerry-v2-0-0-en-es-de-fr-it-pt-nok-e61",
@@ -2462,7 +2921,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/gf_tom_and_jerry_v2_0_0_en_es_de_fr_it_pt_nok_e61.jar"
     ],
     "description": "Jeu mobile Java J2ME (gf_tom_and_jerry_v2_0_0_en_es_de_fr_it_pt_nok_e61.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-globalfun-viperwars-1-0-10-en-es-de-fr-it-pt-nok-s40-320",
@@ -2478,7 +2940,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/globalfun_viperwars_1_0_10_en_es_de_fr_it_pt_nok_s40_320.jar"
     ],
     "description": "Jeu mobile Java J2ME (globalfun_viperwars_1_0_10_en_es_de_fr_it_pt_nok_s40_320.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-glu-buildlot-nokia-e71-de-en-es-fr-it-pt-v1-0-2-full",
@@ -2494,7 +2959,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/glu_buildlot_nokia_e71_de_en_es_fr_it_pt_v1_0_2_full.jar"
     ],
     "description": "Jeu mobile Java J2ME (glu_buildlot_nokia_e71_de_en_es_fr_it_pt_v1_0_2_full.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-go-go-rescue-squad",
@@ -2510,7 +2978,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/go-go-rescue-squad-320x240-s60-namobilu.com.jar"
     ],
     "description": "Jeu mobile Java J2ME (go-go-rescue-squad-320x240-s60-namobilu.com.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-gogamz-golf-superstars",
@@ -2526,7 +2997,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/GoGamz-golf-superstars.jar"
     ],
     "description": "Jeu mobile Java J2ME (GoGamz-golf-superstars.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-gorilla-rampage",
@@ -2542,7 +3016,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/gorilla-rampage-320x240-s60-namobilu.com.jar"
     ],
     "description": "Jeu mobile Java J2ME (gorilla-rampage-320x240-s60-namobilu.com.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-governor-of-poker",
@@ -2558,7 +3035,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/governor-of-poker-320x240-s60-namobilu.com.jar"
     ],
     "description": "Jeu mobile Java J2ME (governor-of-poker-320x240-s60-namobilu.com.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-greysanatomy-s40v6",
@@ -2574,7 +3054,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/GreysAnatomy_s40v6-C3-00.jar"
     ],
     "description": "Jeu mobile Java J2ME (GreysAnatomy_s40v6-C3-00.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-gumball-journey-to-the-moon",
@@ -2590,7 +3073,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/gumball-journey-to-the-moon-320x240-s60-namobilu.com.jar"
     ],
     "description": "Jeu mobile Java J2ME (gumball-journey-to-the-moon-320x240-s60-namobilu.com.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-gogamz-hamster-homie",
@@ -2606,7 +3092,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/GoGamz-hamster-homie.jar"
     ],
     "description": "Jeu mobile Java J2ME (GoGamz-hamster-homie.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-helicabexpress-s40v6",
@@ -2622,7 +3111,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/HelicabExpress_s40v6-C3-00.jar"
     ],
     "description": "Jeu mobile Java J2ME (HelicabExpress_s40v6-C3-00.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-high-school-party",
@@ -2638,7 +3130,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/high-school-party-320x240-s60-namobilu.com.jar"
     ],
     "description": "Jeu mobile Java J2ME (high-school-party-320x240-s60-namobilu.com.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-house-md",
@@ -2654,7 +3149,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/house-md-320x240-s60-namobilu.com.jar"
     ],
     "description": "Jeu mobile Java J2ME (house-md-320x240-s60-namobilu.com.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-ibionic-nke61",
@@ -2670,7 +3168,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/ibionic_nke61.jar"
     ],
     "description": "Jeu mobile Java J2ME (ibionic_nke61.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-icytowerjump-s40v6",
@@ -2686,7 +3187,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/IcyTowerJump_s40v6-C3-00.jar"
     ],
     "description": "Jeu mobile Java J2ME (IcyTowerJump_s40v6-C3-00.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-igloo-en-fr-it-de-es-pt-nokiae61",
@@ -2702,7 +3206,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/igloo_en_fr_it_de_es_pt_nokiae61.jar"
     ],
     "description": "Jeu mobile Java J2ME (igloo_en_fr_it_de_es_pt_nokiae61.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-indiana-jones-and-the-lost-puzzles",
@@ -2718,7 +3225,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/indiana-jones-and-the-lost-puzzles-320x240-namobilu.com.jar"
     ],
     "description": "Jeu mobile Java J2ME (indiana-jones-and-the-lost-puzzles-320x240-namobilu.com.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-jtce-nok-320x240",
@@ -2734,7 +3244,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/JTCE_Nok_320x240.jar"
     ],
     "description": "Jeu mobile Java J2ME (JTCE_Nok_320x240.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-jungle-puzzle-blitz",
@@ -2750,7 +3263,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/jungle-puzzle-blitz-320x240-s60-namobilu.com.jar"
     ],
     "description": "Jeu mobile Java J2ME (jungle-puzzle-blitz-320x240-s60-namobilu.com.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-jurassic-park",
@@ -2766,7 +3282,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/jurassic-park-320x240-s60-namobilu.com.jar"
     ],
     "description": "Jeu mobile Java J2ME (jurassic-park-320x240-s60-namobilu.com.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-lasvegasnights-temptationsinthecity-s40v6",
@@ -2782,7 +3301,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/LasVegasNights-TemptationsInTheCity_s40v6-C3-00.jar"
     ],
     "description": "Jeu mobile Java J2ME (LasVegasNights-TemptationsInTheCity_s40v6-C3-00.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-larry-love-for-sail-s60v3-1",
@@ -2798,7 +3320,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/Larry%20Love%20For%20Sail%20S60v3-1.jar"
     ],
     "description": "Jeu mobile Java J2ME (Larry Love For Sail S60v3-1.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-lethalmisison-nok-e61-es-en-1",
@@ -2814,7 +3339,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/LethalMisison_nok_e61_es_en_1.jar"
     ],
     "description": "Jeu mobile Java J2ME (LethalMisison_nok_e61_es_en_1.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-lets-go-bowling",
@@ -2830,7 +3358,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/lets-go-bowling-320x240-s60-namobilu.com.jar"
     ],
     "description": "Jeu mobile Java J2ME (lets-go-bowling-320x240-s60-namobilu.com.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-lets-golf",
@@ -2846,7 +3377,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/lets-golf-320x240-s60-namobilu.com.jar"
     ],
     "description": "Jeu mobile Java J2ME (lets-golf-320x240-s60-namobilu.com.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-little-big-city",
@@ -2862,7 +3396,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/little-big-city-320x240-s60-namobilu.com.jar"
     ],
     "description": "Jeu mobile Java J2ME (little-big-city-320x240-s60-namobilu.com.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-living-mobile-bonks-return-320x240-v1-0-7-s60v3-j2me-retail-binpda",
@@ -2878,7 +3415,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/Living.Mobile.Bonks.Return.320x240.v1.0.7.S60v3.J2ME.Retail-BiNPDA.jar"
     ],
     "description": "Jeu mobile Java J2ME (Living.Mobile.Bonks.Return.320x240.v1.0.7.S60v3.J2ME.Retail-BiNPDA.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-lm-disney-mahjong-cz-1-0-0",
@@ -2894,7 +3434,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/LM-Disney-Mahjong-E61-CZ-1-0-0.jar"
     ],
     "description": "Jeu mobile Java J2ME (LM-Disney-Mahjong-E61-CZ-1-0-0.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-lm-efgsitpt-br-tu-nokia-320x240-nontouch",
@@ -2910,7 +3453,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/lm_efgsitpt_br_tu_nokia_320x240_nontouch.jar"
     ],
     "description": "Jeu mobile Java J2ME (lm_efgsitpt_br_tu_nokia_320x240_nontouch.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-mylifeinnewyork-s40v6",
@@ -2926,7 +3472,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/MyLifeInNewYork_s40v6-C3-00.jar"
     ],
     "description": "Jeu mobile Java J2ME (MyLifeInNewYork_s40v6-C3-00.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-mafia-wars-new-york-any",
@@ -2942,7 +3491,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/mafia-wars-new-york-any-namobilu.com.jar"
     ],
     "description": "Jeu mobile Java J2ME (mafia-wars-new-york-any-namobilu.com.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-mafiawars3-en-fr-it-de-es-pt-el-e61-v150",
@@ -2958,7 +3510,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/mafiawars3_en_fr_it_de_es_pt_el_e61_v150.jar"
     ],
     "description": "Jeu mobile Java J2ME (mafiawars3_en_fr_it_de_es_pt_el_e61_v150.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-march-of-heroes",
@@ -2974,7 +3529,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/march-of-heroes-320x240-s60-namobilu.com.jar"
     ],
     "description": "Jeu mobile Java J2ME (march-of-heroes-320x240-s60-namobilu.com.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-megacityempire-newyork-s40v6",
@@ -2990,7 +3548,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/MegacityEmpire-NewYork_s40v6-C3-00.jar"
     ],
     "description": "Jeu mobile Java J2ME (MegacityEmpire-NewYork_s40v6-C3-00.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-men-in-black-iii",
@@ -3006,7 +3567,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/men-in-black-iii-320x240-s40-namobilu.com.jar"
     ],
     "description": "Jeu mobile Java J2ME (men-in-black-iii-320x240-s40-namobilu.com.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-mforma-365bloxx-en-nokia-e61ossbrowser-v1-0-1-c3",
@@ -3022,7 +3586,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/mforma_365bloxx_en_Nokia_E61ossbrowser_v1_0_1_C3.jar"
     ],
     "description": "Jeu mobile Java J2ME (mforma_365bloxx_en_Nokia_E61ossbrowser_v1_0_1_C3.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-miaminights-singlesinthecity-s40v6",
@@ -3038,7 +3605,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/MiamiNights-SinglesInTheCity_s40v6-C3-00.jar"
     ],
     "description": "Jeu mobile Java J2ME (MiamiNights-SinglesInTheCity_s40v6-C3-00.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-midnightdarts-s40v6",
@@ -3054,7 +3624,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/MidnightDarts_s40v6-C3-00.jar"
     ],
     "description": "Jeu mobile Java J2ME (MidnightDarts_s40v6-C3-00.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-midnightcasino-s40v6",
@@ -3070,7 +3643,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/MidnightCasino_s40v6-C3-00.jar"
     ],
     "description": "Jeu mobile Java J2ME (MidnightCasino_s40v6-C3-00.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-midnightpool2-s40v6",
@@ -3086,7 +3662,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/MidnightPool2_s40v6-C3-00.jar"
     ],
     "description": "Jeu mobile Java J2ME (MidnightPool2_s40v6-C3-00.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-midnightpool-s40v6",
@@ -3102,7 +3681,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/MidnightPool_s40v6-C3-00.jar"
     ],
     "description": "Jeu mobile Java J2ME (MidnightPool_s40v6-C3-00.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-midnightbowling2-s40v6",
@@ -3118,7 +3700,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/MidnightBowling2_s40v6-C3-00.jar"
     ],
     "description": "Jeu mobile Java J2ME (MidnightBowling2_s40v6-C3-00.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-mini-golf-challenge-99-holes",
@@ -3134,7 +3719,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/mini-golf-challenge-99-holes-320x240-s40-namobilu.com.jar"
     ],
     "description": "Jeu mobile Java J2ME (mini-golf-challenge-99-holes-320x240-s40-namobilu.com.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-minigolf-theme-park-99-holes",
@@ -3150,7 +3738,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/minigolf-theme-park-99-holes-320x240-s60-namobilu.com.jar"
     ],
     "description": "Jeu mobile Java J2ME (minigolf-theme-park-99-holes-320x240-s60-namobilu.com.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-monopolyhereandnow-samsunga827-i617",
@@ -3166,7 +3757,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/MonopolyHereandNow_SamsungA827_i617.jar"
     ],
     "description": "Jeu mobile Java J2ME (MonopolyHereandNow_SamsungA827_i617.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-motocross-trial-extreme",
@@ -3182,7 +3776,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/motocross-trial-extreme-320x240-s60-namobilu.com.jar"
     ],
     "description": "Jeu mobile Java J2ME (motocross-trial-extreme-320x240-s60-namobilu.com.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-mysterymania-c3",
@@ -3198,7 +3795,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/MysteryMania_C3.jar"
     ],
     "description": "Jeu mobile Java J2ME (MysteryMania_C3.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-namco-arcade-golf-3d",
@@ -3214,7 +3814,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/namco-arcade-golf-3d-320x240-s60-namobilu.com.jar"
     ],
     "description": "Jeu mobile Java J2ME (namco-arcade-golf-3d-320x240-s60-namobilu.com.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-newyorknights2-iendsforlife-s40v6",
@@ -3230,7 +3833,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/NewYorkNights2-FriendsForLife_s40v6-C3-00.jar"
     ],
     "description": "Jeu mobile Java J2ME (NewYorkNights2-FriendsForLife_s40v6-C3-00.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-nightatthemuseum2-s40v6",
@@ -3246,7 +3852,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/NightAtTheMuseum2_s40v6-C3-00.jar"
     ],
     "description": "Jeu mobile Java J2ME (NightAtTheMuseum2_s40v6-C3-00.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-nightclub-fever",
@@ -3262,7 +3871,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/nightclub-fever-320x240-s60-namobilu.com.jar"
     ],
     "description": "Jeu mobile Java J2ME (nightclub-fever-320x240-s60-namobilu.com.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-no-limit-casino-12-pack",
@@ -3278,7 +3890,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/no-limit-casino-12-pack-320x240-s60-namobilu.com.jar"
     ],
     "description": "Jeu mobile Java J2ME (no-limit-casino-12-pack-320x240-s60-namobilu.com.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-offroaddirtmotocross-s40v6",
@@ -3294,7 +3909,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/OffRoadDirtMotocross_s40v6-C3-00.jar"
     ],
     "description": "Jeu mobile Java J2ME (OffRoadDirtMotocross_s40v6-C3-00.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-gogamz-orcs-elves-ii",
@@ -3310,7 +3928,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/GoGamz-orcs-elves-ii.jar"
     ],
     "description": "Jeu mobile Java J2ME (GoGamz-orcs-elves-ii.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-gogamz-pac-man-pinball-2",
@@ -3326,7 +3947,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/GoGamz-pac-man-pinball-2.jar"
     ],
     "description": "Jeu mobile Java J2ME (GoGamz-pac-man-pinball-2.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-pac-man-pinball-2",
@@ -3342,7 +3966,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/pac-man-pinball-2-320x240-namobilu.com.jar"
     ],
     "description": "Jeu mobile Java J2ME (pac-man-pinball-2-320x240-namobilu.com.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-pac-manparty-nokiac3",
@@ -3358,7 +3985,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/PAC-MANParty_NokiaC3.jar"
     ],
     "description": "Jeu mobile Java J2ME (PAC-MANParty_NokiaC3.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-paparazzi-superstar",
@@ -3374,7 +4004,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/paparazzi-superstar-320x240-s60-namobilu.com.jar"
     ],
     "description": "Jeu mobile Java J2ME (paparazzi-superstar-320x240-s60-namobilu.com.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-paperboyspecialdelivery-de-en-es-fr-it-pt-pt-nokia-c3",
@@ -3390,7 +4023,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/paperboyspecialdelivery_de_en_es_fr_it_pt_pt_Nokia_C3.jar"
     ],
     "description": "Jeu mobile Java J2ME (paperboyspecialdelivery_de_en_es_fr_it_pt_pt_Nokia_C3.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-party-island-pool-2-in-1-320x240-nokia-e61",
@@ -3406,7 +4042,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/Party_Island_Pool_2-In-1_320x240_Nokia_E61-441864.jar"
     ],
     "description": "Jeu mobile Java J2ME (Party_Island_Pool_2-In-1_320x240_Nokia_E61-441864.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-party-island-pool-2-in-1",
@@ -3422,7 +4061,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/party-island-pool-2-in-1-320x240-s60-namobilu.com.jar"
     ],
     "description": "Jeu mobile Java J2ME (party-island-pool-2-in-1-320x240-s60-namobilu.com.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-party-island-sexy-trivia",
@@ -3438,7 +4080,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/party-island-sexy-trivia-320x240-s60-namobilu.com.jar"
     ],
     "description": "Jeu mobile Java J2ME (party-island-sexy-trivia-320x240-s60-namobilu.com.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-gogamz-party-island-solitaire-16-pack",
@@ -3454,7 +4099,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/GoGamz-party-island-solitaire-16-pack.jar"
     ],
     "description": "Jeu mobile Java J2ME (GoGamz-party-island-solitaire-16-pack.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-pegglemobile-s40v6",
@@ -3470,7 +4118,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/PeggleMobile_s40v6-C3-00.jar"
     ],
     "description": "Jeu mobile Java J2ME (PeggleMobile_s40v6-C3-00.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-petz-s40v6",
@@ -3486,7 +4137,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/Petz_s40v6-C3-00.jar"
     ],
     "description": "Jeu mobile Java J2ME (Petz_s40v6-C3-00.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-pictoplay-plus-2",
@@ -3502,7 +4156,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/Pictoplay%20Plus-2-320x240.jar"
     ],
     "description": "Jeu mobile Java J2ME (Pictoplay Plus-2-320x240.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-indiagamesltd-f-nokia-c3-en-cs-piratesofthecaribbeanost-v1-1-1",
@@ -3518,7 +4175,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/indiagamesltd_f_Nokia_C3_en_cs_piratesofthecaribbeanost_v1_1_1.jar"
     ],
     "description": "Jeu mobile Java J2ME (indiagamesltd_f_Nokia_C3_en_cs_piratesofthecaribbeanost_v1_1_1.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-platinummahjong-s40v6",
@@ -3534,7 +4194,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/PlatinumMahjong_s40v6-C3-00.jar"
     ],
     "description": "Jeu mobile Java J2ME (PlatinumMahjong_s40v6-C3-00.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-platinumsolitaire2-s40v6",
@@ -3550,7 +4213,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/PlatinumSolitaire2_s40v6-C3-00.jar"
     ],
     "description": "Jeu mobile Java J2ME (PlatinumSolitaire2_s40v6-C3-00.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-platinumsolitaire3-s40v6",
@@ -3566,7 +4232,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/PlatinumSolitaire3_s40v6-C3-00.jar"
     ],
     "description": "Jeu mobile Java J2ME (PlatinumSolitaire3_s40v6-C3-00.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-platinumsolitaire-s40v6",
@@ -3582,7 +4251,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/PlatinumSolitaire_s40v6-C3-00.jar"
     ],
     "description": "Jeu mobile Java J2ME (PlatinumSolitaire_s40v6-C3-00.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-platinumsudoku2-s40v6",
@@ -3598,7 +4270,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/PlatinumSudoku2_s40v6-C3-00.jar"
     ],
     "description": "Jeu mobile Java J2ME (PlatinumSudoku2_s40v6-C3-00.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-platinumsudoku-s40v6",
@@ -3614,7 +4289,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/PlatinumSudoku_s40v6-C3-00.jar"
     ],
     "description": "Jeu mobile Java J2ME (PlatinumSudoku_s40v6-C3-00.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-playboy-casino",
@@ -3630,7 +4308,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/playboy-casino-320x240-s60-namobilu.com.jar"
     ],
     "description": "Jeu mobile Java J2ME (playboy-casino-320x240-s60-namobilu.com.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-predators-s40v6",
@@ -3646,7 +4327,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/Predators_s40v6-C3-00.jar"
     ],
     "description": "Jeu mobile Java J2ME (Predators_s40v6-C3-00.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-princeofpersia-classic-s40v6",
@@ -3662,7 +4346,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/PrinceOfPersia-Classic_s40v6-C3-00.jar"
     ],
     "description": "Jeu mobile Java J2ME (PrinceOfPersia-Classic_s40v6-C3-00.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-princeofpersia-theforgottensands-s40v6",
@@ -3678,7 +4365,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/PrinceOfPersia-TheForgottenSands_s40v6-C3-00.jar"
     ],
     "description": "Jeu mobile Java J2ME (PrinceOfPersia-TheForgottenSands_s40v6-C3-00.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-princeofpersia-zero-s40v6",
@@ -3694,7 +4384,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/PrinceOfPersia-Zero_s40v6-C3-00.jar"
     ],
     "description": "Jeu mobile Java J2ME (PrinceOfPersia-Zero_s40v6-C3-00.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-prison-break",
@@ -3710,7 +4403,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/prison-break-320x240-s60-namobilu.com.jar"
     ],
     "description": "Jeu mobile Java J2ME (prison-break-320x240-s60-namobilu.com.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-puzzlequest2-s40v6",
@@ -3726,7 +4422,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/PuzzleQuest2_s40v6-C3-00.jar"
     ],
     "description": "Jeu mobile Java J2ME (PuzzleQuest2_s40v6-C3-00.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-puzzlings",
@@ -3742,7 +4441,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/puzzlings-320x240-s60-namobilu.com.jar"
     ],
     "description": "Jeu mobile Java J2ME (puzzlings-320x240-s60-namobilu.com.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-pyramid-bloxx",
@@ -3758,7 +4460,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/pyramid-bloxx-320x240-s60-namobilu.com.jar"
     ],
     "description": "Jeu mobile Java J2ME (pyramid-bloxx-320x240-s60-namobilu.com.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-qbert-e61-de-en-es-fr-it-pt-v1-0-4",
@@ -3774,7 +4479,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/qbert_e61_de_en_es_fr_it_pt_v1_0_4.jar"
     ],
     "description": "Jeu mobile Java J2ME (qbert_e61_de_en_es_fr_it_pt_v1_0_4.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-raymanravingrabbids-tvparty-s40v6",
@@ -3790,7 +4498,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/RaymanRavingRabbids-TVParty_s40v6-C3-00.jar"
     ],
     "description": "Jeu mobile Java J2ME (RaymanRavingRabbids-TVParty_s40v6-C3-00.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-redbullsoapboxrace-nokian92-e71-500k-en-1-0",
@@ -3806,7 +4517,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/RedBullSoapboxRace_NokiaN92_E71_500k_EN_1_0.jar"
     ],
     "description": "Jeu mobile Java J2ME (RedBullSoapboxRace_NokiaN92_E71_500k_EN_1_0.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-realfootball2009-s40v6",
@@ -3822,7 +4536,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/RealFootball2009_s40v6-C3-00.jar"
     ],
     "description": "Jeu mobile Java J2ME (RealFootball2009_s40v6-C3-00.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-realfootball-manageredition2009-s40v6",
@@ -3838,7 +4555,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/RealFootball-ManagerEdition2009_s40v6-C3-00.jar"
     ],
     "description": "Jeu mobile Java J2ME (RealFootball-ManagerEdition2009_s40v6-C3-00.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-riseofantares-c3",
@@ -3854,7 +4574,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/RiseOfAntares_C3.jar"
     ],
     "description": "Jeu mobile Java J2ME (RiseOfAntares_C3.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-road-raider",
@@ -3870,7 +4593,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/road-raider-320x240-s60-namobilu.com.jar"
     ],
     "description": "Jeu mobile Java J2ME (road-raider-320x240-s60-namobilu.com.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-rollerrev99-320x240-nokia",
@@ -3886,7 +4612,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/rollerrev99_320x240_Nokia.jar"
     ],
     "description": "Jeu mobile Java J2ME (rollerrev99_320x240_Nokia.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-san-ancisco-tycoon",
@@ -3902,7 +4631,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/san-francisco-tycoon-320x240-s60-namobilu.com.jar"
     ],
     "description": "Jeu mobile Java J2ME (san-francisco-tycoon-320x240-s60-namobilu.com.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-sblaster-efgsitpt-br-tu-nokia-320x240-nontouch",
@@ -3918,7 +4650,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/sblaster_efgsitpt_br_tu_nokia_320x240_nontouch.jar"
     ],
     "description": "Jeu mobile Java J2ME (sblaster_efgsitpt_br_tu_nokia_320x240_nontouch.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-scoobydoo-ben10-320x240",
@@ -3934,7 +4669,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/ScoobyDoo_Ben10_320x240.jar"
     ],
     "description": "Jeu mobile Java J2ME (ScoobyDoo_Ben10_320x240.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-sega-puzzle-pack-blue",
@@ -3950,7 +4688,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/sega-puzzle-pack-blue-320x240-s60-namobilu.com.jar"
     ],
     "description": "Jeu mobile Java J2ME (sega-puzzle-pack-blue-320x240-s60-namobilu.com.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-shaolin-jump",
@@ -3966,7 +4707,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/shaolin-jump-320x240-s60-namobilu.com.jar"
     ],
     "description": "Jeu mobile Java J2ME (shaolin-jump-320x240-s60-namobilu.com.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-shrekparty-s40v6",
@@ -3982,7 +4726,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/ShrekParty_s40v6-C3-00.jar"
     ],
     "description": "Jeu mobile Java J2ME (ShrekParty_s40v6-C3-00.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-shrekforeverafter-themobilegame-s40v6",
@@ -3998,7 +4745,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/ShrekForeverAfter-TheMobileGame_s40v6-C3-00.jar"
     ],
     "description": "Jeu mobile Java J2ME (ShrekForeverAfter-TheMobileGame_s40v6-C3-00.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-shrek-thethird-s40v6",
@@ -4014,7 +4764,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/Shrek-TheThird_s40v6-C3-00.jar"
     ],
     "description": "Jeu mobile Java J2ME (Shrek-TheThird_s40v6-C3-00.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-sid-meiers-civilization-iv-defenders-of-the-gates",
@@ -4030,7 +4783,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/sid-meiers-civilization-iv-defenders-of-the-gates-320x240-s60-namobilu.com.jar"
     ],
     "description": "Jeu mobile Java J2ME (sid-meiers-civilization-iv-defenders-of-the-gates-320x240-s60-namobilu.com.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-sid-meiers-pirates",
@@ -4046,7 +4802,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/sid-meiers-pirates-320x240-s60-namobilu.com.jar"
     ],
     "description": "Jeu mobile Java J2ME (sid-meiers-pirates-320x240-s60-namobilu.com.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-sid-meiers-railroad-tycoon",
@@ -4062,7 +4821,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/sid-meiers-railroad-tycoon-320x240-s60-namobilu.com.jar"
     ],
     "description": "Jeu mobile Java J2ME (sid-meiers-railroad-tycoon-320x240-s60-namobilu.com.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-skydiving-challenge",
@@ -4078,7 +4840,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/skydiving-challenge-320x240-s60-namobilu.com.jar"
     ],
     "description": "Jeu mobile Java J2ME (skydiving-challenge-320x240-s60-namobilu.com.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-slide-n-loop",
@@ -4094,7 +4859,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/slide-n-loop-320x240-s60-namobilu.com.jar"
     ],
     "description": "Jeu mobile Java J2ME (slide-n-loop-320x240-s60-namobilu.com.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-sm-en-noke61",
@@ -4110,7 +4878,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/SM_EN_NokE61.jar"
     ],
     "description": "Jeu mobile Java J2ME (SM_EN_NokE61.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-smashkartracing-320x240-nokia",
@@ -4126,7 +4897,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/smashkartracing_320x240_Nokia.jar"
     ],
     "description": "Jeu mobile Java J2ME (smashkartracing_320x240_Nokia.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-snake-reloaded",
@@ -4142,7 +4916,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/snake-reloaded-320x240-s60-namobilu.com.jar"
     ],
     "description": "Jeu mobile Java J2ME (snake-reloaded-320x240-s60-namobilu.com.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-splintercell-conviction-s40v6",
@@ -4158,7 +4935,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/SplinterCell-Conviction_s40v6-C3-00.jar"
     ],
     "description": "Jeu mobile Java J2ME (SplinterCell-Conviction_s40v6-C3-00.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-springbreakfever-s40v6",
@@ -4174,7 +4954,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/SpringBreakFever_s40v6-C3-00.jar"
     ],
     "description": "Jeu mobile Java J2ME (SpringBreakFever_s40v6-C3-00.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-sss-nokia-s60-3-320x240-c3",
@@ -4190,7 +4973,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/SSS__Nokia_S60_3_320x240_C3.jar"
     ],
     "description": "Jeu mobile Java J2ME (SSS__Nokia_S60_3_320x240_C3.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-star-invasion",
@@ -4206,7 +4992,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/star-invasion-320x240-s60-namobilu.com.jar"
     ],
     "description": "Jeu mobile Java J2ME (star-invasion-320x240-s60-namobilu.com.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-star-wars-cantina",
@@ -4222,7 +5011,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/star-wars-cantina-320x240-s60-namobilu.com.jar"
     ],
     "description": "Jeu mobile Java J2ME (star-wars-cantina-320x240-s60-namobilu.com.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-gogamz-star-wars-jedi-mind-tricks",
@@ -4238,7 +5030,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/GoGamz-star-wars-jedi-mind-tricks.jar"
     ],
     "description": "Jeu mobile Java J2ME (GoGamz-star-wars-jedi-mind-tricks.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-gogamz-star-wars-the-clone-wars",
@@ -4254,7 +5049,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/GoGamz-star-wars-the-clone-wars.jar"
     ],
     "description": "Jeu mobile Java J2ME (GoGamz-star-wars-the-clone-wars.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-gogamz-stranded-2-mysteries-of-time",
@@ -4270,7 +5068,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/GoGamz-stranded-2-mysteries-of-time.jar"
     ],
     "description": "Jeu mobile Java J2ME (GoGamz-stranded-2-mysteries-of-time.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-stunt-car-racing-99-tracks",
@@ -4286,7 +5087,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/stunt-car-racing-99-tracks-320x240-s60-namobilu.com.jar"
     ],
     "description": "Jeu mobile Java J2ME (stunt-car-racing-99-tracks-320x240-s60-namobilu.com.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-gogamz-super-ko-boxing-2",
@@ -4302,7 +5106,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/GoGamz-super-ko-boxing-2.jar"
     ],
     "description": "Jeu mobile Java J2ME (GoGamz-super-ko-boxing-2.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-superman-batman-heroes-united",
@@ -4318,7 +5125,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/superman-batman-heroes-united-320x240-s60-namobilu.com.jar"
     ],
     "description": "Jeu mobile Java J2ME (superman-batman-heroes-united-320x240-s60-namobilu.com.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-tangled-320x240-nokia-e71",
@@ -4334,7 +5144,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/Tangled_320x240_Nokia_E71-481943.jar"
     ],
     "description": "Jeu mobile Java J2ME (Tangled_320x240_Nokia_E71-481943.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-tbloxxmycity-nok-e61-en",
@@ -4350,7 +5163,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/tbloxxmycity_nok_e61_en.jar"
     ],
     "description": "Jeu mobile Java J2ME (tbloxxmycity_nok_e61_en.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-tetris-full-nokia-c3-00-ml-igp-100",
@@ -4366,7 +5182,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/Tetris_FULL_Nokia_C3_00_ML_IGP_100.jar"
     ],
     "description": "Jeu mobile Java J2ME (Tetris_FULL_Nokia_C3_00_ML_IGP_100.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-thesimpsonsitchyscratchyland-c3",
@@ -4382,7 +5201,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/TheSimpsonsItchyScratchyLand_C3.jar"
     ],
     "description": "Jeu mobile Java J2ME (TheSimpsonsItchyScratchyLand_C3.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-theamazingspiderman2-nokia-c3-00-en-igp-eu-103",
@@ -4398,7 +5220,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/TheAmazingSpiderMan2_Nokia_C3_00_EN_IGP_EU_103.jar"
     ],
     "description": "Jeu mobile Java J2ME (TheAmazingSpiderMan2_Nokia_C3_00_EN_IGP_EU_103.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-thetumbler-s40v6",
@@ -4414,7 +5239,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/TheTumbler_s40v6-C3-00.jar"
     ],
     "description": "Jeu mobile Java J2ME (TheTumbler_s40v6-C3-00.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-themummy3-tombofthedragonemperor-s40v6",
@@ -4430,7 +5258,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/TheMummy3-TombOfTheDragonEmperor_s40v6-C3-00.jar"
     ],
     "description": "Jeu mobile Java J2ME (TheMummy3-TombOfTheDragonEmperor_s40v6-C3-00.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-the-adventures-of-tintin-secret-of-the-unicorn",
@@ -4446,7 +5277,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/the-adventures-of-tintin-secret-of-the-unicorn-320x240-s60-namobilu.com.jar"
     ],
     "description": "Jeu mobile Java J2ME (the-adventures-of-tintin-secret-of-the-unicorn-320x240-s60-namobilu.com.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-the-house-of-the-dead-nightmare",
@@ -4462,7 +5296,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/the-house-of-the-dead-nightmare-320x240-s60-namobilu.com.jar"
     ],
     "description": "Jeu mobile Java J2ME (the-house-of-the-dead-nightmare-320x240-s60-namobilu.com.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-the-oregon-trail-2-gold-rush",
@@ -4478,7 +5315,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/the-oregon-trail-2-gold-rush-320x240-s60-namobilu.com.jar"
     ],
     "description": "Jeu mobile Java J2ME (the-oregon-trail-2-gold-rush-320x240-s60-namobilu.com.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-the-oregon-trail-american-settlers",
@@ -4494,7 +5334,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/the-oregon-trail-american-settlers-320x240-s60-namobilu.com.jar"
     ],
     "description": "Jeu mobile Java J2ME (the-oregon-trail-american-settlers-320x240-s60-namobilu.com.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-the-price-is-right",
@@ -4510,7 +5353,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/the-price-is-right-320x240-s60-namobilu.com.jar"
     ],
     "description": "Jeu mobile Java J2ME (the-price-is-right-320x240-s60-namobilu.com.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-gogamz-the-settlers",
@@ -4526,7 +5372,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/GoGamz-the-settlers.jar"
     ],
     "description": "Jeu mobile Java J2ME (GoGamz-the-settlers.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-theegyptians-nokia-e61-cs-1-0",
@@ -4542,7 +5391,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/theegyptians_nokia_e61_cs_1_0.jar"
     ],
     "description": "Jeu mobile Java J2ME (theegyptians_nokia_e61_cs_1_0.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-thor-the-dark-world",
@@ -4558,7 +5410,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/thor-the-dark-world-320x240-s60-namobilu.com.jar"
     ],
     "description": "Jeu mobile Java J2ME (thor-the-dark-world-320x240-s60-namobilu.com.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-tikitowers2-monkeyrepublic-s40v6",
@@ -4574,7 +5429,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/TikiTowers2-MonkeyRepublic_s40v6-C3.jar"
     ],
     "description": "Jeu mobile Java J2ME (TikiTowers2-MonkeyRepublic_s40v6-C3.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-titans-de-en-es-fr-it-pt-nokiae71",
@@ -4590,7 +5448,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/titans_de_en_es_fr_it_pt_NokiaE71.jar"
     ],
     "description": "Jeu mobile Java J2ME (titans_de_en_es_fr_it_pt_NokiaE71.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-tna-impact",
@@ -4606,7 +5467,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/tna-impact-320x240-s60-namobilu.com.jar"
     ],
     "description": "Jeu mobile Java J2ME (tna-impact-320x240-s60-namobilu.com.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-tomclancys-hawx-s40v6",
@@ -4622,7 +5486,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/TomClancys-HAWX_s40v6-C3-00.jar"
     ],
     "description": "Jeu mobile Java J2ME (TomClancys-HAWX_s40v6-C3-00.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-tom-and-jerry-mouse-maze-2",
@@ -4638,7 +5505,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/tom-and-jerry-mouse-maze-2-320x240-s60-namobilu.com.jar"
     ],
     "description": "Jeu mobile Java J2ME (tom-and-jerry-mouse-maze-2-320x240-s60-namobilu.com.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-toon-cup",
@@ -4654,7 +5524,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/toon-cup-320x240-s60-namobilu.com.jar"
     ],
     "description": "Jeu mobile Java J2ME (toon-cup-320x240-s60-namobilu.com.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-top-trumps-the-best-of-bond",
@@ -4670,7 +5543,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/top-trumps-007-the-best-of-bond-320x240-s60-namobilu.com.jar"
     ],
     "description": "Jeu mobile Java J2ME (top-trumps-007-the-best-of-bond-320x240-s60-namobilu.com.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-total-conquest",
@@ -4686,7 +5562,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/total-conquest-320x240-s60-namobilu.com.jar"
     ],
     "description": "Jeu mobile Java J2ME (total-conquest-320x240-s60-namobilu.com.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-tower-bloxx-revolution",
@@ -4702,7 +5581,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/tower-bloxx-revolution-320x240-s60-namobilu.com.jar"
     ],
     "description": "Jeu mobile Java J2ME (tower-bloxx-revolution-320x240-s60-namobilu.com.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-townsmen-5-352x416",
@@ -4718,7 +5600,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/Townsmen_5_352x416-278320.jar"
     ],
     "description": "Jeu mobile Java J2ME (Townsmen_5_352x416-278320.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-tpt-noke61",
@@ -4734,7 +5619,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/tpt_NokE61.jar"
     ],
     "description": "Jeu mobile Java J2ME (tpt_NokE61.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-treasuresofmontezuma2-s40v6",
@@ -4750,7 +5638,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/TreasuresOfMontezuma2_s40v6-C3-00.jar"
     ],
     "description": "Jeu mobile Java J2ME (TreasuresOfMontezuma2_s40v6-C3-00.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-turtle-dash",
@@ -4766,7 +5657,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/turtle-dash-320x240-s60-namobilu.com.jar"
     ],
     "description": "Jeu mobile Java J2ME (turtle-dash-320x240-s60-namobilu.com.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-ultimate-winter-sports",
@@ -4782,7 +5676,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/ultimate-winter-sports-320x240-s60-namobilu.com.jar"
     ],
     "description": "Jeu mobile Java J2ME (ultimate-winter-sports-320x240-s60-namobilu.com.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-ultimatebrickbreaker2-de-en-es-fr-it-pt-pt-nokia-c3",
@@ -4798,7 +5695,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/ultimatebrickbreaker2_de_en_es_fr_it_pt_pt_Nokia_C3.jar"
     ],
     "description": "Jeu mobile Java J2ME (ultimatebrickbreaker2_de_en_es_fr_it_pt_pt_Nokia_C3.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-uno-s40v6",
@@ -4814,7 +5714,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/UNO_s40v6-C3-00.jar"
     ],
     "description": "Jeu mobile Java J2ME (UNO_s40v6-C3-00.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-uno-iends",
@@ -4830,7 +5733,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/uno-friends-320x240-s60-namobilu.com.jar"
     ],
     "description": "Jeu mobile Java J2ME (uno-friends-320x240-s60-namobilu.com.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-uno-spin",
@@ -4846,7 +5752,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/uno-spin-320x240-s60-namobilu.com.jar"
     ],
     "description": "Jeu mobile Java J2ME (uno-spin-320x240-s60-namobilu.com.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-up",
@@ -4862,7 +5771,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/up-320x240-namobilu.com.jar"
     ],
     "description": "Jeu mobile Java J2ME (up-320x240-namobilu.com.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-vegas-casino-12-pack",
@@ -4878,7 +5790,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/vegas-casino-12-pack-320x240-s60-namobilu.com.jar"
     ],
     "description": "Jeu mobile Java J2ME (vegas-casino-12-pack-320x240-s60-namobilu.com.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-vegas-casino-cruise",
@@ -4894,7 +5809,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/vegas-casino-cruise-320x240-s60-namobilu.com.jar"
     ],
     "description": "Jeu mobile Java J2ME (vegas-casino-cruise-320x240-s60-namobilu.com.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-gogamz-water-game",
@@ -4910,7 +5828,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/GoGamz-water-game.jar"
     ],
     "description": "Jeu mobile Java J2ME (GoGamz-water-game.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-wedding-sale-madness",
@@ -4926,7 +5847,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/wedding-sale-madness-320x240-s60-namobilu.com.jar"
     ],
     "description": "Jeu mobile Java J2ME (wedding-sale-madness-320x240-s60-namobilu.com.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-whac-a-mole",
@@ -4942,7 +5866,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/whac-a-mole-320x240-s60-namobilu.com.jar"
     ],
     "description": "Jeu mobile Java J2ME (whac-a-mole-320x240-s60-namobilu.com.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-whereswallynow-s40v6",
@@ -4958,7 +5885,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/WheresWallyNow_s40v6-C3-00.jar"
     ],
     "description": "Jeu mobile Java J2ME (WheresWallyNow_s40v6-C3-00.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-where-in-the-world-is-carmen-sandiego",
@@ -4974,7 +5904,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/where-in-the-world-is-carmen-sandiego-320x240-s60-namobilu.com.jar"
     ],
     "description": "Jeu mobile Java J2ME (where-in-the-world-is-carmen-sandiego-320x240-s60-namobilu.com.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-wheres-wally",
@@ -4990,7 +5923,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/wheres-wally-320x240-s60-namobilu.com.jar"
     ],
     "description": "Jeu mobile Java J2ME (wheres-wally-320x240-s60-namobilu.com.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-wheres-wally-in-hollywood",
@@ -5006,7 +5942,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/wheres-wally-in-hollywood-320x240-s60-namobilu.com.jar"
     ],
     "description": "Jeu mobile Java J2ME (wheres-wally-in-hollywood-320x240-s60-namobilu.com.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-wild-west-guns",
@@ -5022,7 +5961,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/wild-west-guns-320x240-s60-namobilu.com.jar"
     ],
     "description": "Jeu mobile Java J2ME (wild-west-guns-320x240-s60-namobilu.com.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-wolverine-v1-1-12-nokia-e61-byharpreet",
@@ -5038,7 +5980,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/Wolverine_v1_1_12_Nokia_E61_byharpreet.jar"
     ],
     "description": "Jeu mobile Java J2ME (Wolverine_v1_1_12_Nokia_E61_byharpreet.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-womens-murder-club-death-in-scarlet",
@@ -5054,7 +5999,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/womens-murder-club-death-in-scarlet-320x240-s60-namobilu.com.jar"
     ],
     "description": "Jeu mobile Java J2ME (womens-murder-club-death-in-scarlet-320x240-s60-namobilu.com.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-wonder-zoo",
@@ -5070,7 +6018,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/wonder-zoo-320x240-s60-namobilu.com.jar"
     ],
     "description": "Jeu mobile Java J2ME (wonder-zoo-320x240-s60-namobilu.com.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-woody-woodpecker-in-waterfools",
@@ -5086,7 +6037,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/woody-woodpecker-in-waterfools-320x240-s60-namobilu.com.jar"
     ],
     "description": "Jeu mobile Java J2ME (woody-woodpecker-in-waterfools-320x240-s60-namobilu.com.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-gogamz-wordcrafter",
@@ -5102,7 +6056,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/GoGamz-wordcrafter.jar"
     ],
     "description": "Jeu mobile Java J2ME (GoGamz-wordcrafter.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-world-at-arms",
@@ -5118,7 +6075,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/world-at-arms-320x240-s60-namobilu.com.jar"
     ],
     "description": "Jeu mobile Java J2ME (world-at-arms-320x240-s60-namobilu.com.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-gogamz-xango-tango",
@@ -5134,7 +6094,10 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/GoGamz-xango-tango.jar"
     ],
     "description": "Jeu mobile Java J2ME (GoGamz-xango-tango.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   },
   {
     "id": "java-zombie-mob-defense",
@@ -5150,6 +6113,9 @@
       "https://archive.org/download/320x240JavaGames/320x240%20Java%20Games.zip/zombie-mob-defense-320x240-s60-namobilu.com.jar"
     ],
     "description": "Jeu mobile Java J2ME (zombie-mob-defense-320x240-s60-namobilu.com.jar). Téléchargement automatique et lancement dans FreeJ2ME.",
-    "genre": "Gameloft / J2ME (320×240)"
+    "genre": "Gameloft / J2ME (320×240)",
+    "core": "j2me",
+    "players": "1J",
+    "supportsMultiplayer": false
   }
 ]

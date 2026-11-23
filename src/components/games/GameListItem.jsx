@@ -1,5 +1,6 @@
 import React from 'react';
 import { Play, Users, CheckCircle, Cloud, Download, Star } from 'lucide-react';
+import { supportsOnlineMultiplayer } from '../../utils/gameCapabilities';
 
 export function GameListItem({ game, isAvailable, isBiosReady, onLaunchSolo, onLaunchNetplay }) {
   // Raccourcissement intelligent du genre pour économiser l'espace
@@ -113,14 +114,16 @@ export function GameListItem({ game, isAvailable, isBiosReady, onLaunchSolo, onL
             </button>
           )}
 
-          <button
-            onClick={() => onLaunchNetplay(game)}
-            className="flex items-center justify-center gap-1 px-2 sm:px-2.5 py-1.5 rounded-lg text-[11px] sm:text-xs font-bold font-mono uppercase tracking-wider bg-neutral-950 hover:bg-neutral-800 text-rose-400 border border-rose-500/30 hover:border-rose-500/60 active:scale-95 transition-all"
-            title={`Partie Multijoueur Réseau (${game.players || 2} Joueurs)`}
-          >
-            <Users className="w-3 h-3" />
-            <span className="hidden md:inline">{game.players === 4 ? '4P LAN' : '2P LAN'}</span>
-          </button>
+          {supportsOnlineMultiplayer(game) && (
+            <button
+              onClick={() => onLaunchNetplay(game)}
+              className="flex items-center justify-center gap-1 px-2 sm:px-2.5 py-1.5 rounded-lg text-[11px] sm:text-xs font-bold font-mono uppercase tracking-wider bg-neutral-950 hover:bg-neutral-800 text-rose-400 border border-rose-500/30 hover:border-rose-500/60 active:scale-95 transition-all"
+              title={`Partie Multijoueur Réseau (${game.players || 2} Joueurs)`}
+            >
+              <Users className="w-3 h-3" />
+              <span className="hidden md:inline">{game.players === 4 ? '4P LAN' : '2P LAN'}</span>
+            </button>
+          )}
         </div>
       </div>
 

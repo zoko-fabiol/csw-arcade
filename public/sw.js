@@ -1,4 +1,4 @@
-const SHELL_CACHE_NAME = 'csw-arcade-shell-v22-netplay-fix';
+const SHELL_CACHE_NAME = 'csw-arcade-shell-v23-multiplayer-audit';
 const ENGINE_CACHE_NAME = 'csw-arcade-engine-v6';
 
 // Assets essentiels du moteur WebAssembly (FBNeo + EmulatorJS)

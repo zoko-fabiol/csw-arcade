@@ -2431,6 +2431,7 @@
       gameTitle: '',
       peakScore: 0,
       lastSavedScore: 0,
+      lastMilestoneEmitMs: 0,
       lastScore: 0,
       lastLives: null,
       lastP1Rounds: 0,
@@ -2511,8 +2512,19 @@
       return 0;
     }
 
+    function isLowScoreSportsTitle(title) {
+      return /street.*hoop|dunk.*dream|windjammer|flying.*power.*disc|super.*sidekick|soccer|football|futsal|goal.*goal|tennis|golf|baseball|bowling|volleyball|hockey|nba|fifa/i.test(
+        String(title || '')
+      );
+    }
+
     function bumpScoreCandidate(key, offset, type, curVal, prevVal, requiredHits) {
-      const rec = cswRamTelemetry.scoreCandidates.get(key) || {
+      const existing = cswRamTelemetry.scoreCandidates.get(key);
+      // Ne jamais verrouiller une adresse heuristique déjà énorme dès l'initialisation (compteur CPU/VRAM)
+      if (!existing && (prevVal > 150000 || curVal > 5000000)) {
+        return null;
+      }
+      const rec = existing || {
         offset,
         type,
         hits: 0,
@@ -2520,7 +2532,7 @@
         sameTicks: 0,
       };
       // Rejeter si la valeur précédente enregistrée ne correspond pas à une progression monotone
-      if (curVal < rec.val) {
+      if (curVal < rec.val || curVal - rec.val > 50000) {
         cswRamTelemetry.scoreCandidates.delete(key);
         return null;
       }
@@ -2534,10 +2546,15 @@
       return null;
     }
 
-    function runHeuristicRamScan(ram) {
+    function runHeuristicRamScan(ram, isRawSystemRam = false) {
       // Scanner jusqu'à 6 Mo de RAM / Savestate (FBNeo Neo Geo / CPS2 / PS1) grâce au diff 32-bit (< 3ms/tick)
       const scanLen = Math.min(ram.length, 6291456) & ~3;
       if (scanLen < 1024) return { score: cswRamTelemetry.lastScore, lives: cswRamTelemetry.lastLives };
+
+      const isLowScoreSports = isLowScoreSportsTitle(cswRamTelemetry.gameTitle);
+      const maxHeuristicScore = isLowScoreSports ? 300 : 5000000;
+      const hits32 = isRawSystemRam ? 3 : 4;
+      const hits16 = isLowScoreSports ? 3 : 4;
 
       const prev = cswRamTelemetry.prevSnapshot;
       if (!prev || prev.length !== scanLen) {
@@ -2545,14 +2562,18 @@
         return { score: cswRamTelemetry.lastScore, lives: cswRamTelemetry.lastLives };
       }
 
-      // 1. Si l'adresse de score est déjà verrouillée, la lire directement
+      // 1. Si l'adresse de score est déjà verrouillée, la lire directement avec garde anti-saut absurde
       let detectedScore = cswRamTelemetry.lastScore;
       if (cswRamTelemetry.lockedScoreAddr) {
         const v = readHeuristicValue(ram, cswRamTelemetry.lockedScoreAddr);
-        if (v < 50000000) {
+        const hugeSpike =
+          cswRamTelemetry.lastScore > 0 && v - cswRamTelemetry.lastScore > (isLowScoreSports ? 30 : 250000);
+        if (v <= maxHeuristicScore && !hugeSpike) {
           detectedScore = v;
         } else {
           cswRamTelemetry.lockedScoreAddr = null;
+          cswRamTelemetry.scoreCandidates.clear();
+          detectedScore = 0;
         }
       } else {
         const cur32 = new Uint32Array(ram.buffer, ram.byteOffset, scanLen >> 2);
@@ -2561,10 +2582,10 @@
         const dvPrev = new DataView(prev.buffer, prev.byteOffset, scanLen);
         const words = scanLen >> 2;
 
-        // Invalider les candidats qui ont diminué entre deux ticks
+        // Invalider les candidats qui ont diminué ou dépassé le plafond plausible
         for (const [k, rec] of cswRamTelemetry.scoreCandidates.entries()) {
           const curV = readHeuristicValue(ram, rec);
-          if (curV < rec.val || curV >= 50000000) {
+          if (curV < rec.val || curV > maxHeuristicScore || curV - rec.val > 50000) {
             cswRamTelemetry.scoreCandidates.delete(k);
           }
         }
@@ -2579,69 +2600,73 @@
             const off = base + sub;
             if (off + 4 >= scanLen) break;
 
-            // A. BCD 4 octets (8 chiffres : Metal Slug, KOF, Neo Geo, Capcom)
-            const b4Cur = readBcd4(ram, off);
-            const b4Prev = readBcd4(prev, off);
-            if (b4Cur > b4Prev && b4Prev >= 0 && b4Cur <= 99999999) {
-              const diff = b4Cur - b4Prev;
-              if (diff >= 10 && diff <= 50000 && diff % 10 === 0) {
-                const locked = bumpScoreCandidate(`bcd4_${off}`, off, 'bcd4', b4Cur, b4Prev, 2);
-                if (locked !== null) { detectedScore = locked; break; }
+            if (!isLowScoreSports) {
+              // A. BCD 4 octets (8 chiffres : Metal Slug, KOF, Neo Geo, Capcom)
+              const b4Cur = readBcd4(ram, off);
+              const b4Prev = readBcd4(prev, off);
+              if (b4Cur > b4Prev && b4Prev >= 0 && b4Prev <= 150000 && b4Cur <= maxHeuristicScore) {
+                const diff = b4Cur - b4Prev;
+                if (diff >= 10 && diff <= 20000 && diff % 10 === 0) {
+                  const locked = bumpScoreCandidate(`bcd4_${off}`, off, 'bcd4', b4Cur, b4Prev, hits32);
+                  if (locked !== null) { detectedScore = locked; break; }
+                }
               }
-            }
 
-            // B. BCD 3 octets (6 chiffres)
-            const b3Cur = readBcd3(ram, off);
-            const b3Prev = readBcd3(prev, off);
-            if (b3Cur > b3Prev && b3Prev >= 0 && b3Cur <= 999999) {
-              const diff = b3Cur - b3Prev;
-              if (diff >= 10 && diff <= 50000 && diff % 10 === 0) {
-                const locked = bumpScoreCandidate(`bcd3_${off}`, off, 'bcd3', b3Cur, b3Prev, 2);
-                if (locked !== null) { detectedScore = locked; break; }
+              // B. BCD 3 octets (6 chiffres)
+              const b3Cur = readBcd3(ram, off);
+              const b3Prev = readBcd3(prev, off);
+              if (b3Cur > b3Prev && b3Prev >= 0 && b3Prev <= 150000 && b3Cur <= 999999) {
+                const diff = b3Cur - b3Prev;
+                if (diff >= 10 && diff <= 20000 && diff % 10 === 0) {
+                  const locked = bumpScoreCandidate(`bcd3_${off}`, off, 'bcd3', b3Cur, b3Prev, hits32);
+                  if (locked !== null) { detectedScore = locked; break; }
+                }
               }
             }
 
             // Pour u32 / u16, vérifier les offsets pairs (sub === 0 || sub === 2)
             if ((sub & 1) === 0) {
-              // C. u32 Big-Endian (Neo Geo MVS & Sega Mega Drive 68000)
-              const beCur = dvCur.getUint32(off, false);
-              const bePrev = dvPrev.getUint32(off, false);
-              if (beCur > bePrev && bePrev < 5000000 && beCur <= 9999999) {
-                const diff = beCur - bePrev;
-                if (diff >= 10 && diff <= 50000 && diff % 10 === 0) {
-                  const locked = bumpScoreCandidate(`u32be_${off}`, off, 'u32be', beCur, bePrev, 2);
-                  if (locked !== null) { detectedScore = locked; break; }
+              if (!isLowScoreSports) {
+                // C. u32 Big-Endian (Neo Geo MVS & Sega Mega Drive 68000)
+                const beCur = dvCur.getUint32(off, false);
+                const bePrev = dvPrev.getUint32(off, false);
+                if (beCur > bePrev && bePrev <= 150000 && beCur <= maxHeuristicScore) {
+                  const diff = beCur - bePrev;
+                  if (diff >= 10 && diff <= 20000 && diff % 10 === 0) {
+                    const locked = bumpScoreCandidate(`u32be_${off}`, off, 'u32be', beCur, bePrev, hits32);
+                    if (locked !== null) { detectedScore = locked; break; }
+                  }
                 }
-              }
 
-              // D. u32 Little-Endian (PlayStation PS1, SNES, GBA, N64)
-              const leCur = dvCur.getUint32(off, true);
-              const lePrev = dvPrev.getUint32(off, true);
-              if (leCur > lePrev && lePrev < 5000000 && leCur <= 9999999) {
-                const diff = leCur - lePrev;
-                if (diff >= 10 && diff <= 50000 && diff % 10 === 0) {
-                  const locked = bumpScoreCandidate(`u32le_${off}`, off, 'u32le', leCur, lePrev, 2);
-                  if (locked !== null) { detectedScore = locked; break; }
+                // D. u32 Little-Endian (PlayStation PS1, SNES, GBA, N64)
+                const leCur = dvCur.getUint32(off, true);
+                const lePrev = dvPrev.getUint32(off, true);
+                if (leCur > lePrev && lePrev <= 150000 && leCur <= maxHeuristicScore) {
+                  const diff = leCur - lePrev;
+                  if (diff >= 10 && diff <= 20000 && diff % 10 === 0) {
+                    const locked = bumpScoreCandidate(`u32le_${off}`, off, 'u32le', leCur, lePrev, hits32);
+                    if (locked !== null) { detectedScore = locked; break; }
+                  }
                 }
               }
 
               // E. u16 Big-Endian & Little-Endian (Jeux de sport ex: Street Hoop +2/+3 pts, NES, Arcade)
               const u16beCur = dvCur.getUint16(off, false);
               const u16bePrev = dvPrev.getUint16(off, false);
-              if (u16beCur > u16bePrev && u16beCur <= 500) {
+              if (u16beCur > u16bePrev && u16bePrev <= 150 && u16beCur <= 300) {
                 const diff = u16beCur - u16bePrev;
-                if (diff >= 2 && diff <= 6) {
-                  const locked = bumpScoreCandidate(`u16be_${off}`, off, 'u16be', u16beCur, u16bePrev, 3);
+                if (diff >= 1 && diff <= 6) {
+                  const locked = bumpScoreCandidate(`u16be_${off}`, off, 'u16be', u16beCur, u16bePrev, hits16);
                   if (locked !== null) { detectedScore = locked; break; }
                 }
               }
 
               const u16leCur = dvCur.getUint16(off, true);
               const u16lePrev = dvPrev.getUint16(off, true);
-              if (u16leCur > u16lePrev && u16leCur <= 500) {
+              if (u16leCur > u16lePrev && u16lePrev <= 150 && u16leCur <= 300) {
                 const diff = u16leCur - u16lePrev;
-                if (diff >= 2 && diff <= 6) {
-                  const locked = bumpScoreCandidate(`u16le_${off}`, off, 'u16le', u16leCur, u16lePrev, 3);
+                if (diff >= 1 && diff <= 6) {
+                  const locked = bumpScoreCandidate(`u16le_${off}`, off, 'u16le', u16leCur, u16lePrev, hits16);
                   if (locked !== null) { detectedScore = locked; break; }
                 }
               }
@@ -2689,7 +2714,12 @@
     function emitRamAutoScore(score, reason) {
       const clean = Math.floor(Number(score) || 0);
       if (clean <= 0) return;
-      if (reason === 'milestone' && clean <= cswRamTelemetry.lastSavedScore) return;
+      const now = Date.now();
+      if (reason === 'milestone') {
+        if (clean <= cswRamTelemetry.lastSavedScore) return;
+        if (now - cswRamTelemetry.lastMilestoneEmitMs < 5000) return;
+        cswRamTelemetry.lastMilestoneEmitMs = now;
+      }
       cswRamTelemetry.lastSavedScore = Math.max(cswRamTelemetry.lastSavedScore, clean);
       notifyParent('RAM_AUTO_SCORE', {
         score: clean,
@@ -2749,12 +2779,13 @@
           p2Rounds = typeof res.p2Rounds === 'number' ? res.p2Rounds : null;
         }
       } else {
-        const res = runHeuristicRamScan(ram);
+        const res = runHeuristicRamScan(ram, isRawSystemRam);
         score = Number(res.score || 0);
         lives = typeof res.lives === 'number' ? res.lives : null;
       }
 
-      if (score > 0 && score < 99999999) {
+      const maxScoreCap = isLowScoreSportsTitle(cswRamTelemetry.gameTitle) ? 300 : 5000000;
+      if (score > 0 && score <= maxScoreCap) {
         cswRamTelemetry.hadActivePlay = true;
         if (score > cswRamTelemetry.peakScore) {
           cswRamTelemetry.peakScore = score;
@@ -2814,6 +2845,7 @@
         RAM_GAME_PROFILES.find((p) => p.cores.includes(lowerCore) && p.match.test(lowerTitle)) || null;
       cswRamTelemetry.peakScore = 0;
       cswRamTelemetry.lastSavedScore = 0;
+      cswRamTelemetry.lastMilestoneEmitMs = 0;
       cswRamTelemetry.lastScore = 0;
       cswRamTelemetry.lastLives = null;
       cswRamTelemetry.lastP1Rounds = 0;

@@ -1,6 +1,7 @@
 import { WebSocketServer, WebSocket } from 'ws';
 import fs from 'node:fs';
 import path from 'node:path';
+import { supportsOnlineMultiplayer } from '../utils/gameCapabilities.js';
 
 function loadEnvValue(key, fallback = '') {
   if (process.env[key]) return process.env[key];
@@ -358,6 +359,177 @@ export function setupNetplayHub(server) {
   const allGlobalUsers = new Map(); // uid -> userObj (présence unifiée partagée sur tous les salons)
   const fcChallenges = new Map(); // challengeId -> challengeObj
 
+  // Répertoire joueurs & système d'amitié (persistance locale .csw-data/social-store.json + temps réel WS)
+  const socialDir = path.resolve(process.cwd(), '.csw-data');
+  const socialStorePath = path.join(socialDir, 'social-store.json');
+  const userDirectory = new Map(); // uid -> public user profile
+  const friendships = new Map(); // uid -> Set<friendUid>
+  const friendRequests = new Map(); // reqId -> { id, fromUid, toUid, fromUser, toUser, createdAtMs }
+  let socialSaveTimer = null;
+
+  const computeFriendCode = (uid) => {
+    const clean = String(uid || '0000').replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+    return (clean.slice(-4) || '0000').padStart(4, '0');
+  };
+
+  const toPublicUserSummary = (raw = {}) => {
+    const uid = String(raw.uid || '').trim();
+    if (!uid) return null;
+    const displayName = String(raw.displayName || raw.name || `Joueur_${computeFriendCode(uid)}`).trim();
+    const baseName = displayName.replace(/#[a-zA-Z0-9]+$/, '') || 'Joueur';
+    const friendCode = String(raw.friendCode || computeFriendCode(uid)).toUpperCase();
+    const friendTag = String(raw.friendTag || `${baseName}#${friendCode}`);
+    return {
+      uid,
+      name: displayName,
+      displayName,
+      friendCode,
+      friendTag,
+      firstName: String(raw.firstName || ''),
+      lastName: String(raw.lastName || ''),
+      email: raw.email ? String(raw.email) : null,
+      region: String(raw.region || 'FR').toUpperCase().slice(0, 2),
+      rank: String(raw.rank || 'D'),
+      ratingPoints: Number(raw.ratingPoints || 0),
+      photoURL: raw.photoURL !== undefined ? raw.photoURL : null,
+      isAuthenticated: Boolean(raw.isAuthenticated),
+      updatedAtMs: Number(raw.updatedAtMs || Date.now()),
+    };
+  };
+
+  const loadSocialStore = () => {
+    try {
+      if (!fs.existsSync(socialStorePath)) return;
+      const parsed = JSON.parse(fs.readFileSync(socialStorePath, 'utf8'));
+      if (parsed && typeof parsed === 'object') {
+        if (parsed.users && typeof parsed.users === 'object') {
+          for (const u of Object.values(parsed.users)) {
+            const summary = toPublicUserSummary(u);
+            if (summary) userDirectory.set(summary.uid, summary);
+          }
+        }
+        if (parsed.friendships && typeof parsed.friendships === 'object') {
+          for (const [uid, arr] of Object.entries(parsed.friendships)) {
+            if (Array.isArray(arr)) {
+              friendships.set(uid, new Set(arr.filter(Boolean)));
+            }
+          }
+        }
+        if (Array.isArray(parsed.friendRequests)) {
+          for (const req of parsed.friendRequests) {
+            if (req?.id && req?.fromUid && req?.toUid) {
+              friendRequests.set(req.id, req);
+            }
+          }
+        }
+      }
+    } catch {
+      /* ignore corrupt store */
+    }
+  };
+
+  const persistSocialStoreNow = () => {
+    try {
+      if (!fs.existsSync(socialDir)) fs.mkdirSync(socialDir, { recursive: true });
+      const usersObj = {};
+      for (const [uid, u] of userDirectory.entries()) {
+        // Ne pas dupliquer les photos base64 uploadées sur le disque (elles sont stockées sur Firestore)
+        usersObj[uid] = {
+          ...u,
+          photoURL: u.photoURL && !String(u.photoURL).startsWith('data:') ? u.photoURL : null,
+        };
+      }
+      const friendsObj = {};
+      for (const [uid, set] of friendships.entries()) {
+        if (set.size > 0) friendsObj[uid] = Array.from(set);
+      }
+      fs.writeFileSync(
+        socialStorePath,
+        JSON.stringify(
+          {
+            users: usersObj,
+            friendships: friendsObj,
+            friendRequests: Array.from(friendRequests.values()),
+          },
+          null,
+          2
+        ),
+        'utf8'
+      );
+    } catch {
+      /* noop */
+    }
+  };
+
+  const scheduleSaveSocialStore = () => {
+    if (socialSaveTimer) clearTimeout(socialSaveTimer);
+    socialSaveTimer = setTimeout(persistSocialStoreNow, 400);
+  };
+
+  const upsertDirectoryUser = (rawUser) => {
+    if (!rawUser?.uid) return null;
+    const prev = userDirectory.get(rawUser.uid);
+    const merged = toPublicUserSummary({
+      ...prev,
+      ...rawUser,
+      photoURL: rawUser.photoURL !== undefined ? rawUser.photoURL : (prev?.photoURL ?? null),
+      email: rawUser.email !== undefined ? rawUser.email : (prev?.email ?? null),
+      firstName: rawUser.firstName !== undefined ? rawUser.firstName : (prev?.firstName ?? ''),
+      lastName: rawUser.lastName !== undefined ? rawUser.lastName : (prev?.lastName ?? ''),
+      updatedAtMs: Date.now(),
+    });
+    if (merged) {
+      userDirectory.set(merged.uid, merged);
+      scheduleSaveSocialStore();
+    }
+    return merged;
+  };
+
+  const enrichSocialUser = (uid, fallbackRaw = null) => {
+    const dir = userDirectory.get(uid);
+    const liveRaw = allGlobalUsers.get(uid);
+    const now = Date.now();
+    const isLive = Boolean(liveRaw && now - (liveRaw.lastSeen || 0) < 65000);
+    const base = toPublicUserSummary({ ...(fallbackRaw || {}), ...(dir || {}), ...(isLive ? liveRaw : {}), uid });
+    return {
+      ...base,
+      isOnline: isLive,
+      status: isLive ? liveRaw.status || 'available' : 'offline',
+      currentGame: isLive ? liveRaw.currentGame || null : null,
+      activeGames: isLive && Array.isArray(liveRaw.activeGames) ? liveRaw.activeGames : [],
+      matchMeta: isLive ? liveRaw.matchMeta || null : null,
+      ping: isLive ? liveRaw.ping || 22 : null,
+      lastSeen: isLive ? liveRaw.lastSeen : dir?.updatedAtMs || 0,
+    };
+  };
+
+  const getFriendSet = (uid) => {
+    if (!friendships.has(uid)) friendships.set(uid, new Set());
+    return friendships.get(uid);
+  };
+
+  const linkFriends = (uidA, uidB) => {
+    if (!uidA || !uidB || uidA === uidB) return;
+    getFriendSet(uidA).add(uidB);
+    getFriendSet(uidB).add(uidA);
+    friendRequests.delete(`${uidA}__${uidB}`);
+    friendRequests.delete(`${uidB}__${uidA}`);
+    scheduleSaveSocialStore();
+  };
+
+  const pushFriendWsEvent = (targetUid, eventPayload) => {
+    const sockets = connectedUsers.get(targetUid);
+    if (!sockets) return;
+    const msg = JSON.stringify({ type: 'FRIEND_EVENT', ...eventPayload });
+    for (const s of sockets) {
+      if (s.readyState === WebSocket.OPEN) {
+        try { s.send(msg); } catch {}
+      }
+    }
+  };
+
+  loadSocialStore();
+
   // Nettoyage automatique des défis expirés (conserver 10 min si accepté pour gros téléchargements CHD/PS1)
   setInterval(() => {
     const now = Date.now();
@@ -421,6 +593,10 @@ export function setupNetplayHub(server) {
           const { action, challenge, id, status, offer, answer, role, candidate } = payload;
 
           if (action === 'create' && challenge?.challengeId) {
+            if (challenge.gameEntry && !supportsOnlineMultiplayer(challenge.gameEntry)) {
+              res.statusCode = 400;
+              return res.end(JSON.stringify({ ok: false, error: 'SOLO_ONLY_GAME' }));
+            }
             fcChallenges.set(challenge.challengeId, {
               ...challenge,
               callerCandidates: [],
@@ -569,6 +745,7 @@ export function setupNetplayHub(server) {
             };
             lobby.users.set(payload.user.uid, u);
             allGlobalUsers.set(payload.user.uid, u);
+            upsertDirectoryUser(u);
           } else if (payload.action === 'leave' && payload.uid) {
             console.log(`[LOBBY LEAVE] ${payload.uid} from ${targetId}`);
             lobby.users.delete(payload.uid);
@@ -577,6 +754,220 @@ export function setupNetplayHub(server) {
 
           res.statusCode = 200;
           return res.end(JSON.stringify({ ok: true }));
+        } catch (err) {
+          res.statusCode = 400;
+          return res.end(JSON.stringify({ ok: false, error: err.message }));
+        }
+      });
+      return;
+    }
+
+    res.statusCode = 405;
+    res.end(JSON.stringify({ ok: false }));
+  });
+
+  // API Système d'Amitié (style Fortnite) + Répertoire Joueurs
+  server.middlewares.use('/api/friends', (req, res) => {
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    if (req.method === 'OPTIONS') {
+      res.statusCode = 204;
+      return res.end();
+    }
+
+    const url = new URL(req.url, 'http://localhost:3003');
+    const uid = url.searchParams.get('uid') || '';
+    const action = url.searchParams.get('action') || 'state';
+
+    if (req.method === 'GET') {
+      if (!uid) {
+        res.statusCode = 400;
+        return res.end(JSON.stringify({ ok: false, error: 'Missing uid' }));
+      }
+
+      if (action === 'search') {
+        const q = String(url.searchParams.get('q') || '').trim().toLowerCase();
+        const qBare = q.replace(/^#/, '');
+        const myFriends = friendships.get(uid) || new Set();
+        const combinedUids = new Set([...userDirectory.keys(), ...allGlobalUsers.keys()]);
+        const results = [];
+
+        for (const candidateUid of combinedUids) {
+          if (!candidateUid || candidateUid === uid) continue;
+          const user = enrichSocialUser(candidateUid);
+          if (!user) continue;
+          if (q) {
+            const haystack = [
+              user.displayName,
+              user.friendTag,
+              user.friendCode,
+              user.firstName,
+              user.lastName,
+              user.email,
+              user.uid,
+            ]
+              .filter(Boolean)
+              .join(' ')
+              .toLowerCase();
+            if (!haystack.includes(q) && (!qBare || !haystack.includes(qBare))) continue;
+          }
+          let relation = 'none';
+          let requestId = null;
+          if (myFriends.has(candidateUid)) {
+            relation = 'friend';
+          } else if (friendRequests.has(`${candidateUid}__${uid}`)) {
+            relation = 'incoming';
+            requestId = `${candidateUid}__${uid}`;
+          } else if (friendRequests.has(`${uid}__${candidateUid}`)) {
+            relation = 'outgoing';
+            requestId = `${uid}__${candidateUid}`;
+          }
+          results.push({ ...user, relation, requestId });
+        }
+
+        results.sort((a, b) => {
+          if (a.isOnline !== b.isOnline) return a.isOnline ? -1 : 1;
+          return (b.lastSeen || 0) - (a.lastSeen || 0);
+        });
+
+        res.statusCode = 200;
+        return res.end(JSON.stringify({ ok: true, results: results.slice(0, 30) }));
+      }
+
+      const myFriends = friendships.get(uid) || new Set();
+      const friends = Array.from(myFriends)
+        .map((fid) => enrichSocialUser(fid))
+        .filter(Boolean)
+        .sort((a, b) => {
+          if (a.isOnline !== b.isOnline) return a.isOnline ? -1 : 1;
+          const rankOrder = { playing: 0, in_game_available: 1, available: 2, afk: 3, offline: 4 };
+          const d = (rankOrder[a.status] ?? 4) - (rankOrder[b.status] ?? 4);
+          if (d !== 0) return d;
+          return String(a.displayName || '').localeCompare(String(b.displayName || ''));
+        });
+
+      const incomingRequests = [];
+      const outgoingRequests = [];
+      for (const reqObj of friendRequests.values()) {
+        if (reqObj.toUid === uid) {
+          incomingRequests.push({
+            ...reqObj,
+            fromUser: enrichSocialUser(reqObj.fromUid, reqObj.fromUser),
+          });
+        } else if (reqObj.fromUid === uid) {
+          outgoingRequests.push({
+            ...reqObj,
+            toUser: enrichSocialUser(reqObj.toUid, reqObj.toUser),
+          });
+        }
+      }
+      incomingRequests.sort((a, b) => (b.createdAtMs || 0) - (a.createdAtMs || 0));
+      outgoingRequests.sort((a, b) => (b.createdAtMs || 0) - (a.createdAtMs || 0));
+
+      res.statusCode = 200;
+      return res.end(JSON.stringify({ ok: true, friends, incomingRequests, outgoingRequests }));
+    }
+
+    if (req.method === 'POST') {
+      const chunks = [];
+      req.on('data', (c) => chunks.push(c));
+      req.on('end', () => {
+        try {
+          const payload = JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}');
+          const act = payload.action;
+
+          if (act === 'register_profile' && payload.user?.uid) {
+            const saved = upsertDirectoryUser(payload.user);
+            res.statusCode = 200;
+            return res.end(JSON.stringify({ ok: true, user: saved }));
+          }
+
+          if (act === 'send_request') {
+            const { fromUid, toUid, fromUser, toUser } = payload;
+            if (!fromUid || !toUid || fromUid === toUid) {
+              res.statusCode = 400;
+              return res.end(JSON.stringify({ ok: false, error: 'Destinataire invalide' }));
+            }
+            if (fromUser?.uid) upsertDirectoryUser(fromUser);
+            if (toUser?.uid) upsertDirectoryUser(toUser);
+
+            if (getFriendSet(fromUid).has(toUid)) {
+              res.statusCode = 200;
+              return res.end(JSON.stringify({ ok: true, alreadyFriends: true }));
+            }
+
+            // Si l'autre joueur a déjà envoyé une demande, accepter automatiquement (comme Fortnite)
+            const reverseId = `${toUid}__${fromUid}`;
+            if (friendRequests.has(reverseId)) {
+              linkFriends(fromUid, toUid);
+              pushFriendWsEvent(toUid, { event: 'accepted', byUid: fromUid });
+              pushFriendWsEvent(fromUid, { event: 'accepted', byUid: toUid });
+              res.statusCode = 200;
+              return res.end(JSON.stringify({ ok: true, autoAccepted: true }));
+            }
+
+            const reqId = `${fromUid}__${toUid}`;
+            const reqObj = {
+              id: reqId,
+              fromUid,
+              toUid,
+              fromUser: enrichSocialUser(fromUid, fromUser),
+              toUser: enrichSocialUser(toUid, toUser),
+              createdAtMs: Date.now(),
+            };
+            friendRequests.set(reqId, reqObj);
+            scheduleSaveSocialStore();
+            pushFriendWsEvent(toUid, { event: 'request_received', request: reqObj });
+            res.statusCode = 200;
+            return res.end(JSON.stringify({ ok: true, request: reqObj }));
+          }
+
+          if (act === 'accept_request') {
+            const targetUid = payload.uid;
+            const reqId = payload.requestId || (payload.fromUid && targetUid ? `${payload.fromUid}__${targetUid}` : '');
+            const reqObj = friendRequests.get(reqId);
+            const fromUid = reqObj?.fromUid || payload.fromUid;
+            const toUid = reqObj?.toUid || targetUid;
+            if (!fromUid || !toUid) {
+              res.statusCode = 404;
+              return res.end(JSON.stringify({ ok: false, error: 'Demande introuvable' }));
+            }
+            linkFriends(fromUid, toUid);
+            pushFriendWsEvent(fromUid, { event: 'accepted', byUid: toUid });
+            pushFriendWsEvent(toUid, { event: 'accepted', byUid: fromUid });
+            res.statusCode = 200;
+            return res.end(JSON.stringify({ ok: true }));
+          }
+
+          if (act === 'decline_request' || act === 'cancel_request') {
+            const reqId = payload.requestId || `${payload.fromUid}__${payload.toUid}`;
+            const reqObj = friendRequests.get(reqId);
+            friendRequests.delete(reqId);
+            scheduleSaveSocialStore();
+            if (reqObj) {
+              pushFriendWsEvent(reqObj.fromUid, { event: 'updated' });
+              pushFriendWsEvent(reqObj.toUid, { event: 'updated' });
+            }
+            res.statusCode = 200;
+            return res.end(JSON.stringify({ ok: true }));
+          }
+
+          if (act === 'remove_friend') {
+            const { uid: u1, friendUid: u2 } = payload;
+            if (u1 && u2) {
+              getFriendSet(u1).delete(u2);
+              getFriendSet(u2).delete(u1);
+              scheduleSaveSocialStore();
+              pushFriendWsEvent(u2, { event: 'removed', byUid: u1 });
+            }
+            res.statusCode = 200;
+            return res.end(JSON.stringify({ ok: true }));
+          }
+
+          res.statusCode = 400;
+          return res.end(JSON.stringify({ ok: false, error: 'Action invalide' }));
         } catch (err) {
           res.statusCode = 400;
           return res.end(JSON.stringify({ ok: false, error: err.message }));
@@ -743,7 +1134,11 @@ export function setupNetplayHub(server) {
             for (const st of payload.gameStats) {
               if (!st?.gameId) continue;
               const prev = rec.gameStats.get(st.gameId);
-              if (
+              const incomingVer = Number(st.statsFormulaVersion || 1);
+              const prevVer = Number(prev?.statsFormulaVersion || 1);
+              if (incomingVer > prevVer) {
+                rec.gameStats.set(st.gameId, st);
+              } else if (
                 !prev ||
                 Number(st.bestScore || 0) > Number(prev.bestScore || 0) ||
                 Number(st.gamesPlayed || 0) > Number(prev.gamesPlayed || 0) ||
@@ -1282,7 +1677,7 @@ export function setupNetplayHub(server) {
 
         switch(data.type) {
           case 'IDENTIFY': {
-            const { uid, name } = data;
+            const { uid, name, region } = data;
             if (uid) {
               if (ws.uid && ws.uid !== uid && connectedUsers.has(ws.uid)) {
                 const oldSet = connectedUsers.get(ws.uid);
@@ -1293,6 +1688,7 @@ export function setupNetplayHub(server) {
               ws.userName = name;
               if (!connectedUsers.has(uid)) connectedUsers.set(uid, new Set());
               connectedUsers.get(uid).add(ws);
+              upsertDirectoryUser({ uid, name, displayName: name, region });
               ws.send(JSON.stringify({ type: 'IDENTIFIED', uid, ok: true }));
             }
             break;
@@ -1301,6 +1697,9 @@ export function setupNetplayHub(server) {
           case 'CHALLENGE_INVITE': {
             const { challenge } = data;
             if (challenge && challenge.challengeId) {
+              if (challenge.gameEntry && !supportsOnlineMultiplayer(challenge.gameEntry)) {
+                break;
+              }
               const existing = fcChallenges.get(challenge.challengeId);
               fcChallenges.set(challenge.challengeId, {
                 callerCandidates: [],

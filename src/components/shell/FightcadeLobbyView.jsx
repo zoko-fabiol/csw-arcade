@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
-  Swords, Eye, Send, Play, LogOut, Wifi, UserCheck, Globe, Megaphone, Sparkles, Gamepad2, Trophy, MessageSquare, Users
+  Swords, Eye, Send, Play, LogOut, Wifi, UserCheck, Globe, Megaphone, Sparkles, Gamepad2, Trophy, MessageSquare, Users, UserPlus, Check, Clock
 } from 'lucide-react';
 import {
   firebaseFightcadeService,
@@ -8,8 +8,11 @@ import {
   GLOBAL_CHANNEL_ID,
 } from '../../services/firebaseFightcadeService';
 import { getRankTierMeta, subscribeGameLeaderboard } from '../../services/scoreRankingService';
+import { acceptFriendRequest, sendFriendRequest } from '../../services/friendsService';
 import { countryCodeToFlag } from '../../data/countries';
 import { GameCover } from './GameCover';
+import { PlayerAvatar } from '../common/PlayerAvatar';
+import { supportsOnlineMultiplayer } from '../../utils/gameCapabilities';
 
 const RANK_BADGE_STYLE = {
   'S+': 'bg-gradient-to-r from-amber-600/40 to-rose-600/40 text-rose-200 border-rose-400',
@@ -49,6 +52,8 @@ function formatTime(ms) {
 export function FightcadeLobbyView({
   channel,
   activeChannels = [],
+  userProfile = null,
+  friendsState = { friends: [], incomingRequests: [], outgoingRequests: [] },
   onChallengePlayer,
   onTestLocal,
   onLeaveChannel,
@@ -137,7 +142,6 @@ export function FightcadeLobbyView({
   };
 
   const handleChallenge = async (u, targetGameOverride = null) => {
-    setPendingChallengeId(u.uid);
     let resolvedEntry = null;
     let targetGid = null;
     let targetTitle = null;
@@ -165,16 +169,21 @@ export function FightcadeLobbyView({
       resolvedEntry = channel.entry;
     }
 
-    if (!resolvedEntry) {
-      const fallbackActive = activeChannels.find((c) => c.entry);
+    if (!resolvedEntry || !supportsOnlineMultiplayer(resolvedEntry)) {
+      const fallbackActive = activeChannels.find((c) => c.entry && supportsOnlineMultiplayer(c.entry));
       if (fallbackActive) {
         targetGid = fallbackActive.gameId;
         targetTitle = fallbackActive.title;
         targetPlatform = fallbackActive.platformLabel || 'Arcade';
         resolvedEntry = fallbackActive.entry;
+      } else {
+        return;
       }
     }
 
+    if (!supportsOnlineMultiplayer(resolvedEntry)) return;
+
+    setPendingChallengeId(u.uid);
     const targetChannel = {
       gameId: targetGid,
       title: targetTitle,
@@ -584,6 +593,7 @@ export function FightcadeLobbyView({
                         <span className="font-mono font-black text-xs text-amber-400 w-6 shrink-0">
                           #{idx + 1}
                         </span>
+                        <PlayerAvatar photoURL={row.photoURL} name={row.displayName} size="xs" />
                         <span className="text-sm shrink-0">{countryCodeToFlag(row.region)}</span>
                         <div className="min-w-0">
                           <div className="flex items-center gap-1.5">
@@ -617,7 +627,20 @@ export function FightcadeLobbyView({
                 const isInGameAvailable = u.status === 'in_game_available' || Boolean(u.currentGame && !isNetplayMatch);
                 const isAfk = u.status === 'afk';
                 const rankStyle = RANK_BADGE_STYLE[u.rank || 'D'] || RANK_BADGE_STYLE.D;
-                const userActiveGames = Array.isArray(u.activeGames) ? u.activeGames : [];
+                const userActiveGames = (Array.isArray(u.activeGames) ? u.activeGames : []).filter((g) =>
+                  supportsOnlineMultiplayer(g)
+                );
+                const challengeCandidate = !isGlobal
+                  ? (supportsOnlineMultiplayer(channel?.entry) ? channel : null)
+                  : (supportsOnlineMultiplayer(u.currentGame)
+                      ? u.currentGame
+                      : userActiveGames[0] ||
+                        activeChannels.find((c) => c.entry && supportsOnlineMultiplayer(c.entry)) ||
+                        null);
+                const canChallengeUser = Boolean(challengeCandidate);
+                const isFriend = (friendsState?.friends || []).some((f) => f.uid === u.uid);
+                const incomingReq = (friendsState?.incomingRequests || []).find((r) => r.fromUid === u.uid);
+                const isOutgoingReq = (friendsState?.outgoingRequests || []).some((r) => r.toUid === u.uid);
 
                 return (
                   <div
@@ -629,87 +652,117 @@ export function FightcadeLobbyView({
                     }`}
                   >
                     <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          <span
-                            className={`w-2 h-2 rounded-full shrink-0 ${
-                              isNetplayMatch
-                                ? 'bg-amber-400'
-                                : isInGameAvailable
-                                ? 'bg-emerald-400 animate-pulse'
-                                : isAfk
-                                ? 'bg-neutral-500'
-                                : 'bg-emerald-400'
-                            }`}
-                          />
-                          <span
-                            className={`px-1.5 py-0.2 rounded text-[10px] font-mono font-black border ${rankStyle}`}
-                          >
-                            {u.rank || 'D'}
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => handleMentionUser(u.name)}
-                            className="text-xs font-bold text-white hover:text-cyan-300 truncate"
-                          >
-                            {u.name} {isMe && '(Vous)'}
-                          </button>
-                          <span className="text-[10px] font-mono px-1 rounded bg-neutral-800 text-neutral-300">
-                            {countryCodeToFlag(u.region)} {u.region || 'FR'}
-                        </span>
-                      </div>
+                      <div className="flex items-start gap-2.5 min-w-0">
+                        <PlayerAvatar
+                          photoURL={u.photoURL}
+                          name={u.name}
+                          size="sm"
+                          status={isNetplayMatch ? 'playing' : isInGameAvailable ? 'in_game_available' : isAfk ? 'afk' : 'available'}
+                        />
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span
+                              className={`px-1.5 py-0.2 rounded text-[10px] font-mono font-black border ${rankStyle}`}
+                            >
+                              {u.rank || 'D'}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => handleMentionUser(u.name)}
+                              className="text-xs font-bold text-white hover:text-cyan-300 truncate"
+                            >
+                              {u.name} {isMe && '(Vous)'}
+                            </button>
+                            <span className="text-[10px] font-mono px-1 rounded bg-neutral-800 text-neutral-300">
+                              {countryCodeToFlag(u.region)} {u.region || 'FR'}
+                            </span>
+                          </div>
 
-                      {/* Statut précis du joueur */}
-                      <div className="flex items-center gap-2 mt-1 text-[10px] font-mono text-neutral-300">
-                        <PingBars ping={u.ping || 22} />
-                        <span>{u.ping || 22}ms</span>
-                        <span>·</span>
-                        {isNetplayMatch ? (
-                          <span className="text-amber-300 font-bold">
-                            ⚔️ En match P2P {u.currentGame?.title ? `sur ${u.currentGame.title}` : ''}
-                          </span>
-                        ) : isInGameAvailable ? (
-                          <span className="text-emerald-300 font-bold">
-                            🎮 En jeu &amp; Au salon ({u.currentGame?.title || 'Training'})
-                          </span>
-                        ) : isAfk ? (
-                          <span className="text-neutral-500">⚪ AFK</span>
-                        ) : (
-                          <span className="text-emerald-400">🟢 Au salon · Prêt à jouer</span>
-                        )}
+                          {/* Statut précis du joueur */}
+                          <div className="flex items-center gap-2 mt-1 text-[10px] font-mono text-neutral-300">
+                            <PingBars ping={u.ping || 22} />
+                            <span>{u.ping || 22}ms</span>
+                            <span>·</span>
+                            {isNetplayMatch ? (
+                              <span className="text-amber-300 font-bold">
+                                ⚔️ En match P2P {u.currentGame?.title ? `sur ${u.currentGame.title}` : ''}
+                              </span>
+                            ) : isInGameAvailable ? (
+                              <span className="text-emerald-300 font-bold">
+                                🎮 En jeu &amp; Au salon ({u.currentGame?.title || 'Training'})
+                              </span>
+                            ) : isAfk ? (
+                              <span className="text-neutral-500">⚪ AFK</span>
+                            ) : (
+                              <span className="text-emerald-400">🟢 Au salon · Prêt à jouer</span>
+                            )}
+                          </div>
+                        </div>
                       </div>
-                    </div>
 
                     {!isMe && (
-                      isNetplayMatch ? (
-                        <button
-                          type="button"
-                          onClick={() => onSpectateMatch?.(channel, u)}
-                          className="px-2.5 py-1.5 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-neutral-200 text-[11px] font-bold flex items-center gap-1 shrink-0"
-                        >
-                          <Eye className="w-3.5 h-3.5" />
-                          <span>Regarder</span>
-                        </button>
-                      ) : (
-                        <button
-                          type="button"
-                          disabled={pendingChallengeId === u.uid}
-                          onClick={() => {
-                            if (!isGlobal) {
-                              // Salon d'un jeu précis : défier sur le jeu du salon courant !
-                              handleChallenge(u, channel);
-                            } else {
-                              // Salon global : défier sur le jeu en cours ou le premier jeu actif
-                              handleChallenge(u, u.currentGame || userActiveGames[0] || null);
+                      <div className="flex items-center gap-1 shrink-0">
+                        {isFriend ? (
+                          <span
+                            title="Déjà dans vos amis"
+                            className="p-1.5 rounded-lg bg-emerald-950/60 border border-emerald-500/40 text-emerald-300"
+                          >
+                            <Check className="w-3.5 h-3.5" aria-hidden="true" />
+                          </span>
+                        ) : incomingReq ? (
+                          <button
+                            type="button"
+                            onClick={() => acceptFriendRequest(userProfile || me, incomingReq)}
+                            title="Accepter la demande d'ami"
+                            className="p-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-black"
+                          >
+                            <Check className="w-3.5 h-3.5" aria-hidden="true" />
+                          </button>
+                        ) : isOutgoingReq ? (
+                          <span
+                            title="Demande d'ami envoyée"
+                            className="p-1.5 rounded-lg bg-neutral-800 text-neutral-400"
+                          >
+                            <Clock className="w-3.5 h-3.5" aria-hidden="true" />
+                          </span>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => sendFriendRequest(userProfile || me, { ...u, displayName: u.name })}
+                            aria-label={`Ajouter ${u.name} en ami`}
+                            title={`Ajouter ${u.name} en ami`}
+                            className="p-1.5 rounded-lg bg-neutral-800 hover:bg-cyan-950 border border-neutral-700 hover:border-cyan-500/50 text-cyan-300 transition-colors cursor-pointer"
+                          >
+                            <UserPlus className="w-3.5 h-3.5" aria-hidden="true" />
+                          </button>
+                        )}
+
+                        {isNetplayMatch ? (
+                          <button
+                            type="button"
+                            onClick={() => onSpectateMatch?.(channel, u)}
+                            className="px-2.5 py-1.5 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-neutral-200 text-[11px] font-bold flex items-center gap-1 shrink-0"
+                          >
+                            <Eye className="w-3.5 h-3.5" />
+                            <span>Regarder</span>
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            disabled={pendingChallengeId === u.uid || !canChallengeUser}
+                            onClick={() => handleChallenge(u, challengeCandidate)}
+                            title={
+                              canChallengeUser
+                                ? "Lancer le défi (2 Coins débités chez vous pour financer les deux slots · Gratuit pour l'invité)"
+                                : 'Sélectionnez ou rejoignez un jeu multijoueur pour défier ce joueur'
                             }
-                          }}
-                          title="Lancer le défi (2 Coins débités chez vous pour financer les deux slots · Gratuit pour l'invité)"
-                          className="px-2.5 py-1.5 rounded-lg bg-cyan-500 hover:bg-cyan-400 disabled:opacity-50 text-black text-[11px] font-bold flex items-center gap-1 shrink-0"
-                        >
-                          <Swords className="w-3.5 h-3.5" />
-                          <span>{pendingChallengeId === u.uid ? 'Envoi…' : 'Défier'}</span>
-                        </button>
-                      )
+                            className="px-2.5 py-1.5 rounded-lg bg-cyan-500 hover:bg-cyan-400 disabled:opacity-40 disabled:cursor-not-allowed text-black text-[11px] font-bold flex items-center gap-1 shrink-0"
+                          >
+                            <Swords className="w-3.5 h-3.5" />
+                            <span>{pendingChallengeId === u.uid ? 'Envoi…' : canChallengeUser ? 'Défier' : 'Aucun jeu'}</span>
+                          </button>
+                        )}
+                      </div>
                     )}
                     {isMe && (
                       <span className="text-[10px] font-mono text-emerald-400 flex items-center gap-1 shrink-0">

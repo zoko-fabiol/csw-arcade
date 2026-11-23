@@ -28,6 +28,7 @@ temp_nonmerged/
 # Fichiers temporaires et éditeurs
 .env
 .env.local
+.csw-data/
 scratch/
 .vscode/
 *.log
