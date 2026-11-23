@@ -54,9 +54,9 @@ if (!empty($file)) {
         $zipName .= '.zip';
     }
     $candidateUrls[] = "https://archive.org/download/neo-geo-mvs-romset/" . urlencode($zipName);
-    $candidateUrls[] = "https://archive.org/download/fbnarcade-fullset/" . urlencode($zipName);
+    $candidateUrls[] = "https://archive.org/download/MAME_2003-Plus_Reference/roms/" . urlencode($zipName);
+    $candidateUrls[] = "https://archive.org/download/mame2003-parent/mame%202003%20plus%20parent/parents/" . urlencode($zipName);
     $candidateUrls[] = "https://archive.org/download/NeoGeoRomCollectionByGhostware/" . urlencode($zipName);
-    $candidateUrls[] = "https://archive.org/download/mame-merged/" . urlencode($zipName);
 }
 
 foreach ($candidateUrls as $url) {

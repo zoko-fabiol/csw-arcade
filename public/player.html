@@ -1158,11 +1158,11 @@
             '/roms/neogeo.zip',
             './roms/neogeo.zip',
             '/api/rom-proxy?file=neogeo.zip',
-            '/api/archive-rom/mame-merged/neogeo.zip',
-            '/api/archive-rom/NeoGeoRomCollectionByGhostware/neogeo.zip',
+            '/api/archive-rom/neo-geo-mvs-romset/neogeo.zip',
+            '/api/archive-rom/MAME_2003-Plus_Reference/roms/neogeo.zip',
             '/api/rom-data/neogeo',
-            'https://archive.org/download/mame-merged/neogeo.zip',
-            'https://archive.org/download/NeoGeoRomCollectionByGhostware/neogeo.zip'
+            'https://archive.org/download/neo-geo-mvs-romset/neogeo.zip',
+            'https://archive.org/download/MAME_2003-Plus_Reference/roms/neogeo.zip'
           ];
           biosBuffer = await fetchBinaryWithProgress('BIOS Neo Geo (neogeo.zip)', biosCandidates, 'Synchronisation du BIOS Neo Geo');
           saveRomToIDB('neogeo.zip', biosBuffer);
@@ -1208,13 +1208,13 @@
               '/api/rom-proxy?file=' + encodeURIComponent(cleanInput + '.zip')
             ] : []),
             '/api/archive-rom/neo-geo-mvs-romset/' + encodeURIComponent(targetZipName),
-            '/api/archive-rom/NeoGeoRomCollectionByGhostware/' + encodeURIComponent(targetZipName),
+            '/api/archive-rom/MAME_2003-Plus_Reference/roms/' + encodeURIComponent(targetZipName),
             '/roms/' + encodeURIComponent(targetZipName),
             './roms/' + encodeURIComponent(targetZipName),
             '/api/rom-data/' + encodeURIComponent(fbneoShortName),
             'https://archive.org/download/neo-geo-mvs-romset/' + encodeURIComponent(targetZipName),
-            'https://archive.org/download/NeoGeoRomCollectionByGhostware/' + encodeURIComponent(targetZipName),
-            'https://archive.org/download/mame-merged/' + encodeURIComponent(targetZipName)
+            'https://archive.org/download/MAME_2003-Plus_Reference/roms/' + encodeURIComponent(targetZipName),
+            'https://archive.org/download/mame2003-parent/mame%202003%20plus%20parent/parents/' + encodeURIComponent(targetZipName)
           ];
           romBuffer = await fetchBinaryWithProgress(`ROM ${targetZipName}`, romCandidates, `Téléchargement de ${fbneoShortName.toUpperCase()}`);
           

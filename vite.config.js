@@ -2,11 +2,16 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import electron from 'vite-plugin-electron';
 import renderer from 'vite-plugin-electron-renderer';
+import dns from 'node:dns';
 import path from 'node:path';
 import fs from 'node:fs';
 import os from 'node:os';
 import { execSync, spawn } from 'node:child_process';
-import { setupNetplayHub } from './src/server/netplayHub.js';
+import { handleRomProxyRequest, listLocalRomFiles, setupNetplayHub } from './src/server/netplayHub.js';
+
+try {
+  dns.setDefaultResultOrder('ipv4first');
+} catch {}
 
 // Plugin pour streamer les ROMs en flux mémoire sans déclencher les gestionnaires de téléchargement externes (IDM)
 function romStreamPlugin() {
@@ -24,160 +29,12 @@ function romStreamPlugin() {
       const romsDir = path.resolve(__dirname, 'public/roms');
       if (!fs.existsSync(romsDir)) fs.mkdirSync(romsDir, { recursive: true });
 
-      const handleRomRequest = async (req, res) => {
-        try {
-          if (req.method === 'OPTIONS') {
-            res.writeHead(204, {
-              'Access-Control-Allow-Origin': '*',
-              'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS',
-              'Access-Control-Allow-Headers': '*'
-            });
-            return res.end();
-          }
-
-          const url = new URL(req.url, 'http://localhost:3003');
-          const customUrl = url.searchParams.get('url');
-
-          // 0. Si une URL directe (?url=https://archive.org/...) est fournie, proxy direct avec timeout header
-          if (customUrl && /^https?:\/\//i.test(customUrl)) {
-            let remoteRes;
-            try {
-              const ctrl0 = new AbortController();
-              const timer0 = setTimeout(() => ctrl0.abort(new Error('ROM header timeout')), 8500);
-              try {
-                remoteRes = await fetch(customUrl, {
-                  method: req.method === 'HEAD' ? 'HEAD' : 'GET',
-                  redirect: 'follow',
-                  signal: ctrl0.signal,
-                  headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) CSW-Arcade' }
-                });
-              } finally {
-                clearTimeout(timer0);
-              }
-            } catch {
-              res.writeHead(404, { 'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json' });
-              return res.end(JSON.stringify({ error: 'ROM source inaccessible ou expirée' }));
-            }
-            const ct = remoteRes.headers.get('content-type') || 'application/octet-stream';
-            if (!remoteRes.ok || ct.includes('text/html')) {
-              res.writeHead(404, { 'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json' });
-              return res.end(JSON.stringify({ error: 'ROM indisponible', status: remoteRes.status }));
-            }
-            const cl = remoteRes.headers.get('content-length');
-            res.writeHead(200, {
-              'Content-Type': 'application/octet-stream',
-              ...(cl ? { 'Content-Length': cl } : {}),
-              'Access-Control-Allow-Origin': '*',
-              'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS',
-              'Access-Control-Expose-Headers': 'Content-Length, Content-Type',
-              'Cache-Control': 'public, max-age=31536000'
-            });
-            if (req.method === 'HEAD' || !remoteRes.body) return res.end();
-            const reader = remoteRes.body.getReader();
-            while (true) {
-              const { done, value } = await reader.read();
-              if (done) break;
-              res.write(Buffer.from(value));
-            }
-            return res.end();
-          }
-
-          const rawParam = url.searchParams.get('file') || url.searchParams.get('id') || req.url.replace(/^\//, '');
-          const cleanName = path.basename(decodeURIComponent(rawParam)).replace(/\.(zip|bin|dat|rom)$/i, '').toLowerCase();
-
-          // Resolution via mapping table ou nom direct
-          const resolvedName = nameMap[cleanName] || cleanName;
-
-          // 1. Vérifier si la ROM existe déjà dans public/roms/
-          let filePath = path.resolve(romsDir, resolvedName + '.zip');
-          if (!fs.existsSync(filePath)) {
-            const fallbackPath = path.resolve(romsDir, cleanName + '.zip');
-            if (fs.existsSync(fallbackPath)) {
-              filePath = fallbackPath;
-            }
-          }
-
-          // Si la ROM est disponible localement, streaming direct
-          if (fs.existsSync(filePath)) {
-            const stat = fs.statSync(filePath);
-            res.writeHead(200, {
-              'Content-Type': 'application/zip',
-              'Content-Length': stat.size,
-              'Access-Control-Allow-Origin': '*',
-              'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS',
-              'Access-Control-Expose-Headers': 'Content-Length, Content-Type',
-              'Cache-Control': 'public, max-age=31536000'
-            });
-            if (req.method === 'HEAD') return res.end();
-            return fs.createReadStream(filePath).pipe(res);
-          }
-
-          // 2. Si la ROM n'existe pas encore, stream asynchrone depuis Archive.org sans bloquer le serveur
-          console.log(`[CSW-Arcade] Streaming asynchrone de la ROM: ${resolvedName}.zip...`);
-          const candidateUrls = [
-            `https://archive.org/download/neo-geo-mvs-romset/${resolvedName}.zip`,
-            `https://archive.org/download/NeoGeoRomCollectionByGhostware/${resolvedName}.zip`,
-            `https://archive.org/download/mame-merged/${resolvedName}.zip`
-          ];
-
-          for (const remoteUrl of candidateUrls) {
-            try {
-              const ctrl = new AbortController();
-              const timer = setTimeout(() => ctrl.abort(new Error('ROM header timeout')), 7000);
-              let remoteRes;
-              try {
-                remoteRes = await fetch(remoteUrl, {
-                  method: req.method === 'HEAD' ? 'HEAD' : 'GET',
-                  redirect: 'follow',
-                  signal: ctrl.signal,
-                  headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' }
-                });
-              } finally {
-                clearTimeout(timer);
-              }
-
-              if (remoteRes.ok) {
-                const cl = remoteRes.headers.get('content-length');
-                res.writeHead(200, {
-                  'Content-Type': 'application/zip',
-                  ...(cl ? { 'Content-Length': cl } : {}),
-                  'Access-Control-Allow-Origin': '*',
-                  'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS',
-                  'Access-Control-Expose-Headers': 'Content-Length, Content-Type',
-                  'Cache-Control': 'public, max-age=31536000'
-                });
-
-                if (req.method === 'HEAD') return res.end();
-
-                const targetPath = path.resolve(romsDir, resolvedName + '.zip');
-                const fileWriteStream = fs.createWriteStream(targetPath);
-                const reader = remoteRes.body.getReader();
-
-                while (true) {
-                  const { done, value } = await reader.read();
-                  if (done) break;
-                  const buf = Buffer.from(value);
-                  res.write(buf);
-                  fileWriteStream.write(buf);
-                }
-
-                fileWriteStream.end();
-                res.end();
-                console.log(`[CSW-Arcade] ROM ${resolvedName}.zip téléchargée et mise en cache (${targetPath}).`);
-                return;
-              }
-            } catch (dlErr) {
-              console.warn(`[CSW-Arcade] Erreur stream source ${remoteUrl}:`, dlErr.message);
-            }
-          }
-
-          res.statusCode = 404;
-          return res.end(`ROM ${resolvedName}.zip introuvable sur les serveurs distants`);
-        } catch (err) {
-          res.statusCode = 500;
-          res.end(err.message);
-        }
-      };
+      const handleRomRequest = (req, res) =>
+        handleRomProxyRequest(req, res, {
+          romsDir,
+          romNameMap: nameMap,
+          cacheToDisk: true,
+        });
 
       server.middlewares.use('/api/rom-data', handleRomRequest);
       server.middlewares.use('/api/rom', handleRomRequest);
@@ -186,9 +43,7 @@ function romStreamPlugin() {
       // Endpoint d'audit des ROMs pour le frontend (Web & Electron)
       server.middlewares.use('/api/roms-list', (req, res) => {
         try {
-          const files = fs.existsSync(romsDir) 
-            ? fs.readdirSync(romsDir).filter(f => f.toLowerCase().endsWith('.zip')) 
-            : [];
+          const files = listLocalRomFiles(romsDir, nameMap);
           res.writeHead(200, { 
             'Content-Type': 'application/json',
             'Access-Control-Allow-Origin': '*'

@@ -17,6 +17,20 @@ function iaUrls(identifier, filePath) {
   ];
 }
 
+function iaMultiUrls(sources = []) {
+  const out = [];
+  const seen = new Set();
+  for (const [identifier, filePath] of sources) {
+    for (const u of iaUrls(identifier, filePath)) {
+      if (!seen.has(u)) {
+        seen.add(u);
+        out.push(u);
+      }
+    }
+  }
+  return out;
+}
+
 export const MODE_META = {
   arcade: {
     id: 'arcade',
@@ -117,7 +131,10 @@ export const PLAYSTATION_CATALOG = [
     engine: 'emulatorjs:psx',
     estimatedSize: '94 Mo',
     filename: 'Crash Bandicoot 2 - Cortex Strikes Back (USA).chd',
-    urls: iaUrls('ultimate-rom-collection', 'Sony - PS1/Crash Bandicoot 2 - Cortex Strikes Back (USA).chd'),
+    urls: iaMultiUrls([
+      ['ps1-rip-chd-ck', 'Crash Bandicoot 2 - Cortex Strikes Back.chd'],
+      ['ultimate-rom-collection', 'Sony - PS1/Crash Bandicoot 2 - Cortex Strikes Back (USA).chd'],
+    ]),
     description: 'Plateforme 3D culte et très légère (94 Mo en CHD). Téléchargement automatique et lancement direct.',
   },
   {
@@ -131,10 +148,13 @@ export const PLAYSTATION_CATALOG = [
     supportsMultiplayer: false,
     formats: ['.chd'],
     engine: 'emulatorjs:psx',
-    estimatedSize: '99 Mo',
-    filename: 'Crash Bandicoot - Warped (USA).chd',
-    urls: iaUrls('ultimate-rom-collection', 'Sony - PS1/Crash Bandicoot - Warped (USA).chd'),
-    description: 'Voyage temporel sur PS1, téléchargement rapide (< 100 Mo).',
+    estimatedSize: '78 Mo',
+    filename: 'Crash Bandicoot 3 - Warped.chd',
+    urls: iaMultiUrls([
+      ['ps1-rip-chd-ck', 'Crash Bandicoot 3 - Warped.chd'],
+      ['ultimate-rom-collection', 'Sony - PS1/Crash Bandicoot - Warped (USA).chd'],
+    ]),
+    description: 'Voyage temporel sur PS1, téléchargement rapide (78 Mo CHD).',
   },
   {
     id: 'ps1-final-fantasy-origins',
@@ -149,7 +169,10 @@ export const PLAYSTATION_CATALOG = [
     engine: 'emulatorjs:psx',
     estimatedSize: '105 Mo',
     filename: 'Final Fantasy Origins (USA) (Rev 1).chd',
-    urls: iaUrls('ultimate-rom-collection', 'Sony - PS1/Final Fantasy Origins (USA) (Rev 1).chd'),
+    urls: iaMultiUrls([
+      ['ps1-rip-chd-ck', 'Final Fantasy Origins.chd'],
+      ['ultimate-rom-collection', 'Sony - PS1/Final Fantasy Origins (USA) (Rev 1).chd'],
+    ]),
     description: 'Compilation remastérisée de Final Fantasy I et II sur PS1 (105 Mo).',
   },
   {
@@ -165,7 +188,10 @@ export const PLAYSTATION_CATALOG = [
     engine: 'emulatorjs:psx',
     estimatedSize: '110 Mo',
     filename: 'Final Fantasy Anthology - Final Fantasy V (USA) (Rev 1).chd',
-    urls: iaUrls('ultimate-rom-collection', 'Sony - PS1/Final Fantasy Anthology - Final Fantasy V (USA) (Rev 1).chd'),
+    urls: iaMultiUrls([
+      ['ultimate-rom-collection', 'Sony - PS1/Final Fantasy Anthology - Final Fantasy V (USA) (Rev 1).chd'],
+      ['ps1-rip-chd-ck', 'Final Fantasy Anthology - Final Fantasy V.chd'],
+    ]),
     description: 'Système de jobs emblématique sur PlayStation (110 Mo).',
   },
   {
@@ -179,10 +205,13 @@ export const PLAYSTATION_CATALOG = [
     supportsMultiplayer: false,
     formats: ['.chd'],
     engine: 'emulatorjs:psx',
-    estimatedSize: '111 Mo',
-    filename: 'Ape Escape (USA).chd',
-    urls: iaUrls('ultimate-rom-collection', 'Sony - PS1/Ape Escape (USA).chd'),
-    description: 'Plateforme 3D emblématique de la PS1 (111 Mo).',
+    estimatedSize: '30 Mo',
+    filename: 'Ape Escape.chd',
+    urls: iaMultiUrls([
+      ['ps1-rip-chd-ck', 'Ape Escape.chd'],
+      ['ultimate-rom-collection', 'Sony - PS1/Ape Escape (USA).chd'],
+    ]),
+    description: 'Plateforme 3D emblématique de la PS1 (30 Mo CHD).',
   },
   {
     id: 'ps1-bishi-bashi-special',
@@ -213,7 +242,10 @@ export const PLAYSTATION_CATALOG = [
     engine: 'emulatorjs:psx',
     estimatedSize: '132 Mo',
     filename: 'Final Fantasy Anthology - Final Fantasy VI (USA) (Rev 1).chd',
-    urls: iaUrls('ultimate-rom-collection', 'Sony - PS1/Final Fantasy Anthology - Final Fantasy VI (USA) (Rev 1).chd'),
+    urls: iaMultiUrls([
+      ['ultimate-rom-collection', 'Sony - PS1/Final Fantasy Anthology - Final Fantasy VI (USA) (Rev 1).chd'],
+      ['ps1-rip-chd-ck', 'Final Fantasy Anthology - Final Fantasy VI.chd'],
+    ]),
     description: 'Chef-d’œuvre JRPG de Square sur PS1 (132 Mo).',
   },
   {
@@ -243,10 +275,13 @@ export const PLAYSTATION_CATALOG = [
     supportsMultiplayer: false,
     formats: ['.chd'],
     engine: 'emulatorjs:psx',
-    estimatedSize: '145 Mo',
-    filename: 'Breath of Fire III (USA).chd',
-    urls: iaUrls('ultimate-rom-collection', 'Sony - PS1/Breath of Fire III (USA).chd'),
-    description: 'JRPG Capcom classique avec sprites 2D sur décors 3D (145 Mo).',
+    estimatedSize: '108 Mo',
+    filename: 'Breath of Fire III.chd',
+    urls: iaMultiUrls([
+      ['ps1-rip-chd-ck', 'Breath of Fire III.chd'],
+      ['ultimate-rom-collection', 'Sony - PS1/Breath of Fire III (USA).chd'],
+    ]),
+    description: 'JRPG Capcom classique avec sprites 2D sur décors 3D (108 Mo CHD).',
   },
 ];
 

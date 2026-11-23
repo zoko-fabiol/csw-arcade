@@ -34,7 +34,9 @@ export function subscribeDeadRoms(cb) {
   return () => deadRomListeners.delete(cb);
 }
 
-function isValidRomBuffer(buffer) {
+const ROM_CACHE_VERSION = 3;
+
+function isValidRomBuffer(buffer, filename = '') {
   if (!buffer || buffer.byteLength < 256) return false;
   const headBytes = new Uint8Array(buffer, 0, Math.min(96, buffer.byteLength));
   let headStr = '';
@@ -51,6 +53,12 @@ function isValidRomBuffer(buffer) {
     lower.includes('rom introuvable')
   ) {
     return false;
+  }
+  const lowerName = String(filename || '').toLowerCase();
+  if (lowerName.endsWith('.zip') || lowerName.endsWith('.jar')) {
+    if (!(headBytes[0] === 0x50 && headBytes[1] === 0x4b && (headBytes[2] === 0x03 || headBytes[2] === 0x05))) {
+      return false;
+    }
   }
   return true;
 }
@@ -128,12 +136,28 @@ function openPlatformDb() {
 export async function getCachedRom(id) {
   try {
     const db = await openPlatformDb();
-    return await new Promise((resolve) => {
+    const record = await new Promise((resolve) => {
       const tx = db.transaction(PLATFORM_IDB_STORE, 'readonly');
       const req = tx.objectStore(PLATFORM_IDB_STORE).get(id);
       req.onsuccess = () => resolve(req.result || null);
       req.onerror = () => resolve(null);
     });
+    if (!record) return null;
+    const isLegacyArcadeCache =
+      (record.core === 'mame2003_plus' ||
+        record.core === 'fbneo' ||
+        String(id || '').startsWith('arc-')) &&
+      (record.cacheVersion || 0) < ROM_CACHE_VERSION;
+    if (isLegacyArcadeCache || !isValidRomBuffer(record.data, record.filename)) {
+      try {
+        const delTx = db.transaction(PLATFORM_IDB_STORE, 'readwrite');
+        delTx.objectStore(PLATFORM_IDB_STORE).delete(id);
+      } catch {
+        /* ignore cleanup error */
+      }
+      return null;
+    }
+    return record;
   } catch {
     return null;
   }
@@ -155,6 +179,7 @@ export async function saveCachedRom(id, buffer, meta = {}) {
         supportsMultiplayer: typeof meta.supportsMultiplayer === 'boolean' ? meta.supportsMultiplayer : null,
         size: buffer.byteLength,
         data: buffer,
+        cacheVersion: ROM_CACHE_VERSION,
         cachedAt: Date.now(),
       });
       tx.oncomplete = () => resolve(true);
@@ -233,6 +258,25 @@ async function ensureJSZip() {
     });
   }
   return jsZipPromise;
+}
+
+export async function padNeoRAGExZipFile(file, padSpec, targetFilename) {
+  if (!padSpec || !file) return file;
+  const JSZipLib = await ensureJSZip();
+  const zip = await JSZipLib.loadAsync(file);
+  for (const [entryName, targetSize] of Object.entries(padSpec)) {
+    const zEntry = zip.file(entryName);
+    if (!zEntry) continue;
+    const bytes = await zEntry.async('uint8array');
+    if (bytes.byteLength < targetSize) {
+      const padded = new Uint8Array(targetSize);
+      padded.fill(0xff);
+      padded.set(bytes, 0);
+      zip.file(entryName, padded);
+    }
+  }
+  const outBlob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE' });
+  return new File([outBlob], targetFilename || file.name, { type: 'application/octet-stream' });
 }
 
 async function fetchJsonWithTimeout(url, timeoutMs = 4500) {
@@ -330,38 +374,48 @@ export async function downloadAndCacheRom(entry, { mode = 'retro', core = 'nes',
       String(entry.core || core || '').toLowerCase().includes('mame');
 
     if (isMame) {
-      const mameDl = `https://archive.org/download/MAME_2003-Plus_Reference_Set_2018/roms/${encoded}`;
+      const mameRef = `https://archive.org/download/MAME_2003-Plus_Reference/roms/${encoded}`;
+      const mamePar = `https://archive.org/download/mame2003-parent/mame%202003%20plus%20parent/parents/${encoded}`;
       urls = [
+        `https://archive.org/cors/MAME_2003-Plus_Reference/roms/${encoded}`,
+        `/api/rom-proxy?url=${encodeURIComponent(mameRef)}`,
+        `https://archive.org/cors/mame2003-parent/mame%202003%20plus%20parent/parents/${encoded}`,
+        `/api/rom-proxy?url=${encodeURIComponent(mamePar)}`,
         `/api/rom-proxy?file=${encoded}`,
-        `/api/rom-proxy?url=${encodeURIComponent(mameDl)}`,
-        `https://archive.org/cors/MAME_2003-Plus_Reference_Set_2018/roms/${encoded}`,
-        mameDl,
       ];
     } else {
       const neoDl = `https://archive.org/download/neo-geo-mvs-romset/${encoded}`;
+      const mameRef = `https://archive.org/download/MAME_2003-Plus_Reference/roms/${encoded}`;
       urls = [
-        `/api/rom-proxy?file=${encoded}`,
-        `/api/rom-proxy?url=${encodeURIComponent(neoDl)}`,
         `https://archive.org/cors/neo-geo-mvs-romset/${encoded}`,
-        neoDl,
+        `/api/rom-proxy?url=${encodeURIComponent(neoDl)}`,
+        `https://archive.org/cors/MAME_2003-Plus_Reference/roms/${encoded}`,
+        `/api/rom-proxy?url=${encodeURIComponent(mameRef)}`,
+        `/api/rom-proxy?file=${encoded}`,
       ];
     }
   }
 
-  // Toujours ajouter un fallback /api/rom-proxy?url=... pour les liens directs archive.org/download/ (contourne CORS 302)
+  // Toujours préférer /cors/ puis /api/rom-proxy?url=... (évite les blocages CORS 302 sur archive.org/download/ dans le navigateur)
   const expandedUrls = [];
   const seenUrls = new Set();
   for (const u of urls) {
     if (!u || seenUrls.has(u)) continue;
-    seenUrls.add(u);
-    expandedUrls.push(u);
     if (/^https?:\/\/archive\.org\/download\//i.test(u)) {
+      const cors = u.replace(/^https?:\/\/archive\.org\/download\//i, 'https://archive.org/cors/');
+      if (!seenUrls.has(cors)) {
+        seenUrls.add(cors);
+        expandedUrls.push(cors);
+      }
       const proxied = `/api/rom-proxy?url=${encodeURIComponent(u)}`;
       if (!seenUrls.has(proxied)) {
         seenUrls.add(proxied);
         expandedUrls.push(proxied);
       }
+      continue;
     }
+    seenUrls.add(u);
+    expandedUrls.push(u);
   }
   urls = expandedUrls;
 
@@ -379,7 +433,7 @@ export async function downloadAndCacheRom(entry, { mode = 'retro', core = 'nes',
     const headerCtrl = typeof AbortController !== 'undefined' ? new AbortController() : null;
     const isLocalProxy = url.startsWith('/') || url.includes('/api/rom-proxy');
     const headerTimer = headerCtrl
-      ? setTimeout(() => headerCtrl.abort(new Error('Délai réseau dépassé')), isLocalProxy ? 9500 : 6500)
+      ? setTimeout(() => headerCtrl.abort(new Error('Délai réseau dépassé')), isLocalProxy ? 90000 : 30000)
       : null;
     try {
       const res = await fetch(url, headerCtrl ? { signal: headerCtrl.signal } : undefined);
@@ -410,7 +464,7 @@ export async function downloadAndCacheRom(entry, { mode = 'retro', core = 'nes',
       } else {
         candidateBuf = await res.arrayBuffer();
       }
-      if (isValidRomBuffer(candidateBuf)) {
+      if (isValidRomBuffer(candidateBuf, entry.filename)) {
         buffer = candidateBuf;
         break;
       }

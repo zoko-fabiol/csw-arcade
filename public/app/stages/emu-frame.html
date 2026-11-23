@@ -3152,18 +3152,30 @@
               ? msg.fileBlob.arrayBuffer().then((ab) => new Uint8Array(ab)).catch(() => null)
               : Promise.resolve(null),
             isFbneo
-              ? fetch('/roms/neogeo.zip')
+              ? fetch('/roms/neogeo.zip?v=3', { cache: 'no-cache' })
                   .then((biosRes) => (biosRes.ok ? biosRes.arrayBuffer().then((ab) => new Uint8Array(ab)) : null))
                   .catch(() => null)
               : Promise.resolve(null),
           ]);
 
-          // Intercepteur fetch + XHR pour servir la ROM avec son vrai nom de fichier (indispensable pour FBNeo et MAME)
+          // Intercepteur fetch + XHR pour servir la ROM avec son vrai nom de fichier (indispensable pour FBNeo, MAME et noms avec espaces)
           if (romBytes || neogeoBytes) {
+            const targetLower = targetFilename.toLowerCase();
+            const isTargetRomUrl = (rawUrl) => {
+              const u = String(rawUrl || '').toLowerCase();
+              let decoded = u;
+              try { decoded = decodeURIComponent(u); } catch {}
+              return (
+                u.includes(targetLower) ||
+                decoded.includes(targetLower) ||
+                (shortKey && (u.endsWith('/' + shortKey + '.zip') || decoded.endsWith('/' + shortKey + '.zip')))
+              );
+            };
             const _origFetch = window.fetch;
             window.fetch = async function(input, init) {
-              const u = (typeof input === 'string' ? input : (input?.url || '')).toLowerCase();
-              if (romBytes && (u.includes(targetFilename.toLowerCase()) || (shortKey && u.endsWith('/' + shortKey + '.zip')))) {
+              const rawU = typeof input === 'string' ? input : (input?.url || '');
+              const u = rawU.toLowerCase();
+              if (romBytes && isTargetRomUrl(rawU)) {
                 const buf = romBytes.buffer.slice(romBytes.byteOffset, romBytes.byteOffset + romBytes.byteLength);
                 return new Response(buf, {
                   status: 200,
@@ -3189,7 +3201,8 @@
               return _origXHROpen.apply(this, [method, url, ...rest]);
             };
             XMLHttpRequest.prototype.send = function(...args) {
-              const u = (this._reqUrl || '').toLowerCase();
+              const rawU = this._reqUrl || '';
+              const u = rawU.toLowerCase();
               const serveBuf = (bytes) => {
                 const buf = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
                 Object.defineProperty(this, 'status', { get: () => 200 });
@@ -3210,7 +3223,7 @@
                   this.dispatchEvent(new Event('loadend'));
                 }, 5);
               };
-              if (romBytes && (u.includes(targetFilename.toLowerCase()) || (shortKey && u.endsWith('/' + shortKey + '.zip')))) {
+              if (romBytes && isTargetRomUrl(rawU)) {
                 serveBuf(romBytes);
                 return;
               }
@@ -3225,9 +3238,18 @@
           const hw = readHardwareSettings();
           let ctrlCfg = buildControllersConfig(hw.controls, msg.core, hw) || buildControllersConfig({ p1: {}, p2: {} }, msg.core, hw);
 
+          const normalizeEmuCore = (raw) => {
+            const lower = String(raw || 'fbneo').trim().toLowerCase();
+            if (lower === 'fbneo' || lower === 'arcade') return 'arcade';
+            if (lower === 'ps1' || lower === 'psx' || lower === 'playstation' || lower === 'pcsx_rearmed') return 'psx';
+            if (lower === 'gbc') return 'gb';
+            if (lower === 'parallel-n64') return 'parallel_n64';
+            return raw || 'arcade';
+          };
+
           const hasLocalCoreProxy = isFbneo ? true : await hasLocalCoreProxyPromise;
           window.EJS_player = '#game';
-          window.EJS_core = isFbneo ? 'arcade' : msg.core;
+          window.EJS_core = normalizeEmuCore(msg.core);
           window.EJS_gameName = isFbneo ? shortKey.toUpperCase() : (msg.gameName || 'CSW Game');
           window.EJS_gameUrl = romBytes ? targetFilename : (msg.gameUrl || targetFilename);
           window.EJS_biosUrl = isFbneo ? 'neogeo.zip' : '';

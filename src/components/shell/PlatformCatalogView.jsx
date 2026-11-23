@@ -11,17 +11,29 @@ import {
 } from '../../data/platformCatalogs';
 import neoGeoGames from '../../data/games.json';
 import fbneoMapping from '../../data/fbneoMapping.json';
+import neoragexVerified from '../../data/neoragexVerified.json';
 import {
   downloadAndCacheRom,
   formatBytes,
   getCachedRom,
   listCachedRoms,
   markRomAsDead,
+  padNeoRAGExZipFile,
   probeRomAvailability,
   removeCachedRom,
   searchOnlineRoms,
   subscribeDeadRoms,
 } from '../../services/platformRomService';
+
+const NEO_GEO_SHORTNAME_SET = new Set(
+  Object.values(fbneoMapping || {}).map((v) => String(v || '').toLowerCase()).filter(Boolean)
+);
+const NATIVE_NEORAGEX_SET = new Set(
+  (neoragexVerified?.nativeFbneo || []).map((v) => String(v || '').toLowerCase())
+);
+const PLAYABLE_EXTRAS_SET = new Set(
+  (neoragexVerified?.playableExtras || []).map((v) => String(v || '').toLowerCase())
+);
 import { addCoins } from '../../services/walletService';
 import { GameCover } from './GameCover';
 import { getMultiplayerBadgeMeta, supportsOnlineMultiplayer } from '../../utils/gameCapabilities';
@@ -200,7 +212,7 @@ function buildMergedArcade(arcJson) {
     .filter((g) => {
       const rawKey = String(g.filename || g.rom || g.id || '').replace(/\.zip$/i, '').toLowerCase();
       const mapped = fbneoMapping[rawKey] || rawKey;
-      if (!mapped || seenRom.has(mapped)) return false;
+      if (!mapped || seenRom.has(mapped) || !PLAYABLE_EXTRAS_SET.has(mapped)) return false;
       seenRom.add(mapped);
       return true;
     })
@@ -413,9 +425,70 @@ export function PlatformCatalogView({ mode, onLaunchStage, onCacheChanged, onJoi
     );
   }, [cachedRoms, search]);
 
-  const launchFile = (file, coreOverride, titleOverride, entryOverride = null) => {
+  const launchFile = async (file, coreOverride, titleOverride, entryOverride = null) => {
     const ext = file.name.split('.').pop()?.toLowerCase() || '';
-    const resolvedCore = coreOverride || (ext === 'jar' ? 'j2me' : RETRO_EXT_CORE_MAP[ext] || cfg.defaultCore);
+    const rawZipKey = ext === 'zip' ? file.name.replace(/\.zip$/i, '').toLowerCase() : '';
+    const mappedNeoKey = rawZipKey ? fbneoMapping[rawZipKey] || '' : '';
+    const isKnownNeoZip =
+      Boolean(mappedNeoKey) ||
+      (rawZipKey &&
+        (NEO_GEO_SHORTNAME_SET.has(rawZipKey) ||
+          catalog.some(
+            (g) => g.core === 'fbneo' && String(g.filename || '').replace(/\.zip$/i, '').toLowerCase() === rawZipKey
+          )));
+    const resolvedCore =
+      coreOverride ||
+      (ext === 'jar' ? 'j2me' : isKnownNeoZip ? 'fbneo' : RETRO_EXT_CORE_MAP[ext] || cfg.defaultCore);
+    const resolvedFilename =
+      entryOverride?.filename ||
+      (isKnownNeoZip ? `${mappedNeoKey || rawZipKey}.zip` : file.name);
+    const matchedNeoMeta =
+      !entryOverride && isKnownNeoZip
+        ? (Array.isArray(neoGeoGames)
+            ? neoGeoGames.find(
+                (g) =>
+                  String(g.id || '').toLowerCase() === rawZipKey ||
+                  String(g.filename || '').replace(/\.zip$/i, '').toLowerCase() === rawZipKey
+              )
+            : null)
+        : null;
+
+    let finalBlob = file;
+    if (!entryOverride && isKnownNeoZip) {
+      if (neoragexVerified?.padFixable?.[rawZipKey]) {
+        try {
+          setDownloadingId('local-import');
+          setDownloadProgress('Adaptation NeoRAGEx…');
+          finalBlob = await padNeoRAGExZipFile(file, neoragexVerified.padFixable[rawZipKey], resolvedFilename);
+        } catch {
+          finalBlob = file;
+        } finally {
+          setDownloadingId(null);
+          setDownloadProgress('');
+        }
+      } else if (!NATIVE_NEORAGEX_SET.has(rawZipKey)) {
+        // Les dumps décryptés NeoRAGEx dont les CRC diffèrent de FBNeo (ex: metalslug1, metalslug3, kof98)
+        // basculent automatiquement sur le romset FBNeo vérifié via /api/rom-proxy?source=fbneo si disponible.
+        try {
+          setDownloadingId('local-import');
+          setDownloadProgress('Synchronisation FBNeo…');
+          const res = await fetch(`/api/rom-proxy?file=${encodeURIComponent(resolvedFilename)}&source=fbneo`);
+          if (res.ok) {
+            const ab = await res.arrayBuffer();
+            const u8 = new Uint8Array(ab);
+            if (u8.byteLength > 4096 && u8[0] === 0x50 && u8[1] === 0x4b) {
+              finalBlob = new File([ab], resolvedFilename, { type: 'application/octet-stream' });
+            }
+          }
+        } catch {
+          /* conserve le fichier importé si hors-ligne */
+        } finally {
+          setDownloadingId(null);
+          setDownloadProgress('');
+        }
+      }
+    }
+
     const isLocalImport = !entryOverride;
     const isJ2me = resolvedCore === 'j2me' || mode === 'java' || ext === 'jar';
     const canMulti =
@@ -425,13 +498,13 @@ export function PlatformCatalogView({ mode, onLaunchStage, onCacheChanged, onJoi
     onLaunchStage(
       {
         kind: isJ2me ? 'j2me' : 'emu',
-        gameId: entryOverride?.id || titleOverride || file.name,
-        title: titleOverride || file.name,
-        filename: file.name,
+        gameId: entryOverride?.id || (isKnownNeoZip ? `arc-neo-${mappedNeoKey || rawZipKey}` : titleOverride || file.name),
+        title: entryOverride?.title || matchedNeoMeta?.title || titleOverride || file.name,
+        filename: resolvedFilename,
         badge: `${resolvedCore.toUpperCase()} · ${isJ2me ? 'J2ME' : 'EmulatorJS'}`,
         core: resolvedCore,
-        fileBlob: file,
-        gameUrl: entryOverride?.urls?.[0] || '',
+        fileBlob: finalBlob,
+        gameUrl: entryOverride?.urls?.[0] || (isKnownNeoZip ? `/api/rom-proxy?file=${encodeURIComponent(resolvedFilename)}` : ''),
         isLocalImport,
         players: entryOverride?.players || (canMulti ? '1–2J' : '1J'),
         supportsMultiplayer: canMulti,
@@ -479,14 +552,18 @@ export function PlatformCatalogView({ mode, onLaunchStage, onCacheChanged, onJoi
   };
 
   const handleLaunchCached = async (item) => {
-    if (onRequireCoin && !onRequireCoin()) return;
-    const cached = await getCachedRom(item.id);
-    if (!cached?.data) {
-      refreshCache();
-      return;
-    }
     const matchedEntry =
       catalog.find((c) => c.id === item.id || (item.filename && c.filename === item.filename)) || null;
+    const cached = await getCachedRom(item.id);
+    if (!cached?.data) {
+      await refreshCache();
+      if (matchedEntry?.urls?.length) {
+        return handleLaunchCatalogEntry(matchedEntry);
+      }
+      setErrorMsg(`ROM en cache invalide ou expirée (« ${item.title} ») : veuillez la retélécharger.`);
+      return;
+    }
+    if (onRequireCoin && !onRequireCoin()) return;
     const resolvedCore = matchedEntry?.core || matchedEntry?.platform || item.core || cfg.defaultCore;
     const resolvedEntry = matchedEntry || {
       id: item.id,

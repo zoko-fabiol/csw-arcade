@@ -1,16 +1,449 @@
 import { WebSocketServer, WebSocket } from 'ws';
+import dns from 'node:dns';
+import http from 'node:http';
+import https from 'node:https';
 import fs from 'node:fs';
 import path from 'node:path';
+import zlib from 'node:zlib';
 import { supportsOnlineMultiplayer } from '../utils/gameCapabilities.js';
 import { LocalFirebaseStore } from './localFirebaseStore.js';
 
-async function fetchWithHeaderTimeout(url, options = {}, timeoutMs = 8500) {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(new Error(`Timeout after ${timeoutMs}ms`)), timeoutMs);
+try {
+  dns.setDefaultResultOrder('ipv4first');
+} catch {}
+
+export function openRemoteStreamIpv4(
+  targetUrl,
+  { method = 'GET', timeoutMs = 25000, maxRedirects = 5, headers = {} } = {}
+) {
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    let activeReq = null;
+    const timer = setTimeout(() => {
+      settled = true;
+      try {
+        activeReq?.destroy();
+      } catch {}
+      reject(new Error(`Timeout after ${timeoutMs}ms`));
+    }, timeoutMs);
+
+    const visit = (currentUrl, redirectsLeft) => {
+      let parsed;
+      try {
+        parsed = new URL(currentUrl);
+      } catch (err) {
+        clearTimeout(timer);
+        if (!settled) {
+          settled = true;
+          reject(err);
+        }
+        return;
+      }
+      const mod = parsed.protocol === 'http:' ? http : https;
+      activeReq = mod.request(
+        parsed,
+        {
+          method,
+          family: 4,
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) CSW-Arcade',
+            ...headers,
+          },
+        },
+        (upstreamRes) => {
+          const status = upstreamRes.statusCode || 0;
+          const loc = upstreamRes.headers.location;
+          if (status >= 300 && status < 400 && loc && redirectsLeft > 0) {
+            upstreamRes.resume();
+            return visit(new URL(loc, parsed).toString(), redirectsLeft - 1);
+          }
+          clearTimeout(timer);
+          if (!settled) {
+            settled = true;
+            resolve(upstreamRes);
+          } else {
+            upstreamRes.destroy();
+          }
+        }
+      );
+      activeReq.on('error', (err) => {
+        clearTimeout(timer);
+        if (!settled) {
+          settled = true;
+          reject(err);
+        }
+      });
+      activeReq.end();
+    };
+
+    visit(targetUrl, maxRedirects);
+  });
+}
+
+function pipeUpstreamRomResponse(req, res, upstreamRes, { contentType = 'application/octet-stream', diskCachePath = null } = {}) {
+  const cl = upstreamRes.headers['content-length'];
+  res.writeHead(200, {
+    'Content-Type': contentType,
+    ...(cl ? { 'Content-Length': String(cl) } : {}),
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS',
+    'Access-Control-Expose-Headers': 'Content-Length, Content-Type',
+    'Cache-Control': 'public, max-age=31536000',
+  });
+  if (req.method === 'HEAD') {
+    upstreamRes.resume();
+    return res.end();
+  }
+
+  let tmpPath = null;
+  let diskStream = null;
+  let aborted = false;
+  if (diskCachePath) {
+    tmpPath = `${diskCachePath}.${Date.now()}.part`;
+    diskStream = fs.createWriteStream(tmpPath);
+    diskStream.on('error', () => {
+      diskStream = null;
+    });
+  }
+
+  const cleanupTmp = () => {
+    if (tmpPath) {
+      try {
+        if (fs.existsSync(tmpPath)) fs.unlinkSync(tmpPath);
+      } catch {}
+    }
+  };
+
+  req.on('close', () => {
+    if (!res.writableEnded) {
+      aborted = true;
+      upstreamRes.destroy();
+      try {
+        diskStream?.destroy();
+      } catch {}
+      cleanupTmp();
+    }
+  });
+
+  upstreamRes.on('data', (chunk) => {
+    if (!res.writableEnded) res.write(chunk);
+    if (diskStream && !aborted) diskStream.write(chunk);
+  });
+  upstreamRes.on('end', () => {
+    if (!res.writableEnded) res.end();
+    if (diskStream) {
+      diskStream.end(() => {
+        if (!aborted && tmpPath && diskCachePath) {
+          try {
+            fs.renameSync(tmpPath, diskCachePath);
+          } catch {
+            cleanupTmp();
+          }
+        } else {
+          cleanupTmp();
+        }
+      });
+    }
+  });
+  upstreamRes.on('error', () => {
+    aborted = true;
+    try {
+      diskStream?.destroy();
+    } catch {}
+    cleanupTmp();
+    if (!res.writableEnded) res.end();
+  });
+}
+
+const DEFAULT_NEORAGEX_ROMS_DIR =
+  process.env.CSW_NEORAGEX_ROMS_DIR ||
+  'E:\\Telechargement\\EMULADORDENEOGEO\\NeoRAGEx_5.0\\NEO GEO\\NeoRAGEx_5.0\\ROMs';
+
+let cachedNeoVerified = null;
+function loadNeoRAGExVerified() {
+  if (cachedNeoVerified) return cachedNeoVerified;
+  const fallback = { nativeSet: new Set(), cloneOverrides: {}, padFixable: {}, playableExtras: new Set() };
   try {
-    return await fetch(url, { ...options, signal: controller.signal });
-  } finally {
-    clearTimeout(timer);
+    const p = path.resolve(process.cwd(), 'src/data/neoragexVerified.json');
+    if (fs.existsSync(p)) {
+      const parsed = JSON.parse(fs.readFileSync(p, 'utf8'));
+      cachedNeoVerified = {
+        nativeSet: new Set((parsed.nativeFbneo || []).map((k) => String(k).toLowerCase())),
+        cloneOverrides: parsed.cloneOverrides || {},
+        padFixable: parsed.padFixable || {},
+        playableExtras: new Set((parsed.playableExtras || []).map((k) => String(k).toLowerCase())),
+      };
+      return cachedNeoVerified;
+    }
+  } catch {
+    /* ignore missing verified map */
+  }
+  cachedNeoVerified = fallback;
+  return cachedNeoVerified;
+}
+
+function buildPaddedNeoZipBuffer(zipPath, padSpec = {}) {
+  const buf = fs.readFileSync(zipPath);
+  let eocd = -1;
+  for (let i = buf.length - 22; i >= Math.max(0, buf.length - 65560); i--) {
+    if (buf.readUInt32LE(i) === 0x06054b50) {
+      eocd = i;
+      break;
+    }
+  }
+  if (eocd < 0) return buf;
+  let pos = buf.readUInt32LE(eocd + 16);
+  const cnt = buf.readUInt16LE(eocd + 10);
+  const localChunks = [];
+  const cdChunks = [];
+  let offset = 0;
+
+  for (let i = 0; i < cnt && pos < buf.length; i++) {
+    if (buf.readUInt32LE(pos) !== 0x02014b50) break;
+    const method = buf.readUInt16LE(pos + 10);
+    const compSize = buf.readUInt32LE(pos + 20);
+    const localOff = buf.readUInt32LE(pos + 42);
+    const fnL = buf.readUInt16LE(pos + 28);
+    const exL = buf.readUInt16LE(pos + 30);
+    const cmL = buf.readUInt16LE(pos + 32);
+    const nameBuf = buf.slice(pos + 46, pos + 46 + fnL);
+    const name = nameBuf.toString('utf8');
+    const lfnL = buf.readUInt16LE(localOff + 26);
+    const lexL = buf.readUInt16LE(localOff + 28);
+    const rawComp = buf.slice(localOff + 30 + lfnL + lexL, localOff + 30 + lfnL + lexL + compSize);
+    let data = method === 0 ? rawComp : zlib.inflateRawSync(rawComp);
+
+    const targetLen = padSpec[name];
+    if (targetLen && targetLen > data.length) {
+      const padded = Buffer.alloc(targetLen, 0xff);
+      data.copy(padded);
+      data = padded;
+    }
+
+    const comp = zlib.deflateRawSync(data, { level: 5 });
+    const crc = zlib.crc32(data) >>> 0;
+    const lh = Buffer.alloc(30);
+    lh.writeUInt32LE(0x04034b50, 0);
+    lh.writeUInt16LE(20, 4);
+    lh.writeUInt16LE(8, 8);
+    lh.writeUInt32LE(crc, 14);
+    lh.writeUInt32LE(comp.length, 18);
+    lh.writeUInt32LE(data.length, 22);
+    lh.writeUInt16LE(nameBuf.length, 26);
+    localChunks.push(lh, nameBuf, comp);
+
+    const cd = Buffer.alloc(46);
+    cd.writeUInt32LE(0x02014b50, 0);
+    cd.writeUInt16LE(20, 4);
+    cd.writeUInt16LE(20, 6);
+    cd.writeUInt16LE(8, 10);
+    cd.writeUInt32LE(crc, 16);
+    cd.writeUInt32LE(comp.length, 20);
+    cd.writeUInt32LE(data.length, 24);
+    cd.writeUInt16LE(nameBuf.length, 28);
+    cd.writeUInt32LE(offset, 42);
+    cdChunks.push(cd, nameBuf);
+
+    offset += lh.length + nameBuf.length + comp.length;
+    pos += 46 + fnL + exL + cmL;
+  }
+
+  const cdBuf = Buffer.concat(cdChunks);
+  const eocdOut = Buffer.alloc(22);
+  eocdOut.writeUInt32LE(0x06054b50, 0);
+  eocdOut.writeUInt16LE(cnt, 8);
+  eocdOut.writeUInt16LE(cnt, 10);
+  eocdOut.writeUInt32LE(cdBuf.length, 12);
+  eocdOut.writeUInt32LE(offset, 16);
+  return Buffer.concat([...localChunks, cdBuf, eocdOut]);
+}
+
+function buildNeoRAGExIndex(romNameMap = {}) {
+  const byAnyKey = new Map();
+  const verified = loadNeoRAGExVerified();
+  try {
+    if (!DEFAULT_NEORAGEX_ROMS_DIR || !fs.existsSync(DEFAULT_NEORAGEX_ROMS_DIR)) {
+      return byAnyKey;
+    }
+    const entries = fs.readdirSync(DEFAULT_NEORAGEX_ROMS_DIR);
+    for (const entry of entries) {
+      if (!entry.toLowerCase().endsWith('.zip')) continue;
+      const baseKey = entry.slice(0, -4).toLowerCase();
+      const padSpec = verified.padFixable[baseKey] || null;
+      const isNative = verified.nativeSet.has(baseKey);
+      const cloneKey = verified.cloneOverrides[baseKey] || null;
+      if (!isNative && !padSpec && !cloneKey) continue;
+
+      const fullPath = path.join(DEFAULT_NEORAGEX_ROMS_DIR, entry);
+      const rec = { fullPath, baseKey, padSpec };
+      if (cloneKey) {
+        byAnyKey.set(cloneKey, rec);
+      } else {
+        byAnyKey.set(baseKey, rec);
+        const mappedKey = String(romNameMap[baseKey] || '').toLowerCase();
+        if (mappedKey && (!byAnyKey.has(mappedKey) || baseKey === mappedKey)) {
+          byAnyKey.set(mappedKey, rec);
+        }
+      }
+    }
+  } catch {
+    /* ignore inaccessible external folder */
+  }
+  return byAnyKey;
+}
+
+export function listLocalRomFiles(romsDir, romNameMap = {}) {
+  const result = new Set();
+  try {
+    if (romsDir && fs.existsSync(romsDir)) {
+      for (const f of fs.readdirSync(romsDir)) {
+        if (f.toLowerCase().endsWith('.zip')) result.add(f);
+      }
+    }
+  } catch {}
+  try {
+    const idx = buildNeoRAGExIndex(romNameMap);
+    for (const k of idx.keys()) {
+      result.add(`${k}.zip`);
+    }
+  } catch {}
+  return Array.from(result);
+}
+
+export async function handleRomProxyRequest(req, res, { romsDir, romNameMap = {}, cacheToDisk = false } = {}) {
+  try {
+    if (req.method === 'OPTIONS') {
+      res.writeHead(204, {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS',
+        'Access-Control-Allow-Headers': '*',
+      });
+      return res.end();
+    }
+
+    const url = new URL(req.url, 'http://localhost:3003');
+    const customUrl = url.searchParams.get('url');
+
+    if (customUrl && /^https?:\/\//i.test(customUrl)) {
+      let upstreamRes;
+      try {
+        upstreamRes = await openRemoteStreamIpv4(customUrl, {
+          method: req.method === 'HEAD' ? 'HEAD' : 'GET',
+          timeoutMs: 25000,
+        });
+      } catch {
+        res.writeHead(404, { 'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json' });
+        return res.end(JSON.stringify({ error: 'ROM source inaccessible ou expirée' }));
+      }
+      const status = upstreamRes.statusCode || 0;
+      const ct = String(upstreamRes.headers['content-type'] || 'application/octet-stream').toLowerCase();
+      if (status < 200 || status >= 300 || ct.includes('text/html')) {
+        upstreamRes.resume();
+        res.writeHead(404, { 'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json' });
+        return res.end(JSON.stringify({ error: 'ROM indisponible', status }));
+      }
+      return pipeUpstreamRomResponse(req, res, upstreamRes, { contentType: 'application/octet-stream' });
+    }
+
+    const rawParam = url.searchParams.get('file') || url.searchParams.get('id') || req.url.replace(/^\//, '');
+    const cleanName = path
+      .basename(decodeURIComponent(rawParam))
+      .replace(/\.(zip|bin|dat|rom)$/i, '')
+      .replace(/^arc-(neo|mame)-/i, '')
+      .toLowerCase();
+    const resolvedName = romNameMap[cleanName] || cleanName;
+
+    if (!resolvedName) {
+      res.writeHead(400, { 'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json' });
+      return res.end(JSON.stringify({ error: 'Paramètre file ou url manquant' }));
+    }
+
+    let filePath = path.resolve(romsDir, `${resolvedName}.zip`);
+    if (!fs.existsSync(filePath)) {
+      const altPath = path.resolve(romsDir, `${cleanName}.zip`);
+      if (fs.existsSync(altPath)) filePath = altPath;
+    }
+
+    if (fs.existsSync(filePath)) {
+      const stat = fs.statSync(filePath);
+      res.writeHead(200, {
+        'Content-Type': 'application/zip',
+        'Content-Length': stat.size,
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS',
+        'Access-Control-Expose-Headers': 'Content-Length, Content-Type',
+        'Cache-Control': 'public, max-age=31536000',
+      });
+      if (req.method === 'HEAD') return res.end();
+      return fs.createReadStream(filePath).pipe(res);
+    }
+
+    const forceFbneoArchive = url.searchParams.get('source') === 'fbneo';
+    if (!forceFbneoArchive) {
+      const neoIndex = buildNeoRAGExIndex(romNameMap);
+      const neoMatch = neoIndex.get(cleanName) || neoIndex.get(resolvedName);
+      if (neoMatch && fs.existsSync(neoMatch.fullPath)) {
+        if (neoMatch.padSpec) {
+          const paddedBuf = buildPaddedNeoZipBuffer(neoMatch.fullPath, neoMatch.padSpec);
+          res.writeHead(200, {
+            'Content-Type': 'application/zip',
+            'Content-Length': paddedBuf.length,
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS',
+            'Access-Control-Expose-Headers': 'Content-Length, Content-Type',
+            'Cache-Control': 'public, max-age=31536000',
+          });
+          if (req.method === 'HEAD') return res.end();
+          return res.end(paddedBuf);
+        }
+        const stat = fs.statSync(neoMatch.fullPath);
+        res.writeHead(200, {
+          'Content-Type': 'application/zip',
+          'Content-Length': stat.size,
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS',
+          'Access-Control-Expose-Headers': 'Content-Length, Content-Type',
+          'Cache-Control': 'public, max-age=31536000',
+        });
+        if (req.method === 'HEAD') return res.end();
+        return fs.createReadStream(neoMatch.fullPath).pipe(res);
+      }
+    }
+
+    const candidateUrls = [
+      `https://archive.org/download/neo-geo-mvs-romset/${encodeURIComponent(resolvedName)}.zip`,
+      `https://archive.org/download/MAME_2003-Plus_Reference/roms/${encodeURIComponent(resolvedName)}.zip`,
+      `https://archive.org/download/mame2003-parent/mame%202003%20plus%20parent/parents/${encodeURIComponent(resolvedName)}.zip`,
+      `https://archive.org/download/NeoGeoRomCollectionByGhostware/${encodeURIComponent(resolvedName)}.zip`,
+    ];
+
+    for (const remoteUrl of candidateUrls) {
+      try {
+        const upstreamRes = await openRemoteStreamIpv4(remoteUrl, {
+          method: req.method === 'HEAD' ? 'HEAD' : 'GET',
+          timeoutMs: 25000,
+        });
+        const status = upstreamRes.statusCode || 0;
+        const ct = String(upstreamRes.headers['content-type'] || '').toLowerCase();
+        if (status >= 200 && status < 300 && !ct.includes('text/html')) {
+          return pipeUpstreamRomResponse(req, res, upstreamRes, {
+            contentType: 'application/zip',
+            diskCachePath: cacheToDisk ? path.resolve(romsDir, `${resolvedName}.zip`) : null,
+          });
+        }
+        upstreamRes.resume();
+      } catch {
+        /* try next candidate */
+      }
+    }
+
+    res.writeHead(404, { 'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json' });
+    return res.end(JSON.stringify({ error: `ROM introuvable: ${resolvedName}.zip` }));
+  } catch (err) {
+    if (!res.headersSent) {
+      res.writeHead(500, { 'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: err.message }));
+    }
   }
 }
 
@@ -239,139 +672,13 @@ export function setupNetplayHub(server) {
     /* ignore */
   }
 
-  server.middlewares.use('/api/rom-proxy', async (req, res) => {
-    try {
-      if (req.method === 'OPTIONS') {
-        res.writeHead(204, {
-          'Access-Control-Allow-Origin': '*',
-          'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS',
-          'Access-Control-Allow-Headers': '*',
-        });
-        return res.end();
-      }
-
-      const romsDir = path.resolve(process.cwd(), 'public/roms');
-      const url = new URL(req.url, 'http://localhost:3003');
-      const customUrl = url.searchParams.get('url');
-
-      if (customUrl && /^https?:\/\//i.test(customUrl)) {
-        const remoteRes = await fetchWithHeaderTimeout(
-          customUrl,
-          {
-            method: req.method === 'HEAD' ? 'HEAD' : 'GET',
-            redirect: 'follow',
-            headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) CSW-Arcade' },
-          },
-          8500
-        );
-        const ct = (remoteRes.headers.get('content-type') || 'application/octet-stream').toLowerCase();
-        if (!remoteRes.ok || ct.includes('text/html')) {
-          res.writeHead(404, { 'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json' });
-          return res.end(JSON.stringify({ error: 'ROM indisponible', status: remoteRes.status }));
-        }
-        const cl = remoteRes.headers.get('content-length');
-        res.writeHead(200, {
-          'Content-Type': 'application/octet-stream',
-          ...(cl ? { 'Content-Length': cl } : {}),
-          'Access-Control-Allow-Origin': '*',
-          'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS',
-          'Access-Control-Expose-Headers': 'Content-Length, Content-Type',
-          'Cache-Control': 'public, max-age=31536000',
-        });
-        if (req.method === 'HEAD' || !remoteRes.body) return res.end();
-        const reader = remoteRes.body.getReader();
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          res.write(Buffer.from(value));
-        }
-        return res.end();
-      }
-
-      const rawParam = url.searchParams.get('file') || url.searchParams.get('id') || '';
-      const cleanName = path
-        .basename(decodeURIComponent(rawParam))
-        .replace(/\.(zip|bin|dat|rom)$/i, '')
-        .replace(/^arc-(neo|mame)-/i, '')
-        .toLowerCase();
-      const resolvedName = romNameMap[cleanName] || cleanName;
-
-      if (!resolvedName) {
-        res.writeHead(400, { 'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json' });
-        return res.end(JSON.stringify({ error: 'Paramètre file ou url manquant' }));
-      }
-
-      let filePath = path.resolve(romsDir, `${resolvedName}.zip`);
-      if (!fs.existsSync(filePath)) {
-        const altPath = path.resolve(romsDir, `${cleanName}.zip`);
-        if (fs.existsSync(altPath)) filePath = altPath;
-      }
-
-      if (fs.existsSync(filePath)) {
-        const stat = fs.statSync(filePath);
-        res.writeHead(200, {
-          'Content-Type': 'application/zip',
-          'Content-Length': stat.size,
-          'Access-Control-Allow-Origin': '*',
-          'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS',
-          'Access-Control-Expose-Headers': 'Content-Length, Content-Type',
-          'Cache-Control': 'public, max-age=31536000',
-        });
-        if (req.method === 'HEAD') return res.end();
-        return fs.createReadStream(filePath).pipe(res);
-      }
-
-      const candidateUrls = [
-        `https://archive.org/download/neo-geo-mvs-romset/${encodeURIComponent(resolvedName)}.zip`,
-        `https://archive.org/download/MAME_2003-Plus_Reference_Set_2018/roms/${encodeURIComponent(resolvedName)}.zip`,
-        `https://archive.org/download/NeoGeoRomCollectionByGhostware/${encodeURIComponent(resolvedName)}.zip`,
-      ];
-
-      for (const remoteUrl of candidateUrls) {
-        try {
-          const remoteRes = await fetchWithHeaderTimeout(
-            remoteUrl,
-            {
-              method: req.method === 'HEAD' ? 'HEAD' : 'GET',
-              redirect: 'follow',
-              headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) CSW-Arcade' },
-            },
-            7000
-          );
-          const ct = (remoteRes.headers.get('content-type') || '').toLowerCase();
-          if (remoteRes.ok && !ct.includes('text/html')) {
-            const cl = remoteRes.headers.get('content-length');
-            res.writeHead(200, {
-              'Content-Type': 'application/zip',
-              ...(cl ? { 'Content-Length': cl } : {}),
-              'Access-Control-Allow-Origin': '*',
-              'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS',
-              'Access-Control-Expose-Headers': 'Content-Length, Content-Type',
-              'Cache-Control': 'public, max-age=31536000',
-            });
-            if (req.method === 'HEAD' || !remoteRes.body) return res.end();
-            const reader = remoteRes.body.getReader();
-            while (true) {
-              const { done, value } = await reader.read();
-              if (done) break;
-              res.write(Buffer.from(value));
-            }
-            return res.end();
-          }
-        } catch {
-          /* try next candidate */
-        }
-      }
-
-      res.writeHead(404, { 'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json' });
-      return res.end(JSON.stringify({ error: `ROM introuvable: ${resolvedName}.zip` }));
-    } catch (err) {
-      if (!res.headersSent) {
-        res.writeHead(500, { 'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ error: err.message }));
-      }
-    }
-  });
+  server.middlewares.use('/api/rom-proxy', (req, res) =>
+    handleRomProxyRequest(req, res, {
+      romsDir: path.resolve(process.cwd(), 'public/roms'),
+      romNameMap,
+      cacheToDisk: false,
+    })
+  );
 
   // Cache disque local pour les cores EmulatorJS (/emulatorjs/cores/*) :
   // sert d'abord public/emulatorjs/cores/, puis .csw-data/emu-cores-cache/, sinon télécharge une fois depuis CDN.
@@ -431,20 +738,23 @@ export function setupNetplayHub(server) {
           let lastErr = null;
           for (let attempt = 0; attempt < 2; attempt++) {
             try {
-              const remoteRes = await fetchWithHeaderTimeout(
-                cdnUrl,
-                { redirect: 'follow', headers: { 'User-Agent': 'Mozilla/5.0 CSW-Arcade' } },
-                25000
-              );
-              if (!remoteRes.ok) {
-                throw new Error(`CDN HTTP ${remoteRes.status}`);
+              const upstreamRes = await openRemoteStreamIpv4(cdnUrl, { timeoutMs: 25000 });
+              const status = upstreamRes.statusCode || 0;
+              if (status < 200 || status >= 300) {
+                upstreamRes.resume();
+                throw new Error(`CDN HTTP ${status}`);
               }
-              const ct = (remoteRes.headers.get('content-type') || '').toLowerCase();
+              const ct = String(upstreamRes.headers['content-type'] || '').toLowerCase();
               if (ct.includes('text/html')) {
+                upstreamRes.resume();
                 throw new Error('CDN returned HTML');
               }
-              const ab = await remoteRes.arrayBuffer();
-              const buf = Buffer.from(ab);
+              const buf = await new Promise((resolve, reject) => {
+                const chunks = [];
+                upstreamRes.on('data', (c) => chunks.push(c));
+                upstreamRes.on('end', () => resolve(Buffer.concat(chunks)));
+                upstreamRes.on('error', reject);
+              });
               if (buf.byteLength === 0) {
                 throw new Error('Empty CDN asset');
               }

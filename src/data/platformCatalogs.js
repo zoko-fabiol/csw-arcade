@@ -17,6 +17,20 @@ function iaUrls(identifier, filePath) {
   ];
 }
 
+function iaMultiUrls(sources = []) {
+  const out = [];
+  const seen = new Set();
+  for (const [identifier, filePath] of sources) {
+    for (const u of iaUrls(identifier, filePath)) {
+      if (!seen.has(u)) {
+        seen.add(u);
+        out.push(u);
+      }
+    }
+  }
+  return out;
+}
+
 export const MODE_META = {
   arcade: {
     id: 'arcade',
@@ -115,10 +129,10 @@ export const PLAYSTATION_CATALOG = [
     supportsMultiplayer: true,
     formats: ['.chd'],
     engine: 'emulatorjs:psx',
-    estimatedSize: '435 Mo',
-    filename: 'Tekken 3 (USA).chd',
-    urls: iaUrls('ultimate-rom-collection', 'Sony - PS1/Tekken 3 (USA).chd'),
-    description: 'Référence absolue du combat 3D Namco sur PlayStation. Compatible Solo & Multijoueur P2P.',
+    estimatedSize: '23 Mo',
+    filename: 'Tekken 3.chd',
+    urls: iaUrls('ps1-rip-chd-ck', 'Tekken 3.chd'),
+    description: 'Référence absolue du combat 3D Namco sur PlayStation (23 Mo CHD). Compatible Solo & Multijoueur P2P.',
   },
   {
     id: 'ps1-tekken-2',
@@ -131,10 +145,10 @@ export const PLAYSTATION_CATALOG = [
     supportsMultiplayer: true,
     formats: ['.chd'],
     engine: 'emulatorjs:psx',
-    estimatedSize: '460 Mo',
-    filename: 'Tekken 2 (USA) (Rev 1).chd',
-    urls: iaUrls('ultimate-rom-collection', 'Sony - PS1/Tekken 2 (USA) (Rev 1).chd'),
-    description: 'Classique du tournoi King of Iron Fist 2 sur PS1.',
+    estimatedSize: '25 Mo',
+    filename: 'Tekken 2.chd',
+    urls: iaUrls('ps1-rip-chd-ck', 'Tekken 2.chd'),
+    description: 'Classique du tournoi King of Iron Fist 2 sur PS1 (25 Mo CHD).',
   },
   {
     id: 'ps1-tekken-1',
@@ -147,10 +161,10 @@ export const PLAYSTATION_CATALOG = [
     supportsMultiplayer: true,
     formats: ['.chd'],
     engine: 'emulatorjs:psx',
-    estimatedSize: '410 Mo',
-    filename: 'Tekken (USA).chd',
-    urls: iaUrls('ultimate-rom-collection', 'Sony - PS1/Tekken (USA).chd'),
-    description: 'Premier épisode fondateur de la saga Tekken sur PlayStation.',
+    estimatedSize: '13 Mo',
+    filename: 'Tekken 1.chd',
+    urls: iaUrls('ps1-rip-chd-ck', 'Tekken 1.chd'),
+    description: 'Premier épisode fondateur de la saga Tekken sur PlayStation (13 Mo CHD).',
   },
   {
     id: 'ps1-street-fighter-alpha-3',
@@ -163,10 +177,10 @@ export const PLAYSTATION_CATALOG = [
     supportsMultiplayer: true,
     formats: ['.chd'],
     engine: 'emulatorjs:psx',
-    estimatedSize: '310 Mo',
-    filename: 'Street Fighter Alpha 3 (USA).chd',
-    urls: iaUrls('ultimate-rom-collection', 'Sony - PS1/Street Fighter Alpha 3 (USA).chd'),
-    description: 'Version PlayStation complète avec mode World Tour et 3 styles ISM.',
+    estimatedSize: '59 Mo',
+    filename: 'Street Fighter Alpha 3.chd',
+    urls: iaUrls('ps1-rip-chd-ck', 'Street Fighter Alpha 3.chd'),
+    description: 'Version PlayStation complète avec mode World Tour et 3 styles ISM (59 Mo CHD).',
   },
   {
     id: 'ps1-metal-slug-x',
@@ -179,10 +193,10 @@ export const PLAYSTATION_CATALOG = [
     supportsMultiplayer: true,
     formats: ['.chd'],
     engine: 'emulatorjs:psx',
-    estimatedSize: '155 Mo',
-    filename: 'Metal Slug X (USA).chd',
-    urls: iaUrls('ultimate-rom-collection', 'Sony - PS1/Metal Slug X (USA).chd'),
-    description: 'Adaptation PlayStation de Metal Slug X avec mode Combat School.',
+    estimatedSize: '57 Mo',
+    filename: 'Metal Slug X.chd',
+    urls: iaUrls('ps1-rip-chd-ck', 'Metal Slug X.chd'),
+    description: 'Adaptation PlayStation de Metal Slug X avec mode Combat School (57 Mo CHD).',
   },
   {
     id: 'ps1-castlevania-sotn',
@@ -195,9 +209,12 @@ export const PLAYSTATION_CATALOG = [
     supportsMultiplayer: false,
     formats: ['.chd'],
     engine: 'emulatorjs:psx',
-    estimatedSize: '355 Mo',
-    filename: 'Castlevania - Symphony of the Night (USA).chd',
-    urls: iaUrls('ultimate-rom-collection', 'Sony - PS1/Castlevania - Symphony of the Night (USA).chd'),
+    estimatedSize: '55 Mo',
+    filename: 'Castlevania - Symphony Of The Night.chd',
+    urls: iaMultiUrls([
+      ['ps1-rip-chd-ck', 'Castlevania - Symphony Of The Night.chd'],
+      ['ultimate-rom-collection', 'Sony - PS1/Castlevania - Symphony of the Night (USA).chd'],
+    ]),
     description: 'Chef-d’œuvre culte de Konami mettant en scène Alucard.',
   },
   {
@@ -211,10 +228,13 @@ export const PLAYSTATION_CATALOG = [
     supportsMultiplayer: true,
     formats: ['.chd'],
     engine: 'emulatorjs:psx',
-    estimatedSize: '330 Mo',
-    filename: 'Crash Team Racing (USA).chd',
-    urls: iaUrls('ultimate-rom-collection', 'Sony - PS1/Crash Team Racing (USA).chd'),
-    description: 'Course de karts nerveuse par Naughty Dog sur PS1.',
+    estimatedSize: '65 Mo',
+    filename: 'Crash Team Racing.chd',
+    urls: iaMultiUrls([
+      ['ps1-rip-chd-ck', 'Crash Team Racing.chd'],
+      ['ultimate-rom-collection', 'Sony - PS1/CTR - Crash Team Racing (USA).chd'],
+    ]),
+    description: 'Course de karts nerveuse par Naughty Dog sur PS1 (65 Mo CHD).',
   },
   {
     id: 'ps1-crash-bandicoot-1',
@@ -227,9 +247,12 @@ export const PLAYSTATION_CATALOG = [
     supportsMultiplayer: false,
     formats: ['.chd'],
     engine: 'emulatorjs:psx',
-    estimatedSize: '420 Mo',
-    filename: 'Crash Bandicoot (USA).chd',
-    urls: iaUrls('ultimate-rom-collection', 'Sony - PS1/Crash Bandicoot (USA).chd'),
+    estimatedSize: '134 Mo',
+    filename: 'Crash Bandicoot 1.chd',
+    urls: iaMultiUrls([
+      ['ps1-rip-chd-ck', 'Crash Bandicoot 1.chd'],
+      ['ultimate-rom-collection', 'Sony - PS1/Crash Bandicoot (USA).chd'],
+    ]),
     description: 'Le premier opus emblématique de Crash Bandicoot sur PlayStation.',
   },
   {
@@ -245,7 +268,10 @@ export const PLAYSTATION_CATALOG = [
     engine: 'emulatorjs:psx',
     estimatedSize: '94 Mo',
     filename: 'Crash Bandicoot 2 - Cortex Strikes Back (USA).chd',
-    urls: iaUrls('ultimate-rom-collection', 'Sony - PS1/Crash Bandicoot 2 - Cortex Strikes Back (USA).chd'),
+    urls: iaMultiUrls([
+      ['ps1-rip-chd-ck', 'Crash Bandicoot 2 - Cortex Strikes Back.chd'],
+      ['ultimate-rom-collection', 'Sony - PS1/Crash Bandicoot 2 - Cortex Strikes Back (USA).chd'],
+    ]),
     description: 'Plateforme 3D culte et très légère (94 Mo en CHD). Téléchargement automatique et lancement direct.',
   },
   {
@@ -259,10 +285,13 @@ export const PLAYSTATION_CATALOG = [
     supportsMultiplayer: false,
     formats: ['.chd'],
     engine: 'emulatorjs:psx',
-    estimatedSize: '99 Mo',
-    filename: 'Crash Bandicoot - Warped (USA).chd',
-    urls: iaUrls('ultimate-rom-collection', 'Sony - PS1/Crash Bandicoot - Warped (USA).chd'),
-    description: 'Voyage temporel sur PS1, téléchargement rapide (< 100 Mo).',
+    estimatedSize: '78 Mo',
+    filename: 'Crash Bandicoot 3 - Warped.chd',
+    urls: iaMultiUrls([
+      ['ps1-rip-chd-ck', 'Crash Bandicoot 3 - Warped.chd'],
+      ['ultimate-rom-collection', 'Sony - PS1/Crash Bandicoot - Warped (USA).chd'],
+    ]),
+    description: 'Voyage temporel sur PS1, téléchargement rapide (78 Mo CHD).',
   },
   {
     id: 'ps1-final-fantasy-origins',
@@ -277,7 +306,10 @@ export const PLAYSTATION_CATALOG = [
     engine: 'emulatorjs:psx',
     estimatedSize: '105 Mo',
     filename: 'Final Fantasy Origins (USA) (Rev 1).chd',
-    urls: iaUrls('ultimate-rom-collection', 'Sony - PS1/Final Fantasy Origins (USA) (Rev 1).chd'),
+    urls: iaMultiUrls([
+      ['ps1-rip-chd-ck', 'Final Fantasy Origins.chd'],
+      ['ultimate-rom-collection', 'Sony - PS1/Final Fantasy Origins (USA) (Rev 1).chd'],
+    ]),
     description: 'Compilation remastérisée de Final Fantasy I et II sur PS1 (105 Mo).',
   },
   {
@@ -293,7 +325,10 @@ export const PLAYSTATION_CATALOG = [
     engine: 'emulatorjs:psx',
     estimatedSize: '110 Mo',
     filename: 'Final Fantasy Anthology - Final Fantasy V (USA) (Rev 1).chd',
-    urls: iaUrls('ultimate-rom-collection', 'Sony - PS1/Final Fantasy Anthology - Final Fantasy V (USA) (Rev 1).chd'),
+    urls: iaMultiUrls([
+      ['ultimate-rom-collection', 'Sony - PS1/Final Fantasy Anthology - Final Fantasy V (USA) (Rev 1).chd'],
+      ['ps1-rip-chd-ck', 'Final Fantasy Anthology - Final Fantasy V.chd'],
+    ]),
     description: 'Système de jobs emblématique sur PlayStation (110 Mo).',
   },
   {
@@ -307,10 +342,13 @@ export const PLAYSTATION_CATALOG = [
     supportsMultiplayer: false,
     formats: ['.chd'],
     engine: 'emulatorjs:psx',
-    estimatedSize: '111 Mo',
-    filename: 'Ape Escape (USA).chd',
-    urls: iaUrls('ultimate-rom-collection', 'Sony - PS1/Ape Escape (USA).chd'),
-    description: 'Plateforme 3D emblématique de la PS1 (111 Mo).',
+    estimatedSize: '30 Mo',
+    filename: 'Ape Escape.chd',
+    urls: iaMultiUrls([
+      ['ps1-rip-chd-ck', 'Ape Escape.chd'],
+      ['ultimate-rom-collection', 'Sony - PS1/Ape Escape (USA).chd'],
+    ]),
+    description: 'Plateforme 3D emblématique de la PS1 (30 Mo CHD).',
   },
   {
     id: 'ps1-bishi-bashi-special',
@@ -341,7 +379,10 @@ export const PLAYSTATION_CATALOG = [
     engine: 'emulatorjs:psx',
     estimatedSize: '132 Mo',
     filename: 'Final Fantasy Anthology - Final Fantasy VI (USA) (Rev 1).chd',
-    urls: iaUrls('ultimate-rom-collection', 'Sony - PS1/Final Fantasy Anthology - Final Fantasy VI (USA) (Rev 1).chd'),
+    urls: iaMultiUrls([
+      ['ultimate-rom-collection', 'Sony - PS1/Final Fantasy Anthology - Final Fantasy VI (USA) (Rev 1).chd'],
+      ['ps1-rip-chd-ck', 'Final Fantasy Anthology - Final Fantasy VI.chd'],
+    ]),
     description: 'Chef-d’œuvre JRPG de Square sur PS1 (132 Mo).',
   },
   {
@@ -371,10 +412,13 @@ export const PLAYSTATION_CATALOG = [
     supportsMultiplayer: false,
     formats: ['.chd'],
     engine: 'emulatorjs:psx',
-    estimatedSize: '145 Mo',
-    filename: 'Breath of Fire III (USA).chd',
-    urls: iaUrls('ultimate-rom-collection', 'Sony - PS1/Breath of Fire III (USA).chd'),
-    description: 'JRPG Capcom classique avec sprites 2D sur décors 3D (145 Mo).',
+    estimatedSize: '108 Mo',
+    filename: 'Breath of Fire III.chd',
+    urls: iaMultiUrls([
+      ['ps1-rip-chd-ck', 'Breath of Fire III.chd'],
+      ['ultimate-rom-collection', 'Sony - PS1/Breath of Fire III (USA).chd'],
+    ]),
+    description: 'JRPG Capcom classique avec sprites 2D sur décors 3D (108 Mo CHD).',
   },
 ];
 

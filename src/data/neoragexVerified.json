@@ -1,0 +1,127 @@
+{
+  "nativeFbneo": [
+    "aggressorsofdarkkombat",
+    "alphamission2",
+    "artoffighting2",
+    "bakatonosmahjong",
+    "bangbead",
+    "breakers",
+    "burningfight",
+    "captaintomaday",
+    "columns",
+    "doubledragon",
+    "eightman",
+    "fatalfury2",
+    "fatalfuryspecial",
+    "footballfrenzy",
+    "galaxyfight",
+    "ghostlop",
+    "ghostpilots",
+    "jonasindiana",
+    "karnovsrevenge",
+    "kizunaencounter",
+    "kof2002",
+    "kof94",
+    "kof96",
+    "kof97",
+    "kof97plus",
+    "kof99",
+    "lastresort",
+    "magicaldrop2",
+    "metalslug2",
+    "metalslugx",
+    "minnasanookagesa",
+    "mutationnation",
+    "neonopanepon",
+    "neopong",
+    "ninjacombat",
+    "ninjacommando",
+    "overtop",
+    "pokernight",
+    "popnbounce",
+    "powerspikes2",
+    "puzzlebobble2",
+    "quizdaisousasen1",
+    "quizdaisousasen2",
+    "samuraishodown1",
+    "samuraishodown2",
+    "sengoku1",
+    "shocktroopers2",
+    "stakeswinner1",
+    "stakeswinner2",
+    "supersidekicks1",
+    "supersidekicks2",
+    "supersidekicks3",
+    "thelastblade2",
+    "thrashrally",
+    "tophunter",
+    "worldheroes2",
+    "worldheroes2jet",
+    "zedblade",
+    "zintrick"
+  ],
+  "cloneOverrides": {
+    "kof98": "kof98h"
+  },
+  "padFixable": {
+    "2020superbaseball": {
+      "030-c3.rom": 1048576,
+      "030-c4.rom": 1048576
+    },
+    "battleflipshot": {
+      "FLIP_P1.ROM": 1048576
+    },
+    "bluesjourney": {
+      "bj-m1.rom": 131072
+    },
+    "breakersrevenge": {
+      "BREV_C5.ROM": 4194304,
+      "BREV_C6.ROM": 4194304
+    },
+    "moneyidolexchanger": {
+      "231-c3.rom": 1048576,
+      "231-c4.rom": 1048576
+    },
+    "panicbomber": {
+      "PANIC_P1.ROM": 524288
+    },
+    "puzzlebobble1": {
+      "puzzb_m1.rom": 131072,
+      "puzzb_p1.rom": 524288
+    },
+    "puzzledepon": {
+      "202-s1.rom": 131072
+    },
+    "puzzledeponr": {
+      "235-s1.rom": 131072
+    },
+    "sonicwings2": {
+      "075-v2.rom": 1048576
+    },
+    "spinmaster": {
+      "SPNM_P2.ROM": 1048576
+    },
+    "thelastblade1": {
+      "lb_c5.rom": 4194304,
+      "lb_c6.rom": 4194304
+    },
+    "viewpoint": {
+      "051-m1.rom": 131072,
+      "051-s1.rom": 131072
+    },
+    "windjammers": {
+      "065-v4.rom": 1048576,
+      "065-p1.rom": 1048576
+    }
+  },
+  "playableExtras": [
+    "columnsn",
+    "ghostlop",
+    "kof97pls",
+    "ltorb",
+    "neonopon",
+    "neopong",
+    "poknight",
+    "zintrckb"
+  ]
+}
