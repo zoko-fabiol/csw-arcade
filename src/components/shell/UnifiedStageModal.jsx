@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
-  X, Maximize2, Minimize2, RotateCcw, Settings, Coins, Play, Pause, Sliders, Save, UploadCloud, Trophy, Award, Gamepad2, Trash2, Swords, MessageSquare, ShieldAlert, Radio, Send
+  X, Maximize2, Minimize2, RotateCcw, Settings, Coins, Play, Pause, Sliders, Save, UploadCloud, Trophy, Award, Gamepad2, Trash2, Swords, MessageSquare, ShieldAlert, Radio, Send, Eye
 } from 'lucide-react';
 import { addCoins, consumeCoin, hasCoins, setWalletCoins, subscribeWallet } from '../../services/walletService';
 import { getCurrentUserProfile, subscribeAuthProfile } from '../../services/authService';
@@ -76,19 +76,23 @@ export function UnifiedStageModal({
   const [localEmuReady, setLocalEmuReady] = useState(false);
   const [remoteEmuReady, setRemoteEmuReady] = useState(false);
   const [netplaySyncReady, setNetplaySyncReady] = useState(() => !session?.isNetplay);
+  const [spectatorsCount, setSpectatorsCount] = useState(0);
+  const isSpectator = Boolean(session?.isSpectator || session?.playerIndex === 2);
 
   useEffect(() => {
     if (!session) return;
     setLocalEmuReady(false);
     setRemoteEmuReady(false);
+    setSpectatorsCount(0);
+    setOpponentLeftModal(null);
     setNetplaySyncReady(!session.isNetplay);
-  }, [session?.gameId, session?.title, session?.isNetplay, bootKey]);
+  }, [session?.gameId, session?.title, session?.isNetplay, session?.isSpectator, bootKey]);
 
   useEffect(() => {
-    if (!session?.isNetplay || netplaySyncReady || !localEmuReady || !remoteEmuReady) return;
+    if (!session?.isNetplay || isSpectator || netplaySyncReady || !localEmuReady || !remoteEmuReady) return;
     const safetyTimer = setTimeout(() => setNetplaySyncReady(true), 18000);
     return () => clearTimeout(safetyTimer);
-  }, [session?.isNetplay, netplaySyncReady, localEmuReady, remoteEmuReady]);
+  }, [session?.isNetplay, isSpectator, netplaySyncReady, localEmuReady, remoteEmuReady]);
 
   useEffect(() => {
     if (session?.isNetplay && typeof p2pStats?.pingMs === 'number' && p2pStats.pingMs > 0) {
@@ -123,6 +127,7 @@ export function UnifiedStageModal({
     setScorePanelOpen(false);
     setNetplayPanelOpen(false);
     setPauseMenuOpen(true);
+    if (isSpectator) return;
     try {
       iframeRef.current?.contentWindow?.postMessage({ type: 'PAUSE_EMU' }, window.location.origin);
     } catch {}
@@ -137,6 +142,7 @@ export function UnifiedStageModal({
   const closePauseMenuAndResume = (fromRemote = false) => {
     setPauseMenuOpen(false);
     setRemotePausedBy(null);
+    if (isSpectator) return;
     try {
       iframeRef.current?.focus();
       iframeRef.current?.contentWindow?.postMessage({ type: 'RESUME_EMU' }, window.location.origin);
@@ -155,7 +161,7 @@ export function UnifiedStageModal({
   useEffect(() => {
     if (!session || !iframeRef.current?.contentWindow) return;
     iframeRef.current.contentWindow.postMessage(
-      { type: 'SET_CUSTOM_TOUCH_PAD', enabled: touchPadVisible },
+      { type: 'SET_CUSTOM_TOUCH_PAD', enabled: isSpectator ? false : touchPadVisible },
       window.location.origin
     );
   }, [session, touchPadVisible, bootKey]);
@@ -219,7 +225,7 @@ export function UnifiedStageModal({
         else openPauseMenu();
         return;
       }
-      if (session.kind !== 'j2me' && !quickMenuOpen && !pauseMenuOpen && !isTypingTarget(e.target)) {
+      if (session.kind !== 'j2me' && !isSpectator && !quickMenuOpen && !pauseMenuOpen && !isTypingTarget(e.target)) {
         try {
           iframeRef.current?.contentWindow?.postMessage(
             {
@@ -235,7 +241,7 @@ export function UnifiedStageModal({
       }
     };
     const onKeyUp = (e) => {
-      if (!session || session.kind === 'j2me' || quickMenuOpen || pauseMenuOpen || isTypingTarget(e.target)) return;
+      if (!session || session.kind === 'j2me' || isSpectator || quickMenuOpen || pauseMenuOpen || isTypingTarget(e.target)) return;
       try {
         iframeRef.current?.contentWindow?.postMessage(
           {
@@ -255,7 +261,7 @@ export function UnifiedStageModal({
       window.removeEventListener('keydown', onKeyDown);
       window.removeEventListener('keyup', onKeyUp);
     };
-  }, [session, quickMenuOpen, pauseMenuOpen]);
+  }, [session, isSpectator, quickMenuOpen, pauseMenuOpen]);
 
   useEffect(() => {
     if (!session || !iframeRef.current?.contentWindow) return;
@@ -371,6 +377,7 @@ export function UnifiedStageModal({
           mode: event.data.mode || 'heuristic',
         });
       } else if (event.data.type === 'RAM_AUTO_SCORE' && typeof event.data.score === 'number' && event.data.score > 0) {
+        if (session?.isSpectator || session?.playerIndex === 2) return;
         const gid = normalizeScoreGameId(session.gameId || session.title);
         const profile = userProfileRef.current;
         recordGameScore({
@@ -434,6 +441,40 @@ export function UnifiedStageModal({
         p2pEngine?.sendFrame0Go?.(Number(event.data.syncFrame || 0));
       } else if (event.data.type === 'NETPLAY_SYNC_COMPLETE') {
         setNetplaySyncReady(true);
+      } else if (event.data.type === 'NETPLAY_SPECTATOR_READY') {
+        if (isSpectator) {
+          firebaseFightcadeService.joinSpectate({
+            challengeId: session.challengeId,
+            hostUid: session.hostUid,
+            targetUid: session.opponentUid,
+            spectatorName: getMyDisplayName(),
+          });
+        }
+      } else if (event.data.type === 'NETPLAY_SPECTATE_RESYNC') {
+        if (isSpectator) {
+          firebaseFightcadeService.requestSpectateResync({
+            challengeId: session.challengeId,
+            hostUid: session.hostUid,
+          });
+        }
+      } else if (event.data.type === 'NETPLAY_SPECTATE_STATE' && event.data.stateBase64) {
+        if (session?.isNetplay && session?.isHost) {
+          firebaseFightcadeService.sendSpectatorState(
+            event.data.stateBase64,
+            Number(event.data.syncFrame || 0),
+            {
+              challengeId: session.challengeId,
+              targetUid: event.data.targetUid || null,
+            }
+          );
+        }
+      } else if (event.data.type === 'NETPLAY_SPECTATE_BATCH' && Array.isArray(event.data.frames)) {
+        if (session?.isNetplay && session?.isHost) {
+          firebaseFightcadeService.sendSpectatorInputBatch({
+            challengeId: session.challengeId,
+            frames: event.data.frames,
+          });
+        }
       } else if (event.data.type === 'ROLLBACK_TELEMETRY' && event.data.stats) {
         p2pEngine?.updateRollbackTelemetry?.(event.data.stats);
       } else if (event.data.type === 'STATE_EXPORTED' && event.data.stateBase64) {
@@ -628,18 +669,80 @@ export function UnifiedStageModal({
     };
   }, [p2pEngine, session?.isNetplay, session?.isHost, session?.opponentName]);
 
-  // Si l'utilisateur ferme l'onglet, quitte via PWA (pagehide) ou recharge en plein match, arrêter immédiatement chez l'adversaire
+  // Pont Spectateur Live Fightcade 2 : demande/envoi savestate + flux d'inputs confirmés + arrêt propre fin de match
   useEffect(() => {
-    if (!session?.isNetplay || !p2pEngine) return;
+    if (!session?.isNetplay) return;
+    const unsubSpectate = firebaseFightcadeService.subscribeSpectate((ev) => {
+      if (!ev || !ev.type) return;
+      if (ev.type === 'SPECTATE_COUNT_UPDATE') {
+        const count = Number(ev.spectatorsCount || 0);
+        setSpectatorsCount(count);
+        try {
+          iframeRef.current?.contentWindow?.postMessage(
+            { type: 'NETPLAY_SPECTATOR_COUNT', count },
+            window.location.origin
+          );
+        } catch {}
+      } else if (ev.type === 'SPECTATE_SNAPSHOT_REQ' && session.isHost && !isSpectator) {
+        try {
+          iframeRef.current?.contentWindow?.postMessage(
+            { type: 'NETPLAY_SPECTATE_SNAPSHOT_REQ', targetUid: ev.targetUid || null },
+            window.location.origin
+          );
+        } catch {}
+      } else if (ev.type === 'SPECTATE_STATE' && isSpectator && ev.stateBase64) {
+        try {
+          iframeRef.current?.contentWindow?.postMessage(
+            {
+              type: 'NETPLAY_SPECTATE_STATE',
+              stateBase64: ev.stateBase64,
+              syncFrame: Number(ev.syncFrame || 0),
+            },
+            window.location.origin
+          );
+        } catch {}
+      } else if (ev.type === 'SPECTATE_INPUT_BATCH' && isSpectator && Array.isArray(ev.frames)) {
+        try {
+          iframeRef.current?.contentWindow?.postMessage(
+            { type: 'NETPLAY_SPECTATE_BATCH', frames: ev.frames },
+            window.location.origin
+          );
+        } catch {}
+      } else if ((ev.type === 'SPECTATE_ENDED' || ev.type === 'SPECTATE_UNAVAILABLE') && isSpectator) {
+        try {
+          iframeRef.current?.contentWindow?.postMessage({ type: 'STOP_NETPLAY_MATCH' }, window.location.origin);
+        } catch {}
+        setPauseMenuOpen(false);
+        setQuickMenuOpen(false);
+        setNetplayPanelOpen(false);
+        setOpponentLeftModal({
+          name: ev.senderName || session.opponentName || 'Un joueur',
+          reason: ev.type === 'SPECTATE_UNAVAILABLE' ? 'unavailable' : 'spectate_ended',
+          customMessage:
+            ev.reason ||
+            'La diffusion en direct est terminée car un des joueurs a quitté ou arrêté la partie.',
+        });
+      }
+    });
+    return () => unsubSpectate();
+  }, [session?.isNetplay, session?.isHost, session?.opponentName, isSpectator]);
+
+  // Si l'utilisateur ferme l'onglet, quitte via PWA (pagehide) ou recharge en plein match, arrêter immédiatement chez l'adversaire (ou désinscrire le spectateur)
+  useEffect(() => {
+    if (!session?.isNetplay) return;
     const onUnloadLeave = () => {
       try {
+        if (isSpectator) {
+          firebaseFightcadeService.leaveSpectate({ challengeId: session.challengeId });
+          return;
+        }
         const leaveEv = {
           event: 'MATCH_LEAVE',
           senderName: getMyDisplayName(),
           reason: 'disconnect',
           eventId: `leave_${Date.now()}`,
         };
-        p2pEngine.sendNetplayEvent(leaveEv);
+        p2pEngine?.sendNetplayEvent?.(leaveEv);
         if (session.opponentUid) {
           firebaseFightcadeService.sendRelayInput(session.opponentUid, {
             syncType: 'NETPLAY_EVENT',
@@ -654,7 +757,7 @@ export function UnifiedStageModal({
       window.removeEventListener('beforeunload', onUnloadLeave);
       window.removeEventListener('pagehide', onUnloadLeave);
     };
-  }, [session?.isNetplay, session?.opponentUid, p2pEngine]);
+  }, [session?.isNetplay, session?.opponentUid, session?.challengeId, isSpectator, p2pEngine]);
 
   useEffect(() => {
     if (!session || !iframeRef.current?.contentWindow) return;
@@ -816,7 +919,9 @@ export function UnifiedStageModal({
         try {
           iframeRef.current?.contentWindow?.postMessage({ type: 'STOP_NETPLAY_MATCH' }, window.location.origin);
         } catch {}
-        if (!opponentLeftModal) {
+        if (isSpectator) {
+          firebaseFightcadeService.leaveSpectate({ challengeId: session.challengeId });
+        } else if (!opponentLeftModal) {
           const leaveEv = {
             event: 'MATCH_LEAVE',
             senderName: getMyDisplayName(),
@@ -832,11 +937,13 @@ export function UnifiedStageModal({
           }
         }
       }
-      iframeRef.current?.contentWindow?.postMessage(
-        { type: 'FLUSH_RAM_SCORE', reason: 'session_end' },
-        window.location.origin
-      );
-      if (session?.kind !== 'j2me' && !session?.isNetplay) {
+      if (!isSpectator) {
+        iframeRef.current?.contentWindow?.postMessage(
+          { type: 'FLUSH_RAM_SCORE', reason: 'session_end' },
+          window.location.origin
+        );
+      }
+      if (session?.kind !== 'j2me' && !session?.isNetplay && !isSpectator) {
         iframeRef.current?.contentWindow?.postMessage(
           { type: 'EXPORT_STATE', slot: 'cloud_handoff' },
           window.location.origin
@@ -932,9 +1039,9 @@ export function UnifiedStageModal({
           </div>
         </div>
 
-        {/* Droite : Uniquement les 3 contrôles essentiels (Crédits, Options 2P si Netplay, Menu Unifié) */}
+        {/* Droite : Crédits / Statut Spectateur / Options 2P / Menu */}
         <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-          {session.kind !== 'j2me' && (
+          {session.kind !== 'j2me' && !isSpectator && (
             <div className="px-2 py-1 rounded-xl bg-amber-950/50 border border-amber-500/40 text-amber-300 text-[11px] font-mono font-bold flex items-center gap-1.5">
               <Coins className="w-3.5 h-3.5 text-amber-400 shrink-0" />
               <span>{String(coins).padStart(2, '0')}</span>
@@ -953,7 +1060,17 @@ export function UnifiedStageModal({
             </div>
           )}
 
-          {session.isNetplay && session.kind !== 'j2me' && (() => {
+          {isSpectator && (
+            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-purple-950/80 border border-purple-500/50 text-purple-200 text-[11px] font-mono font-bold">
+              <Eye className="w-3.5 h-3.5 text-purple-300 animate-pulse shrink-0" />
+              <span>LIVE</span>
+              {spectatorsCount > 0 && (
+                <span className="text-purple-300/80">· {spectatorsCount}</span>
+              )}
+            </div>
+          )}
+
+          {session.isNetplay && !isSpectator && session.kind !== 'j2me' && (() => {
             const ping = Number(p2pStats?.pingMs || 0);
             const pingColor =
               ping === 0
@@ -984,6 +1101,11 @@ export function UnifiedStageModal({
                 {p2pStats && (
                   <span className={`font-mono text-[10px] font-black ${netplayPanelOpen ? 'text-black' : pingColor}`}>
                     {ping}ms
+                  </span>
+                )}
+                {spectatorsCount > 0 && (
+                  <span className={`inline-flex items-center gap-0.5 font-mono text-[10px] ${netplayPanelOpen ? 'text-black' : 'text-purple-300'}`}>
+                    · <Eye className="w-3 h-3" /> {spectatorsCount}
                   </span>
                 )}
               </button>
@@ -1028,47 +1150,66 @@ export function UnifiedStageModal({
           className="w-full h-full border-0"
         />
 
-        {/* Sas d'attente mutuel Netplay : les 2 joueurs entrent au même instant dès que les 2 moteurs WASM + Frame 0 sont prêts */}
+        {/* Sas d'attente mutuel Netplay OU connexion Spectateur Live */}
         {session.isNetplay && !netplaySyncReady && !opponentLeftModal && (
           <div className="absolute inset-0 z-[55] bg-neutral-950/92 backdrop-blur-md flex items-center justify-center p-4">
             <div className="max-w-md w-full rounded-2xl bg-neutral-900 border-2 border-cyan-500/50 p-6 text-center space-y-4 shadow-2xl">
               <div className="w-12 h-12 rounded-full bg-cyan-500/15 border-2 border-cyan-400 flex items-center justify-center mx-auto">
-                <Radio className="w-6 h-6 text-cyan-300 animate-pulse" />
+                {isSpectator ? (
+                  <Eye className="w-6 h-6 text-purple-300 animate-pulse" />
+                ) : (
+                  <Radio className="w-6 h-6 text-cyan-300 animate-pulse" />
+                )}
               </div>
-              <div className="space-y-1">
-                <h3 className="text-base font-black text-white uppercase tracking-wide">
-                  Synchronisation des 2 joueurs…
-                </h3>
-                <p className="text-xs text-neutral-300">
-                  {localEmuReady && remoteEmuReady
-                    ? 'Transfert & verrouillage de la Frame 0 pour un départ simultané…'
-                    : 'Le premier joueur prêt patiente jusqu’à la fin du chargement de son adversaire.'}
-                </p>
-              </div>
-              <div className="grid grid-cols-2 gap-2.5 text-xs">
-                <div className="p-3 rounded-xl bg-neutral-950 border border-neutral-800 space-y-1">
-                  <div className="text-[10px] font-mono text-cyan-300 font-bold">
-                    {session.isHost ? 'VOUS (P1 HÔTE)' : 'ADVERSAIRE (P1)'}
-                  </div>
-                  <div className={`font-black ${(session.isHost ? localEmuReady : remoteEmuReady) ? 'text-emerald-400' : 'text-amber-300 animate-pulse'}`}>
-                    {(session.isHost ? localEmuReady : remoteEmuReady) ? 'Moteur prêt ✅' : 'Chargement… ⏳'}
-                  </div>
+              {isSpectator ? (
+                <div className="space-y-1.5">
+                  <h3 className="text-base font-black text-white uppercase tracking-wide">
+                    Connexion au match en direct…
+                  </h3>
+                  <p className="text-xs text-neutral-300 leading-relaxed">
+                    {localEmuReady
+                      ? 'Réception du savestate live depuis l’Hôte et remplissage du tampon Fightcade (0 Coin requis)…'
+                      : 'Préparation du moteur WASM en mode lecture seule pour observer le match…'}
+                  </p>
                 </div>
-                <div className="p-3 rounded-xl bg-neutral-950 border border-neutral-800 space-y-1">
-                  <div className="text-[10px] font-mono text-rose-300 font-bold">
-                    {!session.isHost ? 'VOUS (P2 INVITÉ)' : 'ADVERSAIRE (P2)'}
+              ) : (
+                <>
+                  <div className="space-y-1">
+                    <h3 className="text-base font-black text-white uppercase tracking-wide">
+                      Synchronisation des 2 joueurs…
+                    </h3>
+                    <p className="text-xs text-neutral-300">
+                      {localEmuReady && remoteEmuReady
+                        ? 'Transfert & verrouillage de la Frame 0 pour un départ simultané…'
+                        : 'Le premier joueur prêt patiente jusqu’à la fin du chargement de son adversaire.'}
+                    </p>
                   </div>
-                  <div className={`font-black ${(!session.isHost ? localEmuReady : remoteEmuReady) ? 'text-emerald-400' : 'text-amber-300 animate-pulse'}`}>
-                    {(!session.isHost ? localEmuReady : remoteEmuReady) ? 'Moteur prêt ✅' : 'Chargement… ⏳'}
+                  <div className="grid grid-cols-2 gap-2.5 text-xs">
+                    <div className="p-3 rounded-xl bg-neutral-950 border border-neutral-800 space-y-1">
+                      <div className="text-[10px] font-mono text-cyan-300 font-bold">
+                        {session.isHost ? 'VOUS (P1 HÔTE)' : 'ADVERSAIRE (P1)'}
+                      </div>
+                      <div className={`font-black ${(session.isHost ? localEmuReady : remoteEmuReady) ? 'text-emerald-400' : 'text-amber-300 animate-pulse'}`}>
+                        {(session.isHost ? localEmuReady : remoteEmuReady) ? 'Moteur prêt ✅' : 'Chargement… ⏳'}
+                      </div>
+                    </div>
+                    <div className="p-3 rounded-xl bg-neutral-950 border border-neutral-800 space-y-1">
+                      <div className="text-[10px] font-mono text-rose-300 font-bold">
+                        {!session.isHost ? 'VOUS (P2 INVITÉ)' : 'ADVERSAIRE (P2)'}
+                      </div>
+                      <div className={`font-black ${(!session.isHost ? localEmuReady : remoteEmuReady) ? 'text-emerald-400' : 'text-amber-300 animate-pulse'}`}>
+                        {(!session.isHost ? localEmuReady : remoteEmuReady) ? 'Moteur prêt ✅' : 'Chargement… ⏳'}
+                      </div>
+                    </div>
                   </div>
-                </div>
-              </div>
+                </>
+              )}
               <button
                 type="button"
                 onClick={handleCloseStage}
                 className="px-4 py-2 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-xs font-bold text-neutral-300 transition-colors"
               >
-                Annuler &amp; Quitter
+                {isSpectator ? 'Quitter le mode Spectateur' : 'Annuler & Quitter'}
               </button>
             </div>
           </div>
@@ -1166,13 +1307,16 @@ export function UnifiedStageModal({
               </div>
               <div className="space-y-1.5">
                 <span className="inline-block px-2.5 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-400/50 text-emerald-300 text-[10px] font-mono font-black uppercase">
-                  🏆 Victoire par Forfait · Partie Arrêtée
+                  {isSpectator ? '📡 Diffusion terminée · Match arrêté' : '🏆 Victoire par Forfait · Partie Arrêtée'}
                 </span>
                 <h3 className="text-lg font-black text-white">
-                  {opponentLeftModal.name} a quitté la partie
+                  {isSpectator
+                    ? `Le match (${opponentLeftModal.name}) est terminé`
+                    : `${opponentLeftModal.name} a quitté la partie`}
                 </h3>
                 <p className="text-xs text-neutral-300 leading-relaxed">
-                  Le match multijoueur a été arrêté automatiquement car votre adversaire a quitté la session.
+                  {opponentLeftModal.customMessage ||
+                    'Le match multijoueur a été arrêté automatiquement car votre adversaire a quitté la session.'}
                 </p>
               </div>
               <div className="flex flex-col sm:flex-row gap-2 pt-2">
@@ -1536,7 +1680,7 @@ export function UnifiedStageModal({
                 <div>
                   <div className="flex items-center gap-2">
                     <span className="px-2 py-0.5 rounded bg-amber-500/20 border border-amber-500/50 text-amber-300 text-[10px] font-mono font-black uppercase">
-                      ⏸ Jeu en Pause
+                      {isSpectator ? '👁 Spectateur Live' : '⏸ Jeu en Pause'}
                     </span>
                     <span className="text-[11px] font-mono text-cyan-300">{session.badge}</span>
                   </div>
@@ -1550,24 +1694,26 @@ export function UnifiedStageModal({
                   className="flex items-center gap-2 px-4 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-black font-black text-xs sm:text-sm transition-colors shadow-lg"
                 >
                   <Play className="w-4 h-4" />
-                  <span>Reprendre la partie</span>
+                  <span>{isSpectator ? 'Revenir au direct' : 'Reprendre la partie'}</span>
                 </button>
               </div>
 
               {/* Barre d'outils rapide (Pad, Affichage, Plein écran, Score RAM, Start/Crédits, Salon) */}
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2">
-                <button
-                  type="button"
-                  onClick={() => setTouchPadVisible((v) => !v)}
-                  className={`px-3 py-2 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 transition-colors ${
-                    touchPadVisible
-                      ? 'bg-cyan-500/20 border-cyan-400 text-cyan-200'
-                      : 'bg-neutral-900 border-neutral-800 text-neutral-300 hover:text-white'
-                  }`}
-                >
-                  <Gamepad2 className="w-3.5 h-3.5" />
-                  <span>Pad : {touchPadVisible ? 'ON' : 'OFF'}</span>
-                </button>
+                {!isSpectator && (
+                  <button
+                    type="button"
+                    onClick={() => setTouchPadVisible((v) => !v)}
+                    className={`px-3 py-2 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 transition-colors ${
+                      touchPadVisible
+                        ? 'bg-cyan-500/20 border-cyan-400 text-cyan-200'
+                        : 'bg-neutral-900 border-neutral-800 text-neutral-300 hover:text-white'
+                    }`}
+                  >
+                    <Gamepad2 className="w-3.5 h-3.5" />
+                    <span>Pad : {touchPadVisible ? 'ON' : 'OFF'}</span>
+                  </button>
+                )}
                 {session.kind !== 'j2me' && (
                   <>
                     <button
@@ -1584,34 +1730,38 @@ export function UnifiedStageModal({
                     >
                       {ratio === 'stretch' ? '📐 16:9 Étiré' : '📺 4:3 Origine'}
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setPauseMenuOpen(false);
-                        setScorePanelOpen(true);
-                      }}
-                      className="px-3 py-2 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/40 text-amber-200 text-xs font-bold flex items-center justify-center gap-1.5 transition-colors"
-                    >
-                      <Trophy className="w-3.5 h-3.5 text-amber-400" />
-                      <span>
-                        {liveRamTelemetry.score > 0
-                          ? `${liveRamTelemetry.score.toLocaleString('fr-FR')} pts`
-                          : 'Score RAM'}
-                      </span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        closePauseMenuAndResume();
-                        if (iframeRef.current?.contentWindow) {
-                          iframeRef.current.contentWindow.postMessage({ type: 'FORCE_SYNC_CREDITS' }, window.location.origin);
-                        }
-                      }}
-                      className="px-3 py-2 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/40 text-emerald-200 text-xs font-bold flex items-center justify-center gap-1.5 transition-colors"
-                    >
-                      <Coins className="w-3.5 h-3.5" />
-                      <span>Sync Crédits (5)</span>
-                    </button>
+                    {!isSpectator && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setPauseMenuOpen(false);
+                            setScorePanelOpen(true);
+                          }}
+                          className="px-3 py-2 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/40 text-amber-200 text-xs font-bold flex items-center justify-center gap-1.5 transition-colors"
+                        >
+                          <Trophy className="w-3.5 h-3.5 text-amber-400" />
+                          <span>
+                            {liveRamTelemetry.score > 0
+                              ? `${liveRamTelemetry.score.toLocaleString('fr-FR')} pts`
+                              : 'Score RAM'}
+                          </span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            closePauseMenuAndResume();
+                            if (iframeRef.current?.contentWindow) {
+                              iframeRef.current.contentWindow.postMessage({ type: 'FORCE_SYNC_CREDITS' }, window.location.origin);
+                            }
+                          }}
+                          className="px-3 py-2 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/40 text-emerald-200 text-xs font-bold flex items-center justify-center gap-1.5 transition-colors"
+                        >
+                          <Coins className="w-3.5 h-3.5" />
+                          <span>Sync Crédits (5)</span>
+                        </button>
+                      </>
+                    )}
                   </>
                 )}
                 <button
@@ -1653,20 +1803,22 @@ export function UnifiedStageModal({
                     </div>
                   </button>
 
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setPauseMenuOpen(false);
-                      handleRestartGame();
-                    }}
-                    className="w-full px-4 py-3 rounded-xl bg-neutral-900 hover:bg-neutral-800 border border-neutral-800 text-left flex items-center gap-3 transition-colors"
-                  >
-                    <RotateCcw className="w-4 h-4 text-amber-400 shrink-0" />
-                    <div>
-                      <div className="text-xs font-black text-white">Recommencer</div>
-                      <div className="text-[10px] text-neutral-400">Redémarrer le jeu (-1 crédit)</div>
-                    </div>
-                  </button>
+                  {!session.isNetplay && !isSpectator && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPauseMenuOpen(false);
+                        handleRestartGame();
+                      }}
+                      className="w-full px-4 py-3 rounded-xl bg-neutral-900 hover:bg-neutral-800 border border-neutral-800 text-left flex items-center gap-3 transition-colors"
+                    >
+                      <RotateCcw className="w-4 h-4 text-amber-400 shrink-0" />
+                      <div>
+                        <div className="text-xs font-black text-white">Recommencer</div>
+                        <div className="text-[10px] text-neutral-400">Redémarrer le jeu (-1 crédit)</div>
+                      </div>
+                    </button>
+                  )}
 
                   <button
                     type="button"
@@ -1960,13 +2112,15 @@ export function UnifiedStageModal({
                     </button>
                   </>
                 )}
-                <button
-                  type="button"
-                  onClick={handleRestartGame}
-                  className="px-2.5 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-xs font-bold text-neutral-200 flex items-center justify-center gap-1"
-                >
-                  <RotateCcw className="w-3.5 h-3.5" /> Recommencer (-1 Coin)
-                </button>
+                {!session.isNetplay && !isSpectator && (
+                  <button
+                    type="button"
+                    onClick={handleRestartGame}
+                    className="px-2.5 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-xs font-bold text-neutral-200 flex items-center justify-center gap-1"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" /> Recommencer (-1 Coin)
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={toggleFullscreen}
@@ -1990,7 +2144,7 @@ export function UnifiedStageModal({
 
             <button
               type="button"
-              onClick={onClose}
+              onClick={handleCloseStage}
               className="mt-auto w-full py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold transition-colors"
             >
               {session.kind === 'j2me' ? 'Quitter le jeu' : 'Quitter vers le salon'}
@@ -2000,7 +2154,7 @@ export function UnifiedStageModal({
       </div>
 
       {/* Contrôleurs Tactiles Mobile Sur-Mesure par Plateforme (Arcade / PS1 / Nintendo / Sega / Java J2ME) */}
-      {touchPadVisible && (
+      {!isSpectator && touchPadVisible && (
         <MobilePlatformController
           kind={session.kind}
           core={session.core}

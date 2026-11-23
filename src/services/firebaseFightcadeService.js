@@ -96,6 +96,8 @@ class FirebaseFightcadeService {
     this.challengeListeners = new Map();
     this.matchSyncListeners = new Map();
     this.rtcSignalListeners = new Map();
+    this.spectateListeners = new Set();
+    this.spectateChunks = new Map();
     this.relayInputListener = null;
 
     // Toujours maintenir la présence dans le salon global + les salons actifs
@@ -206,7 +208,10 @@ class FirebaseFightcadeService {
       this.ws.send(JSON.stringify(data));
     } else {
       // Ne jamais encombrer la file d'attente de reconnexion avec des paquets GGPO/PING temps-réel périmés
-      if (data?.type === 'RELAY_INPUT' && (data.packetHex || data.syncType === 'PING' || data.syncType === 'PONG')) {
+      if (
+        (data?.type === 'RELAY_INPUT' && (data.packetHex || data.syncType === 'PING' || data.syncType === 'PONG')) ||
+        data?.type === 'SPECTATE_INPUT_BATCH'
+      ) {
         return;
       }
       if (this.wsQueue.length >= 60) {
@@ -252,6 +257,59 @@ class FirebaseFightcadeService {
       }
     } else if (data.type === 'REMOTE_BTN_RELAY') {
       this.relayInputListener?.(data);
+    } else if (data.type === 'SPECTATE_STATE_CHUNK') {
+      this._handleSpectateStateChunk(data);
+    } else if (
+      data.type === 'SPECTATE_COUNT_UPDATE' ||
+      data.type === 'SPECTATE_SNAPSHOT_REQ' ||
+      data.type === 'SPECTATE_INPUT_BATCH' ||
+      data.type === 'SPECTATE_ENDED' ||
+      data.type === 'SPECTATE_UNAVAILABLE'
+    ) {
+      this.spectateListeners.forEach((cb) => {
+        try { cb(data); } catch {}
+      });
+    }
+  }
+
+  _handleSpectateStateChunk(data) {
+    const { transferId, chunkIndex, chunkTotal, stateBase64, syncFrame, matchKey, challengeId } = data || {};
+    if (!transferId || typeof chunkIndex !== 'number' || !chunkTotal || !stateBase64) return;
+    let entry = this.spectateChunks.get(transferId);
+    if (!entry) {
+      entry = {
+        total: chunkTotal,
+        syncFrame: Number(syncFrame || 0),
+        matchKey: matchKey || null,
+        challengeId: challengeId || null,
+        chunks: new Map(),
+      };
+      this.spectateChunks.set(transferId, entry);
+      if (this.spectateChunks.size > 6) {
+        const firstKey = this.spectateChunks.keys().next().value;
+        this.spectateChunks.delete(firstKey);
+      }
+    }
+    entry.chunks.set(chunkIndex, stateBase64);
+    if (entry.chunks.size === entry.total) {
+      const parts = [];
+      for (let i = 0; i < entry.total; i++) {
+        if (!entry.chunks.has(i)) return;
+        parts.push(entry.chunks.get(i));
+      }
+      this.spectateChunks.delete(transferId);
+      const assembled = parts.join('');
+      const event = {
+        type: 'SPECTATE_STATE',
+        transferId,
+        stateBase64: assembled,
+        syncFrame: entry.syncFrame,
+        matchKey: entry.matchKey,
+        challengeId: entry.challengeId,
+      };
+      this.spectateListeners.forEach((cb) => {
+        try { cb(event); } catch {}
+      });
     }
   }
 
@@ -367,6 +425,83 @@ class FirebaseFightcadeService {
 
   onRelayInput(cb) {
     this.relayInputListener = cb;
+  }
+
+  subscribeSpectate(cb) {
+    if (typeof cb !== 'function') return () => {};
+    this.spectateListeners.add(cb);
+    return () => {
+      this.spectateListeners.delete(cb);
+    };
+  }
+
+  registerSpectateMatch({ challengeId, hostUid, guestUid, isHost } = {}) {
+    this.sendWs({
+      type: 'SPECTATE_HOST_REGISTER',
+      challengeId: challengeId || null,
+      hostUid: hostUid || null,
+      guestUid: guestUid || null,
+      isHost: Boolean(isHost),
+    });
+  }
+
+  joinSpectate({ challengeId, hostUid, targetUid, spectatorName } = {}) {
+    this.sendWs({
+      type: 'SPECTATE_JOIN',
+      challengeId: challengeId || null,
+      hostUid: hostUid || null,
+      targetUid: targetUid || null,
+      spectatorName: spectatorName || this.identity?.name || 'Spectateur',
+    });
+  }
+
+  requestSpectateResync({ challengeId, hostUid } = {}) {
+    this.sendWs({
+      type: 'SPECTATE_RESYNC_REQ',
+      challengeId: challengeId || null,
+      hostUid: hostUid || null,
+    });
+  }
+
+  leaveSpectate({ challengeId, matchKey } = {}) {
+    this.spectateChunks.clear();
+    this.sendWs({
+      type: 'SPECTATE_LEAVE',
+      challengeId: challengeId || null,
+      matchKey: matchKey || null,
+    });
+  }
+
+  async sendSpectatorState(stateBase64, syncFrame = 0, { challengeId = null, targetUid = null } = {}) {
+    if (!stateBase64) return;
+    const CHUNK_SIZE = 24576;
+    const total = Math.ceil(stateBase64.length / CHUNK_SIZE);
+    const transferId = `sp_${Date.now()}_${Math.random().toString(36).slice(2, 7)}_${Number(syncFrame || 0)}`;
+    for (let i = 0; i < total; i++) {
+      const chunk = stateBase64.slice(i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE);
+      this.sendWs({
+        type: 'SPECTATE_STATE_CHUNK',
+        challengeId,
+        targetUid,
+        transferId,
+        chunkIndex: i,
+        chunkTotal: total,
+        stateBase64: chunk,
+        syncFrame: Number(syncFrame || 0),
+      });
+      if (i + 1 < total) {
+        await new Promise((r) => setTimeout(r, 8));
+      }
+    }
+  }
+
+  sendSpectatorInputBatch({ challengeId = null, frames = [] } = {}) {
+    if (!Array.isArray(frames) || frames.length === 0) return;
+    this.sendWs({
+      type: 'SPECTATE_INPUT_BATCH',
+      challengeId,
+      frames,
+    });
   }
 
   loadSavedChannels() {
@@ -527,7 +662,10 @@ class FirebaseFightcadeService {
    * - L'inscrit automatiquement comme actif dans le salon de ce jeu
    * - Affiche aux autres joueurs qu'il est "Au salon & En jeu sur [Titre]" et prêt à être défié
    */
-  async setActivePlayingGame(gameEntry, { isNetplay = false, opponentName = null } = {}) {
+  async setActivePlayingGame(
+    gameEntry,
+    { isNetplay = false, opponentName = null, opponentUid = null, challengeId = null, hostUid = null } = {}
+  ) {
     if (!gameEntry) return;
     const gameId = normalizeGameChannelId(gameEntry);
     const title = gameEntry.title || gameId;
@@ -550,6 +688,9 @@ class FirebaseFightcadeService {
       urls: Array.isArray(gameEntry.urls) ? gameEntry.urls.slice(0, 4) : [],
       isNetplay: Boolean(isNetplay),
       opponentName: opponentName || null,
+      opponentUid: opponentUid || null,
+      challengeId: challengeId || null,
+      hostUid: hostUid || null,
       startedAt: Date.now(),
     };
 

@@ -81,6 +81,85 @@ export function setupNetplayHub(server) {
   const rooms = new Map(); // roomCode -> Room
   const clientRooms = new Map(); // ws -> { roomCode, playerIndex, role }
   const connectedUsers = new Map(); // uid -> Set<WebSocket>
+  const spectateMatches = new Map(); // matchKey -> { matchKey, challengeId, hostUid, guestUid, spectators: Map<uid, { uid, name }> }
+
+  function sendToUid(uid, payloadObj) {
+    if (!uid) return false;
+    const sockets = connectedUsers.get(uid);
+    if (!sockets || sockets.size === 0) return false;
+    const raw = typeof payloadObj === 'string' ? payloadObj : JSON.stringify(payloadObj);
+    let sent = false;
+    for (const s of sockets) {
+      if (s.readyState === WebSocket.OPEN) {
+        try {
+          s.send(raw);
+          sent = true;
+        } catch {}
+      }
+    }
+    return sent;
+  }
+
+  function findSpectateMatch({ challengeId = null, hostUid = null, targetUid = null, ws = null } = {}) {
+    if (challengeId && spectateMatches.has(challengeId)) {
+      return spectateMatches.get(challengeId);
+    }
+    for (const m of spectateMatches.values()) {
+      if (
+        (hostUid && (m.hostUid === hostUid || m.guestUid === hostUid)) ||
+        (targetUid && (m.hostUid === targetUid || m.guestUid === targetUid)) ||
+        (ws?.uid && (m.hostUid === ws.uid || m.guestUid === ws.uid))
+      ) {
+        return m;
+      }
+    }
+    return null;
+  }
+
+  function broadcastSpectateCount(match) {
+    if (!match) return;
+    const count = match.spectators.size;
+    const payload = JSON.stringify({
+      type: 'SPECTATE_COUNT_UPDATE',
+      matchKey: match.matchKey,
+      challengeId: match.challengeId,
+      spectatorsCount: count,
+    });
+    sendToUid(match.hostUid, payload);
+    sendToUid(match.guestUid, payload);
+    for (const specUid of match.spectators.keys()) {
+      sendToUid(specUid, payload);
+    }
+  }
+
+  function endSpectateMatch(matchKeyOrUid, reason = 'quit', senderName = 'Un joueur') {
+    const match =
+      spectateMatches.get(matchKeyOrUid) ||
+      findSpectateMatch({ targetUid: matchKeyOrUid });
+    if (!match) return;
+    const payload = JSON.stringify({
+      type: 'SPECTATE_ENDED',
+      matchKey: match.matchKey,
+      challengeId: match.challengeId,
+      reason,
+      senderName,
+    });
+    for (const specUid of match.spectators.keys()) {
+      sendToUid(specUid, payload);
+    }
+    match.spectators.clear();
+    spectateMatches.delete(match.matchKey);
+  }
+
+  function removeSpectatorFromMatch(ws, specificMatchKey = null) {
+    const key = specificMatchKey || ws.spectatingMatchKey;
+    ws.spectatingMatchKey = null;
+    if (!key || !ws.uid) return;
+    const match = spectateMatches.get(key);
+    if (!match || !match.spectators.has(ws.uid)) return;
+    match.spectators.delete(ws.uid);
+    broadcastSpectateCount(match);
+  }
 
   // Génération d'un code court de salon (ex: ARC-72 ou 4 caractères simples)
   function generateRoomCode() {
@@ -1122,7 +1201,14 @@ export function setupNetplayHub(server) {
       }
     }
 
-    // Si ce joueur ferme brutalement son onglet/app en plein match Netplay, arrêter net la partie chez son adversaire
+    // Retirer proprement le spectateur s'il ferme son onglet (sans perturber le match des 2 joueurs)
+    if (ws.spectatingMatchKey && wasLastUserSocket) {
+      removeSpectatorFromMatch(ws);
+    } else {
+      ws.spectatingMatchKey = null;
+    }
+
+    // Si ce joueur ferme brutalement son onglet/app en plein match Netplay, arrêter net la partie chez son adversaire et les spectateurs
     const partnerUid = ws.activeMatchPartnerUid;
     if (partnerUid && wasLastUserSocket) {
       const disconnectedUid = ws.uid;
@@ -1130,6 +1216,7 @@ export function setupNetplayHub(server) {
       setTimeout(() => {
         // Ne notifier que si l'utilisateur ne s'est pas reconnecté entre-temps (< 1.2s)
         if (disconnectedUid && !connectedUsers.has(disconnectedUid)) {
+          endSpectateMatch(disconnectedUid, 'disconnect', disconnectedName);
           const partnerSockets = connectedUsers.get(partnerUid);
           if (partnerSockets) {
             const leavePayload = JSON.stringify({
@@ -1338,6 +1425,7 @@ export function setupNetplayHub(server) {
             } = data;
             if (syncType === 'NETPLAY_EVENT' && eventData?.event === 'MATCH_LEAVE') {
               ws.activeMatchPartnerUid = null;
+              endSpectateMatch(ws.uid, eventData.reason || 'quit', eventData.senderName || ws.userName || 'Un joueur');
             } else if (targetUid) {
               ws.activeMatchPartnerUid = targetUid;
             }
@@ -1364,6 +1452,144 @@ export function setupNetplayHub(server) {
                 }
                 if (s !== ws && s.readyState === WebSocket.OPEN) s.send(msg);
               }
+            }
+            break;
+          }
+
+          case 'SPECTATE_HOST_REGISTER': {
+            const { challengeId, hostUid, guestUid } = data;
+            const resolvedHost = hostUid || (data.isHost ? ws.uid : null);
+            const resolvedGuest = guestUid || (!data.isHost ? ws.uid : null);
+            if (!resolvedHost) break;
+            const matchKey = challengeId || `host:${resolvedHost}`;
+            for (const [k, existing] of spectateMatches.entries()) {
+              if (k !== matchKey && (existing.hostUid === resolvedHost || existing.guestUid === resolvedHost)) {
+                endSpectateMatch(k, 'replaced', 'Hôte');
+              }
+            }
+            let match = spectateMatches.get(matchKey);
+            if (!match) {
+              match = {
+                matchKey,
+                challengeId: challengeId || null,
+                hostUid: resolvedHost,
+                guestUid: resolvedGuest || null,
+                spectators: new Map(),
+              };
+              spectateMatches.set(matchKey, match);
+            } else {
+              match.hostUid = resolvedHost;
+              if (resolvedGuest) match.guestUid = resolvedGuest;
+            }
+            broadcastSpectateCount(match);
+            break;
+          }
+
+          case 'SPECTATE_JOIN': {
+            const { challengeId, hostUid, targetUid, spectatorName } = data;
+            let match = findSpectateMatch({ challengeId, hostUid, targetUid });
+            if (!match) {
+              const ch = challengeId ? fcChallenges.get(challengeId) : null;
+              const effectiveHost = hostUid || ch?.fromUid || targetUid;
+              const effectiveGuest = ch?.toUid && ch.toUid !== effectiveHost ? ch.toUid : (targetUid && targetUid !== effectiveHost ? targetUid : null);
+              if (effectiveHost && connectedUsers.has(effectiveHost)) {
+                const matchKey = challengeId || `host:${effectiveHost}`;
+                match = {
+                  matchKey,
+                  challengeId: challengeId || null,
+                  hostUid: effectiveHost,
+                  guestUid: effectiveGuest,
+                  spectators: new Map(),
+                };
+                spectateMatches.set(matchKey, match);
+              }
+            }
+            if (!match || !match.hostUid || !connectedUsers.has(match.hostUid)) {
+              ws.send(JSON.stringify({
+                type: 'SPECTATE_UNAVAILABLE',
+                challengeId: challengeId || null,
+                reason: 'Match introuvable ou hôte déconnecté.',
+              }));
+              break;
+            }
+            if (ws.spectatingMatchKey && ws.spectatingMatchKey !== match.matchKey) {
+              removeSpectatorFromMatch(ws, ws.spectatingMatchKey);
+            }
+            const cleanName = spectatorName || ws.userName || 'Spectateur';
+            if (ws.uid) {
+              match.spectators.set(ws.uid, { uid: ws.uid, name: cleanName });
+              ws.spectatingMatchKey = match.matchKey;
+            }
+            broadcastSpectateCount(match);
+            sendToUid(match.hostUid, {
+              type: 'SPECTATE_SNAPSHOT_REQ',
+              matchKey: match.matchKey,
+              challengeId: match.challengeId,
+              targetUid: ws.uid,
+              spectatorName: cleanName,
+            });
+            break;
+          }
+
+          case 'SPECTATE_RESYNC_REQ': {
+            const { challengeId, hostUid } = data;
+            const match = findSpectateMatch({ challengeId, hostUid, targetUid: hostUid }) || (ws.spectatingMatchKey ? spectateMatches.get(ws.spectatingMatchKey) : null);
+            if (match && match.hostUid && connectedUsers.has(match.hostUid)) {
+              sendToUid(match.hostUid, {
+                type: 'SPECTATE_SNAPSHOT_REQ',
+                matchKey: match.matchKey,
+                challengeId: match.challengeId,
+                targetUid: ws.uid,
+                spectatorName: ws.userName || 'Spectateur',
+              });
+            } else {
+              ws.send(JSON.stringify({ type: 'SPECTATE_ENDED', reason: 'disconnect', senderName: 'Hôte' }));
+            }
+            break;
+          }
+
+          case 'SPECTATE_LEAVE': {
+            const matchKey = data.matchKey || data.challengeId || ws.spectatingMatchKey;
+            removeSpectatorFromMatch(ws, matchKey);
+            break;
+          }
+
+          case 'SPECTATE_STATE_CHUNK': {
+            const { matchKey, challengeId, targetUid, transferId, chunkIndex, chunkTotal, stateBase64, syncFrame } = data;
+            const match = (matchKey && spectateMatches.get(matchKey)) || findSpectateMatch({ challengeId, ws });
+            const payload = {
+              type: 'SPECTATE_STATE_CHUNK',
+              matchKey: match?.matchKey || matchKey || null,
+              challengeId: match?.challengeId || challengeId || null,
+              transferId,
+              chunkIndex,
+              chunkTotal,
+              stateBase64,
+              syncFrame,
+            };
+            if (targetUid) {
+              sendToUid(targetUid, payload);
+            } else if (match) {
+              for (const specUid of match.spectators.keys()) {
+                sendToUid(specUid, payload);
+              }
+            }
+            break;
+          }
+
+          case 'SPECTATE_INPUT_BATCH': {
+            const { matchKey, challengeId, frames } = data;
+            if (!Array.isArray(frames) || frames.length === 0) break;
+            const match = (matchKey && spectateMatches.get(matchKey)) || findSpectateMatch({ challengeId, ws });
+            if (!match || match.spectators.size === 0) break;
+            const payload = JSON.stringify({
+              type: 'SPECTATE_INPUT_BATCH',
+              matchKey: match.matchKey,
+              challengeId: match.challengeId,
+              frames,
+            });
+            for (const specUid of match.spectators.keys()) {
+              sendToUid(specUid, payload);
             }
             break;
           }

@@ -125,7 +125,7 @@ export default function App() {
       gameEntry?.core === 'j2me' ||
       gameEntry?.platform === 'j2me';
 
-    if (sessionObj) {
+    if (sessionObj && !sessionObj.isSpectator) {
       const uid = userProfileRef.current?.uid;
       if (uid) {
         pushActiveSession(uid, {
@@ -153,6 +153,9 @@ export default function App() {
           {
             isNetplay: Boolean(sessionObj.isNetplay),
             opponentName: sessionObj.opponentName || null,
+            opponentUid: sessionObj.opponentUid || null,
+            challengeId: sessionObj.challengeId || null,
+            hostUid: sessionObj.isNetplay ? (sessionObj.isHost ? uid : sessionObj.opponentUid) : null,
           }
         );
       }
@@ -164,11 +167,13 @@ export default function App() {
     {
       isNetplay = false,
       isHost = true,
+      isSpectator = false,
       playerIndex = 0,
       badgeSuffix = 'LOCAL',
       refundCoinOnFail = true,
       opponentName = null,
       opponentUid = null,
+      hostUid = null,
       challengeId = null,
       initialStateBase64 = null,
       preloadedBlob = null,
@@ -210,9 +215,11 @@ export default function App() {
           gameUrl: gameEntry.urls?.[0] || '',
           isNetplay,
           isHost,
+          isSpectator: Boolean(isSpectator),
           playerIndex,
           opponentName,
           opponentUid,
+          hostUid,
           challengeId,
           initialStateBase64,
           accent: '#00f0ff',
@@ -396,17 +403,32 @@ export default function App() {
     }
 
     if (gameEntry) {
+      const myUid = userProfileRef.current?.uid || null;
+      const resolvedHostUid = isHost ? myUid : opponentUid;
+      const resolvedGuestUid = isHost ? opponentUid : myUid;
+      firebaseFightcadeService.registerSpectateMatch({
+        challengeId,
+        hostUid: resolvedHostUid,
+        guestUid: resolvedGuestUid,
+        isHost,
+      });
       if (selectedChannelId) {
-        firebaseFightcadeService.upsertPresence(selectedChannelId, 'playing', { challengeId });
+        firebaseFightcadeService.upsertPresence(selectedChannelId, 'playing', {
+          challengeId,
+          hostUid: resolvedHostUid,
+          isHost,
+        });
       }
       await launchEntryWithRom(gameEntry, {
         isNetplay: true,
         isHost,
+        isSpectator: false,
         playerIndex: isHost ? 0 : 1,
         badgeSuffix: isHost ? 'P1 HOST · NETPLAY 2P' : 'P2 GUEST · NETPLAY 2P',
         preloadedBlob,
         opponentName,
         opponentUid,
+        hostUid: resolvedHostUid,
         challengeId,
       });
     }
@@ -656,15 +678,20 @@ export default function App() {
 
   const handleCloseStage = () => {
     const uid = userProfileRef.current?.uid;
-    if (uid) {
-      pushActiveSession(uid, null);
+    const curSess = stageSessionRef.current;
+    if (curSess?.isSpectator) {
+      firebaseFightcadeService.leaveSpectate({ challengeId: curSess.challengeId });
+    } else {
+      if (uid) {
+        pushActiveSession(uid, null);
+      }
+      firebaseFightcadeService.clearActivePlayingGame();
     }
     setRemoteActiveSession(null);
     p2pEngineRef.current?.destroy();
     p2pEngineRef.current = null;
     setP2pStats(null);
     setStageSession(null);
-    firebaseFightcadeService.clearActivePlayingGame();
   };
 
   const { exitToastVisible } = useMobileNavigation({
@@ -1000,14 +1027,29 @@ export default function App() {
               });
             }}
             onSpectateMatch={(channel, targetUser) => {
-              const targetEntry = channel.entry || targetUser?.currentGame;
+              const targetEntry = !channel?.isGlobal && channel?.entry
+                ? { ...(targetUser?.currentGame || {}), ...channel.entry }
+                : targetUser?.currentGame || channel?.entry;
               if (!targetEntry) return;
+              const cg = targetUser?.currentGame || {};
+              const mm = targetUser?.matchMeta || {};
+              const challengeId = mm.challengeId || cg.challengeId || null;
+              const hostUid = mm.hostUid || cg.hostUid || (mm.isHost === true ? targetUser.uid : null);
+              const vsName = cg.opponentName ? ` vs ${cg.opponentName}` : '';
+              p2pEngineRef.current?.destroy();
+              p2pEngineRef.current = null;
+              setP2pStats(null);
               launchEntryWithRom(targetEntry, {
-                isNetplay: false,
+                isNetplay: true,
                 isHost: false,
+                isSpectator: true,
                 playerIndex: 2,
-                badgeSuffix: `SPECTATEUR (${targetUser.name})`,
+                badgeSuffix: `SPECTATEUR LIVE (${targetUser.name}${vsName})`,
                 refundCoinOnFail: false,
+                opponentName: targetUser.name,
+                opponentUid: targetUser.uid,
+                hostUid,
+                challengeId,
               });
             }}
             onLeaveChannel={handleLeaveFightcadeChannel}

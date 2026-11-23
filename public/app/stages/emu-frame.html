@@ -219,7 +219,7 @@
     }
 
     function startNetplayGamepadLoop() {
-      if (!isNetplaySession || netplayGamepadRafId) return;
+      if (!isNetplaySession || netplayPlayerIndex === 2 || netplayGamepadRafId) return;
       const poll = () => {
         if (!isNetplaySession) {
           netplayGamepadRafId = null;
@@ -693,7 +693,7 @@
 
     // Pont universel clavier -> EmulatorJS (utilisé uniquement en Solo ou hors boucle GGPO)
     function handleUniversalKeyboardBridge(code, keyCode, isDown) {
-      if (isNetplaySession && window.__cswGgpoEngine?.isActive()) return;
+      if (isNetplaySession && (netplayPlayerIndex === 2 || window.__cswGgpoEngine?.isActive())) return;
       const myPort = netplayPlayerIndex === 1 ? 1 : 0;
       const lowerCore = String(currentCoreName || '').toLowerCase();
       const isAnalogConsole = ['n64', 'mupen64plus_next', 'psx', 'ps1', 'pcsx_rearmed', 'nds', 'melonds'].includes(lowerCore);
@@ -738,6 +738,7 @@
 
     function routeLocalPlayerInput(btnIdx, isDown) {
       if (btnIdx < 0) return;
+      if (isNetplaySession && netplayPlayerIndex === 2) return;
       const myPort = netplayPlayerIndex === 1 ? 1 : 0;
       const ggpo = window.__cswGgpoEngine;
       if (isNetplaySession && ggpo && ggpo.isActive()) {
@@ -804,6 +805,19 @@
         this.hostGoDelayUntilMs = 0;
         this.hostGoPendingFrame = 0;
         this.peerPingMs = 30;
+        this.spectatorsCount = 0;
+        this.pendingSpectatorTargets = [];
+        this.confirmedWatermark = -1;
+        this.lastSpectatorStreamedFrame = -1;
+        this.spectatorFrameBuffer = [];
+        this.spectateLastFlushMs = 0;
+        this.spectatorInputMap = new Map();
+        this.spectatorMaxFrame = -1;
+        this.spectatorWaitingSnapshot = false;
+        this.spectatorBufferHold = true;
+        this.spectatorBufferWaitStartMs = 0;
+        this.spectatorResyncRequestedMs = 0;
+        this.spectatorReadyTimer = null;
         this.syncMuted = false;
         this.lastSentMask = -1;
         this.autoHealEnabled = true;
@@ -957,6 +971,9 @@
           this.remoteFrameNums[idx] = f;
         }
         this.lastConfirmedRemoteFrame = cleanFrame;
+        this.confirmedWatermark = cleanFrame - 1;
+        this.lastSpectatorStreamedFrame = cleanFrame - 1;
+        this.spectatorFrameBuffer = [];
 
         this.forceApplyAllInputs = true;
         this.applyInputs(0, 0);
@@ -1325,6 +1342,10 @@
       }
 
       onRemoteSyncStateLoaded(syncFrame = 0) {
+        if (netplayPlayerIndex === 2) {
+          this.onSpectatorSyncLoaded(syncFrame);
+          return;
+        }
         if (this.guestReadyTimer) {
           clearInterval(this.guestReadyTimer);
           this.guestReadyTimer = null;
@@ -1680,6 +1701,246 @@
         }
       }
 
+      setSpectatorsCount(count) {
+        const clean = Math.max(0, Number(count) || 0);
+        this.spectatorsCount = clean;
+        if (clean === 0) {
+          this.pendingSpectatorTargets = [];
+          this.spectatorFrameBuffer = [];
+        }
+      }
+
+      requestSpectatorSnapshot(targetUid = null) {
+        if (!isNetplaySession || netplayPlayerIndex !== 0 || this.matchAborted) return;
+        this.spectatorsCount = Math.max(1, this.spectatorsCount);
+        if (!this.pendingSpectatorTargets.includes(targetUid)) {
+          this.pendingSpectatorTargets.push(targetUid);
+        }
+      }
+
+      advanceConfirmedWatermark() {
+        if (netplayPlayerIndex !== 0) return;
+        while (this.confirmedWatermark + 1 < this.currentFrame) {
+          const nf = this.confirmedWatermark + 1;
+          const idx = nf & this.BUFFER_MASK;
+          const confirmedRemote = this.remoteFrameNums[idx] === nf && this.remoteConfirmed[idx] === 1;
+          const lagGapFallback = this.currentFrame - nf > 18 && this.lastRemotePacketMs > 0;
+          if (!confirmedRemote && !lagGapFallback) break;
+          if (!confirmedRemote && lagGapFallback) {
+            this.remoteInputs[idx] = this.lastConfirmedRemoteMask;
+            this.remoteFrameNums[idx] = nf;
+            this.remoteConfirmed[idx] = 1;
+          }
+          this.confirmedWatermark = nf;
+          if (this.spectatorsCount > 0 && nf > this.lastSpectatorStreamedFrame) {
+            this.lastSpectatorStreamedFrame = nf;
+            const p1 = this.localFrameNums[idx] === nf ? this.localInputs[idx] : this.localLiveMask;
+            const p2 = this.remoteInputs[idx];
+            const c = nf > 0 && nf % 30 === 0 && this.localChecksumFrames[idx] === nf ? this.localChecksums[idx] : 0;
+            this.spectatorFrameBuffer.push({ f: nf, p1, p2, c });
+          }
+        }
+      }
+
+      processSpectatorStreaming() {
+        if (!isNetplaySession || netplayPlayerIndex !== 0 || this.matchAborted) return;
+        if (
+          this.pendingSpectatorTargets.length > 0 &&
+          this.hostSetupCompleted &&
+          !this.waitingForFrame0Ack &&
+          !this.hostGoDelayUntilMs &&
+          !this.isWasmAsyncifyBusy() &&
+          this.confirmedWatermark >= 0
+        ) {
+          const snapFrame = this.confirmedWatermark;
+          const slot = snapFrame & this.BUFFER_MASK;
+          if (this.savestateFrames[slot] === snapFrame && this.savestates[slot] && this.savestateLengths[slot] > 0) {
+            const bytes = new Uint8Array(this.savestates[slot].subarray(0, this.savestateLengths[slot]));
+            const targets = this.pendingSpectatorTargets.splice(0);
+            const tailFrames = [];
+            for (let tf = snapFrame; tf <= this.confirmedWatermark; tf++) {
+              const tIdx = tf & this.BUFFER_MASK;
+              tailFrames.push({
+                f: tf,
+                p1: this.localFrameNums[tIdx] === tf ? this.localInputs[tIdx] : this.localLiveMask,
+                p2: this.remoteFrameNums[tIdx] === tf ? this.remoteInputs[tIdx] : this.lastConfirmedRemoteMask,
+                c: tf > 0 && tf % 30 === 0 && this.localChecksumFrames[tIdx] === tf ? this.localChecksums[tIdx] : 0,
+              });
+            }
+            this.lastSpectatorStreamedFrame = Math.max(this.lastSpectatorStreamedFrame, this.confirmedWatermark);
+            if (tailFrames.length > 0) {
+              notifyParent('NETPLAY_SPECTATE_BATCH', { frames: tailFrames });
+            }
+            gzipBytesToTaggedBase64(bytes).then((encodedState) => {
+              targets.forEach((targetUid) => {
+                notifyParent('NETPLAY_SPECTATE_STATE', {
+                  stateBase64: encodedState,
+                  syncFrame: snapFrame,
+                  targetUid,
+                });
+              });
+              console.log(
+                `[CSW Spectateur] État live exporté à la Frame ${snapFrame} pour ${targets.length} spectateur(s) (${encodedState.length} chars).`
+              );
+            });
+          }
+        }
+
+        const now = performance.now();
+        if (this.spectatorsCount > 0 && this.spectatorFrameBuffer.length > 0 && (this.spectatorFrameBuffer.length >= 3 || now - this.spectateLastFlushMs >= 45)) {
+          this.spectateLastFlushMs = now;
+          const batch = this.spectatorFrameBuffer.splice(0);
+          notifyParent('NETPLAY_SPECTATE_BATCH', { frames: batch });
+        }
+      }
+
+      receiveSpectatorFrames(frames) {
+        if (!Array.isArray(frames) || netplayPlayerIndex !== 2) return;
+        for (let i = 0; i < frames.length; i++) {
+          const item = frames[i];
+          if (!item || typeof item.f !== 'number') continue;
+          const f = item.f;
+          if (f >= this.currentFrame || this.spectatorWaitingSnapshot) {
+            this.spectatorInputMap.set(f, {
+              p1: (item.p1 || 0) & 0xffff,
+              p2: (item.p2 || 0) & 0xffff,
+              c: (item.c || 0) >>> 0,
+            });
+            if (f > this.spectatorMaxFrame) {
+              this.spectatorMaxFrame = f;
+              this.remoteFrameAdvancement = f;
+            }
+          }
+        }
+        const cutoff = this.currentFrame - 40;
+        if (this.spectatorInputMap.size > 300) {
+          for (const k of this.spectatorInputMap.keys()) {
+            if (k < cutoff) this.spectatorInputMap.delete(k);
+          }
+        }
+      }
+
+      onSpectatorSyncLoaded(syncFrame = 0) {
+        if (this.spectatorReadyTimer) {
+          clearInterval(this.spectatorReadyTimer);
+          this.spectatorReadyTimer = null;
+        }
+        try {
+          this.gm = this.gm || window.EJS_emulator?.gameManager;
+          this.gm?.setKeyboardEnabled?.(false);
+          this.gm?.functions?.setKeyboardEnabled?.(0);
+        } catch {}
+        const cleanFrame = Math.max(0, Number(syncFrame) || 0);
+        this.spectatorWaitingSnapshot = false;
+        this.currentFrame = cleanFrame;
+        this.desyncStreak = 0;
+        for (const k of this.spectatorInputMap.keys()) {
+          if (k < cleanFrame) this.spectatorInputMap.delete(k);
+        }
+        this.savestateFrames.fill(-1);
+        this.forceApplyAllInputs = true;
+        this.applyInputs(0, 0);
+        this.applyInputs(1, 0);
+        if (!this.isWasmAsyncifyBusy()) {
+          this.captureSnapshot(cleanFrame);
+        }
+        this.spectatorBufferHold = true;
+        this.spectatorBufferWaitStartMs = performance.now();
+        this.accumulatorMs = 0;
+        this.lastTickMs = performance.now();
+        this.stats.currentFrame = cleanFrame;
+        this.stats.syncStatus = 'BUFFERING...';
+        this.setSyncWaitMute(true);
+        notifyParent('NETPLAY_SYNC_COMPLETE', { syncFrame: cleanFrame, isSpectator: true });
+        console.log(`[CSW Spectateur] État live chargé à la Frame ${cleanFrame}, remplissage du tampon...`);
+      }
+
+      stepSpectatorLoop(now) {
+        if (this.spectatorWaitingSnapshot) {
+          this.lastTickMs = now;
+          return;
+        }
+        if (!this.lastTickMs) this.lastTickMs = now;
+        const dt = Math.max(0, Math.min(80, now - this.lastTickMs));
+        this.lastTickMs = now;
+        this.accumulatorMs = Math.min(this.FRAME_TIME_MS * 3, this.accumulatorMs + dt);
+        if (this.accumulatorMs < 15.2) return;
+        this.accumulatorMs -= this.FRAME_TIME_MS;
+
+        const ahead = this.spectatorMaxFrame >= this.currentFrame ? this.spectatorMaxFrame - this.currentFrame + 1 : 0;
+        if (this.spectatorBufferHold) {
+          if (ahead < 10 && !(ahead >= 2 && now - this.spectatorBufferWaitStartMs > 850)) {
+            return;
+          }
+          this.spectatorBufferHold = false;
+          this.setSyncWaitMute(false);
+          this.stats.syncStatus = 'LIVE';
+        }
+
+        const stepOneSpectatorFrame = () => {
+          const f = this.currentFrame;
+          const item = this.spectatorInputMap.get(f);
+          if (!item) {
+            if (this.spectatorMaxFrame > f + 45 && now - this.spectatorResyncRequestedMs > 3000) {
+              this.spectatorResyncRequestedMs = now;
+              notifyParent('NETPLAY_SPECTATE_RESYNC');
+            }
+            return false;
+          }
+          this.spectatorInputMap.delete(f);
+
+          if (!this.isWasmAsyncifyBusy() && item.c > 0 && f > 0 && f % 30 === 0) {
+            this.captureSnapshot(f);
+            const localC = this.computeRamChecksum(f);
+            const cSlot = f & this.BUFFER_MASK;
+            this.localChecksums[cSlot] = localC;
+            this.localChecksumFrames[cSlot] = f;
+            if (localC && localC !== item.c) {
+              this.desyncStreak += 1;
+              if (this.desyncStreak >= 2 && now - this.spectatorResyncRequestedMs > 4000) {
+                this.desyncStreak = 0;
+                this.spectatorResyncRequestedMs = now;
+                this.stats.syncStatus = 'RESYNC...';
+                notifyParent('NETPLAY_SPECTATE_RESYNC');
+              }
+            } else {
+              this.desyncStreak = 0;
+              this.stats.syncStatus = 'LIVE';
+            }
+          }
+
+          this.applyInputs(0, item.p1);
+          this.applyInputs(1, item.p2);
+          this.forceApplyAllInputs = false;
+          if (this.originalMainLoopFunc) {
+            this.originalMainLoopFunc();
+          }
+          this.currentFrame += 1;
+          this.stats.currentFrame = this.currentFrame;
+          this.fpsCount += 1;
+          return true;
+        };
+
+        if (this.isWasmAsyncifyBusy()) return;
+        stepOneSpectatorFrame();
+
+        // Si le tampon spectateur accumule > 34 frames de retard, accélérer légèrement d'1 frame par tick pour coller au direct
+        const remainingAhead = this.spectatorMaxFrame >= this.currentFrame ? this.spectatorMaxFrame - this.currentFrame + 1 : 0;
+        if (!this.isWasmAsyncifyBusy() && (remainingAhead > 34 || this.accumulatorMs >= this.FRAME_TIME_MS)) {
+          this.accumulatorMs = Math.max(0, this.accumulatorMs - this.FRAME_TIME_MS);
+          stepOneSpectatorFrame();
+        }
+
+        const tNow = performance.now();
+        if (tNow - this.lastFpsTimer >= 500) {
+          this.stats.fps = Math.round((this.fpsCount * 1000) / (tNow - this.lastFpsTimer));
+          this.fpsCount = 0;
+          this.lastFpsTimer = tNow;
+          this.stats.frameAdvantage = Math.max(0, this.spectatorMaxFrame - this.currentFrame + 1);
+          notifyParent('ROLLBACK_TELEMETRY', { stats: { ...this.stats } });
+        }
+      }
+
       onMainLoopTick() {
         if (this.matchAborted || !this.isRunning) return;
         const now = performance.now();
@@ -1706,8 +1967,20 @@
             this.gm?.functions?.setFastForwardRatio?.(0);
           } catch {}
 
-          notifyParent('NETPLAY_EMU_READY', { isHost: netplayPlayerIndex === 0 });
-          if (netplayPlayerIndex === 0) {
+          notifyParent('NETPLAY_EMU_READY', { isHost: netplayPlayerIndex === 0, isSpectator: netplayPlayerIndex === 2 });
+          if (netplayPlayerIndex === 2) {
+            this.spectatorWaitingSnapshot = true;
+            notifyParent('NETPLAY_SPECTATOR_READY');
+            if (this.spectatorReadyTimer) clearInterval(this.spectatorReadyTimer);
+            this.spectatorReadyTimer = setInterval(() => {
+              if (this.spectatorWaitingSnapshot && !this.pendingSyncLoad && !this.matchAborted) {
+                notifyParent('NETPLAY_SPECTATOR_READY');
+              } else {
+                clearInterval(this.spectatorReadyTimer);
+                this.spectatorReadyTimer = null;
+              }
+            }, 900);
+          } else if (netplayPlayerIndex === 0) {
             if (this.guestIsReady) {
               this.hostWaitingForGuestEmu = false;
               this.pendingHostExportSlot = 'frame0';
@@ -1785,6 +2058,12 @@
           return;
         }
 
+        // Phase 1C (Spectateur en lecture seule) : rejouer les inputs confirmés du match en différé tamponné 60 FPS
+        if (netplayPlayerIndex === 2) {
+          this.stepSpectatorLoop(now);
+          return;
+        }
+
         // Phase 1C (Hôte P1) : Patienter jusqu'à ce que le moteur WASM de l'Invité soit prêt
         if (netplayPlayerIndex === 0 && this.hostWaitingForGuestEmu) {
           this.lastTickMs = now;
@@ -1793,6 +2072,10 @@
 
         // 2. Dépouiller les paquets réseau GGPO reçus (0x5A / 0x5B / 0x5C / 0xCB / 0xCC)
         this.processIncomingPackets();
+        if (netplayPlayerIndex === 0) {
+          this.advanceConfirmedWatermark();
+          this.processSpectatorStreaming();
+        }
 
         // 3. Barrière Frame 0 / Départ Simultané
         if (this.waitingForFrame0) {
@@ -1867,6 +2150,10 @@
 
         if (this.isWasmAsyncifyBusy()) return;
         this.stepOneFrame();
+        if (netplayPlayerIndex === 0) {
+          this.advanceConfirmedWatermark();
+          this.processSpectatorStreaming();
+        }
 
         // Ne jamais ré-entrer WASM pour une 2e frame si Asyncify vient de déclencher un unwind ou pendant les 6 premières frames
         if (
@@ -1878,6 +2165,10 @@
           this.processIncomingPackets();
           if (!this.isWasmAsyncifyBusy()) {
             this.stepOneFrame();
+            if (netplayPlayerIndex === 0) {
+              this.advanceConfirmedWatermark();
+              this.processSpectatorStreaming();
+            }
           }
         }
       }
@@ -1888,8 +2179,16 @@
         this.waitingForFrame0 = false;
         this.waitingForFrame0Ack = false;
         this.waitingForGoAck = false;
+        this.spectatorWaitingSnapshot = false;
         this.pendingSyncLoad = null;
         this.pendingHostExportSlot = null;
+        this.pendingSpectatorTargets = [];
+        this.spectatorFrameBuffer = [];
+        this.spectatorInputMap.clear();
+        if (this.spectatorReadyTimer) {
+          clearInterval(this.spectatorReadyTimer);
+          this.spectatorReadyTimer = null;
+        }
         if (this.guestReadyTimer) {
           clearInterval(this.guestReadyTimer);
           this.guestReadyTimer = null;
@@ -2579,6 +2878,26 @@
         return;
       }
 
+      if (msg.type === 'NETPLAY_SPECTATOR_COUNT') {
+        window.__cswGgpoEngine?.setSpectatorsCount?.(msg.count || 0);
+        return;
+      }
+
+      if (msg.type === 'NETPLAY_SPECTATE_SNAPSHOT_REQ') {
+        window.__cswGgpoEngine?.requestSpectatorSnapshot?.(msg.targetUid || null);
+        return;
+      }
+
+      if (msg.type === 'NETPLAY_SPECTATE_BATCH' && Array.isArray(msg.frames)) {
+        window.__cswGgpoEngine?.receiveSpectatorFrames?.(msg.frames);
+        return;
+      }
+
+      if (msg.type === 'NETPLAY_SPECTATE_STATE' && msg.stateBase64) {
+        applyLoadStateBase64(msg.stateBase64, msg.syncFrame || 0, true);
+        return;
+      }
+
       if (msg.type === 'NETPLAY_FRAME0_ACK') {
         window.__cswGgpoEngine?.onFrame0AckReceived(Number(msg.syncFrame || 0));
         return;
@@ -2747,6 +3066,7 @@
       }
 
       if (msg.type === 'PRESS_BUTTON') {
+        if (isNetplaySession && netplayPlayerIndex === 2) return;
         const idx = msg.button === 'coin' ? 2 : 3;
         try { window.focus(); } catch {}
         const ggpo = window.__cswGgpoEngine;
