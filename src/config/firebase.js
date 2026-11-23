@@ -1,9 +1,9 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
-import { getFirestore } from 'firebase/firestore';
 import { getAuth, GoogleAuthProvider } from 'firebase/auth';
+import { getLocalFirestore } from '../services/localFirestore';
 
 /**
- * Configuration de production Firebase v10 SDK pour CSW-ARCADE
+ * Configuration de production Firebase Auth + Moteur Local Firestore ultra-rapide pour CSW-ARCADE
  */
 const firebaseConfig = {
   apiKey: "AIzaSyBcXrh08RjPuDc6P8CQ6LqrvG5WNo-jzt0",
@@ -15,6 +15,6 @@ const firebaseConfig = {
 };
 
 export const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
-export const db = getFirestore(app);
+export const db = getLocalFirestore();
 export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();

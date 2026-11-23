@@ -13,7 +13,7 @@ import {
   signOut,
   updateProfile,
 } from 'firebase/auth';
-import { doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore';
+import { doc, getDoc, onSnapshot, serverTimestamp, setDoc } from './localFirestore';
 import { auth, db, googleProvider } from '../config/firebase';
 import { getCoins, setWalletCoins } from './walletService';
 import {
@@ -28,9 +28,22 @@ const FIRST_NAME_KEY = 'csw_player_first_name_v1';
 const LAST_NAME_KEY = 'csw_player_last_name_v1';
 const REGION_KEY = 'csw_player_region_v1';
 const RANK_KEY = 'csw_player_rank_v1';
-const PHOTO_PREFIX = 'csw_player_photo_v1_';
 
 const authListeners = new Set();
+
+function clearLegacyLocalPhotos() {
+  try {
+    const toDelete = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && k.startsWith('csw_player_photo_v1_')) toDelete.push(k);
+    }
+    toDelete.forEach((k) => localStorage.removeItem(k));
+  } catch {
+    /* noop */
+  }
+}
+if (typeof window !== 'undefined') clearLegacyLocalPhotos();
 
 export function getPlayerFriendCode(uid) {
   const clean = String(uid || '0000').replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
@@ -40,27 +53,6 @@ export function getPlayerFriendCode(uid) {
 export function getPlayerFriendTag(displayName, uid) {
   const base = String(displayName || 'Joueur').trim().replace(/#[a-zA-Z0-9]+$/, '') || 'Joueur';
   return `${base}#${getPlayerFriendCode(uid)}`;
-}
-
-function getStoredPhoto(uid) {
-  if (!uid) return undefined;
-  try {
-    const val = localStorage.getItem(PHOTO_PREFIX + uid);
-    if (val === null) return undefined;
-    return val === '' ? null : val;
-  } catch {
-    return undefined;
-  }
-}
-
-function setStoredPhoto(uid, photoURL) {
-  if (!uid) return;
-  try {
-    if (photoURL === undefined) return;
-    localStorage.setItem(PHOTO_PREFIX + uid, photoURL ? String(photoURL) : '');
-  } catch {
-    /* noop */
-  }
 }
 
 function pushDirectoryProfile(profile) {
@@ -108,7 +100,6 @@ function getFallbackGuestProfile() {
   let lastName = '';
   let region = getDefaultRegion();
   let rank = 'D';
-  let photoURL = null;
   try {
     uid = localStorage.getItem(UID_KEY) || uid;
     localStorage.setItem(UID_KEY, uid);
@@ -117,8 +108,6 @@ function getFallbackGuestProfile() {
     firstName = localStorage.getItem(FIRST_NAME_KEY) || '';
     lastName = localStorage.getItem(LAST_NAME_KEY) || '';
     rank = localStorage.getItem(RANK_KEY) || 'D';
-    const stored = getStoredPhoto(uid);
-    if (stored !== undefined) photoURL = stored;
   } catch {
     /* noop */
   }
@@ -133,7 +122,7 @@ function getFallbackGuestProfile() {
     firstName,
     lastName,
     email: null,
-    photoURL,
+    photoURL: null,
     region,
     rank,
     rankLabel: baseEval.rankLabel,
@@ -165,10 +154,54 @@ function notifyAuthListeners() {
   });
 }
 
-// Charger les stats locales/Firestore pour l'invité au démarrage
+// Charger les stats & la photo Firestore pour le joueur au démarrage
+let activeUserDocUnsub = null;
+let activeUserDocUid = null;
+
+function watchFirestoreUserDoc(uid) {
+  if (!uid || activeUserDocUid === uid) return;
+  activeUserDocUnsub?.();
+  activeUserDocUid = uid;
+  try {
+    activeUserDocUnsub = onSnapshot(
+      doc(db, 'users', uid),
+      (snap) => {
+        if (!snap.exists() || currentUserProfile.uid !== uid) return;
+        const d = snap.data() || {};
+        const nextPhoto = d.photoURL
+          ? d.photoURL
+          : d.photoCleared
+          ? null
+          : auth.currentUser?.photoURL || currentUserProfile.photoURL || null;
+        if (nextPhoto !== currentUserProfile.photoURL) {
+          currentUserProfile = {
+            ...currentUserProfile,
+            photoURL: nextPhoto,
+          };
+          pushDirectoryProfile(currentUserProfile);
+          notifyAuthListeners();
+        }
+      },
+      () => {}
+    );
+  } catch {
+    /* noop */
+  }
+}
+
 async function hydrateProfileStats(uid) {
   if (!uid) return;
-  const { stats, evaluation } = await loadPlayerGameStats(uid);
+  watchFirestoreUserDoc(uid);
+  const [snapRes, statsRes] = await Promise.all([
+    getDoc(doc(db, 'users', uid)).catch(() => null),
+    loadPlayerGameStats(uid),
+  ]);
+  let remotePhoto = currentUserProfile.photoURL;
+  if (snapRes?.exists?.()) {
+    const d = snapRes.data() || {};
+    if (d.photoURL !== undefined) remotePhoto = d.photoURL;
+  }
+  const { stats, evaluation } = statsRes;
   if (currentUserProfile.uid !== uid) return;
   try {
     localStorage.setItem(RANK_KEY, evaluation.rank);
@@ -177,6 +210,7 @@ async function hydrateProfileStats(uid) {
   }
   currentUserProfile = {
     ...currentUserProfile,
+    photoURL: remotePhoto ?? null,
     rank: evaluation.rank,
     rankLabel: evaluation.rankLabel,
     ratingPoints: evaluation.ratingPoints,
@@ -221,14 +255,13 @@ async function syncFirestoreUserProfile(firebaseUser, overrides = {}) {
   if (!firebaseUser?.uid) return currentUserProfile;
   const uid = firebaseUser.uid;
   const ref = doc(db, 'users', uid);
+  const [snapRes, statsRes] = await Promise.all([
+    getDoc(ref).catch(() => null),
+    loadPlayerGameStats(uid),
+  ]);
   let remoteData = {};
-  try {
-    const snap = await getDoc(ref);
-    if (snap.exists()) {
-      remoteData = snap.data() || {};
-    }
-  } catch {
-    /* ignore offline */
+  if (snapRes?.exists?.()) {
+    remoteData = snapRes.data() || {};
   }
 
   const displayName =
@@ -247,18 +280,23 @@ async function syncFirestoreUserProfile(firebaseUser, overrides = {}) {
       ? overrides.lastName
       : remoteData.lastName || localStorage.getItem(LAST_NAME_KEY) || '';
   const region = (overrides.region || remoteData.region || getDefaultRegion()).toUpperCase();
-  const storedPhoto = getStoredPhoto(uid);
+  const photoCleared =
+    overrides.photoURL === null
+      ? true
+      : overrides.photoURL
+      ? false
+      : Boolean(remoteData.photoCleared);
   const photoURL =
     overrides.photoURL !== undefined
       ? overrides.photoURL
-      : remoteData.photoURL !== undefined
+      : remoteData.photoURL
       ? remoteData.photoURL
-      : storedPhoto !== undefined
-      ? storedPhoto
+      : photoCleared
+      ? null
       : firebaseUser.photoURL || null;
 
   // Évaluer le rang automatiquement à partir des meilleurs scores enregistrés
-  const { stats, evaluation } = await loadPlayerGameStats(uid);
+  const { stats, evaluation } = statsRes;
   const rank = evaluation.rank;
   const wins = Number(remoteData.wins || 0);
   const losses = Number(remoteData.losses || 0);
@@ -270,7 +308,6 @@ async function syncFirestoreUserProfile(firebaseUser, overrides = {}) {
     localStorage.setItem(LAST_NAME_KEY, lastName);
     localStorage.setItem(REGION_KEY, region);
     localStorage.setItem(RANK_KEY, rank);
-    setStoredPhoto(uid, photoURL);
   } catch {
     /* noop */
   }
@@ -312,13 +349,23 @@ async function syncFirestoreUserProfile(firebaseUser, overrides = {}) {
     setWalletCoins(remoteData.coins);
   }
 
-  const firestoreDoc = { ...profilePayload, updatedAt: serverTimestamp() };
+  const firestoreDoc = { ...profilePayload, photoCleared, updatedAt: serverTimestamp() };
   delete firestoreDoc.gameStats;
-  const fsWrite = setDoc(ref, firestoreDoc, { merge: true }).catch(() => {});
   if (overrides && Object.keys(overrides).length > 0) {
-    await fsWrite;
+    try {
+      await setDoc(ref, firestoreDoc, { merge: true });
+    } catch (err) {
+      if (overrides.photoURL !== undefined) {
+        throw new Error(
+          `Impossible d'enregistrer la photo sur Firestore (${err?.code || err?.message || 'accès refusé'}). Déployez les règles Firestore.`
+        );
+      }
+    }
+  } else {
+    setDoc(ref, firestoreDoc, { merge: true }).catch(() => {});
   }
 
+  watchFirestoreUserDoc(uid);
   currentUserProfile = profilePayload;
   pushDirectoryProfile(currentUserProfile);
   notifyAuthListeners();
@@ -405,7 +452,7 @@ export async function loginWithGoogle() {
   });
 }
 
-export async function loginAsGuest({ firstName = '', lastName = '', displayName, region = 'FR' } = {}) {
+export async function loginAsGuest({ firstName = '', lastName = '', displayName, region = 'FR', photoURL } = {}) {
   const cleanName = String(displayName || '').trim().slice(0, 24);
   try {
     const cred = await signInAnonymously(auth);
@@ -417,6 +464,7 @@ export async function loginAsGuest({ firstName = '', lastName = '', displayName,
       lastName: String(lastName || '').trim(),
       displayName: cleanName || undefined,
       region,
+      ...(photoURL !== undefined ? { photoURL } : {}),
     });
   } catch {
     return await updateUserProfile({
@@ -424,6 +472,7 @@ export async function loginAsGuest({ firstName = '', lastName = '', displayName,
       lastName,
       displayName: cleanName || currentUserProfile.name,
       region,
+      ...(photoURL !== undefined ? { photoURL } : {}),
     });
   }
 }
@@ -444,7 +493,6 @@ export async function updateUserProfile({ firstName, lastName, displayName, regi
     localStorage.setItem(FIRST_NAME_KEY, cleanFirst);
     localStorage.setItem(LAST_NAME_KEY, cleanLast);
     localStorage.setItem(REGION_KEY, cleanRegion);
-    setStoredPhoto(currentUserProfile.uid, nextPhoto);
   } catch {
     /* noop */
   }
@@ -463,12 +511,40 @@ export async function updateUserProfile({ firstName, lastName, displayName, regi
       lastName: cleanLast,
       displayName: cleanName,
       region: cleanRegion,
-      photoURL: nextPhoto,
+      ...(photoURL !== undefined ? { photoURL: nextPhoto } : {}),
     });
   }
 
   const friendCode = getPlayerFriendCode(currentUserProfile.uid);
   const friendTag = getPlayerFriendTag(cleanName, currentUserProfile.uid);
+  const guestDoc = {
+    uid: currentUserProfile.uid,
+    displayName: cleanName,
+    friendCode,
+    friendTag,
+    firstName: cleanFirst,
+    lastName: cleanLast,
+    region: cleanRegion,
+    photoURL: nextPhoto,
+    photoCleared: photoURL === null,
+    rank: currentUserProfile.rank,
+    ratingPoints: currentUserProfile.ratingPoints || 0,
+    coins: getCoins(),
+    updatedAt: serverTimestamp(),
+  };
+
+  if (photoURL !== undefined) {
+    try {
+      await setDoc(doc(db, 'users', currentUserProfile.uid), guestDoc, { merge: true });
+    } catch (err) {
+      throw new Error(
+        `Impossible d'enregistrer la photo sur Firestore (${err?.code || err?.message || 'accès refusé'}). Déployez les règles Firestore.`
+      );
+    }
+  } else {
+    setDoc(doc(db, 'users', currentUserProfile.uid), guestDoc, { merge: true }).catch(() => {});
+  }
+
   currentUserProfile = {
     ...currentUserProfile,
     name: cleanName,
@@ -480,27 +556,6 @@ export async function updateUserProfile({ firstName, lastName, displayName, regi
     region: cleanRegion,
     photoURL: nextPhoto,
   };
-  const fsGuestWrite = setDoc(
-    doc(db, 'users', currentUserProfile.uid),
-    {
-      uid: currentUserProfile.uid,
-      displayName: cleanName,
-      friendCode,
-      friendTag,
-      firstName: cleanFirst,
-      lastName: cleanLast,
-      region: cleanRegion,
-      photoURL: nextPhoto,
-      rank: currentUserProfile.rank,
-      ratingPoints: currentUserProfile.ratingPoints || 0,
-      coins: getCoins(),
-      updatedAt: serverTimestamp(),
-    },
-    { merge: true }
-  ).catch(() => {});
-  if (photoURL !== undefined) {
-    await fsGuestWrite;
-  }
   pushDirectoryProfile(currentUserProfile);
   notifyAuthListeners();
   return currentUserProfile;

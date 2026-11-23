@@ -116,6 +116,7 @@ export default function App() {
   const sessionStartedAtRef = useRef(0);
   const lastRemoteCoinsTsRef = useRef(0);
   const lastRemoteChannelsTsRef = useRef(0);
+  const channelsTouchedRef = useRef(false);
   const stageSessionRef = useRef(null);
   stageSessionRef.current = stageSession;
   const userProfileRef = useRef(userProfile);
@@ -301,6 +302,7 @@ export default function App() {
       setTimeout(() => setBootNotice(''), 3500);
       return;
     }
+    channelsTouchedRef.current = true;
     const res = await firebaseFightcadeService.joinChannel(gameEntry);
     if (!res.ok && res.reason === 'MAX_3_CHANNELS') {
       setLimitModalGame(gameEntry);
@@ -312,12 +314,14 @@ export default function App() {
   };
 
   const handleReplaceFightcadeChannel = async (oldGameId, newGameEntry) => {
+    channelsTouchedRef.current = true;
     await firebaseFightcadeService.leaveChannel(oldGameId);
     setLimitModalGame(null);
     await handleJoinFightcadeChannel(newGameEntry);
   };
 
   const handleLeaveFightcadeChannel = async (gameId) => {
+    channelsTouchedRef.current = true;
     await firebaseFightcadeService.leaveChannel(gameId);
     if (selectedChannelId === gameId) setSelectedChannelId(null);
   };
@@ -659,8 +663,12 @@ export default function App() {
         setWalletCoins(sync.coins);
       }
 
-      // 2. Synchroniser les 3 Salons Fightcade 2 actifs entre tous les appareils du compte
-      if (Array.isArray(sync.activeChannels) && sync.channelsUpdatedAtMs > lastRemoteChannelsTsRef.current) {
+      // 2. Synchroniser les 3 Salons Fightcade 2 actifs uniquement s'ils proviennent d'un autre appareil/session
+      if (
+        Array.isArray(sync.activeChannels) &&
+        sync.channelsUpdatedAtMs > lastRemoteChannelsTsRef.current &&
+        (!sync.channelsSourceDeviceId || sync.channelsSourceDeviceId !== myDevId)
+      ) {
         lastRemoteChannelsTsRef.current = sync.channelsUpdatedAtMs;
         firebaseFightcadeService.applySyncedChannels(sync.activeChannels);
       }
@@ -701,6 +709,8 @@ export default function App() {
   useEffect(() => {
     const uid = userProfile?.uid;
     if (!uid) return;
+    if (activeChannels.length > 0) channelsTouchedRef.current = true;
+    if (!channelsTouchedRef.current && activeChannels.length === 0) return;
     pushChannelsSync(uid, activeChannels, selectedChannelId);
   }, [userProfile?.uid, activeChannels, selectedChannelId]);
 

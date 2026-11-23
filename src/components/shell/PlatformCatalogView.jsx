@@ -31,6 +31,27 @@ const PAGE_SIZE = 48;
 const XBOX_CATALOG = [];
 const PC_DOS_CATALOG = [];
 
+const CATALOG_JSON_CACHE = new Map();
+const CATALOG_INFLIGHT_CACHE = new Map();
+
+async function fetchCachedCatalogJson(url) {
+  if (CATALOG_JSON_CACHE.has(url)) return CATALOG_JSON_CACHE.get(url);
+  if (CATALOG_INFLIGHT_CACHE.has(url)) return CATALOG_INFLIGHT_CACHE.get(url);
+  const p = fetch(url)
+    .then(async (res) => {
+      if (!res.ok) return null;
+      const json = await res.json();
+      if (json) CATALOG_JSON_CACHE.set(url, json);
+      return json;
+    })
+    .catch(() => null)
+    .finally(() => {
+      CATALOG_INFLIGHT_CACHE.delete(url);
+    });
+  CATALOG_INFLIGHT_CACHE.set(url, p);
+  return p;
+}
+
 const MODE_CONFIG = {
   all: {
     title: 'TOUS LES JEUX — GAME MODE',
@@ -269,23 +290,24 @@ export function PlatformCatalogView({ mode, onLaunchStage, onCacheChanged, onJoi
     async function loadCatalog() {
       if (mode === 'all') {
         const base = [...PLAYSTATION_CATALOG, ...SEGA_CATALOG, ...NINTENDO_CATALOG, ...XBOX_CATALOG, ...PC_DOS_CATALOG];
-        setCatalog(base);
+        const hasCachedAll =
+          CATALOG_JSON_CACHE.has('./app/data/arcade-catalog.json') &&
+          CATALOG_JSON_CACHE.has('./app/data/extended-catalogs.json') &&
+          CATALOG_JSON_CACHE.has('./app/data/java-catalog.json');
+        if (!hasCachedAll) setCatalog(base);
         try {
-          const [arcRes, extRes, javaRes] = await Promise.all([
-            fetch('./app/data/arcade-catalog.json'),
-            fetch('./app/data/extended-catalogs.json'),
-            fetch('./app/data/java-catalog.json'),
+          const [arcJson, extJson, javaJson] = await Promise.all([
+            fetchCachedCatalogJson('./app/data/arcade-catalog.json'),
+            fetchCachedCatalogJson('./app/data/extended-catalogs.json'),
+            fetchCachedCatalogJson('./app/data/java-catalog.json'),
           ]);
-          const arcJson = arcRes.ok ? await arcRes.json() : {};
-          const extJson = extRes.ok ? await extRes.json() : {};
-          const javaJson = javaRes.ok ? await javaRes.json() : [];
-          const arc = buildMergedArcade(arcJson);
+          const arc = buildMergedArcade(arcJson || {});
           if (!cancelled) {
             setCatalog([
               ...arc.neogeo,
               ...arc.mame,
               ...arc.retro64_32,
-              ...(Array.isArray(extJson.segaMD) ? extJson.segaMD : []),
+              ...(Array.isArray(extJson?.segaMD) ? extJson.segaMD : []),
               ...base,
               ...(Array.isArray(javaJson) ? javaJson : []),
             ]);
@@ -295,11 +317,13 @@ export function PlatformCatalogView({ mode, onLaunchStage, onCacheChanged, onJoi
         }
       } else if (mode === 'arcade') {
         const base64_32 = NINTENDO_CATALOG.filter((g) => g.platform === 'n64' || g.platform === 'gba');
-        setCatalog(base64_32);
+        if (!CATALOG_JSON_CACHE.has('./app/data/arcade-catalog.json')) {
+          setCatalog(base64_32);
+        }
         try {
-          const res = await fetch('./app/data/arcade-catalog.json');
-          if (res.ok && !cancelled) {
-            const arc = buildMergedArcade(await res.json());
+          const json = await fetchCachedCatalogJson('./app/data/arcade-catalog.json');
+          if (json && !cancelled) {
+            const arc = buildMergedArcade(json);
             setCatalog([
               ...arc.neogeo,
               ...arc.mame,
@@ -313,11 +337,12 @@ export function PlatformCatalogView({ mode, onLaunchStage, onCacheChanged, onJoi
       } else if (mode === 'playstation') {
         setCatalog(PLAYSTATION_CATALOG);
       } else if (mode === 'sega') {
-        setCatalog(SEGA_CATALOG);
+        if (!CATALOG_JSON_CACHE.has('./app/data/extended-catalogs.json')) {
+          setCatalog(SEGA_CATALOG);
+        }
         try {
-          const res = await fetch('./app/data/extended-catalogs.json');
-          if (res.ok && !cancelled) {
-            const json = await res.json();
+          const json = await fetchCachedCatalogJson('./app/data/extended-catalogs.json');
+          if (json && !cancelled) {
             if (Array.isArray(json?.segaMD)) {
               const baseTitles = new Set(SEGA_CATALOG.map((g) => g.title.toLowerCase()));
               setCatalog([...SEGA_CATALOG, ...json.segaMD.filter((g) => !baseTitles.has(g.title.toLowerCase()))]);
@@ -333,12 +358,13 @@ export function PlatformCatalogView({ mode, onLaunchStage, onCacheChanged, onJoi
       } else if (mode === 'pc') {
         setCatalog(PC_DOS_CATALOG);
       } else if (mode === 'java') {
-        setCatalog([]);
+        if (!CATALOG_JSON_CACHE.has('./app/data/java-catalog.json')) {
+          setCatalog([]);
+        }
         try {
-          const res = await fetch('./app/data/java-catalog.json');
-          if (res.ok && !cancelled) {
-            const json = await res.json();
-            if (Array.isArray(json)) setCatalog(json);
+          const json = await fetchCachedCatalogJson('./app/data/java-catalog.json');
+          if (Array.isArray(json) && !cancelled) {
+            setCatalog(json);
           }
         } catch {
           /* keep empty */

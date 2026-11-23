@@ -1,14 +1,14 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { 
-  collection, 
-  doc, 
-  setDoc, 
-  getDoc, 
-  updateDoc, 
-  onSnapshot, 
-  addDoc, 
-  deleteDoc 
-} from 'firebase/firestore';
+import {
+  collection,
+  doc,
+  setDoc,
+  getDoc,
+  updateDoc,
+  onSnapshot,
+  addDoc,
+  deleteDoc
+} from '../services/localFirestore';
 import { db } from '../config/firebase';
 
 const RTC_CONFIG = {

@@ -17,7 +17,7 @@ import {
   serverTimestamp,
   setDoc,
   where,
-} from 'firebase/firestore';
+} from './localFirestore';
 import { db } from '../config/firebase';
 import { getPlayerFriendCode, getPlayerFriendTag } from './authService';
 
@@ -75,10 +75,29 @@ function readCachedState(uid) {
   return { friends: [], incomingRequests: [], outgoingRequests: [] };
 }
 
+function stripDataPhoto(u) {
+  if (!u || typeof u !== 'object') return u;
+  return {
+    ...u,
+    photoURL: u.photoURL && !String(u.photoURL).startsWith('data:') ? u.photoURL : null,
+  };
+}
+
 function writeCachedState(uid, state) {
   if (!uid) return;
   try {
-    localStorage.setItem(LOCAL_FRIENDS_PREFIX + uid, JSON.stringify(state));
+    const clean = {
+      friends: (state.friends || []).map(stripDataPhoto),
+      incomingRequests: (state.incomingRequests || []).map((r) => ({
+        ...r,
+        fromUser: stripDataPhoto(r.fromUser),
+      })),
+      outgoingRequests: (state.outgoingRequests || []).map((r) => ({
+        ...r,
+        toUser: stripDataPhoto(r.toUser),
+      })),
+    };
+    localStorage.setItem(LOCAL_FRIENDS_PREFIX + uid, JSON.stringify(clean));
   } catch {
     /* noop */
   }
@@ -200,9 +219,10 @@ export function subscribeFriendsState(userProfile, cb) {
   };
 
   emitMerged();
-  registerDirectoryProfile(userProfile).then(pullRelay);
+  registerDirectoryProfile(userProfile);
+  pullRelay();
 
-  const pollId = setInterval(pullRelay, 6000);
+  const pollId = setInterval(pullRelay, 20000);
   const onEvent = () => pullRelay();
   if (typeof window !== 'undefined') {
     window.addEventListener('csw-friend-event', onEvent);

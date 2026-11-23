@@ -12,7 +12,7 @@ import {
   query,
   serverTimestamp,
   setDoc,
-} from 'firebase/firestore';
+} from './localFirestore';
 import { db } from '../config/firebase';
 import {
   STATS_FORMULA_VERSION,
@@ -163,38 +163,31 @@ export async function loadPlayerGameStats(uid) {
   const localMap = readLocalStatsMap(uid);
   const migrated = migrateGuestStatsIntoMap(uid, localMap);
 
-  // 1. Récupérer depuis le relais serveur /api/account-sync (fonctionne même sans règles Firestore publiées)
-  try {
-    const res = await fetch(`/api/account-sync?uid=${encodeURIComponent(uid)}`);
-    if (res.ok) {
-      const data = await res.json();
-      if (Array.isArray(data?.gameStats)) {
-        data.gameStats.forEach((remote) => {
-          if (!remote?.gameId) return;
-          localMap[remote.gameId] = mergeStatEntry(localMap[remote.gameId], remote);
-        });
-      }
-    }
-  } catch {
-    /* ignore */
+  // 1 & 2. Récupérer EN PARALLÈLE le relais /api/account-sync et Local Firestore
+  let serverRemoteCount = 0;
+  const [relayRes, fsSnap] = await Promise.all([
+    fetch(`/api/account-sync?uid=${encodeURIComponent(uid)}`).then((r) => (r.ok ? r.json() : null)).catch(() => null),
+    getDocs(collection(db, 'users', uid, 'gameStats')).catch(() => null),
+  ]);
+
+  if (Array.isArray(relayRes?.gameStats)) {
+    serverRemoteCount = relayRes.gameStats.length;
+    relayRes.gameStats.forEach((remote) => {
+      if (!remote?.gameId) return;
+      localMap[remote.gameId] = mergeStatEntry(localMap[remote.gameId], remote);
+    });
   }
 
-  // 2. Récupérer depuis Firebase Firestore
   const docsToCleanInFirestore = [];
-  try {
-    const snap = await getDocs(collection(db, 'users', uid, 'gameStats'));
-    snap.forEach((d) => {
-      const remote = d.data();
-      if (!remote?.gameId) return;
-      const merged = mergeStatEntry(localMap[remote.gameId], remote);
-      localMap[remote.gameId] = merged;
-      if (Number(remote.statsFormulaVersion || 1) < STATS_FORMULA_VERSION) {
-        docsToCleanInFirestore.push(merged);
-      }
-    });
-  } catch {
-    /* offline fallback */
-  }
+  fsSnap?.forEach?.((d) => {
+    const remote = d.data();
+    if (!remote?.gameId) return;
+    const merged = mergeStatEntry(localMap[remote.gameId], remote);
+    localMap[remote.gameId] = merged;
+    if (Number(remote.statsFormulaVersion || 1) < STATS_FORMULA_VERSION) {
+      docsToCleanInFirestore.push(merged);
+    }
+  });
 
   const stats = Object.values(localMap)
     .map(sanitizeGameStatEntry)
@@ -229,14 +222,7 @@ export async function loadPlayerGameStats(uid) {
     ).catch(() => {});
   }
 
-  if (stats.length > 0 && migrated) {
-    fetch(`/api/account-sync?uid=${encodeURIComponent(uid)}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ uid, gameStats: stats }),
-    }).catch(() => {});
-  } else if (stats.length > 0) {
-    // Synchronisation bidirectionnelle vers le relais serveur si ce navigateur détient déjà des stats locales
+  if (stats.length > 0 && (migrated || serverRemoteCount < stats.length)) {
     fetch(`/api/account-sync?uid=${encodeURIComponent(uid)}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -558,7 +544,7 @@ export function subscribeGameLeaderboard(gameId, cb) {
 
   emitMerged();
   pullRelay();
-  const pollId = setInterval(pullRelay, 5000);
+  const pollId = setInterval(pullRelay, 15000);
 
   const onLocal = (e) => {
     if (!e?.detail?.gameId || e.detail.gameId === normGameId) {

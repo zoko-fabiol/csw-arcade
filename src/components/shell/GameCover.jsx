@@ -1,4 +1,7 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
+
+const FAILED_COVER_URLS = new Set();
+const RESOLVED_COVER_CACHE = new Map();
 
 const LIBRETRO_SYSTEM_MAP = [
   [/mega\s*drive|genesis|segamd|picodrive/i, 'Sega - Mega Drive - Genesis'],
@@ -22,8 +25,13 @@ function sanitizeLibretroName(name) {
 }
 
 function resolveCoverCandidates({ title, platformLabel, filename, imageUrl }) {
+  const cacheKey = `${platformLabel || ''}|${filename || ''}|${title || ''}|${imageUrl || ''}`;
+  const resolved = RESOLVED_COVER_CACHE.get(cacheKey);
+  if (resolved === 'none') return [];
+  if (resolved) return [resolved];
+
   const candidates = [];
-  if (imageUrl) candidates.push(imageUrl);
+  if (imageUrl && !FAILED_COVER_URLS.has(imageUrl)) candidates.push(imageUrl);
 
   const label = String(platformLabel || '');
   const match = LIBRETRO_SYSTEM_MAP.find(([re]) => re.test(label));
@@ -42,32 +50,34 @@ function resolveCoverCandidates({ title, platformLabel, filename, imageUrl }) {
   }
   const cleanTitle = sanitizeLibretroName(String(title).replace(/\s*\([^)]*\)\s*$/g, ''));
   if (cleanTitle) {
-    names.push(
-      `${cleanTitle} (USA)`,
-      `${cleanTitle} (Europe)`,
-      `${cleanTitle} (USA, Europe)`,
-      `${cleanTitle} (World)`,
-      cleanTitle
-    );
+    names.push(`${cleanTitle} (USA)`, `${cleanTitle} (Europe)`, cleanTitle);
   }
 
   const seen = new Set();
   for (const n of names) {
     if (!n || seen.has(n)) continue;
     seen.add(n);
-    candidates.push(`${base}${encodeURIComponent(n)}.png`);
+    const u = `${base}${encodeURIComponent(n)}.png`;
+    if (!FAILED_COVER_URLS.has(u)) candidates.push(u);
+    if (candidates.length >= 4) break;
   }
   return candidates;
 }
 
 export function GameCover({ title, platformLabel, filename, imageUrl, compact = false }) {
+  const coverKey = `${platformLabel || ''}|${filename || ''}|${title || ''}|${imageUrl || ''}`;
   const candidates = useMemo(
     () => resolveCoverCandidates({ title, platformLabel, filename, imageUrl }),
-    [title, platformLabel, filename, imageUrl]
+    [coverKey]
   );
 
   const [idx, setIdx] = useState(0);
   const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    setIdx(0);
+    setLoaded(Boolean(RESOLVED_COVER_CACHE.get(coverKey) && RESOLVED_COVER_CACHE.get(coverKey) !== 'none'));
+  }, [coverKey]);
 
   const initials = useMemo(() => {
     const parts = String(title || '?').split(/\s+/).filter(Boolean).slice(0, 2);
@@ -114,8 +124,22 @@ export function GameCover({ title, platformLabel, filename, imageUrl, compact = 
           alt={title ? `Jaquette ${title}` : 'Jaquette du jeu'}
           loading="lazy"
           decoding="async"
-          onLoad={() => setLoaded(true)}
-          onError={() => setIdx((prev) => prev + 1)}
+          onLoad={() => {
+            if (currentSrc) RESOLVED_COVER_CACHE.set(coverKey, currentSrc);
+            setLoaded(true);
+          }}
+          onError={() => {
+            if (currentSrc) {
+              if (FAILED_COVER_URLS.size > 1500) FAILED_COVER_URLS.clear();
+              FAILED_COVER_URLS.add(currentSrc);
+            }
+            const nextIdx = idx + 1;
+            if (nextIdx >= candidates.length) {
+              if (RESOLVED_COVER_CACHE.size > 1500) RESOLVED_COVER_CACHE.clear();
+              RESOLVED_COVER_CACHE.set(coverKey, 'none');
+            }
+            setIdx(nextIdx);
+          }}
           className={`absolute inset-0 w-full h-full object-contain bg-black/70 transition-opacity duration-200 ${
             loaded ? 'opacity-100' : 'opacity-0'
           }`}

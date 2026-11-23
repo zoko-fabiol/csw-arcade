@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>CSW Stage — MS-DOS (js-dos)</title>
-  <link rel="stylesheet" href="https://v8.js-dos.com/latest/js-dos.css" />
+  <link rel="preconnect" href="https://v8.js-dos.com" crossorigin />
   <style>
     * { box-sizing: border-box; }
     html, body {
@@ -60,6 +60,13 @@
     function loadJsDos() {
       return new Promise((resolve, reject) => {
         if (window.Dos) return resolve();
+        if (!document.querySelector('link[data-csw-jsdos-css]')) {
+          const css = document.createElement('link');
+          css.rel = 'stylesheet';
+          css.href = 'https://v8.js-dos.com/latest/js-dos.css';
+          css.setAttribute('data-csw-jsdos-css', '1');
+          document.head.append(css);
+        }
         const s = document.createElement('script');
         s.src = 'https://v8.js-dos.com/latest/js-dos.js';
         s.onload = () => (window.Dos ? resolve() : reject(new Error('js-dos non initialisé')));
@@ -85,9 +92,11 @@
         try {
           await loadJsDos();
           const container = document.getElementById('dos');
+          let ciReady = false;
           const opts = {
             onEvent: (ev) => {
-              if (ev === 'ci-ready') {
+              if (ev === 'ci-ready' || ev === 'open-emulators') {
+                ciReady = true;
                 bootEl.hidden = true;
                 notifyParent('STAGE_STATUS', { status: 'playing', message: 'Environnement MS-DOS prêt.' });
               } else if (ev === 'error') {
@@ -106,7 +115,7 @@
           }
 
           window.Dos(container, opts);
-          setTimeout(() => { bootEl.hidden = true; }, 2200);
+          setTimeout(() => { if (!ciReady) bootEl.hidden = true; }, 3500);
         } catch (err) {
           bootEl.replaceChildren();
           const strong = document.createElement('strong');

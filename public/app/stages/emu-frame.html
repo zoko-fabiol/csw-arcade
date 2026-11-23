@@ -141,6 +141,10 @@
     })();
 
     const CDN_DATA = 'https://cdn.emulatorjs.org/stable/data/';
+    // Pré-vérifier dès le chargement de l'iframe si le backend local /emulatorjs/cores/* est disponible (< 2ms en local)
+    const hasLocalCoreProxyPromise = fetch('/api/local-firebase?op=health')
+      .then((r) => r.ok)
+      .catch(() => false);
     let started = false;
     let isNetplaySession = false;
     let netplayPlayerIndex = 0;
@@ -2463,7 +2467,12 @@
           const snap = ggpo.getLatestSnapshotBytes();
           return snap && snap.length > 4096 ? { ram: snap, isRawSystemRam: false } : null;
         }
-        // Savestate RAM complet (EmulatorJS FBNeo / MAME / PS1 / SNES / Mega Drive / GBA)
+        // Savestate RAM complet (fallback si _retro_get_memory_data absent) : limiter la fréquence pour éviter tout micro-freeze WASM
+        const now = performance.now();
+        if (cswRamTelemetry.lastSavestateScanMs && now - cswRamTelemetry.lastSavestateScanMs < 2200) {
+          return null;
+        }
+        cswRamTelemetry.lastSavestateScanMs = now;
         const state = window.EJS_emulator?.gameManager?.getState?.();
         if (state && state.length > 4096) {
           const bytes = state instanceof Uint8Array ? state : new Uint8Array(state);
@@ -3132,20 +3141,16 @@
           const targetFilename = decodeURIComponent(rawName);
           const shortKey = targetFilename.replace(/\.[^.]+$/, '').toLowerCase();
 
-          let romBytes = null;
-          if (msg.fileBlob && typeof msg.fileBlob.arrayBuffer === 'function') {
-            romBytes = new Uint8Array(await msg.fileBlob.arrayBuffer());
-          }
-
-          let neogeoBytes = null;
-          if (isFbneo) {
-            try {
-              const biosRes = await fetch('/roms/neogeo.zip');
-              if (biosRes.ok) {
-                neogeoBytes = new Uint8Array(await biosRes.arrayBuffer());
-              }
-            } catch {}
-          }
+          const [romBytes, neogeoBytes] = await Promise.all([
+            msg.fileBlob && typeof msg.fileBlob.arrayBuffer === 'function'
+              ? msg.fileBlob.arrayBuffer().then((ab) => new Uint8Array(ab)).catch(() => null)
+              : Promise.resolve(null),
+            isFbneo
+              ? fetch('/roms/neogeo.zip')
+                  .then((biosRes) => (biosRes.ok ? biosRes.arrayBuffer().then((ab) => new Uint8Array(ab)) : null))
+                  .catch(() => null)
+              : Promise.resolve(null),
+          ]);
 
           // Intercepteur fetch + XHR pour servir la ROM avec son vrai nom de fichier (indispensable pour FBNeo et MAME)
           if (romBytes || neogeoBytes) {
@@ -3214,6 +3219,7 @@
           const hw = readHardwareSettings();
           let ctrlCfg = buildControllersConfig(hw.controls, msg.core, hw) || buildControllersConfig({ p1: {}, p2: {} }, msg.core, hw);
 
+          const hasLocalCoreProxy = isFbneo ? true : await hasLocalCoreProxyPromise;
           window.EJS_player = '#game';
           window.EJS_core = isFbneo ? 'arcade' : msg.core;
           window.EJS_gameName = isFbneo ? shortKey.toUpperCase() : (msg.gameName || 'CSW Game');
@@ -3230,7 +3236,7 @@
               'version.json': '/emulatorjs/version.json',
             };
           } else {
-            window.EJS_pathtodata = msg.localData ? '/emulatorjs/' : CDN_DATA;
+            window.EJS_pathtodata = msg.localData && hasLocalCoreProxy ? '/emulatorjs/' : CDN_DATA;
           }
           window.EJS_startOnLoaded = true;
           window.EJS_color = msg.accent || '#3b82f6';

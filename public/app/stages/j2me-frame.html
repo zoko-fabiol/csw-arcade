@@ -4,7 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>CSW Stage — FreeJ2ME / Gameloft Runtime</title>
-  <script src="https://cjrtnc.leaningtech.com/20260317_2978/loader.js"></script>
+  <link rel="preconnect" href="https://cjrtnc.leaningtech.com" crossorigin />
+  <script async src="https://cjrtnc.leaningtech.com/20260317_2978/loader.js" onload="window.__cswCheerpjLoaded=true" onerror="window.__cswCheerpjError=true"></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
     html, body {
@@ -624,10 +625,25 @@
       return ret;
     }
 
+    async function waitForCheerpJLoader(timeoutMs = 20000) {
+      if (typeof window.cheerpjInit === "function") return true;
+      const start = performance.now();
+      while (typeof window.cheerpjInit !== "function") {
+        if (window.__cswCheerpjError) {
+          throw new Error("Impossible de charger le moteur Java CheerpJ.");
+        }
+        if (performance.now() - start > timeoutMs) {
+          throw new Error("Délai dépassé lors du chargement de CheerpJ.");
+        }
+        await new Promise((r) => setTimeout(r, 40));
+      }
+      return true;
+    }
+
     async function ensureCheerpJInitialized() {
       if (!cheerpjReadyPromise) {
         cheerpjReadyPromise = (async () => {
-          setLoadingText("Initialisation moteur Java CheerpJ…", "Démarrage de la JVM WebAssembly FreeJ2ME…");
+          setLoadingText("Initialisation moteur Java CheerpJ…", "Démarrage parallèle JVM WebAssembly & Synthétiseur MIDI…");
           const noopMidiStub = {
             midiPlayer: {
               duration: 0,
@@ -642,7 +658,12 @@
               addEventListener: () => {},
             },
           };
-          if (!fastMidiOff) {
+
+          const midiInitTask = (async () => {
+            if (fastMidiOff) {
+              window.libmidi = noopMidiStub;
+              return;
+            }
             try {
               window.libmidi = new LibMidi(createUnlockingAudioContext());
               await window.libmidi.init();
@@ -657,80 +678,84 @@
               console.warn("[J2ME] LibMidi non disponible, bascule en mode silencieux sécurisé :", err);
               window.libmidi = noopMidiStub;
             }
-          } else {
-            window.libmidi = noopMidiStub;
-          }
+          })();
+
           window.libmedia = new LibMedia();
 
-          await cheerpjInit({
-            enableDebug: false,
-            natives: {
-              ...canvasFontNatives,
-              ...canvasGraphicsNatives,
-              ...gles2Natives,
-              ...jsReferenceNatives,
-              ...mediaBridgeNatives,
-              ...midiBridgeNatives,
-              async Java_pl_zb3_freej2me_bridge_shell_Shell_setTitle(lib, title) {
-                if (title) gameTitleEl.textContent = title;
+          const jvmInitTask = (async () => {
+            await waitForCheerpJLoader();
+            await cheerpjInit({
+              enableDebug: false,
+              natives: {
+                ...canvasFontNatives,
+                ...canvasGraphicsNatives,
+                ...gles2Natives,
+                ...jsReferenceNatives,
+                ...mediaBridgeNatives,
+                ...midiBridgeNatives,
+                async Java_pl_zb3_freej2me_bridge_shell_Shell_setTitle(lib, title) {
+                  if (title) gameTitleEl.textContent = title;
+                },
+                async Java_pl_zb3_freej2me_bridge_shell_Shell_setIcon(lib, iconBytes) {
+                  if (iconBytes && iconBytes.buffer) {
+                    const blob = new Blob([iconBytes.buffer], { type: "image/png" });
+                    gameIconEl.src = URL.createObjectURL(blob);
+                    gameIconEl.style.display = "block";
+                  }
+                },
+                async Java_pl_zb3_freej2me_bridge_shell_Shell_getScreenCtx(lib) {
+                  return screenCtx;
+                },
+                async Java_pl_zb3_freej2me_bridge_shell_Shell_setCanvasSize(lib, width, height) {
+                  if (!scaleSet) {
+                    loadingBox.style.display = "none";
+                    display.style.display = "block";
+                    scaleSet = true;
+                    setTimeout(() => display.focus(), 30);
+                    postStatus("playing", `En jeu (${width}×${height})`);
+                  }
+                  screenCtx.canvas.width = width;
+                  screenCtx.canvas.height = height;
+                  autoscale();
+                },
+                async Java_pl_zb3_freej2me_bridge_shell_Shell_waitForAndDispatchEvents(lib, listener) {
+                  const KeyEvent = await lib.pl.zb3.freej2me.bridge.shell.KeyEvent;
+                  const PointerEvent = await lib.pl.zb3.freej2me.bridge.shell.PointerEvent;
+                  const evt = await evtQueue.waitForEvent();
+                  if (evt.kind === "keydown") {
+                    await listener.keyPressed(await new KeyEvent(...evt.args));
+                  } else if (evt.kind === "keyup") {
+                    await listener.keyReleased(await new KeyEvent(...evt.args));
+                  } else if (evt.kind === "pointerpressed") {
+                    await listener.pointerPressed(await new PointerEvent(evt.x, evt.y));
+                  } else if (evt.kind === "pointerdragged") {
+                    await listener.pointerDragged(await new PointerEvent(evt.x, evt.y));
+                  } else if (evt.kind === "pointerreleased") {
+                    await listener.pointerReleased(await new PointerEvent(evt.x, evt.y));
+                  } else if (evt.kind === "player-eom") {
+                    await listener.playerEOM(evt.player);
+                  } else if (evt.kind === "player-video-frame") {
+                    await listener.playerVideoFrame(evt.player);
+                  }
+                },
+                async Java_pl_zb3_freej2me_bridge_shell_Shell_restart(lib) {
+                  location.reload();
+                },
+                async Java_pl_zb3_freej2me_bridge_shell_Shell_exit(lib) {
+                  location.reload();
+                },
+                async Java_pl_zb3_freej2me_bridge_shell_Shell_sthop(lib) {},
+                async Java_pl_zb3_freej2me_bridge_shell_Shell_say(lib, sth) {
+                  console.log("[FreeJ2ME]", sth);
+                },
+                async Java_pl_zb3_freej2me_bridge_shell_Shell_sayObject(lib, label, obj) {
+                  console.log("[FreeJ2ME]", label, obj);
+                },
               },
-              async Java_pl_zb3_freej2me_bridge_shell_Shell_setIcon(lib, iconBytes) {
-                if (iconBytes && iconBytes.buffer) {
-                  const blob = new Blob([iconBytes.buffer], { type: "image/png" });
-                  gameIconEl.src = URL.createObjectURL(blob);
-                  gameIconEl.style.display = "block";
-                }
-              },
-              async Java_pl_zb3_freej2me_bridge_shell_Shell_getScreenCtx(lib) {
-                return screenCtx;
-              },
-              async Java_pl_zb3_freej2me_bridge_shell_Shell_setCanvasSize(lib, width, height) {
-                if (!scaleSet) {
-                  loadingBox.style.display = "none";
-                  display.style.display = "block";
-                  scaleSet = true;
-                  setTimeout(() => display.focus(), 30);
-                  postStatus("playing", `En jeu (${width}×${height})`);
-                }
-                screenCtx.canvas.width = width;
-                screenCtx.canvas.height = height;
-                autoscale();
-              },
-              async Java_pl_zb3_freej2me_bridge_shell_Shell_waitForAndDispatchEvents(lib, listener) {
-                const KeyEvent = await lib.pl.zb3.freej2me.bridge.shell.KeyEvent;
-                const PointerEvent = await lib.pl.zb3.freej2me.bridge.shell.PointerEvent;
-                const evt = await evtQueue.waitForEvent();
-                if (evt.kind === "keydown") {
-                  await listener.keyPressed(await new KeyEvent(...evt.args));
-                } else if (evt.kind === "keyup") {
-                  await listener.keyReleased(await new KeyEvent(...evt.args));
-                } else if (evt.kind === "pointerpressed") {
-                  await listener.pointerPressed(await new PointerEvent(evt.x, evt.y));
-                } else if (evt.kind === "pointerdragged") {
-                  await listener.pointerDragged(await new PointerEvent(evt.x, evt.y));
-                } else if (evt.kind === "pointerreleased") {
-                  await listener.pointerReleased(await new PointerEvent(evt.x, evt.y));
-                } else if (evt.kind === "player-eom") {
-                  await listener.playerEOM(evt.player);
-                } else if (evt.kind === "player-video-frame") {
-                  await listener.playerVideoFrame(evt.player);
-                }
-              },
-              async Java_pl_zb3_freej2me_bridge_shell_Shell_restart(lib) {
-                location.reload();
-              },
-              async Java_pl_zb3_freej2me_bridge_shell_Shell_exit(lib) {
-                location.reload();
-              },
-              async Java_pl_zb3_freej2me_bridge_shell_Shell_sthop(lib) {},
-              async Java_pl_zb3_freej2me_bridge_shell_Shell_say(lib, sth) {
-                console.log("[FreeJ2ME]", sth);
-              },
-              async Java_pl_zb3_freej2me_bridge_shell_Shell_sayObject(lib, label, obj) {
-                console.log("[FreeJ2ME]", label, obj);
-              },
-            },
-          });
+            });
+          })();
+
+          await Promise.all([midiInitTask, jvmInitTask]);
 
           setLoadingText("Chargement de FreeJ2ME…", "Ouverture de la librairie /app/freej2me/freej2me-web.jar…");
           const lib = await cheerpjRunLibrary("/app/freej2me/freej2me-web.jar");
@@ -768,8 +793,10 @@
 
       try {
         postStatus("loading", `Chargement de ${gameName}…`);
-        const fileBuffer = await fileBlob.arrayBuffer();
-        const lib = await ensureCheerpJInitialized();
+        const [fileBuffer, lib] = await Promise.all([
+          fileBlob.arrayBuffer(),
+          ensureCheerpJInitialized(),
+        ]);
 
         setLoadingText(`Installation de ${gameName}…`, "Analyse du manifeste MIDlet et configuration de l'écran…");
 
@@ -958,16 +985,28 @@
       15: "ArrowRight",
     };
 
+    let _cachedJavaGpMap = null;
+    let _cachedJavaGpMapAt = 0;
+
     function getEffectiveJavaGamepadMap() {
+      const now = performance.now();
+      if (_cachedJavaGpMap && now - _cachedJavaGpMapAt < 1500) {
+        return _cachedJavaGpMap;
+      }
+      _cachedJavaGpMapAt = now;
       const javaCfg = getJavaCustomSettings();
       const padCfg = javaCfg?.gamepad;
-      if (!padCfg || typeof padCfg !== "object") return GP_BTN_MAP;
+      if (!padCfg || typeof padCfg !== "object") {
+        _cachedJavaGpMap = GP_BTN_MAP;
+        return GP_BTN_MAP;
+      }
       const map = { 12: "ArrowUp", 13: "ArrowDown", 14: "ArrowLeft", 15: "ArrowRight" };
       for (const [act, physIdx] of Object.entries(padCfg)) {
         if (typeof physIdx === "number" && J2ME_ACTION_TO_CODE[act]) {
           map[physIdx] = J2ME_ACTION_TO_CODE[act];
         }
       }
+      _cachedJavaGpMap = map;
       return map;
     }
 

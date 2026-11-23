@@ -753,7 +753,7 @@ export class RollbackP2PEngine {
 
     const dispatchWsChunks = async () => {
       if (!this.onRelayButtonFallback || this.destroyed) return;
-      const WS_CHUNK = 16384;
+      const WS_CHUNK = 49152;
       const wsTotal = Math.ceil(stateBase64.length / WS_CHUNK);
       const wsTransferId = `${transferId}_ws`;
       try {
@@ -769,7 +769,7 @@ export class RollbackP2PEngine {
             syncFrame: cleanSyncFrame,
           });
           if (i + 1 < wsTotal) {
-            await new Promise((r) => setTimeout(r, 12));
+            await new Promise((r) => setTimeout(r, 2));
           }
         }
       } catch {
@@ -777,15 +777,14 @@ export class RollbackP2PEngine {
       }
     };
 
-    // Si WebRTC fiable est ouvert, ne pas congestionner le WebSocket immédiatement ;
-    // basculer automatiquement sur le relais WS uniquement si l'ACK tarde (> 1400ms).
+    // Si WebRTC fiable est ouvert, basculer sur le relais WS uniquement si l'ACK tarde (> 650ms).
     if (!sentOverRtc) {
       dispatchWsChunks();
     } else if (this.onRelayButtonFallback) {
       this.frame0FallbackTimer = setTimeout(() => {
         this.frame0FallbackTimer = null;
         dispatchWsChunks();
-      }, 1400);
+      }, 650);
     }
   }
 

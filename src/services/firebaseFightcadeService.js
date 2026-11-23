@@ -12,6 +12,7 @@ import {
   deleteDoc,
   doc,
   limit,
+  notifyLocalFirestoreRemoteEvent,
   onSnapshot,
   orderBy,
   query,
@@ -19,7 +20,7 @@ import {
   setDoc,
   updateDoc,
   where,
-} from 'firebase/firestore';
+} from './localFirestore';
 import { db } from '../config/firebase';
 import { getCurrentUserProfile, getPlayerFriendCode, getPlayerFriendTag, subscribeAuthProfile, updateUserProfile } from './authService';
 import { isJ2meGame, supportsOnlineMultiplayer } from '../utils/gameCapabilities';
@@ -231,6 +232,11 @@ class FirebaseFightcadeService {
 
   handleWsMessage(data) {
     if (!data || !data.type) return;
+
+    if (data.type === 'LOCAL_FS_EVENT') {
+      notifyLocalFirestoreRemoteEvent(data);
+      return;
+    }
 
     if (data.type === 'INCOMING_CHALLENGE' && data.challenge) {
       if (data.challenge.fromUid !== this.identity.uid) {
@@ -941,7 +947,9 @@ class FirebaseFightcadeService {
     };
 
     pullRelay();
-    const pollId = setInterval(pullRelay, 4000);
+    const pollId = setInterval(() => {
+      if (!this.wsConnected) pullRelay();
+    }, 12000);
 
     const onLocalEv = (e) => {
       const d = e?.detail || e?.data;
@@ -1014,7 +1022,9 @@ class FirebaseFightcadeService {
 
     emitMerged();
     pullRelay();
-    const pollId = setInterval(pullRelay, 2500);
+    const pollId = setInterval(() => {
+      if (!this.wsConnected) pullRelay();
+    }, 10000);
 
     const onLocalEv = (e) => {
       const d = e?.detail || e?.data;
@@ -1198,7 +1208,9 @@ class FirebaseFightcadeService {
     };
 
     pullRelay();
-    const pollId = setInterval(pullRelay, 1500);
+    const pollId = setInterval(() => {
+      if (!this.wsConnected) pullRelay();
+    }, 8000);
 
     const q = query(
       collection(db, 'fc_challenges'),
@@ -1249,7 +1261,9 @@ class FirebaseFightcadeService {
     };
 
     pullRelay();
-    const pollId = setInterval(pullRelay, 1000);
+    const pollId = setInterval(() => {
+      if (!this.wsConnected) pullRelay();
+    }, 6000);
 
     const unsubFs = onSnapshot(
       doc(db, 'fc_challenges', challengeId),
@@ -1401,7 +1415,9 @@ class FirebaseFightcadeService {
     };
 
     pullRelay();
-    const pollId = setInterval(pullRelay, 800);
+    const pollId = setInterval(() => {
+      if (!this.wsConnected) pullRelay();
+    }, 4500);
 
     const subCol = remoteRole === 'caller' ? 'callerCandidates' : 'calleeCandidates';
     const unsubFs = onSnapshot(

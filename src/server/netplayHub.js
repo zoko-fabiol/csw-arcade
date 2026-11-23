@@ -2,6 +2,17 @@ import { WebSocketServer, WebSocket } from 'ws';
 import fs from 'node:fs';
 import path from 'node:path';
 import { supportsOnlineMultiplayer } from '../utils/gameCapabilities.js';
+import { LocalFirebaseStore } from './localFirebaseStore.js';
+
+async function fetchWithHeaderTimeout(url, options = {}, timeoutMs = 8500) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(new Error(`Timeout after ${timeoutMs}ms`)), timeoutMs);
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 function loadEnvValue(key, fallback = '') {
   if (process.env[key]) return process.env[key];
@@ -244,11 +255,15 @@ export function setupNetplayHub(server) {
       const customUrl = url.searchParams.get('url');
 
       if (customUrl && /^https?:\/\//i.test(customUrl)) {
-        const remoteRes = await fetch(customUrl, {
-          method: req.method === 'HEAD' ? 'HEAD' : 'GET',
-          redirect: 'follow',
-          headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) CSW-Arcade' },
-        });
+        const remoteRes = await fetchWithHeaderTimeout(
+          customUrl,
+          {
+            method: req.method === 'HEAD' ? 'HEAD' : 'GET',
+            redirect: 'follow',
+            headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) CSW-Arcade' },
+          },
+          8500
+        );
         const ct = (remoteRes.headers.get('content-type') || 'application/octet-stream').toLowerCase();
         if (!remoteRes.ok || ct.includes('text/html')) {
           res.writeHead(404, { 'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json' });
@@ -314,11 +329,15 @@ export function setupNetplayHub(server) {
 
       for (const remoteUrl of candidateUrls) {
         try {
-          const remoteRes = await fetch(remoteUrl, {
-            method: req.method === 'HEAD' ? 'HEAD' : 'GET',
-            redirect: 'follow',
-            headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) CSW-Arcade' },
-          });
+          const remoteRes = await fetchWithHeaderTimeout(
+            remoteUrl,
+            {
+              method: req.method === 'HEAD' ? 'HEAD' : 'GET',
+              redirect: 'follow',
+              headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) CSW-Arcade' },
+            },
+            7000
+          );
           const ct = (remoteRes.headers.get('content-type') || '').toLowerCase();
           if (remoteRes.ok && !ct.includes('text/html')) {
             const cl = remoteRes.headers.get('content-length');
@@ -351,6 +370,97 @@ export function setupNetplayHub(server) {
         res.writeHead(500, { 'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ error: err.message }));
       }
+    }
+  });
+
+  // Cache disque local pour les cores EmulatorJS (/emulatorjs/cores/*) :
+  // sert d'abord public/emulatorjs/cores/, puis .csw-data/emu-cores-cache/, sinon télécharge une fois depuis CDN.
+  const emuCorePublicDir = path.resolve(process.cwd(), 'public/emulatorjs/cores');
+  const emuCoreCacheDir = path.resolve(process.cwd(), '.csw-data/emu-cores-cache');
+  const emuCoreInflight = new Map();
+
+  const getMimeForCoreAsset = (filePath) => {
+    const low = filePath.toLowerCase();
+    if (low.endsWith('.json')) return 'application/json; charset=utf-8';
+    if (low.endsWith('.wasm')) return 'application/wasm';
+    if (low.endsWith('.js')) return 'application/javascript; charset=utf-8';
+    if (low.endsWith('.css')) return 'text/css; charset=utf-8';
+    return 'application/octet-stream';
+  };
+
+  server.middlewares.use('/emulatorjs/cores', async (req, res, next) => {
+    try {
+      const reqUrl = new URL(req.url, 'http://localhost:3003');
+      const rawRel = decodeURIComponent(reqUrl.pathname || '').replace(/^\/+/, '');
+      if (!rawRel || rawRel.includes('..') || rawRel.includes('\\')) {
+        return typeof next === 'function' ? next() : (res.writeHead(404), res.end());
+      }
+
+      const publicCandidate = path.resolve(emuCorePublicDir, rawRel);
+      if (publicCandidate.startsWith(emuCorePublicDir) && fs.existsSync(publicCandidate) && fs.statSync(publicCandidate).isFile()) {
+        const stat = fs.statSync(publicCandidate);
+        res.writeHead(200, {
+          'Content-Type': getMimeForCoreAsset(publicCandidate),
+          'Content-Length': stat.size,
+          'Access-Control-Allow-Origin': '*',
+          'Cache-Control': 'public, max-age=31536000',
+          'X-CSW-Cache': 'public-hit',
+        });
+        return fs.createReadStream(publicCandidate).pipe(res);
+      }
+
+      const cacheCandidate = path.resolve(emuCoreCacheDir, rawRel);
+      if (cacheCandidate.startsWith(emuCoreCacheDir) && fs.existsSync(cacheCandidate) && fs.statSync(cacheCandidate).isFile()) {
+        const stat = fs.statSync(cacheCandidate);
+        res.writeHead(200, {
+          'Content-Type': getMimeForCoreAsset(cacheCandidate),
+          'Content-Length': stat.size,
+          'Access-Control-Allow-Origin': '*',
+          'Cache-Control': 'public, max-age=31536000',
+          'X-CSW-Cache': 'disk-hit',
+        });
+        return fs.createReadStream(cacheCandidate).pipe(res);
+      }
+
+      let downloadPromise = emuCoreInflight.get(rawRel);
+      if (!downloadPromise) {
+        downloadPromise = (async () => {
+          const cdnUrl = `https://cdn.emulatorjs.org/stable/data/cores/${rawRel}`;
+          const remoteRes = await fetchWithHeaderTimeout(
+            cdnUrl,
+            { redirect: 'follow', headers: { 'User-Agent': 'Mozilla/5.0 CSW-Arcade' } },
+            10000
+          );
+          if (!remoteRes.ok) {
+            throw new Error(`CDN HTTP ${remoteRes.status}`);
+          }
+          const ab = await remoteRes.arrayBuffer();
+          const buf = Buffer.from(ab);
+          if (buf.byteLength > 0 && cacheCandidate.startsWith(emuCoreCacheDir)) {
+            fs.mkdirSync(path.dirname(cacheCandidate), { recursive: true });
+            const tmp = `${cacheCandidate}.tmp_${Date.now()}`;
+            fs.writeFileSync(tmp, buf);
+            fs.renameSync(tmp, cacheCandidate);
+          }
+          return buf;
+        })().finally(() => {
+          emuCoreInflight.delete(rawRel);
+        });
+        emuCoreInflight.set(rawRel, downloadPromise);
+      }
+
+      const buf = await downloadPromise;
+      res.writeHead(200, {
+        'Content-Type': getMimeForCoreAsset(rawRel),
+        'Content-Length': buf.byteLength,
+        'Access-Control-Allow-Origin': '*',
+        'Cache-Control': 'public, max-age=31536000',
+        'X-CSW-Cache': 'cdn-cached',
+      });
+      return res.end(buf);
+    } catch {
+      res.writeHead(404, { 'Access-Control-Allow-Origin': '*' });
+      return res.end('Core asset unavailable');
     }
   });
 
@@ -1181,6 +1291,145 @@ export function setupNetplayHub(server) {
   // Attach WebSocket server to httpServer avec support de payload de 64 Mo pour les savestates à froid
   const wss = new WebSocketServer({ noServer: true, maxPayload: 64 * 1024 * 1024 });
 
+  // Moteur Local Firebase (Firestore local persistant + diffusion temps réel WebSocket)
+  const localFirebase = new LocalFirebaseStore();
+  localFirebase.onMutation((event) => {
+    try {
+      if (event?.type === 'set' && event.parentPath === 'users' && event.data && event.id) {
+        upsertDirectoryUser({ ...event.data, uid: event.id });
+      }
+      const raw = JSON.stringify({
+        type: 'LOCAL_FS_EVENT',
+        changeType: event.changeType,
+        opType: event.type,
+        path: event.path,
+        parentPath: event.parentPath,
+        id: event.id,
+        data: event.data,
+      });
+      for (const client of wss.clients) {
+        if (client.readyState === WebSocket.OPEN) {
+          try {
+            client.send(raw);
+          } catch {}
+        }
+      }
+    } catch {
+      /* ignore broadcast errors */
+    }
+  });
+
+  server.middlewares.use('/api/local-firebase', (req, res) => {
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    if (req.method === 'OPTIONS') {
+      res.statusCode = 204;
+      return res.end();
+    }
+
+    if (req.method === 'GET') {
+      try {
+        const reqUrl = new URL(req.url, 'http://localhost:3003');
+        const op = reqUrl.searchParams.get('op') || 'health';
+        const targetPath = reqUrl.searchParams.get('path') || '';
+        if (op === 'health') {
+          res.statusCode = 200;
+          return res.end(JSON.stringify({ ok: true, localFirebase: true, docsCount: localFirebase.docs.size }));
+        }
+        if (op === 'getDoc') {
+          res.statusCode = 200;
+          return res.end(JSON.stringify({ ok: true, ...localFirebase.getDoc(targetPath) }));
+        }
+        if (op === 'getDocs') {
+          const docs = localFirebase.getCollectionDocs(targetPath);
+          res.statusCode = 200;
+          return res.end(JSON.stringify({ ok: true, docs }));
+        }
+        res.statusCode = 400;
+        return res.end(JSON.stringify({ ok: false, error: 'Opération GET inconnue' }));
+      } catch (err) {
+        res.statusCode = 400;
+        return res.end(JSON.stringify({ ok: false, error: err?.message || 'Erreur GET' }));
+      }
+    }
+
+    if (req.method === 'POST') {
+      const chunks = [];
+      let totalBytes = 0;
+      const MAX_BODY = 8 * 1024 * 1024;
+      let aborted = false;
+      req.on('data', (chunk) => {
+        if (aborted) return;
+        totalBytes += chunk.length;
+        if (totalBytes > MAX_BODY) {
+          aborted = true;
+          res.statusCode = 413;
+          res.end(JSON.stringify({ ok: false, error: 'Payload trop volumineux (>8 Mo)' }));
+          return;
+        }
+        chunks.push(chunk);
+      });
+      req.on('end', () => {
+        if (aborted) return;
+        try {
+          const raw = Buffer.concat(chunks).toString('utf8');
+          const body = raw ? JSON.parse(raw) : {};
+          const op = body.op;
+          if (op === 'health') {
+            res.statusCode = 200;
+            return res.end(JSON.stringify({ ok: true, localFirebase: true, docsCount: localFirebase.docs.size }));
+          }
+          if (op === 'getDoc') {
+            res.statusCode = 200;
+            return res.end(JSON.stringify({ ok: true, ...localFirebase.getDoc(body.path) }));
+          }
+          if (op === 'getDocs') {
+            const docs = localFirebase.queryCollection(body.path, body.constraints);
+            res.statusCode = 200;
+            return res.end(JSON.stringify({ ok: true, docs }));
+          }
+          if (op === 'setDoc') {
+            const ev = localFirebase.setDoc(body.path, body.data, { merge: Boolean(body.merge) });
+            res.statusCode = 200;
+            return res.end(JSON.stringify({ ok: true, ...ev }));
+          }
+          if (op === 'updateDoc') {
+            const ev = localFirebase.updateDoc(body.path, body.patch || body.data);
+            res.statusCode = 200;
+            return res.end(JSON.stringify({ ok: true, ...ev }));
+          }
+          if (op === 'addDoc') {
+            const ev = localFirebase.addDoc(body.path, body.data);
+            res.statusCode = 200;
+            return res.end(JSON.stringify({ ok: true, ...ev }));
+          }
+          if (op === 'deleteDoc') {
+            const ev = localFirebase.deleteDoc(body.path);
+            res.statusCode = 200;
+            return res.end(JSON.stringify({ ok: true, ...ev }));
+          }
+          if (op === 'batchGetDocs') {
+            const paths = Array.isArray(body.paths) ? body.paths : [];
+            const results = paths.map((p) => localFirebase.getDoc(p));
+            res.statusCode = 200;
+            return res.end(JSON.stringify({ ok: true, results }));
+          }
+          res.statusCode = 400;
+          return res.end(JSON.stringify({ ok: false, error: `Opération inconnue: ${op}` }));
+        } catch (err) {
+          res.statusCode = 400;
+          return res.end(JSON.stringify({ ok: false, error: err?.message || 'Requête invalide' }));
+        }
+      });
+      return;
+    }
+
+    res.statusCode = 405;
+    res.end(JSON.stringify({ ok: false }));
+  });
+
   if (server.httpServer) {
     server.httpServer.on('upgrade', (request, socket, head) => {
       try {
@@ -1209,6 +1458,9 @@ export function setupNetplayHub(server) {
     rec.coins = next;
     rec.coinsUpdatedAtMs = Date.now();
     rec.updatedAtMs = Date.now();
+    try {
+      localFirebase.setDoc(`wallets/${uid}`, { coins: next, updatedAt: Date.now() }, { merge: true });
+    } catch {}
     return next;
   }
 
@@ -2263,6 +2515,26 @@ export function setupNetplayHub(server) {
           case 'LEAVE_ROOM': {
             handleClientDisconnect(ws);
             ws.send(JSON.stringify({ type: 'LEFT_ROOM' }));
+            break;
+          }
+
+          case 'LOCAL_FS_OP': {
+            const { reqId, op, path: fsPath, data: docData, patch, merge, constraints } = data;
+            let result = { ok: false };
+            try {
+              if (op === 'getDoc') result = { ok: true, ...localFirebase.getDoc(fsPath) };
+              else if (op === 'getDocs') result = { ok: true, docs: localFirebase.queryCollection(fsPath, constraints) };
+              else if (op === 'setDoc') result = { ok: true, ...localFirebase.setDoc(fsPath, docData, { merge: Boolean(merge) }) };
+              else if (op === 'updateDoc') result = { ok: true, ...localFirebase.updateDoc(fsPath, patch || docData) };
+              else if (op === 'addDoc') result = { ok: true, ...localFirebase.addDoc(fsPath, docData) };
+              else if (op === 'deleteDoc') result = { ok: true, ...localFirebase.deleteDoc(fsPath) };
+              else result = { ok: false, error: `Unknown op: ${op}` };
+            } catch (opErr) {
+              result = { ok: false, error: opErr?.message || 'LocalFS error' };
+            }
+            if (reqId && ws.readyState === WebSocket.OPEN) {
+              ws.send(JSON.stringify({ type: 'LOCAL_FS_RES', reqId, ...result }));
+            }
             break;
           }
         }

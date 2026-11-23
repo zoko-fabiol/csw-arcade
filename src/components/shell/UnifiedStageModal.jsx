@@ -321,7 +321,7 @@ export function UnifiedStageModal({
                 ratio,
                 volume: settings?.audio?.volume ?? 80,
                 muted: Boolean(settings?.audio?.muted),
-                localData: false,
+                localData: true,
               };
         iframeRef.current.contentWindow.postMessage(bootMsg, window.location.origin);
         iframeRef.current.contentWindow.postMessage(

@@ -90,9 +90,13 @@ export function formatBytes(bytes) {
   return `${(n / (1024 * 1024)).toFixed(1)} Mo`;
 }
 
+let cachedPlatformDbPromise = null;
+
 function openPlatformDb() {
-  return new Promise((resolve, reject) => {
+  if (cachedPlatformDbPromise) return cachedPlatformDbPromise;
+  cachedPlatformDbPromise = new Promise((resolve, reject) => {
     if (typeof window === 'undefined' || !window.indexedDB) {
+      cachedPlatformDbPromise = null;
       return reject(new Error('IndexedDB indisponible'));
     }
     const req = window.indexedDB.open(PLATFORM_IDB_NAME, 1);
@@ -102,9 +106,23 @@ function openPlatformDb() {
         db.createObjectStore(PLATFORM_IDB_STORE, { keyPath: 'id' });
       }
     };
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error || new Error('Erreur IndexedDB'));
+    req.onsuccess = () => {
+      const db = req.result;
+      db.onclose = () => {
+        cachedPlatformDbPromise = null;
+      };
+      db.onversionchange = () => {
+        db.close();
+        cachedPlatformDbPromise = null;
+      };
+      resolve(db);
+    };
+    req.onerror = () => {
+      cachedPlatformDbPromise = null;
+      reject(req.error || new Error('Erreur IndexedDB'));
+    };
   });
+  return cachedPlatformDbPromise;
 }
 
 export async function getCachedRom(id) {
@@ -217,6 +235,18 @@ async function ensureJSZip() {
   return jsZipPromise;
 }
 
+async function fetchJsonWithTimeout(url, timeoutMs = 4500) {
+  const ctrl = typeof AbortController !== 'undefined' ? new AbortController() : null;
+  const timer = ctrl ? setTimeout(() => ctrl.abort(new Error('Timeout Archive.org')), timeoutMs) : null;
+  try {
+    const res = await fetch(url, ctrl ? { signal: ctrl.signal } : undefined);
+    if (!res.ok) throw new Error(`Archive.org HTTP ${res.status}`);
+    return await res.json();
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
 export async function searchOnlineRoms(query, { system = 'nes', limit = 12 } = {}) {
   const hint = SYSTEM_SEARCH_HINTS[system] || { keywords: system, extensions: ['.zip'] };
   const cleanQ = String(query || '').trim();
@@ -224,40 +254,40 @@ export async function searchOnlineRoms(query, { system = 'nes', limit = 12 } = {
 
   const q = `(${cleanQ}) AND (${hint.keywords}) AND mediatype:(software OR data)`;
   const searchUrl = `https://archive.org/advancedsearch.php?q=${encodeURIComponent(q)}&fl[]=identifier,title,downloads&sort[]=downloads+desc&rows=8&output=json`;
-  const res = await fetch(searchUrl);
-  if (!res.ok) throw new Error(`Archive.org HTTP ${res.status}`);
-  const data = await res.json();
-  const docs = data?.response?.docs || [];
-  const results = [];
+  const data = await fetchJsonWithTimeout(searchUrl, 5500);
+  const docs = (data?.response?.docs || []).slice(0, 4);
 
-  for (const doc of docs.slice(0, 4)) {
-    try {
-      const metaRes = await fetch(`https://archive.org/metadata/${encodeURIComponent(doc.identifier)}/files`);
-      if (!metaRes.ok) continue;
-      const meta = await metaRes.json();
-      const files = (meta?.result || []).filter((f) => {
-        const lower = String(f.name || '').toLowerCase();
-        return hint.extensions.some((ext) => lower.endsWith(ext)) && Number(f.size || 0) < 160 * 1024 * 1024;
+  const metaSettled = await Promise.allSettled(
+    docs.map(async (doc) => {
+      const meta = await fetchJsonWithTimeout(`https://archive.org/metadata/${encodeURIComponent(doc.identifier)}/files`, 4500);
+      return { doc, meta };
+    })
+  );
+
+  const results = [];
+  for (const item of metaSettled) {
+    if (item.status !== 'fulfilled') continue;
+    const { doc, meta } = item.value;
+    const files = (meta?.result || []).filter((f) => {
+      const lower = String(f.name || '').toLowerCase();
+      return hint.extensions.some((ext) => lower.endsWith(ext)) && Number(f.size || 0) < 160 * 1024 * 1024;
+    });
+    for (const f of files.slice(0, 4)) {
+      const encoded = f.name.split('/').map((s) => encodeURIComponent(s)).join('/');
+      const dl = `https://archive.org/download/${encodeURIComponent(doc.identifier)}/${encoded}`;
+      results.push({
+        id: `${doc.identifier}-${f.name}`.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+        title: f.name.split('/').pop().replace(/\.[^.]+$/, ''),
+        filename: f.name.split('/').pop(),
+        size: Number(f.size || 0),
+        sourceLabel: doc.title || doc.identifier,
+        urls: [
+          `https://archive.org/cors/${encodeURIComponent(doc.identifier)}/${encoded}`,
+          `/api/rom-proxy?url=${encodeURIComponent(dl)}`,
+          dl,
+        ],
       });
-      for (const f of files.slice(0, 4)) {
-        const encoded = f.name.split('/').map((s) => encodeURIComponent(s)).join('/');
-        const dl = `https://archive.org/download/${encodeURIComponent(doc.identifier)}/${encoded}`;
-        results.push({
-          id: `${doc.identifier}-${f.name}`.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
-          title: f.name.split('/').pop().replace(/\.[^.]+$/, ''),
-          filename: f.name.split('/').pop(),
-          size: Number(f.size || 0),
-          sourceLabel: doc.title || doc.identifier,
-          urls: [
-            `https://archive.org/cors/${encodeURIComponent(doc.identifier)}/${encoded}`,
-            `/api/rom-proxy?url=${encodeURIComponent(dl)}`,
-            dl,
-          ],
-        });
-        if (results.length >= limit) return results;
-      }
-    } catch {
-      /* continue */
+      if (results.length >= limit) return results;
     }
   }
   return results;
@@ -346,8 +376,14 @@ export async function downloadAndCacheRom(entry, { mode = 'retro', core = 'nes',
   let lastErr = null;
 
   for (const url of urls) {
+    const headerCtrl = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    const isLocalProxy = url.startsWith('/') || url.includes('/api/rom-proxy');
+    const headerTimer = headerCtrl
+      ? setTimeout(() => headerCtrl.abort(new Error('Délai réseau dépassé')), isLocalProxy ? 9500 : 6500)
+      : null;
     try {
-      const res = await fetch(url);
+      const res = await fetch(url, headerCtrl ? { signal: headerCtrl.signal } : undefined);
+      if (headerTimer) clearTimeout(headerTimer);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const ct = (res.headers.get('content-type') || '').toLowerCase();
       if (ct.includes('text/html')) throw new Error('HTML 404 response');
@@ -380,6 +416,7 @@ export async function downloadAndCacheRom(entry, { mode = 'retro', core = 'nes',
       }
       throw new Error('Fichier ROM invalide ou corrompu');
     } catch (err) {
+      if (headerTimer) clearTimeout(headerTimer);
       lastErr = err;
     }
   }

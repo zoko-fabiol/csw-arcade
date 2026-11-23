@@ -38,13 +38,21 @@ function romStreamPlugin() {
           const url = new URL(req.url, 'http://localhost:3003');
           const customUrl = url.searchParams.get('url');
 
-          // 0. Si une URL directe (?url=https://archive.org/...) est fournie, proxy direct avec suivi de redirection
+          // 0. Si une URL directe (?url=https://archive.org/...) est fournie, proxy direct avec timeout header
           if (customUrl && /^https?:\/\//i.test(customUrl)) {
-            const remoteRes = await fetch(customUrl, {
-              method: req.method === 'HEAD' ? 'HEAD' : 'GET',
-              redirect: 'follow',
-              headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) CSW-Arcade' }
-            });
+            const ctrl0 = new AbortController();
+            const timer0 = setTimeout(() => ctrl0.abort(new Error('ROM header timeout')), 8500);
+            let remoteRes;
+            try {
+              remoteRes = await fetch(customUrl, {
+                method: req.method === 'HEAD' ? 'HEAD' : 'GET',
+                redirect: 'follow',
+                signal: ctrl0.signal,
+                headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) CSW-Arcade' }
+              });
+            } finally {
+              clearTimeout(timer0);
+            }
             const ct = remoteRes.headers.get('content-type') || 'application/octet-stream';
             if (!remoteRes.ok || ct.includes('text/html')) {
               res.writeHead(404, { 'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json' });
@@ -109,10 +117,19 @@ function romStreamPlugin() {
 
           for (const remoteUrl of candidateUrls) {
             try {
-              const remoteRes = await fetch(remoteUrl, {
-                redirect: 'follow',
-                headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' }
-              });
+              const ctrl = new AbortController();
+              const timer = setTimeout(() => ctrl.abort(new Error('ROM header timeout')), 7000);
+              let remoteRes;
+              try {
+                remoteRes = await fetch(remoteUrl, {
+                  method: req.method === 'HEAD' ? 'HEAD' : 'GET',
+                  redirect: 'follow',
+                  signal: ctrl.signal,
+                  headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' }
+                });
+              } finally {
+                clearTimeout(timer);
+              }
 
               if (remoteRes.ok) {
                 const cl = remoteRes.headers.get('content-length');

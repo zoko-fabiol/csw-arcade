@@ -1,7 +1,7 @@
 /**
  * Pilier 2 : Portefeuille Global Persistant des Coins (0 à 99 crédits).
  */
-import { doc, setDoc } from 'firebase/firestore';
+import { doc, setDoc } from './localFirestore';
 import { db } from '../config/firebase';
 
 const STORAGE_KEY = 'csw_wallet_coins_v1';

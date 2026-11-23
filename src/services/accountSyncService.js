@@ -6,8 +6,9 @@
  * - Partie en cours + Checkpoint Savestate compressé (gzip) pour poursuivre exactement au même endroit sur un autre appareil
  * Double couche : Firebase Firestore (Internet) + Relais serveur /api/account-sync & BroadcastChannel (Instantané LAN / multi-onglets)
  */
-import { doc, getDoc, onSnapshot, serverTimestamp, setDoc } from 'firebase/firestore';
+import { doc, getDoc, onSnapshot, serverTimestamp, setDoc } from './localFirestore';
 import { db } from '../config/firebase';
+import { supportsOnlineMultiplayer } from '../utils/gameCapabilities';
 
 const DEVICE_ID_KEY = 'csw_device_session_id_v1';
 const HANDOFF_MAX_AGE_MS = 3 * 60 * 1000; // Expiration automatique après 3 minutes d'inactivité
@@ -149,7 +150,8 @@ export function pushCoinsSync(uid, coins) {
 export function pushChannelsSync(uid, activeChannels, selectedChannelId) {
   if (!uid) return;
   const now = Date.now();
-  // Nettoyer les objets pour qu'ils soient légers et sérialisables
+  const dev = getDeviceInfo();
+  // Préserver players & supportsMultiplayer pour que la validation multijoueur reste intacte après synchro
   const cleanChannels = (Array.isArray(activeChannels) ? activeChannels : []).slice(0, 3).map((ch) => ({
     gameId: ch.gameId,
     title: ch.title,
@@ -164,6 +166,12 @@ export function pushChannelsSync(uid, activeChannels, selectedChannelId) {
           platform: ch.entry.platform,
           platformLabel: ch.entry.platformLabel,
           filename: ch.entry.filename,
+          players: ch.entry.players ?? null,
+          maxPlayers: ch.entry.maxPlayers ?? null,
+          supportsMultiplayer:
+            typeof ch.entry.supportsMultiplayer === 'boolean'
+              ? ch.entry.supportsMultiplayer
+              : supportsOnlineMultiplayer(ch.entry),
           urls: Array.isArray(ch.entry.urls) ? ch.entry.urls.slice(0, 4) : [],
           imageUrl: ch.entry.imageUrl || ch.entry.coverUrl || null,
         }
@@ -172,6 +180,7 @@ export function pushChannelsSync(uid, activeChannels, selectedChannelId) {
   return postAccountPatch(uid, {
     activeChannels: cleanChannels,
     channelsUpdatedAtMs: now,
+    channelsSourceDeviceId: dev.deviceId,
     selectedChannelId: selectedChannelId ?? null,
   });
 }
@@ -296,6 +305,9 @@ export function subscribeAccountSync(uid, onUpdate) {
       coinsUpdatedAtMs: Math.max(f.coinsUpdatedAtMs || 0, r.coinsUpdatedAtMs || 0),
       activeChannels: useFsChannels ? f.activeChannels : (r.activeChannels ?? f.activeChannels ?? null),
       channelsUpdatedAtMs: Math.max(f.channelsUpdatedAtMs || 0, r.channelsUpdatedAtMs || 0),
+      channelsSourceDeviceId: useFsChannels
+        ? f.channelsSourceDeviceId || null
+        : (r.channelsSourceDeviceId ?? f.channelsSourceDeviceId ?? null),
       selectedChannelId: r.selectedChannelId ?? f.selectedChannelId ?? null,
       activeSession: isFreshSession ? activeSession : null,
       hasSavestate: Boolean(isFreshSession && (r.hasSavestate || activeSession?.hasSavestate)),
@@ -319,7 +331,7 @@ export function subscribeAccountSync(uid, onUpdate) {
   };
 
   pullRelay();
-  const pollId = setInterval(pullRelay, 3000);
+  const pollId = setInterval(pullRelay, 15000);
 
   let bc = null;
   try {
