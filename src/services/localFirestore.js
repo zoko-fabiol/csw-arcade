@@ -462,6 +462,12 @@ export class LocalFirestoreDatabase {
         return null;
       }
       if (!res.ok) return null;
+      const ct = (res.headers.get('content-type') || '').toLowerCase();
+      if (!ct.includes('json')) {
+        this.serverReachable = false;
+        this.lastServerFailMs = Date.now();
+        return null;
+      }
       const data = await res.json();
       if (data && data.ok) {
         this.serverReachable = true;

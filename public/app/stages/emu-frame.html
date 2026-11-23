@@ -141,9 +141,15 @@
     })();
 
     const CDN_DATA = 'https://cdn.emulatorjs.org/stable/data/';
-    // Pré-vérifier dès le chargement de l'iframe si le backend local /emulatorjs/cores/* est disponible (< 2ms en local)
-    const hasLocalCoreProxyPromise = fetch('/api/local-firebase?op=health')
-      .then((r) => r.ok)
+    // Vérifier strictement que le backend Node /api/emu-cores/* est actif (et renvoie du vrai JSON, jamais index.html SPA)
+    const hasLocalCoreProxyPromise = fetch('/api/emu-cores/reports/fceumm.json')
+      .then(async (r) => {
+        if (!r.ok) return false;
+        const ct = (r.headers.get('content-type') || '').toLowerCase();
+        if (!ct.includes('application/json')) return false;
+        const j = await r.json().catch(() => null);
+        return Boolean(j && j.core === 'fceumm');
+      })
       .catch(() => false);
     let started = false;
     let isNetplaySession = false;
@@ -3235,8 +3241,28 @@
               'fbneo.json': '/emulatorjs/cores/reports/fbneo.json',
               'version.json': '/emulatorjs/version.json',
             };
+          } else if (msg.localData && hasLocalCoreProxy) {
+            const coreAliases = [
+              'fceumm', 'nestopia', 'snes9x', 'mupen64plus_next', 'parallel_n64',
+              'gambatte', 'mgba', 'melonds', 'desmume', 'desmume2015',
+              'genesis_plus_gx', 'picodrive', 'smsplus', 'yabause',
+              'pcsx_rearmed', 'mednafen_psx_hw', 'mednafen_pce',
+              'mame2003_plus', 'mame2003', 'ppsspp', 'fbneo',
+            ];
+            const mappedPaths = {
+              'version.json': '/emulatorjs/version.json',
+            };
+            for (const c of coreAliases) {
+              mappedPaths[`${c}.json`] = `/api/emu-cores/reports/${c}.json`;
+              mappedPaths[`${c}-wasm.data`] = `/api/emu-cores/${c}-wasm.data`;
+              mappedPaths[`${c}-legacy-wasm.data`] = `/api/emu-cores/${c}-legacy-wasm.data`;
+              mappedPaths[`${c}-thread-wasm.data`] = `/api/emu-cores/${c}-thread-wasm.data`;
+              mappedPaths[`${c}-thread-legacy-wasm.data`] = `/api/emu-cores/${c}-thread-legacy-wasm.data`;
+            }
+            window.EJS_pathtodata = '/emulatorjs/';
+            window.EJS_paths = mappedPaths;
           } else {
-            window.EJS_pathtodata = msg.localData && hasLocalCoreProxy ? '/emulatorjs/' : CDN_DATA;
+            window.EJS_pathtodata = CDN_DATA;
           }
           window.EJS_startOnLoaded = true;
           window.EJS_color = msg.accent || '#3b82f6';

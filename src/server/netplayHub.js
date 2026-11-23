@@ -388,10 +388,12 @@ export function setupNetplayHub(server) {
     return 'application/octet-stream';
   };
 
-  server.middlewares.use('/emulatorjs/cores', async (req, res, next) => {
+  const serveEmulatorCore = async (req, res, next) => {
     try {
       const reqUrl = new URL(req.url, 'http://localhost:3003');
-      const rawRel = decodeURIComponent(reqUrl.pathname || '').replace(/^\/+/, '');
+      const rawRel = decodeURIComponent(reqUrl.pathname || '')
+        .replace(/^\/?(?:api\/emu-cores|emulatorjs\/cores)\/?/i, '')
+        .replace(/^\/+/, '');
       if (!rawRel || rawRel.includes('..') || rawRel.includes('\\')) {
         return typeof next === 'function' ? next() : (res.writeHead(404), res.end());
       }
@@ -426,23 +428,41 @@ export function setupNetplayHub(server) {
       if (!downloadPromise) {
         downloadPromise = (async () => {
           const cdnUrl = `https://cdn.emulatorjs.org/stable/data/cores/${rawRel}`;
-          const remoteRes = await fetchWithHeaderTimeout(
-            cdnUrl,
-            { redirect: 'follow', headers: { 'User-Agent': 'Mozilla/5.0 CSW-Arcade' } },
-            10000
-          );
-          if (!remoteRes.ok) {
-            throw new Error(`CDN HTTP ${remoteRes.status}`);
+          let lastErr = null;
+          for (let attempt = 0; attempt < 2; attempt++) {
+            try {
+              const remoteRes = await fetchWithHeaderTimeout(
+                cdnUrl,
+                { redirect: 'follow', headers: { 'User-Agent': 'Mozilla/5.0 CSW-Arcade' } },
+                25000
+              );
+              if (!remoteRes.ok) {
+                throw new Error(`CDN HTTP ${remoteRes.status}`);
+              }
+              const ct = (remoteRes.headers.get('content-type') || '').toLowerCase();
+              if (ct.includes('text/html')) {
+                throw new Error('CDN returned HTML');
+              }
+              const ab = await remoteRes.arrayBuffer();
+              const buf = Buffer.from(ab);
+              if (buf.byteLength === 0) {
+                throw new Error('Empty CDN asset');
+              }
+              if (rawRel.toLowerCase().endsWith('.json')) {
+                JSON.parse(buf.toString('utf8'));
+              }
+              if (cacheCandidate.startsWith(emuCoreCacheDir)) {
+                fs.mkdirSync(path.dirname(cacheCandidate), { recursive: true });
+                const tmp = `${cacheCandidate}.tmp_${Date.now()}`;
+                fs.writeFileSync(tmp, buf);
+                fs.renameSync(tmp, cacheCandidate);
+              }
+              return buf;
+            } catch (err) {
+              lastErr = err;
+            }
           }
-          const ab = await remoteRes.arrayBuffer();
-          const buf = Buffer.from(ab);
-          if (buf.byteLength > 0 && cacheCandidate.startsWith(emuCoreCacheDir)) {
-            fs.mkdirSync(path.dirname(cacheCandidate), { recursive: true });
-            const tmp = `${cacheCandidate}.tmp_${Date.now()}`;
-            fs.writeFileSync(tmp, buf);
-            fs.renameSync(tmp, cacheCandidate);
-          }
-          return buf;
+          throw lastErr || new Error('CDN core fetch failed');
         })().finally(() => {
           emuCoreInflight.delete(rawRel);
         });
@@ -459,10 +479,13 @@ export function setupNetplayHub(server) {
       });
       return res.end(buf);
     } catch {
-      res.writeHead(404, { 'Access-Control-Allow-Origin': '*' });
+      res.writeHead(404, { 'Access-Control-Allow-Origin': '*', 'Content-Type': 'text/plain; charset=utf-8' });
       return res.end('Core asset unavailable');
     }
-  });
+  };
+
+  server.middlewares.use('/api/emu-cores', serveEmulatorCore);
+  server.middlewares.use('/emulatorjs/cores', serveEmulatorCore);
 
   // Relais temps réel local / LAN pour les salons Fightcade 2 (chat & présence) — garantit le fonctionnement même sans règles Firestore publiées
   const fcLobbies = new Map(); // gameId -> { messages: [], users: Map<uid, userObj> }

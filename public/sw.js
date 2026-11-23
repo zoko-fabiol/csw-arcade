@@ -1,5 +1,5 @@
-const SHELL_CACHE_NAME = 'csw-arcade-shell-v23-multiplayer-audit';
-const ENGINE_CACHE_NAME = 'csw-arcade-engine-v6';
+const SHELL_CACHE_NAME = 'csw-arcade-shell-v24-emu-cores-fix';
+const ENGINE_CACHE_NAME = 'csw-arcade-engine-v7';
 
 // Assets essentiels du moteur WebAssembly (FBNeo + EmulatorJS)
 const ENGINE_ASSETS = [
@@ -102,7 +102,8 @@ self.addEventListener('fetch', (event) => {
           return cachedResponse;
         }
         return fetch(event.request).then((networkResponse) => {
-          if (networkResponse && (networkResponse.status === 200 || networkResponse.type === 'opaque')) {
+          const ct = (networkResponse?.headers?.get('content-type') || '').toLowerCase();
+          if (networkResponse && ((networkResponse.status === 200 && !ct.includes('text/html')) || networkResponse.type === 'opaque')) {
             const clone = networkResponse.clone();
             caches.open(ENGINE_CACHE_NAME).then((cache) => cache.put(event.request, clone));
           }

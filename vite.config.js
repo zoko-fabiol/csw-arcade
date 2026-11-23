@@ -40,18 +40,23 @@ function romStreamPlugin() {
 
           // 0. Si une URL directe (?url=https://archive.org/...) est fournie, proxy direct avec timeout header
           if (customUrl && /^https?:\/\//i.test(customUrl)) {
-            const ctrl0 = new AbortController();
-            const timer0 = setTimeout(() => ctrl0.abort(new Error('ROM header timeout')), 8500);
             let remoteRes;
             try {
-              remoteRes = await fetch(customUrl, {
-                method: req.method === 'HEAD' ? 'HEAD' : 'GET',
-                redirect: 'follow',
-                signal: ctrl0.signal,
-                headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) CSW-Arcade' }
-              });
-            } finally {
-              clearTimeout(timer0);
+              const ctrl0 = new AbortController();
+              const timer0 = setTimeout(() => ctrl0.abort(new Error('ROM header timeout')), 8500);
+              try {
+                remoteRes = await fetch(customUrl, {
+                  method: req.method === 'HEAD' ? 'HEAD' : 'GET',
+                  redirect: 'follow',
+                  signal: ctrl0.signal,
+                  headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) CSW-Arcade' }
+                });
+              } finally {
+                clearTimeout(timer0);
+              }
+            } catch {
+              res.writeHead(404, { 'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json' });
+              return res.end(JSON.stringify({ error: 'ROM source inaccessible ou expirée' }));
             }
             const ct = remoteRes.headers.get('content-type') || 'application/octet-stream';
             if (!remoteRes.ok || ct.includes('text/html')) {
