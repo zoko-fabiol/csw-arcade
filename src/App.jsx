@@ -168,6 +168,8 @@ export default function App() {
       badgeSuffix = 'LOCAL',
       refundCoinOnFail = true,
       opponentName = null,
+      opponentUid = null,
+      challengeId = null,
       initialStateBase64 = null,
       preloadedBlob = null,
     } = {}
@@ -210,6 +212,8 @@ export default function App() {
           isHost,
           playerIndex,
           opponentName,
+          opponentUid,
+          challengeId,
           initialStateBase64,
           accent: '#00f0ff',
         },
@@ -402,6 +406,8 @@ export default function App() {
         badgeSuffix: isHost ? 'P1 HOST · NETPLAY 2P' : 'P2 GUEST · NETPLAY 2P',
         preloadedBlob,
         opponentName,
+        opponentUid,
+        challengeId,
       });
     }
   };

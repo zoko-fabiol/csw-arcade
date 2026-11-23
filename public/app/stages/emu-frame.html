@@ -777,7 +777,7 @@
       constructor() {
         this.BUFFER_SIZE = 128;
         this.BUFFER_MASK = 127;
-        this.MAX_ROLLBACK = 15;
+        this.MAX_ROLLBACK = 12;
         this.INPUT_DELAY = 2; // 2 frames (33.3 ms) : absorbe la latence réseau et évite 90% des rollbacks
         this.FRAME_TIME_MS = 1000 / 60;
 
@@ -788,6 +788,7 @@
         this.seq = 0;
 
         this.isRunning = false;
+        this.matchAborted = false;
         this.hookAttached = false;
         this.localWarmupDone = false;
         this.warmupFramesLeft = 30;
@@ -960,7 +961,7 @@
         this.forceApplyAllInputs = true;
         this.applyInputs(0, 0);
         this.applyInputs(1, 0);
-        if (!isNetplaySession) {
+        if (!this.isWasmAsyncifyBusy()) {
           this.captureSnapshot(cleanFrame);
         }
 
@@ -971,7 +972,7 @@
       }
 
       captureSnapshot(frame) {
-        if (isHeavy3dCore(currentCoreName)) return false;
+        if (isHeavy3dCore(currentCoreName) || this.isWasmAsyncifyBusy()) return false;
         this.gm = this.gm || window.EJS_emulator?.gameManager;
         this.module = this.module || getWasmModule();
         if (!this.gm) return false;
@@ -995,21 +996,17 @@
               }
             }
           }
-          if (typeof this.gm.getState === 'function') {
-            const st = this.gm.getState();
-            const bytes = st instanceof Uint8Array ? st : st ? new Uint8Array(st) : null;
-            if (bytes && bytes.length > 0 && bytes.length <= 4 * 1024 * 1024) {
-              if (!this.savestates[slot] || this.savestates[slot].length < bytes.length) {
-                this.savestates[slot] = new Uint8Array(bytes.length);
-              }
-              this.savestates[slot].set(bytes, 0);
-              this.savestateLengths[slot] = bytes.length;
-              this.savestateFrames[slot] = frame;
-              return true;
-            }
-          }
         } catch {}
         return false;
+      }
+
+      getLatestSnapshotBytes() {
+        const lastFrame = Math.max(0, this.currentFrame - 1);
+        const slot = lastFrame & this.BUFFER_MASK;
+        if (this.savestateFrames[slot] === lastFrame && this.savestates[slot] && this.savestateLengths[slot] > 0) {
+          return this.savestates[slot].subarray(0, this.savestateLengths[slot]);
+        }
+        return null;
       }
 
       setInputDelay(delayFrames) {
@@ -1040,11 +1037,17 @@
             } catch {}
             this.gm.FS.writeFile('/csw_rb.state', slice);
             this.gm.functions.loadState('csw_rb.state', 0);
+            if (this.originalMainLoopFunc && !this.isWasmAsyncifyBusy()) {
+              this.originalMainLoopFunc(); // Flush tick: RetroArch consomme load_state au tick suivant sans avancer l'émulation
+            }
             this.forceApplyAllInputs = true;
             return true;
           }
           if (typeof this.gm.loadState === 'function') {
             this.gm.loadState(slice);
+            if (this.originalMainLoopFunc && !this.isWasmAsyncifyBusy()) {
+              this.originalMainLoopFunc();
+            }
             this.forceApplyAllInputs = true;
             return true;
           }
@@ -1150,13 +1153,33 @@
             return hash >>> 0;
           }
         }
+        // Fallback universel déterministe : hacher uniquement les zones RAM de jeu (en excluant l'en-tête RASTATE et le scratch audio FM)
         const slot = frame & this.BUFFER_MASK;
         if (this.savestateFrames[slot] === frame && this.savestates[slot]) {
           const snap = this.savestates[slot];
           const len = this.savestateLengths[slot];
-          if (len >= 1024) {
+          if (len >= 360000) {
+            // Bandes 68000 / Z80 / Sprite RAM FBNeo vérifiées (0 bruit au replay, sensibilité totale aux vies/HP/score)
             let hash = 0x811c9dc5;
-            for (let i = 0; i < len; i += 8) {
+            const bands = [
+              [196608, 245760],
+              [270336, 327680],
+              [344064, Math.min(len - 16384, 393216)],
+            ];
+            for (let b = 0; b < bands.length; b++) {
+              const start = bands[b][0];
+              const end = Math.min(len, bands[b][1]);
+              for (let i = start; i < end; i += 8) {
+                hash ^= snap[i];
+                hash = Math.imul(hash, 0x01000193);
+              }
+            }
+            return hash >>> 0;
+          } else if (len >= 8192) {
+            let hash = 0x811c9dc5;
+            const start = 2048;
+            const end = len - 4096;
+            for (let i = start; i < end; i += 8) {
               hash ^= snap[i];
               hash = Math.imul(hash, 0x01000193);
             }
@@ -1178,7 +1201,7 @@
 
       requestDesyncRecovery(frame) {
         const now = performance.now();
-        if (now - this.lastDesyncRequestMs < 6000) return;
+        if (now - this.lastDesyncRequestMs < 2500) return;
         this.lastDesyncRequestMs = now;
         this.stats.syncStatus = 'RESYNC...';
         const buf = new ArrayBuffer(5);
@@ -1385,7 +1408,7 @@
 
         if (magic === 0xcc && view.byteLength >= 5) {
           if (netplayPlayerIndex === 0 && this.hostSetupCompleted) {
-            this.exportAndLockSyncState('resync');
+            this.pendingHostExportSlot = 'resync';
           }
           return;
         }
@@ -1485,61 +1508,75 @@
         }
 
         if (earliestMispredicted !== -1) {
-          // Mode déterministe sans ré-entrance WASM : on ne rappelle pas loadState() en boucle dans runIter
-          this.stats.totalRollbacks += 1;
-          this.stats.lastRollbackDistance = Math.min(this.MAX_ROLLBACK, this.currentFrame - earliestMispredicted);
+          if (this.currentFrame - earliestMispredicted <= this.MAX_ROLLBACK && !this.isWasmAsyncifyBusy()) {
+            this.executeRollback(earliestMispredicted);
+          } else if (netplayPlayerIndex === 1) {
+            this.requestDesyncRecovery(earliestMispredicted);
+          }
         }
         this.verifyPendingChecksums();
       }
 
       executeRollback(rollbackFrame) {
+        if (this.isWasmAsyncifyBusy()) return;
         const dist = this.currentFrame - rollbackFrame;
         if (dist <= 0 || dist > this.MAX_ROLLBACK) return;
-        if (!this.restoreSnapshot(rollbackFrame)) return;
 
-        this.stats.totalRollbacks += 1;
-        this.stats.lastRollbackDistance = dist;
+        const prevSyncMute = this.syncMuted;
+        this.setSyncWaitMute(true);
+        try {
+          this.gm?.functions?.setVSync?.(0);
+          this.gm?.functions?.setFastForwardRatio?.(0);
+          this.gm?.functions?.toggleFastForward?.(1);
 
-        const wasMuted = Boolean(window.EJS_emulator?.muted);
-        if (!wasMuted && window.EJS_emulator) window.EJS_emulator.muted = true;
-
-        for (let rf = rollbackFrame; rf < this.currentFrame; rf++) {
-          const rIdx = rf & this.BUFFER_MASK;
-          if (rf > rollbackFrame) {
-            this.captureSnapshot(rf);
+          if (!this.restoreSnapshot(rollbackFrame)) {
+            if (netplayPlayerIndex === 1) this.requestDesyncRecovery(rollbackFrame);
+            return;
           }
 
-          const localMask = this.localFrameNums[rIdx] === rf ? this.localInputs[rIdx] : this.localLiveMask;
-          let remoteMask = 0;
-          if (this.remoteFrameNums[rIdx] === rf && this.remoteConfirmed[rIdx] === 1) {
-            remoteMask = this.remoteInputs[rIdx];
-          } else {
-            const prevIdx = (rf - 1) & this.BUFFER_MASK;
-            remoteMask = rf > 0 ? this.remoteInputs[prevIdx] : this.lastConfirmedRemoteMask;
-            this.remoteInputs[rIdx] = remoteMask;
-            this.remoteConfirmed[rIdx] = 0;
-            this.remoteFrameNums[rIdx] = rf;
+          this.stats.totalRollbacks += 1;
+          this.stats.lastRollbackDistance = dist;
+
+          for (let rf = rollbackFrame; rf < this.currentFrame; rf++) {
+            if (this.isWasmAsyncifyBusy()) break;
+            const rIdx = rf & this.BUFFER_MASK;
+            if (rf > rollbackFrame) {
+              this.captureSnapshot(rf);
+            }
+
+            const localMask = this.localFrameNums[rIdx] === rf ? this.localInputs[rIdx] : this.localLiveMask;
+            let remoteMask = 0;
+            if (this.remoteFrameNums[rIdx] === rf && this.remoteConfirmed[rIdx] === 1) {
+              remoteMask = this.remoteInputs[rIdx];
+            } else {
+              const prevIdx = (rf - 1) & this.BUFFER_MASK;
+              remoteMask = rf > 0 ? this.remoteInputs[prevIdx] : this.lastConfirmedRemoteMask;
+              this.remoteInputs[rIdx] = remoteMask;
+              this.remoteConfirmed[rIdx] = 0;
+              this.remoteFrameNums[rIdx] = rf;
+            }
+
+            const p1 = netplayPlayerIndex === 0 ? localMask : remoteMask;
+            const p2 = netplayPlayerIndex === 0 ? remoteMask : localMask;
+
+            this.applyInputs(0, p1);
+            this.applyInputs(1, p2);
+            this.forceApplyAllInputs = false;
+
+            if (rf > 0 && rf % 30 === 0) {
+              const csum = this.computeRamChecksum(rf);
+              this.localChecksums[rIdx] = csum;
+              this.localChecksumFrames[rIdx] = rf;
+            }
+
+            if (this.originalMainLoopFunc) {
+              this.originalMainLoopFunc();
+            }
           }
-
-          const p1 = netplayPlayerIndex === 0 ? localMask : remoteMask;
-          const p2 = netplayPlayerIndex === 0 ? remoteMask : localMask;
-
-          this.applyInputs(0, p1);
-          this.applyInputs(1, p2);
-          this.forceApplyAllInputs = false;
-
-          if (this.originalMainLoopFunc) {
-            this.originalMainLoopFunc();
-          }
-
-          if (rf > 0 && rf % 60 === 0) {
-            const csum = this.computeRamChecksum(rf);
-            this.localChecksums[rIdx] = csum;
-            this.localChecksumFrames[rIdx] = rf;
-          }
+        } finally {
+          try { this.gm?.functions?.toggleFastForward?.(0); } catch {}
+          this.setSyncWaitMute(prevSyncMute);
         }
-
-        if (!wasMuted && window.EJS_emulator) window.EJS_emulator.muted = false;
       }
 
       stepOneFrame() {
@@ -1599,7 +1636,11 @@
           this.stats.predictedFramesCount += 1;
         }
 
-        // 5. Appliquer les inputs déterministes P1 et P2 puis exécuter 1 cycle CPU/Audio/Vidéo
+        // 5. Capturer l'état avant la frame pour permettre un Rollback exact à la frame près, puis exécuter 1 cycle CPU/Vidéo
+        if (!this.isWasmAsyncifyBusy()) {
+          this.captureSnapshot(frame);
+        }
+
         const p1 = netplayPlayerIndex === 0 ? localMask : remoteMask;
         const p2 = netplayPlayerIndex === 0 ? remoteMask : localMask;
         this.applyInputs(0, p1);
@@ -1610,8 +1651,11 @@
           this.originalMainLoopFunc();
         }
 
-        // 6. Checksum RAM 68000 (0xCB) toutes les 120 frames (lecture directe sans savestate)
-        if (frame > 0 && frame % 120 === 0) {
+        // 6. Checksum RAM 68000 (0xCB) toutes les 30 frames (0.5s) : détecte et corrige immédiatement la moindre divergence
+        if (frame > 0 && frame % 30 === 0) {
+          if (this.savestateFrames[rIdx] !== frame && !this.isWasmAsyncifyBusy()) {
+            this.captureSnapshot(frame);
+          }
           const csum = this.computeRamChecksum(frame);
           this.localChecksums[rIdx] = csum;
           this.localChecksumFrames[rIdx] = frame;
@@ -1637,6 +1681,7 @@
       }
 
       onMainLoopTick() {
+        if (this.matchAborted || !this.isRunning) return;
         const now = performance.now();
 
         // GARDE ABSOLUE ASYNCIFY : ne jamais ré-entrer WASM ni exécuter loadState/getState pendant un unwind/sleep
@@ -1657,6 +1702,8 @@
           try {
             this.gm?.setKeyboardEnabled?.(false);
             this.gm?.functions?.setKeyboardEnabled?.(0);
+            this.gm?.functions?.setVSync?.(0);
+            this.gm?.functions?.setFastForwardRatio?.(0);
           } catch {}
 
           notifyParent('NETPLAY_EMU_READY', { isHost: netplayPlayerIndex === 0 });
@@ -1714,6 +1761,9 @@
           try {
             this.gm = this.gm || window.EJS_emulator?.gameManager;
             this.gm?.loadState?.(loadJob.bytes);
+            if (this.originalMainLoopFunc && !this.isWasmAsyncifyBusy()) {
+              this.originalMainLoopFunc(); // Flush tick: applique réellement loadJob.bytes en RAM avant captureSnapshot(syncFrame)
+            }
             this.onRemoteSyncStateLoaded(loadJob.syncFrame);
           } catch (err) {
             console.warn('[CSW GGPO] Erreur sync loadState:', err);
@@ -1832,8 +1882,37 @@
         }
       }
 
+      stop() {
+        this.matchAborted = true;
+        this.isRunning = false;
+        this.waitingForFrame0 = false;
+        this.waitingForFrame0Ack = false;
+        this.waitingForGoAck = false;
+        this.pendingSyncLoad = null;
+        this.pendingHostExportSlot = null;
+        if (this.guestReadyTimer) {
+          clearInterval(this.guestReadyTimer);
+          this.guestReadyTimer = null;
+        }
+        if (this.hostReadyTimer) {
+          clearInterval(this.hostReadyTimer);
+          this.hostReadyTimer = null;
+        }
+        if (cswRamTelemetry.timer) {
+          clearInterval(cswRamTelemetry.timer);
+          cswRamTelemetry.timer = null;
+        }
+        if (netplayGamepadRafId) {
+          cancelAnimationFrame(netplayGamepadRafId);
+          netplayGamepadRafId = null;
+        }
+        this.setSyncWaitMute(true);
+        try { window.EJS_emulator?.pause?.(); } catch {}
+        console.log('[CSW GGPO] Match arrêté net.');
+      }
+
       start() {
-        if (!isNetplaySession || this.isRunning) return;
+        if (!isNetplaySession || this.isRunning || this.matchAborted) return;
         this.gm = window.EJS_emulator?.gameManager;
         this.module = getWasmModule();
         this.isRunning = true;
@@ -1854,6 +1933,8 @@
           try {
             this.gm?.setKeyboardEnabled?.(false);
             this.gm?.functions?.setKeyboardEnabled?.(0);
+            this.gm?.functions?.setVSync?.(0);
+            this.gm?.functions?.setFastForwardRatio?.(0);
           } catch {}
 
           // 1. Cœur moderne Emscripten 3.1+ (fbneo_libretro.js) où MainLoop est exposé par l'intercepteur Blob
@@ -2075,6 +2156,12 @@
           if (ptr > 0 && size >= 512 && ptr + size <= mod.HEAPU8.length) {
             return { ram: mod.HEAPU8.subarray(ptr, ptr + size), isRawSystemRam: true };
           }
+        }
+        if (isNetplaySession) {
+          const ggpo = window.__cswGgpoEngine;
+          if (!ggpo?.isActive() || ggpo.isWasmAsyncifyBusy()) return null;
+          const snap = ggpo.getLatestSnapshotBytes();
+          return snap && snap.length > 4096 ? { ram: snap, isRawSystemRam: false } : null;
         }
         // Savestate RAM complet (EmulatorJS FBNeo / MAME / PS1 / SNES / Mega Drive / GBA)
         const state = window.EJS_emulator?.gameManager?.getState?.();
@@ -2453,12 +2540,18 @@
         const c = Number(msg.coins ?? 0);
         targetWalletCoins = c;
         if (hud) hud.textContent = `CRÉDITS : ${String(c).padStart(2, '0')}/99`;
+        if (isNetplaySession) return;
         if (ov) ov.hidden = !msg.locked;
         writeCreditsToRam(c);
         try {
           if (msg.locked) window.EJS_emulator?.pause?.();
           else if (msg.resume) window.EJS_emulator?.play?.();
         } catch {}
+        return;
+      }
+
+      if (msg.type === 'STOP_NETPLAY_MATCH') {
+        window.__cswGgpoEngine?.stop?.();
         return;
       }
 

@@ -1112,11 +1112,47 @@ export function setupNetplayHub(server) {
   }
 
   function handleClientDisconnect(ws) {
+    let wasLastUserSocket = false;
     if (ws.uid && connectedUsers.has(ws.uid)) {
       const set = connectedUsers.get(ws.uid);
       set.delete(ws);
-      if (set.size === 0) connectedUsers.delete(ws.uid);
+      if (set.size === 0) {
+        connectedUsers.delete(ws.uid);
+        wasLastUserSocket = true;
+      }
     }
+
+    // Si ce joueur ferme brutalement son onglet/app en plein match Netplay, arrêter net la partie chez son adversaire
+    const partnerUid = ws.activeMatchPartnerUid;
+    if (partnerUid && wasLastUserSocket) {
+      const disconnectedUid = ws.uid;
+      const disconnectedName = ws.userName || 'Adversaire';
+      setTimeout(() => {
+        // Ne notifier que si l'utilisateur ne s'est pas reconnecté entre-temps (< 1.2s)
+        if (disconnectedUid && !connectedUsers.has(disconnectedUid)) {
+          const partnerSockets = connectedUsers.get(partnerUid);
+          if (partnerSockets) {
+            const leavePayload = JSON.stringify({
+              type: 'REMOTE_BTN_RELAY',
+              syncType: 'NETPLAY_EVENT',
+              eventData: {
+                event: 'MATCH_LEAVE',
+                senderName: disconnectedName,
+                reason: 'disconnect',
+                eventId: `srv_disc_${Date.now()}_${disconnectedUid}`,
+              },
+            });
+            for (const s of partnerSockets) {
+              s.activeMatchPartnerUid = null;
+              if (s.readyState === WebSocket.OPEN) {
+                try { s.send(leavePayload); } catch {}
+              }
+            }
+          }
+        }
+      }, 1200);
+    }
+    ws.activeMatchPartnerUid = null;
 
     const info = clientRooms.get(ws);
     if (!info) return;
@@ -1236,6 +1272,7 @@ export function setupNetplayHub(server) {
 
           case 'MATCH_COUNTDOWN_START': {
             const { challengeId, targetUid } = data;
+            if (targetUid) ws.activeMatchPartnerUid = targetUid;
             const sockets = connectedUsers.get(targetUid);
             if (sockets) {
               const msg = JSON.stringify({ type: 'MATCH_COUNTDOWN_START', challengeId });
@@ -1248,6 +1285,7 @@ export function setupNetplayHub(server) {
 
           case 'MATCH_CANCEL': {
             const { challengeId, targetUid } = data;
+            ws.activeMatchPartnerUid = null;
             if (challengeId && fcChallenges.has(challengeId)) {
               const ch = fcChallenges.get(challengeId);
               ch.status = 'cancelled';
@@ -1265,6 +1303,7 @@ export function setupNetplayHub(server) {
 
           case 'RTC_SIGNAL': {
             const { challengeId, targetUid, signalType, payload } = data;
+            if (targetUid) ws.activeMatchPartnerUid = targetUid;
             const sockets = connectedUsers.get(targetUid);
             if (sockets && signalType) {
               const msg = JSON.stringify({
@@ -1297,6 +1336,11 @@ export function setupNetplayHub(server) {
               eventData,
               t,
             } = data;
+            if (syncType === 'NETPLAY_EVENT' && eventData?.event === 'MATCH_LEAVE') {
+              ws.activeMatchPartnerUid = null;
+            } else if (targetUid) {
+              ws.activeMatchPartnerUid = targetUid;
+            }
             const sockets = connectedUsers.get(targetUid);
             if (sockets) {
               const msg = JSON.stringify({
@@ -1315,6 +1359,9 @@ export function setupNetplayHub(server) {
                 t,
               });
               for (const s of sockets) {
+                if (syncType === 'NETPLAY_EVENT' && eventData?.event === 'MATCH_LEAVE') {
+                  s.activeMatchPartnerUid = null;
+                }
                 if (s !== ws && s.readyState === WebSocket.OPEN) s.send(msg);
               }
             }

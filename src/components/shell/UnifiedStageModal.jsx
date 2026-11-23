@@ -570,7 +570,7 @@ export function UnifiedStageModal({
       const peerName = ev.senderName || session?.opponentName || 'Votre adversaire';
       if (ev.event === 'MATCH_LEAVE') {
         try {
-          iframeRef.current?.contentWindow?.postMessage({ type: 'PAUSE_EMU' }, window.location.origin);
+          iframeRef.current?.contentWindow?.postMessage({ type: 'STOP_NETPLAY_MATCH' }, window.location.origin);
         } catch {}
         setPauseMenuOpen(false);
         setQuickMenuOpen(false);
@@ -628,21 +628,33 @@ export function UnifiedStageModal({
     };
   }, [p2pEngine, session?.isNetplay, session?.isHost, session?.opponentName]);
 
-  // Si l'utilisateur ferme l'onglet ou recharge la page en plein match Multijoueur, prévenir immédiatement l'adversaire pour arrêter sa partie
+  // Si l'utilisateur ferme l'onglet, quitte via PWA (pagehide) ou recharge en plein match, arrêter immédiatement chez l'adversaire
   useEffect(() => {
     if (!session?.isNetplay || !p2pEngine) return;
-    const onBeforeUnload = () => {
+    const onUnloadLeave = () => {
       try {
-        p2pEngine.sendNetplayEvent({
+        const leaveEv = {
           event: 'MATCH_LEAVE',
           senderName: getMyDisplayName(),
           reason: 'disconnect',
-        });
+          eventId: `leave_${Date.now()}`,
+        };
+        p2pEngine.sendNetplayEvent(leaveEv);
+        if (session.opponentUid) {
+          firebaseFightcadeService.sendRelayInput(session.opponentUid, {
+            syncType: 'NETPLAY_EVENT',
+            eventData: leaveEv,
+          });
+        }
       } catch {}
     };
-    window.addEventListener('beforeunload', onBeforeUnload);
-    return () => window.removeEventListener('beforeunload', onBeforeUnload);
-  }, [session?.isNetplay, p2pEngine]);
+    window.addEventListener('beforeunload', onUnloadLeave);
+    window.addEventListener('pagehide', onUnloadLeave);
+    return () => {
+      window.removeEventListener('beforeunload', onUnloadLeave);
+      window.removeEventListener('pagehide', onUnloadLeave);
+    };
+  }, [session?.isNetplay, session?.opponentUid, p2pEngine]);
 
   useEffect(() => {
     if (!session || !iframeRef.current?.contentWindow) return;
@@ -800,18 +812,31 @@ export function UnifiedStageModal({
 
   const handleCloseStage = () => {
     try {
-      if (session?.isNetplay && p2pEngine && !opponentLeftModal) {
-        p2pEngine.sendNetplayEvent({
-          event: 'MATCH_LEAVE',
-          senderName: getMyDisplayName(),
-          reason: 'quit',
-        });
+      if (session?.isNetplay) {
+        try {
+          iframeRef.current?.contentWindow?.postMessage({ type: 'STOP_NETPLAY_MATCH' }, window.location.origin);
+        } catch {}
+        if (!opponentLeftModal) {
+          const leaveEv = {
+            event: 'MATCH_LEAVE',
+            senderName: getMyDisplayName(),
+            reason: 'quit',
+            eventId: `quit_${Date.now()}`,
+          };
+          p2pEngine?.sendNetplayEvent?.(leaveEv);
+          if (session.opponentUid) {
+            firebaseFightcadeService.sendRelayInput(session.opponentUid, {
+              syncType: 'NETPLAY_EVENT',
+              eventData: leaveEv,
+            });
+          }
+        }
       }
       iframeRef.current?.contentWindow?.postMessage(
         { type: 'FLUSH_RAM_SCORE', reason: 'session_end' },
         window.location.origin
       );
-      if (session?.kind !== 'j2me') {
+      if (session?.kind !== 'j2me' && !session?.isNetplay) {
         iframeRef.current?.contentWindow?.postMessage(
           { type: 'EXPORT_STATE', slot: 'cloud_handoff' },
           window.location.origin
@@ -1165,14 +1190,11 @@ export function UnifiedStageModal({
                   type="button"
                   onClick={() => {
                     setOpponentLeftModal(null);
-                    try {
-                      iframeRef.current?.focus();
-                      iframeRef.current?.contentWindow?.postMessage({ type: 'RESUME_EMU' }, window.location.origin);
-                    } catch {}
+                    handleCloseStage();
                   }}
                   className="py-2.5 px-4 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-neutral-200 text-xs font-bold transition-colors"
                 >
-                  Continuer en Solo
+                  Fermer la session
                 </button>
               </div>
             </div>
