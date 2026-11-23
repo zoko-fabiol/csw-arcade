@@ -90,10 +90,12 @@ class FirebaseFightcadeService {
     this.ws = null;
     this.wsConnected = false;
     this.wsQueue = [];
-    this.wsReconnectDelay = 3500;
+    this.wsReconnectDelay = 700;
+    this.wsKeepaliveTimer = null;
     this.incomingChallengeListeners = new Set();
     this.challengeListeners = new Map();
     this.matchSyncListeners = new Map();
+    this.rtcSignalListeners = new Map();
     this.relayInputListener = null;
 
     // Toujours maintenir la présence dans le salon global + les salons actifs
@@ -152,7 +154,7 @@ class FirebaseFightcadeService {
 
       this.ws.onopen = () => {
         this.wsConnected = true;
-        this.wsReconnectDelay = 3500;
+        this.wsReconnectDelay = 700;
         this.sendWs({
           type: 'IDENTIFY',
           uid: this.identity?.uid,
@@ -163,6 +165,12 @@ class FirebaseFightcadeService {
           const item = this.wsQueue.shift();
           try { this.ws.send(JSON.stringify(item)); } catch {}
         }
+        if (this.wsKeepaliveTimer) clearInterval(this.wsKeepaliveTimer);
+        this.wsKeepaliveTimer = setInterval(() => {
+          if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+            try { this.ws.send(JSON.stringify({ type: 'PING', clientTime: Date.now() })); } catch {}
+          }
+        }, 20000);
       };
 
       this.ws.onmessage = (event) => {
@@ -174,8 +182,12 @@ class FirebaseFightcadeService {
 
       this.ws.onclose = () => {
         this.wsConnected = false;
-        const delay = this.wsReconnectDelay || 3500;
-        this.wsReconnectDelay = Math.min(20000, Math.round(delay * 1.5));
+        if (this.wsKeepaliveTimer) {
+          clearInterval(this.wsKeepaliveTimer);
+          this.wsKeepaliveTimer = null;
+        }
+        const delay = this.wsReconnectDelay || 700;
+        this.wsReconnectDelay = Math.min(8000, Math.round(delay * 1.5));
         setTimeout(() => this.initWebSocket(), delay);
       };
 
@@ -183,8 +195,8 @@ class FirebaseFightcadeService {
         this.wsConnected = false;
       };
     } catch {
-      const delay = this.wsReconnectDelay || 5000;
-      this.wsReconnectDelay = Math.min(20000, Math.round(delay * 1.5));
+      const delay = this.wsReconnectDelay || 1200;
+      this.wsReconnectDelay = Math.min(8000, Math.round(delay * 1.5));
       setTimeout(() => this.initWebSocket(), delay);
     }
   }
@@ -193,7 +205,11 @@ class FirebaseFightcadeService {
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
       this.ws.send(JSON.stringify(data));
     } else {
-      if (this.wsQueue.length >= 50) {
+      // Ne jamais encombrer la file d'attente de reconnexion avec des paquets GGPO/PING temps-réel périmés
+      if (data?.type === 'RELAY_INPUT' && (data.packetHex || data.syncType === 'PING' || data.syncType === 'PONG')) {
+        return;
+      }
+      if (this.wsQueue.length >= 60) {
         this.wsQueue.shift();
       }
       this.wsQueue.push(data);
@@ -222,6 +238,13 @@ class FirebaseFightcadeService {
       data.type === 'MATCH_CANCELLED'
     ) {
       const listeners = this.matchSyncListeners.get(data.challengeId);
+      if (listeners) {
+        listeners.forEach((cb) => {
+          try { cb(data); } catch {}
+        });
+      }
+    } else if (data.type === 'RTC_SIGNAL' && data.challengeId) {
+      const listeners = this.rtcSignalListeners.get(data.challengeId);
       if (listeners) {
         listeners.forEach((cb) => {
           try { cb(data); } catch {}
@@ -1036,28 +1059,60 @@ class FirebaseFightcadeService {
     updateDoc(doc(db, 'fc_challenges', challengeId), { status }).catch(() => {});
   }
 
-  async postOffer(challengeId, offer) {
+  sendRtcSignal(challengeId, targetUid, signalType, payload) {
+    if (!challengeId || !targetUid || !signalType) return;
+    this.sendWs({
+      type: 'RTC_SIGNAL',
+      challengeId,
+      targetUid,
+      signalType,
+      payload,
+    });
+  }
+
+  subscribeRtcSignal(challengeId, cb) {
+    if (!this.rtcSignalListeners.has(challengeId)) {
+      this.rtcSignalListeners.set(challengeId, new Set());
+    }
+    this.rtcSignalListeners.get(challengeId).add(cb);
+    return () => {
+      const set = this.rtcSignalListeners.get(challengeId);
+      if (set) {
+        set.delete(cb);
+        if (set.size === 0) this.rtcSignalListeners.delete(challengeId);
+      }
+    };
+  }
+
+  async postOffer(challengeId, offer, targetUid = null) {
+    const clean = offer ? { type: offer.type, sdp: offer.sdp } : null;
+    if (!clean) return;
+    if (targetUid) this.sendRtcSignal(challengeId, targetUid, 'offer', clean);
     fetch('/api/fc-challenge', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'postOffer', id: challengeId, offer }),
+      body: JSON.stringify({ action: 'postOffer', id: challengeId, offer: clean }),
     }).catch(() => {});
 
-    updateDoc(doc(db, 'fc_challenges', challengeId), { offer }).catch(() => {});
+    updateDoc(doc(db, 'fc_challenges', challengeId), { offer: clean }).catch(() => {});
   }
 
-  async postAnswer(challengeId, answer) {
+  async postAnswer(challengeId, answer, targetUid = null) {
+    const clean = answer ? { type: answer.type, sdp: answer.sdp } : null;
+    if (!clean) return;
+    if (targetUid) this.sendRtcSignal(challengeId, targetUid, 'answer', clean);
     fetch('/api/fc-challenge', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'postAnswer', id: challengeId, answer }),
+      body: JSON.stringify({ action: 'postAnswer', id: challengeId, answer: clean }),
     }).catch(() => {});
 
-    updateDoc(doc(db, 'fc_challenges', challengeId), { answer }).catch(() => {});
+    updateDoc(doc(db, 'fc_challenges', challengeId), { answer: clean }).catch(() => {});
   }
 
-  async postRenegotiateOffer(challengeId, offer) {
+  async postRenegotiateOffer(challengeId, offer, targetUid = null) {
     const payload = { sdp: offer?.sdp, type: offer?.type, ts: Date.now() };
+    if (targetUid) this.sendRtcSignal(challengeId, targetUid, 'renegotiateOffer', payload);
     fetch('/api/fc-challenge', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -1067,8 +1122,9 @@ class FirebaseFightcadeService {
     updateDoc(doc(db, 'fc_challenges', challengeId), { renegotiateOffer: payload }).catch(() => {});
   }
 
-  async postRenegotiateAnswer(challengeId, answer) {
+  async postRenegotiateAnswer(challengeId, answer, targetUid = null) {
     const payload = { sdp: answer?.sdp, type: answer?.type, ts: Date.now() };
+    if (targetUid) this.sendRtcSignal(challengeId, targetUid, 'renegotiateAnswer', payload);
     fetch('/api/fc-challenge', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -1078,9 +1134,10 @@ class FirebaseFightcadeService {
     updateDoc(doc(db, 'fc_challenges', challengeId), { renegotiateAnswer: payload }).catch(() => {});
   }
 
-  async postIceCandidate(challengeId, role, candidate) {
+  async postIceCandidate(challengeId, role, candidate, targetUid = null) {
     if (!candidate) return;
     const candJson = candidate.toJSON ? candidate.toJSON() : candidate;
+    if (targetUid) this.sendRtcSignal(challengeId, targetUid, 'candidate', candJson);
 
     fetch('/api/fc-challenge', {
       method: 'POST',
@@ -1137,7 +1194,6 @@ class FirebaseFightcadeService {
     );
 
     return () => {
-      this.incomingChallengeListeners.delete(cb);
       clearInterval(pollId);
       unsubFs?.();
     };

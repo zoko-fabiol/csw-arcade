@@ -129,7 +129,7 @@
             if (text && text.includes('MainLoop.resume')) {
               text = text.replace(
                 'Module["resumeMainLoop"]=MainLoop.resume;',
-                'Module["resumeMainLoop"]=MainLoop.resume;Module["MainLoop"]=MainLoop;'
+                'Module["resumeMainLoop"]=MainLoop.resume;Module["MainLoop"]=MainLoop;if(typeof Asyncify!=="undefined")Module["Asyncify"]=Asyncify;'
               );
               return new _OrigBlob([text], options);
             }
@@ -197,6 +197,11 @@
       }
       try {
         const bytes = await decodeStateBase64ToBytes(b64);
+        if (isNetplaySession && isNetplaySync && window.__cswGgpoEngine?.hookAttached) {
+          window.__cswGgpoEngine.queueRemoteSyncState(bytes, Number(syncFrame || 0));
+          pendingLoadState = null;
+          return true;
+        }
         gm.loadState(bytes);
         pendingLoadState = null;
         if (isNetplaySession && isNetplaySync && window.__cswGgpoEngine) {
@@ -207,7 +212,6 @@
         console.warn('[CSW GGPO] Erreur applyLoadStateBase64:', err);
         if (isNetplaySession && isNetplaySync && window.__cswGgpoEngine) {
           window.__cswGgpoEngine.waitingForFrame0 = false;
-          try { window.EJS_emulator?.play?.(); } catch {}
           notifyParent('NETPLAY_SYNC_COMPLETE', { syncFrame: 0 });
         }
         return false;
@@ -395,10 +399,12 @@
       if (hw.audio && window.EJS_emulator) {
         const isMuted = Boolean(hw.audio.muted);
         const vol = isMuted ? 0 : Math.max(0, Math.min(1, (hw.audio.volume ?? 80) / 100));
+        window.__cswDesiredAudio = { muted: isMuted, vol: Math.max(0, Math.min(1, (hw.audio.volume ?? 80) / 100)) };
         try {
-          window.EJS_emulator.muted = isMuted;
+          const holdMuted = Boolean(window.__cswGgpoEngine?.syncMuted);
+          window.EJS_emulator.muted = isMuted || holdMuted;
           if (typeof window.EJS_emulator.setVolume === 'function') {
-            window.EJS_emulator.setVolume(vol);
+            window.EJS_emulator.setVolume(holdMuted ? 0 : vol);
           }
         } catch {}
       }
@@ -427,15 +433,20 @@
     function applyDisplay({ filter, ratio, volume, muted }) {
       if (filter) document.body.classList.toggle('smooth', filter === 'smooth');
       if (ratio) document.body.classList.toggle('stretch', ratio === 'stretch');
-      const effectiveVol = muted ? 0 : (typeof volume === 'number' ? Math.max(0, Math.min(1, volume / 100)) : null);
-      if (effectiveVol !== null && window.EJS_emulator) {
-        try {
-          window.EJS_emulator.muted = Boolean(muted);
-          if (typeof window.EJS_emulator.setVolume === 'function') {
-            window.EJS_emulator.setVolume(effectiveVol);
-          }
-        } catch {}
-      }
+        const effectiveVol = muted ? 0 : (typeof volume === 'number' ? Math.max(0, Math.min(1, volume / 100)) : null);
+        window.__cswDesiredAudio = {
+          muted: Boolean(muted),
+          vol: effectiveVol !== null ? effectiveVol : (window.__cswDesiredAudio?.vol ?? 0.8),
+        };
+        if (effectiveVol !== null && window.EJS_emulator) {
+          try {
+            const holdMuted = Boolean(window.__cswGgpoEngine?.syncMuted);
+            window.EJS_emulator.muted = Boolean(muted) || holdMuted;
+            if (typeof window.EJS_emulator.setVolume === 'function') {
+              window.EJS_emulator.setVolume(holdMuted ? 0 : effectiveVol);
+            }
+          } catch {}
+        }
     }
 
     function notifyParent(type, payload = {}) {
@@ -778,19 +789,32 @@
 
         this.isRunning = false;
         this.hookAttached = false;
+        this.localWarmupDone = false;
+        this.warmupFramesLeft = 30;
         this.hostSetupCompleted = false;
         this.hostSetupStarted = false;
         this.hostWaitingForGuestEmu = false;
         this.guestIsReady = false;
         this.initialFrame0Sent = false;
+        this.pendingHostExportSlot = null;
+        this.pendingSyncLoad = null;
+        this.waitingForGoAck = false;
+        this.waitingForGoAckSinceMs = 0;
+        this.hostGoDelayUntilMs = 0;
+        this.hostGoPendingFrame = 0;
+        this.peerPingMs = 30;
+        this.syncMuted = false;
         this.lastSentMask = -1;
         this.autoHealEnabled = true;
         this.waitingForFrame0 = false;
         this.waitingForFrame0Ack = false;
         this.waitingForFrame0AckSinceMs = 0;
+        this.lastFrame0RetryMs = 0;
         this.hasRemotePeer = false;
         this.lastRemotePacketMs = 0;
         this.guestReadyTimer = null;
+        this.hostReadyTimer = null;
+        this.lastPaceHoldMs = 0;
 
         this.localLiveMask = 0;
         this.lastAppliedP1Mask = -1;
@@ -843,8 +867,41 @@
           isNetplaySession &&
             this.isRunning &&
             this.hookAttached &&
-            (netplayPlayerIndex !== 0 || this.hostSetupCompleted)
+            this.localWarmupDone &&
+            !this.waitingForFrame0 &&
+            !this.waitingForGoAck &&
+            (netplayPlayerIndex !== 0 || (this.hostSetupCompleted && !this.waitingForFrame0Ack && !this.hostGoDelayUntilMs))
         );
+      }
+
+      isWasmAsyncifyBusy() {
+        this.module = this.module || getWasmModule();
+        const asy = this.module?.Asyncify;
+        return Boolean(asy && (asy.state !== 0 || asy.currData));
+      }
+
+      setSyncWaitMute(muteWait) {
+        this.syncMuted = Boolean(muteWait);
+        const ejs = window.EJS_emulator;
+        if (!ejs) return;
+        const desired = window.__cswDesiredAudio || { muted: false, vol: 0.8 };
+        try {
+          if (this.syncMuted) {
+            ejs.muted = true;
+            ejs.setVolume?.(0);
+          } else {
+            ejs.muted = Boolean(desired.muted);
+            ejs.setVolume?.(desired.muted ? 0 : desired.vol);
+          }
+        } catch {}
+      }
+
+      queueRemoteSyncState(bytes, syncFrame = 0) {
+        if (!bytes) return;
+        this.pendingSyncLoad = {
+          bytes: bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes),
+          syncFrame: Math.max(0, Number(syncFrame) || 0),
+        };
       }
 
       setLocalButton(buttonId, isDown) {
@@ -903,7 +960,9 @@
         this.forceApplyAllInputs = true;
         this.applyInputs(0, 0);
         this.applyInputs(1, 0);
-        this.captureSnapshot(cleanFrame);
+        if (!isNetplaySession) {
+          this.captureSnapshot(cleanFrame);
+        }
 
         this.accumulatorMs = 0;
         this.lastTickMs = performance.now();
@@ -1050,12 +1109,23 @@
       }
 
       send0x5BAckPacket(syncFrame = 0) {
+        const clean = Math.max(0, Number(syncFrame) || 0);
         const buf = new ArrayBuffer(5);
         const view = new DataView(buf);
         view.setUint8(0, 0x5b);
-        view.setUint32(1, Math.max(0, Number(syncFrame) || 0), false);
+        view.setUint32(1, clean, false);
         notifyParent('NETPLAY_GGPO_PACKET', { buffer: buf });
-        notifyParent('NETPLAY_FRAME0_ACK', { syncFrame: Math.max(0, Number(syncFrame) || 0) });
+        notifyParent('NETPLAY_FRAME0_ACK', { syncFrame: clean });
+      }
+
+      send0x5CGOPacket(syncFrame = 0) {
+        const clean = Math.max(0, Number(syncFrame) || 0);
+        const buf = new ArrayBuffer(5);
+        const view = new DataView(buf);
+        view.setUint8(0, 0x5c);
+        view.setUint32(1, clean, false);
+        notifyParent('NETPLAY_GGPO_PACKET', { buffer: buf });
+        notifyParent('NETPLAY_FRAME0_GO', { syncFrame: clean });
       }
 
       computeRamChecksum(frame) {
@@ -1148,31 +1218,40 @@
 
       onGuestReadySignal(slot = 'frame0') {
         this.guestIsReady = true;
-        if (this.hostWaitingForGuestEmu) {
-          this.hostWaitingForGuestEmu = false;
-          try { window.EJS_emulator?.play?.(); } catch {}
-          if (!this.hostSetupStarted && typeof window.__cswStartHostVersusSeq === 'function') {
-            this.hostSetupStarted = true;
-            window.__cswStartHostVersusSeq();
-          }
+        if (!this.localWarmupDone) {
+          // L'Hôte termine son warmup (~30 frames) puis exportera automatiquement frame0
           return;
         }
-        if (this.hostSetupCompleted) {
-          this.exportAndLockSyncState(slot);
+        if (this.hostWaitingForGuestEmu) {
+          this.hostWaitingForGuestEmu = false;
+          this.pendingHostExportSlot = slot || 'frame0';
+          return;
+        }
+        if (this.waitingForFrame0Ack && performance.now() - this.waitingForFrame0AckSinceMs > 3000) {
+          // L'Invité réclame toujours Frame 0 -> ré-exporter proprement au prochain tick
+          this.pendingHostExportSlot = slot || 'frame0';
+          return;
+        }
+        if (this.hostSetupCompleted && !this.waitingForFrame0Ack) {
+          this.pendingHostExportSlot = slot || 'frame0';
         }
       }
 
       onHostSetupFinished() {
         this.hostSetupCompleted = true;
         if (this.guestIsReady || !this.initialFrame0Sent) {
-          this.exportAndLockSyncState('frame0');
+          this.pendingHostExportSlot = 'frame0';
         }
       }
 
       exportAndLockSyncState(slot = 'frame0', force = false) {
         if (!isNetplaySession || netplayPlayerIndex !== 0) return false;
+        if (this.isWasmAsyncifyBusy()) {
+          this.pendingHostExportSlot = slot || 'frame0';
+          return false;
+        }
         const now = performance.now();
-        if (!force && now - this.lastHostResyncMs < 6000) return false;
+        if (!force && now - this.lastHostResyncMs < 4000) return false;
         this.lastHostResyncMs = now;
         this.initialFrame0Sent = true;
 
@@ -1194,11 +1273,16 @@
           if (!state) return false;
           const bytes = state instanceof Uint8Array ? state : new Uint8Array(state);
 
+          if (this.hostReadyTimer) {
+            clearInterval(this.hostReadyTimer);
+            this.hostReadyTimer = null;
+          }
           this.hostSetupCompleted = true;
+          this.hostWaitingForGuestEmu = false;
           this.resetAtFrame(syncFrame);
           this.waitingForFrame0Ack = true;
           this.waitingForFrame0AckSinceMs = performance.now();
-          try { window.EJS_emulator?.pause?.(); } catch {}
+          this.setSyncWaitMute(true);
 
           gzipBytesToTaggedBase64(bytes).then((encodedState) => {
             notifyParent('STATE_EXPORTED', {
@@ -1211,7 +1295,8 @@
             );
           });
           return true;
-        } catch {
+        } catch (err) {
+          console.warn('[CSW GGPO] Erreur exportAndLockSyncState:', err);
           return false;
         }
       }
@@ -1228,20 +1313,48 @@
         } catch {}
         this.waitingForFrame0 = false;
         this.resetAtFrame(syncFrame);
-        try { window.EJS_emulator?.play?.(); } catch {}
         this.send0x5BAckPacket(syncFrame);
-        notifyParent('NETPLAY_SYNC_COMPLETE', { syncFrame });
-        console.log(`[CSW GGPO] État synchronisé chargé à la Frame ${syncFrame} ! ACK envoyé à l'Hôte.`);
+        if (syncFrame === 0) {
+          this.waitingForGoAck = true;
+          this.waitingForGoAckSinceMs = performance.now();
+          this.setSyncWaitMute(true);
+          console.log(`[CSW GGPO] Frame 0 chargée ! ACK envoyé, attente top départ simultané (0x5C)…`);
+        } else {
+          this.waitingForGoAck = false;
+          this.setSyncWaitMute(false);
+          notifyParent('NETPLAY_SYNC_COMPLETE', { syncFrame });
+          console.log(`[CSW GGPO] Resync chargée à la Frame ${syncFrame} !`);
+        }
       }
 
       onFrame0AckReceived(syncFrame = 0) {
         if (this.waitingForFrame0Ack) {
           this.waitingForFrame0Ack = false;
+          const cleanFrame = Math.max(0, Number(syncFrame) || 0);
+          this.send0x5CGOPacket(cleanFrame);
+          if (cleanFrame === 0) {
+            const halfRttMs = Math.min(60, Math.max(8, Math.round((this.peerPingMs || 30) / 2)));
+            this.hostGoPendingFrame = cleanFrame;
+            this.hostGoDelayUntilMs = performance.now() + halfRttMs;
+            console.log(`[CSW GGPO] ACK P2 reçu ! Départ simultané dans ${halfRttMs}ms…`);
+          } else {
+            this.hostGoDelayUntilMs = 0;
+            this.accumulatorMs = 0;
+            this.lastTickMs = performance.now();
+            this.setSyncWaitMute(false);
+            notifyParent('NETPLAY_SYNC_COMPLETE', { syncFrame: cleanFrame });
+          }
+        }
+      }
+
+      onFrame0GoReceived(syncFrame = 0) {
+        if (this.waitingForGoAck) {
+          this.waitingForGoAck = false;
           this.accumulatorMs = 0;
           this.lastTickMs = performance.now();
-          try { window.EJS_emulator?.play?.(); } catch {}
-          notifyParent('NETPLAY_SYNC_COMPLETE', { syncFrame });
-          console.log(`[CSW GGPO] ACK reçu de l'Invité (Frame ${syncFrame}) ! Départ simultané 60.00 FPS.`);
+          this.setSyncWaitMute(false);
+          notifyParent('NETPLAY_SYNC_COMPLETE', { syncFrame: Number(syncFrame || 0) });
+          console.log(`[CSW GGPO] Signal GO (0x5C) reçu ! Départ simultané 60.00 FPS.`);
         }
       }
 
@@ -1261,6 +1374,12 @@
         if (magic === 0x5b && view.byteLength >= 5) {
           const ackFrame = view.getUint32(1, false);
           this.onFrame0AckReceived(ackFrame);
+          return;
+        }
+
+        if (magic === 0x5c && view.byteLength >= 5) {
+          const goFrame = view.getUint32(1, false);
+          this.onFrame0GoReceived(goFrame);
           return;
         }
 
@@ -1294,8 +1413,14 @@
 
           this.hasRemotePeer = true;
           this.lastRemotePacketMs = performance.now();
+          if (this.waitingForGoAck) {
+            this.onFrame0GoReceived(0);
+          }
           if (this.waitingForFrame0Ack) {
             this.waitingForFrame0Ack = false;
+            this.hostGoDelayUntilMs = 0;
+            this.setSyncWaitMute(false);
+            notifyParent('NETPLAY_SYNC_COMPLETE', { syncFrame: 0 });
           }
 
           this.incomingQueue.push({
@@ -1421,6 +1546,16 @@
         const frame = this.currentFrame;
         const rIdx = frame & this.BUFFER_MASK;
 
+        // 0. Auto-Crédit Arcade déterministe sur l'Hôte P1 (MAME aux frames 20/45, NeoGeo post-BIOS aux frames 420/445)
+        const lowerCore = String(currentCoreName || '').toLowerCase();
+        if (
+          netplayPlayerIndex === 0 &&
+          ['fbneo', 'arcade', 'mame2003_plus'].includes(lowerCore) &&
+          (frame === 20 || frame === 45 || frame === 420 || frame === 445)
+        ) {
+          this.pulseLocalButton(2, 5);
+        }
+
         // 1. Décrémenter les impulsions déterministes (Coin / Start)
         for (let b = 0; b < 16; b++) {
           if (this.pulseFrames[b] > 0) {
@@ -1504,36 +1639,147 @@
       onMainLoopTick() {
         const now = performance.now();
 
-        // Si l'Hôte attend que le moteur WASM de l'Invité ait fini de charger, patienter sans avancer la partie
+        // GARDE ABSOLUE ASYNCIFY : ne jamais ré-entrer WASM ni exécuter loadState/getState pendant un unwind/sleep
+        if (this.isWasmAsyncifyBusy()) {
+          return;
+        }
+
+        // Phase 0 : Laisser ~30 frames à RetroArch/WebGL/OpenAL pour initialiser la mémoire & AudioContext
+        if (!this.localWarmupDone) {
+          if (this.warmupFramesLeft > 0) {
+            this.warmupFramesLeft -= 1;
+            if (this.originalMainLoopFunc) this.originalMainLoopFunc();
+            this.lastTickMs = now;
+            return;
+          }
+          this.localWarmupDone = true;
+          this.setSyncWaitMute(true);
+          try {
+            this.gm?.setKeyboardEnabled?.(false);
+            this.gm?.functions?.setKeyboardEnabled?.(0);
+          } catch {}
+
+          notifyParent('NETPLAY_EMU_READY', { isHost: netplayPlayerIndex === 0 });
+          if (netplayPlayerIndex === 0) {
+            if (this.guestIsReady) {
+              this.hostWaitingForGuestEmu = false;
+              this.pendingHostExportSlot = 'frame0';
+            } else {
+              this.hostWaitingForGuestEmu = true;
+              if (this.hostReadyTimer) clearInterval(this.hostReadyTimer);
+              this.hostReadyTimer = setInterval(() => {
+                if (this.hostWaitingForGuestEmu) {
+                  notifyParent('NETPLAY_EMU_READY', { isHost: true });
+                } else {
+                  clearInterval(this.hostReadyTimer);
+                  this.hostReadyTimer = null;
+                }
+              }, 500);
+              setTimeout(() => {
+                if (this.hostWaitingForGuestEmu) {
+                  this.hostWaitingForGuestEmu = false;
+                  this.pendingHostExportSlot = 'frame0';
+                }
+              }, 25000);
+            }
+          } else {
+            this.waitingForFrame0 = true;
+            notifyParent('NETPLAY_GUEST_READY');
+            if (this.guestReadyTimer) clearInterval(this.guestReadyTimer);
+            this.guestReadyTimer = setInterval(() => {
+              if (this.waitingForFrame0 && !this.pendingSyncLoad) {
+                notifyParent('NETPLAY_GUEST_READY');
+              } else if (!this.waitingForFrame0) {
+                clearInterval(this.guestReadyTimer);
+                this.guestReadyTimer = null;
+              }
+            }, 450);
+            setTimeout(() => {
+              if (this.waitingForFrame0 && !this.pendingSyncLoad) {
+                this.waitingForFrame0 = false;
+                this.resetAtFrame(0);
+                this.setSyncWaitMute(false);
+                notifyParent('NETPLAY_SYNC_COMPLETE', { syncFrame: 0 });
+              }
+            }, 25000);
+          }
+          this.lastTickMs = now;
+          return;
+        }
+
+        // Phase 1A (Invité P2) : Appliquer FRAME0 / RESYNC de manière 100% synchrone au début d'un tick propre
+        if (this.pendingSyncLoad) {
+          const loadJob = this.pendingSyncLoad;
+          this.pendingSyncLoad = null;
+          try {
+            this.gm = this.gm || window.EJS_emulator?.gameManager;
+            this.gm?.loadState?.(loadJob.bytes);
+            this.onRemoteSyncStateLoaded(loadJob.syncFrame);
+          } catch (err) {
+            console.warn('[CSW GGPO] Erreur sync loadState:', err);
+            this.waitingForFrame0 = false;
+            this.waitingForGoAck = false;
+            this.setSyncWaitMute(false);
+            notifyParent('NETPLAY_SYNC_COMPLETE', { syncFrame: 0 });
+          }
+          this.lastTickMs = performance.now();
+          return;
+        }
+
+        // Phase 1B (Hôte P1) : Exporter Frame 0 ou Resync sur un tick propre hors Asyncify
+        if (netplayPlayerIndex === 0 && this.pendingHostExportSlot) {
+          const slot = this.pendingHostExportSlot;
+          this.pendingHostExportSlot = null;
+          this.exportAndLockSyncState(slot, true);
+          this.lastTickMs = performance.now();
+          return;
+        }
+
+        // Phase 1C (Hôte P1) : Patienter jusqu'à ce que le moteur WASM de l'Invité soit prêt
         if (netplayPlayerIndex === 0 && this.hostWaitingForGuestEmu) {
           this.lastTickMs = now;
           return;
         }
 
-        // Si l'Hôte est encore dans sa séquence initiale d'insertion Coin/Start Versus (avant Frame 0), laisser tourner nativement
-        if (netplayPlayerIndex === 0 && !this.hostSetupCompleted) {
-          if (this.originalMainLoopFunc) this.originalMainLoopFunc();
-          this.lastTickMs = now;
-          return;
-        }
-
-        // 1. Dépouiller les paquets réseau GGPO reçus (0x5A / 0x5B / 0xCB / 0xCC)
+        // 2. Dépouiller les paquets réseau GGPO reçus (0x5A / 0x5B / 0x5C / 0xCB / 0xCC)
         this.processIncomingPackets();
 
-        // 2. Barrière Frame 0 : l'Invité attend FRAME0_STATE, l'Hôte attend FRAME0_ACK (max 1.8s)
+        // 3. Barrière Frame 0 / Départ Simultané
         if (this.waitingForFrame0) {
           this.lastTickMs = now;
           return;
         }
+        if (this.waitingForGoAck) {
+          if (now - this.waitingForGoAckSinceMs < 220) {
+            this.lastTickMs = now;
+            return;
+          }
+          this.onFrame0GoReceived(0);
+        }
         if (this.waitingForFrame0Ack) {
-          if (now - this.waitingForFrame0AckSinceMs < 1800) {
+          if (now - this.waitingForFrame0AckSinceMs < 4500) {
             this.lastTickMs = now;
             return;
           }
           this.waitingForFrame0Ack = false;
+          this.setSyncWaitMute(false);
+          notifyParent('NETPLAY_SYNC_COMPLETE', { syncFrame: 0 });
+        }
+        if (this.hostGoDelayUntilMs > 0) {
+          if (now < this.hostGoDelayUntilMs) {
+            this.lastTickMs = now;
+            return;
+          }
+          const releaseFrame = this.hostGoPendingFrame || 0;
+          this.hostGoDelayUntilMs = 0;
+          this.accumulatorMs = 0;
+          this.lastTickMs = now;
+          this.setSyncWaitMute(false);
+          notifyParent('NETPLAY_SYNC_COMPLETE', { syncFrame: releaseFrame });
+          console.log(`[CSW GGPO] Départ simultané P1 <-> P2 (Frame ${releaseFrame}) !`);
         }
 
-        // 3. Accumulateur d'horloge strict 60.00 FPS (empêche un écran 120Hz/144Hz de tourner 2x plus vite qu'un 60Hz)
+        // 4. Accumulateur d'horloge strict 60.00 FPS (empêche un écran 120Hz/144Hz de tourner 2x plus vite qu'un 60Hz)
         if (!this.lastTickMs) this.lastTickMs = now;
         const dt = Math.max(0, Math.min(80, now - this.lastTickMs));
         this.lastTickMs = now;
@@ -1544,31 +1790,45 @@
         }
         this.accumulatorMs -= this.FRAME_TIME_MS;
 
-        // 4. Time-Sync / Frame Advantage Pacing GGPO (sans jamais geler la boucle indéfiniment)
+        // 5. Time-Sync / Frame Advantage Pacing GGPO (borné à 250ms max pour ne jamais geler)
         const peerActive = this.hasRemotePeer && now - this.lastRemotePacketMs < 3000;
         const advantage = peerActive ? this.currentFrame - this.remoteFrameAdvancement : 0;
 
-        if (peerActive && advantage >= 8) {
-          // Trop en avance : ralentissement borné à 50% (1 frame sur 2) pour ne jamais figer l'écran
-          this.throttleCounter += 1;
-          if (this.throttleCounter % 2 === 0) {
+        if (peerActive && advantage >= 12) {
+          if (!this.lastPaceHoldMs) this.lastPaceHoldMs = now;
+          if (now - this.lastPaceHoldMs < 240) {
             return;
           }
-        } else if (peerActive && advantage >= 2) {
-          // Légèrement en avance : micro-ralentissement (skip 1 frame sur 6) pour converger vers advantage = 0
-          this.throttleCounter += 1;
-          if (this.throttleCounter % 6 === 0) {
-            return;
+          this.lastPaceHoldMs = now;
+        } else {
+          this.lastPaceHoldMs = 0;
+          if (peerActive && advantage >= 4) {
+            this.throttleCounter += 1;
+            if (this.throttleCounter % 3 === 0) {
+              return;
+            }
+          } else if (peerActive && advantage >= 2) {
+            this.throttleCounter += 1;
+            if (this.throttleCounter % 6 === 0) {
+              return;
+            }
           }
         }
 
+        if (this.isWasmAsyncifyBusy()) return;
         this.stepOneFrame();
 
-        // Si en retard sur l'adversaire (advantage <= -2) ou accumulateur >= 1 frame, rattraper 1 frame supplémentaire
-        if ((peerActive && advantage <= -2) || this.accumulatorMs >= this.FRAME_TIME_MS) {
+        // Ne jamais ré-entrer WASM pour une 2e frame si Asyncify vient de déclencher un unwind ou pendant les 6 premières frames
+        if (
+          this.currentFrame >= 6 &&
+          !this.isWasmAsyncifyBusy() &&
+          ((peerActive && advantage <= -2) || this.accumulatorMs >= this.FRAME_TIME_MS)
+        ) {
           this.accumulatorMs = Math.max(0, this.accumulatorMs - this.FRAME_TIME_MS);
           this.processIncomingPackets();
-          this.stepOneFrame();
+          if (!this.isWasmAsyncifyBusy()) {
+            this.stepOneFrame();
+          }
         }
       }
 
@@ -1577,6 +1837,9 @@
         this.gm = window.EJS_emulator?.gameManager;
         this.module = getWasmModule();
         this.isRunning = true;
+        this.localWarmupDone = false;
+        this.warmupFramesLeft = 30;
+        this.hostSetupCompleted = netplayPlayerIndex !== 0;
         this.lastFpsTimer = performance.now();
         this.lastTickMs = performance.now();
 
@@ -1584,30 +1847,6 @@
           this.gm?.setKeyboardEnabled?.(false);
           this.gm?.functions?.setKeyboardEnabled?.(0);
         } catch {}
-
-        if (netplayPlayerIndex === 1) {
-          this.waitingForFrame0 = true;
-          try { window.EJS_emulator?.pause?.(); } catch {}
-          notifyParent('NETPLAY_GUEST_READY');
-          if (this.guestReadyTimer) clearInterval(this.guestReadyTimer);
-          this.guestReadyTimer = setInterval(() => {
-            if (this.waitingForFrame0) {
-              notifyParent('NETPLAY_GUEST_READY');
-            } else {
-              clearInterval(this.guestReadyTimer);
-              this.guestReadyTimer = null;
-            }
-          }, 600);
-          // Sécurité : débloquer au bout de 10s si l'Hôte n'a pas envoyé d'état
-          setTimeout(() => {
-            if (this.waitingForFrame0) {
-              this.waitingForFrame0 = false;
-              this.resetAtFrame(0);
-              try { window.EJS_emulator?.play?.(); } catch {}
-              notifyParent('NETPLAY_SYNC_COMPLETE', { syncFrame: 0 });
-            }
-          }, 10000);
-        }
 
         const attachHook = () => {
           this.gm = this.gm || window.EJS_emulator?.gameManager;
@@ -2252,12 +2491,22 @@
         return;
       }
 
+      if (msg.type === 'NETPLAY_FRAME0_GO') {
+        window.__cswGgpoEngine?.onFrame0GoReceived(Number(msg.syncFrame || 0));
+        return;
+      }
+
+      if (msg.type === 'SET_PEER_PING' && typeof msg.pingMs === 'number') {
+        if (window.__cswGgpoEngine) window.__cswGgpoEngine.peerPingMs = Math.max(1, msg.pingMs);
+        return;
+      }
+
       if (msg.type === 'EXPORT_NETPLAY_SYNC') {
         if (isNetplaySession && netplayPlayerIndex === 0) {
           const ggpo = window.__cswGgpoEngine;
           if (ggpo) {
             if (msg.force) {
-              ggpo.exportAndLockSyncState(msg.slot || 'resync', true);
+              ggpo.pendingHostExportSlot = msg.slot || 'resync';
             } else {
               ggpo.onGuestReadySignal(msg.slot || 'frame0');
             }
@@ -2278,14 +2527,17 @@
       if (msg.type === 'NETPLAY_REMATCH_RESET') {
         if (isNetplaySession && netplayPlayerIndex === 0) {
           const ggpo = window.__cswGgpoEngine;
-          if (ggpo) {
-            ggpo.hostSetupCompleted = false;
-            ggpo.initialFrame0Sent = false;
-          }
           try {
             window.EJS_emulator?.gameManager?.restart?.();
           } catch {}
-          runHostVersusFrame0Sequence();
+          if (ggpo) {
+            ggpo.localWarmupDone = false;
+            ggpo.warmupFramesLeft = 24;
+            ggpo.hostSetupCompleted = false;
+            ggpo.initialFrame0Sent = false;
+            ggpo.guestIsReady = true;
+            ggpo.pendingHostExportSlot = 'frame0';
+          }
         }
         return;
       }
@@ -2540,34 +2792,9 @@
           if (ctrlCfg) window.EJS_defaultControls = ctrlCfg;
           const effectiveMuted = msg.muted ?? hw.audio?.muted ?? false;
           const effectiveVol = typeof msg.volume === 'number' ? msg.volume : (hw.audio?.volume ?? 80);
+          window.__cswDesiredAudio = { muted: Boolean(effectiveMuted), vol: Math.max(0, Math.min(1, effectiveVol / 100)) };
           window.EJS_volume = effectiveMuted ? 0 : effectiveVol / 100;
           applyHardwareSettings(hw);
-          function runHostVersusFrame0Sequence() {
-            if (!isNetplaySession || netplayPlayerIndex !== 0) return;
-            setTimeout(() => {
-              try {
-                pulseEmuButton(0, 2, 70); // Coin 1 P1
-                setTimeout(() => pulseEmuButton(1, 2, 70), 120); // Coin 1 P2
-                setTimeout(() => pulseEmuButton(0, 2, 70), 240); // Coin 2 P1
-                setTimeout(() => pulseEmuButton(1, 2, 70), 360); // Coin 2 P2
-                setTimeout(() => pulseEmuButton(0, 2, 70), 480); // Coin 3 P1
-                setTimeout(() => pulseEmuButton(1, 2, 70), 600); // Coin 3 P2
-
-                setTimeout(() => {
-                  pulseEmuButton(0, 3, 95); // Start 1
-                  setTimeout(() => {
-                    pulseEmuButton(1, 3, 95); // Start 2 (Challenger !)
-                    console.log('[CSW Fightcade GGPO] Auto-Start 2 Joueurs Versus activé (P1 + P2).');
-                    setTimeout(() => {
-                      window.__cswGgpoEngine?.onHostSetupFinished();
-                    }, 320);
-                  }, 300);
-                }, 820);
-              } catch {}
-            }, 650);
-          }
-
-          window.__cswStartHostVersusSeq = runHostVersusFrame0Sequence;
 
           window.EJS_onGameStart = () => {
             bootEl.hidden = true;
@@ -2585,37 +2812,8 @@
             }
 
             if (isNetplaySession) {
-              // Laisser ~20 frames (~350ms) à RetroArch/WebGL/OpenAL pour s'initialiser
-              // avant d'engager la pause d'attente mutuelle ou la séquence Frame 0.
-              setTimeout(() => {
-                window.__cswGgpoEngine?.start();
-                notifyParent('NETPLAY_EMU_READY', { isHost: netplayPlayerIndex === 0 });
-
-                if (netplayPlayerIndex === 0) {
-                  const ggpo = window.__cswGgpoEngine;
-                  if (ggpo && ggpo.guestIsReady) {
-                    ggpo.hostWaitingForGuestEmu = false;
-                    if (!ggpo.hostSetupStarted) {
-                      ggpo.hostSetupStarted = true;
-                      runHostVersusFrame0Sequence();
-                    }
-                  } else if (ggpo) {
-                    ggpo.hostWaitingForGuestEmu = true;
-                    try { window.EJS_emulator?.pause?.(); } catch {}
-                    // Garde-fou : démarrer après 8s max si le signal GUEST_READY a été retardé
-                    setTimeout(() => {
-                      if (ggpo.hostWaitingForGuestEmu) {
-                        ggpo.hostWaitingForGuestEmu = false;
-                        try { window.EJS_emulator?.play?.(); } catch {}
-                        if (!ggpo.hostSetupStarted) {
-                          ggpo.hostSetupStarted = true;
-                          runHostVersusFrame0Sequence();
-                        }
-                      }
-                    }, 8000);
-                  }
-                }
-              }, 350);
+              // Hook MainLoop.runIter immédiatement : le warmup de 30 frames + garde Asyncify sont gérés dans onMainLoopTick()
+              window.__cswGgpoEngine?.start();
             }
           };
 

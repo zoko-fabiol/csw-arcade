@@ -309,10 +309,10 @@ export default function App() {
       isHost,
       inputDelay: settings?.netplay?.inputDelay ?? 1,
       onSignalIce: (cand) => {
-        firebaseFightcadeService.postIceCandidate(challengeId, isHost ? 'caller' : 'callee', cand);
+        firebaseFightcadeService.postIceCandidate(challengeId, isHost ? 'caller' : 'callee', cand, opponentUid);
       },
       onRenegotiateOffer: (offer) => {
-        firebaseFightcadeService.postRenegotiateOffer(challengeId, offer);
+        firebaseFightcadeService.postRenegotiateOffer(challengeId, offer, opponentUid);
       },
       onStats: (st) => setP2pStats(st),
     });
@@ -328,11 +328,33 @@ export default function App() {
     });
     engine.addCleanup(() => firebaseFightcadeService.onRelayInput(null));
 
+    const unsubRtc = firebaseFightcadeService.subscribeRtcSignal(challengeId, async (msg) => {
+      if (!msg?.signalType || !msg.payload) return;
+      try {
+        if (msg.signalType === 'candidate') {
+          await engine.addRemoteCandidate(msg.payload);
+        } else if (!isHost && msg.signalType === 'offer' && !engine.hasRemoteDesc) {
+          const answer = await engine.acceptOfferAndCreateAnswer(msg.payload);
+          if (answer) await firebaseFightcadeService.postAnswer(challengeId, answer, opponentUid);
+        } else if (isHost && msg.signalType === 'answer' && !engine.hasRemoteDesc) {
+          await engine.acceptAnswer(msg.payload);
+        } else if (!isHost && msg.signalType === 'renegotiateOffer') {
+          const answer = await engine.acceptRenegotiateOffer(msg.payload);
+          if (answer) await firebaseFightcadeService.postRenegotiateAnswer(challengeId, answer, opponentUid);
+        } else if (isHost && msg.signalType === 'renegotiateAnswer') {
+          await engine.acceptRenegotiateAnswer(msg.payload);
+        }
+      } catch {
+        /* noop */
+      }
+    });
+    engine.addCleanup(unsubRtc);
+
     p2pEngineRef.current = engine;
 
     if (isHost) {
       const offer = await engine.initConnection();
-      await firebaseFightcadeService.postOffer(challengeId, offer);
+      await firebaseFightcadeService.postOffer(challengeId, offer, opponentUid);
       const unsubIce = firebaseFightcadeService.subscribeIceCandidates(challengeId, 'callee', (c) =>
         engine.addRemoteCandidate(c)
       );
@@ -355,13 +377,13 @@ export default function App() {
         if (ch?.offer && !engine.hasRemoteDesc) {
           const answer = await engine.acceptOfferAndCreateAnswer(ch.offer);
           if (answer) {
-            await firebaseFightcadeService.postAnswer(challengeId, answer);
+            await firebaseFightcadeService.postAnswer(challengeId, answer, opponentUid);
           }
         }
         if (ch?.renegotiateOffer) {
           const answer = await engine.acceptRenegotiateOffer(ch.renegotiateOffer);
           if (answer) {
-            await firebaseFightcadeService.postRenegotiateAnswer(challengeId, answer);
+            await firebaseFightcadeService.postRenegotiateAnswer(challengeId, answer, opponentUid);
           }
         }
       });
@@ -395,7 +417,12 @@ export default function App() {
   }) => {
     setActiveMatchSync(null);
     if (isHost) {
-      if (!requireAndConsumeCoin(2)) return;
+      if (!requireAndConsumeCoin(2)) {
+        if (challengeId && opponentUid) {
+          firebaseFightcadeService.sendMatchCancel(challengeId, opponentUid);
+        }
+        return;
+      }
     }
     await startRollbackP2PMatch({
       challengeId,

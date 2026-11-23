@@ -5,22 +5,8 @@
 const ICE_SERVERS = [
   { urls: 'stun:stun.l.google.com:19302' },
   { urls: 'stun:stun1.l.google.com:19302' },
+  { urls: 'stun:stun2.l.google.com:19302' },
   { urls: 'stun:stun.cloudflare.com:3478' },
-  { urls: 'stun:global.stun.twilio.com:3478' },
-  {
-    urls: [
-      'turn:openrelay.metered.ca:80',
-      'turn:openrelay.metered.ca:443',
-      'turn:openrelay.metered.ca:443?transport=tcp',
-    ],
-    username: 'openrelayproject',
-    credential: 'openrelayproject',
-  },
-  {
-    urls: 'turns:openrelay.metered.ca:443?transport=tcp',
-    username: 'openrelayproject',
-    credential: 'openrelayproject',
-  },
 ];
 
 const MAX_ROLLBACK_FRAMES = 8;
@@ -82,7 +68,9 @@ export class RollbackP2PEngine {
 
     this.onGgpoPacket = null;
     this.onFrame0Ack = null;
+    this.onFrame0Go = null;
     this.onNetplayEvent = null;
+    this.frame0FallbackTimer = null;
 
     this.stats = {
       pingMs: 0,
@@ -115,7 +103,7 @@ export class RollbackP2PEngine {
   async initConnection() {
     this.pc = new RTCPeerConnection({
       iceServers: ICE_SERVERS,
-      iceCandidatePoolSize: 10,
+      iceCandidatePoolSize: 4,
       bundlePolicy: 'max-bundle',
       rtcpMuxPolicy: 'require',
     });
@@ -146,7 +134,7 @@ export class RollbackP2PEngine {
         this.emitStats();
         this.startPingLoop();
       }
-    }, 3500);
+    }, 1800);
 
     this.pc.oniceconnectionstatechange = () => {
       const s = this.pc?.iceConnectionState || 'closed';
@@ -361,7 +349,13 @@ export class RollbackP2PEngine {
         } else if (msg.type === 'EMU_READY') {
           this.onPeerEmuReady?.(Boolean(msg.isHost));
         } else if (msg.type === 'FRAME0_ACK') {
+          if (this.frame0FallbackTimer) {
+            clearTimeout(this.frame0FallbackTimer);
+            this.frame0FallbackTimer = null;
+          }
           this.onFrame0Ack?.(Number(msg.syncFrame || 0));
+        } else if (msg.type === 'FRAME0_GO') {
+          this.onFrame0Go?.(Number(msg.syncFrame || 0));
         } else if (msg.type === 'NETPLAY_EVENT' && msg.eventData) {
           this._deliverNetplayEvent(msg.eventData);
         }
@@ -424,6 +418,11 @@ export class RollbackP2PEngine {
   }
 
   sendFrame0Ack(syncFrame = 0) {
+    this.pendingAckTransferId = null;
+    if (this.frame0FallbackTimer) {
+      clearTimeout(this.frame0FallbackTimer);
+      this.frame0FallbackTimer = null;
+    }
     if (this.reliableChannel?.readyState === 'open') {
       try {
         this.reliableChannel.send(JSON.stringify({ type: 'FRAME0_ACK', syncFrame }));
@@ -432,6 +431,17 @@ export class RollbackP2PEngine {
       }
     }
     this.onRelayButtonFallback?.({ syncType: 'FRAME0_ACK', syncFrame });
+  }
+
+  sendFrame0Go(syncFrame = 0) {
+    if (this.reliableChannel?.readyState === 'open') {
+      try {
+        this.reliableChannel.send(JSON.stringify({ type: 'FRAME0_GO', syncFrame }));
+      } catch {
+        /* noop */
+      }
+    }
+    this.onRelayButtonFallback?.({ syncType: 'FRAME0_GO', syncFrame });
   }
 
   updateRollbackTelemetry(emuStats = {}) {
@@ -476,8 +486,8 @@ export class RollbackP2PEngine {
       }
     }
 
-    // Pour les paquets de contrôle critiques (0x5B = FRAME0_ACK, 0xCC = DESYNC_REQ) ou si l'UDP WebRTC n'est pas encore ouvert
-    if (!sentUdp || magic === 0x5b || magic === 0xcc) {
+    // Pour les paquets de contrôle critiques (0x5B = FRAME0_ACK, 0x5C = FRAME0_GO, 0xCC = DESYNC_REQ) ou si l'UDP WebRTC n'est pas encore ouvert
+    if (!sentUdp || magic === 0x5b || magic === 0x5c || magic === 0xcc) {
       if (this.onRelayButtonFallback) {
         let hex = '';
         for (let i = 0; i < bytes.length; i++) {
@@ -534,7 +544,9 @@ export class RollbackP2PEngine {
     }
     if (data.syncType === 'PONG' && typeof data.t === 'number') {
       if (this.udpChannel?.readyState !== 'open') {
-        this.stats.pingMs = Math.max(1, Math.round((performance.now() - data.t) / 2));
+        const rawRtt = Math.max(1, Math.min(2500, Math.round((performance.now() - data.t) / 2)));
+        const prev = Number(this.stats.pingMs || 0);
+        this.stats.pingMs = prev > 0 ? Math.round(prev * 0.55 + rawRtt * 0.45) : rawRtt;
         this.stats.p2pState = 'relay-vps';
         this.emitStats();
       }
@@ -553,7 +565,15 @@ export class RollbackP2PEngine {
       return;
     }
     if (data.syncType === 'FRAME0_ACK') {
+      if (this.frame0FallbackTimer) {
+        clearTimeout(this.frame0FallbackTimer);
+        this.frame0FallbackTimer = null;
+      }
       this.onFrame0Ack?.(Number(data.syncFrame || 0));
+      return;
+    }
+    if (data.syncType === 'FRAME0_GO') {
+      this.onFrame0Go?.(Number(data.syncFrame || 0));
       return;
     }
     if (data.syncType === 'FRAME0_CHUNK' && data.stateBase64) {
@@ -696,9 +716,14 @@ export class RollbackP2PEngine {
 
   sendFrame0State(stateBase64, syncFrame = 0) {
     if (!stateBase64) return;
+    if (this.frame0FallbackTimer) {
+      clearTimeout(this.frame0FallbackTimer);
+      this.frame0FallbackTimer = null;
+    }
     const cleanSyncFrame = Number(syncFrame || 0);
     const transferId = `f0_${Date.now()}_${cleanSyncFrame}`;
-    const CHUNK_SIZE = 32768; // 32 KB par paquet SCTP / WebSocket (évite tout blocage Caddy / WebRTC)
+    this.pendingAckTransferId = transferId;
+    const CHUNK_SIZE = 24576; // 24 KB par paquet SCTP WebRTC fiable
     const total = Math.ceil(stateBase64.length / CHUNK_SIZE);
     let sentOverRtc = false;
 
@@ -726,32 +751,41 @@ export class RollbackP2PEngine {
       this.pendingFrame0State = { stateBase64, syncFrame: cleanSyncFrame };
     }
 
-    // Relais WebSocket VPS garanti par paquets de 16 KB espacés de 25ms (100% fiable à travers Caddy/4G/NAT)
-    if (this.onRelayButtonFallback && (!sentOverRtc || stateBase64.length <= 1600000)) {
+    const dispatchWsChunks = async () => {
+      if (!this.onRelayButtonFallback || this.destroyed) return;
       const WS_CHUNK = 16384;
       const wsTotal = Math.ceil(stateBase64.length / WS_CHUNK);
       const wsTransferId = `${transferId}_ws`;
-      (async () => {
-        try {
-          for (let i = 0; i < wsTotal; i++) {
-            if (this.destroyed) break;
-            const chunk = stateBase64.slice(i * WS_CHUNK, (i + 1) * WS_CHUNK);
-            this.onRelayButtonFallback({
-              syncType: 'FRAME0_CHUNK',
-              transferId: wsTransferId,
-              chunkIndex: i,
-              chunkTotal: wsTotal,
-              stateBase64: chunk,
-              syncFrame: cleanSyncFrame,
-            });
-            if (i + 1 < wsTotal) {
-              await new Promise((r) => setTimeout(r, 25));
-            }
+      try {
+        for (let i = 0; i < wsTotal; i++) {
+          if (this.destroyed || this.pendingAckTransferId !== transferId) break;
+          const chunk = stateBase64.slice(i * WS_CHUNK, (i + 1) * WS_CHUNK);
+          this.onRelayButtonFallback({
+            syncType: 'FRAME0_CHUNK',
+            transferId: wsTransferId,
+            chunkIndex: i,
+            chunkTotal: wsTotal,
+            stateBase64: chunk,
+            syncFrame: cleanSyncFrame,
+          });
+          if (i + 1 < wsTotal) {
+            await new Promise((r) => setTimeout(r, 12));
           }
-        } catch {
-          /* noop */
         }
-      })();
+      } catch {
+        /* noop */
+      }
+    };
+
+    // Si WebRTC fiable est ouvert, ne pas congestionner le WebSocket immédiatement ;
+    // basculer automatiquement sur le relais WS uniquement si l'ACK tarde (> 1400ms).
+    if (!sentOverRtc) {
+      dispatchWsChunks();
+    } else if (this.onRelayButtonFallback) {
+      this.frame0FallbackTimer = setTimeout(() => {
+        this.frame0FallbackTimer = null;
+        dispatchWsChunks();
+      }, 1400);
     }
   }
 
@@ -774,12 +808,20 @@ export class RollbackP2PEngine {
     // Paquets binaires GGPO Fightcade :
     // 0x5A = Input Frame + Redondance N-3 (15 octets)
     // 0x5B = Frame-0 / Sync ACK (5 octets)
+    // 0x5C = Frame-0 / Simultaneous GO (5 octets)
     // 0xCB = Checksum RAM 68000 (9 octets)
     // 0xCC = Demande d'Auto-Resync sur divergence checksum (5 octets)
-    if (magic === 0x5a || magic === 0x5b || magic === 0xcb || magic === 0xcc) {
+    if (magic === 0x5a || magic === 0x5b || magic === 0x5c || magic === 0xcb || magic === 0xcc) {
       if (magic === 0x5b && buffer.byteLength >= 5) {
         const ackFrame = view.getUint32(1, false);
+        if (this.frame0FallbackTimer) {
+          clearTimeout(this.frame0FallbackTimer);
+          this.frame0FallbackTimer = null;
+        }
         this.onFrame0Ack?.(ackFrame);
+      } else if (magic === 0x5c && buffer.byteLength >= 5) {
+        const goFrame = view.getUint32(1, false);
+        this.onFrame0Go?.(goFrame);
       }
       this.onGgpoPacket?.(buffer);
       return;
@@ -836,9 +878,11 @@ export class RollbackP2PEngine {
     if (this.pingInterval) clearInterval(this.pingInterval);
     if (this.iceRestartTimer) clearTimeout(this.iceRestartTimer);
     if (this.connectTimeoutTimer) clearTimeout(this.connectTimeoutTimer);
+    if (this.frame0FallbackTimer) clearTimeout(this.frame0FallbackTimer);
     this.pingInterval = null;
     this.iceRestartTimer = null;
     this.connectTimeoutTimer = null;
+    this.frame0FallbackTimer = null;
 
     const cleanups = [...this.cleanupCallbacks];
     this.cleanupCallbacks = [];
@@ -855,6 +899,7 @@ export class RollbackP2PEngine {
     this.onGgpoPacket = null;
     this.onFrame0State = null;
     this.onFrame0Ack = null;
+    this.onFrame0Go = null;
     this.onGuestReady = null;
     this.onRelayButtonFallback = null;
     this.onStats = null;

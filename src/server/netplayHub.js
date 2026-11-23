@@ -1161,6 +1161,11 @@ export function setupNetplayHub(server) {
           case 'IDENTIFY': {
             const { uid, name } = data;
             if (uid) {
+              if (ws.uid && ws.uid !== uid && connectedUsers.has(ws.uid)) {
+                const oldSet = connectedUsers.get(ws.uid);
+                oldSet.delete(ws);
+                if (oldSet.size === 0) connectedUsers.delete(ws.uid);
+              }
               ws.uid = uid;
               ws.userName = name;
               if (!connectedUsers.has(uid)) connectedUsers.set(uid, new Set());
@@ -1251,6 +1256,24 @@ export function setupNetplayHub(server) {
             const sockets = connectedUsers.get(targetUid);
             if (sockets) {
               const msg = JSON.stringify({ type: 'MATCH_CANCELLED', challengeId });
+              for (const s of sockets) {
+                if (s !== ws && s.readyState === WebSocket.OPEN) s.send(msg);
+              }
+            }
+            break;
+          }
+
+          case 'RTC_SIGNAL': {
+            const { challengeId, targetUid, signalType, payload } = data;
+            const sockets = connectedUsers.get(targetUid);
+            if (sockets && signalType) {
+              const msg = JSON.stringify({
+                type: 'RTC_SIGNAL',
+                challengeId,
+                fromUid: ws.uid || null,
+                signalType,
+                payload,
+              });
               for (const s of sockets) {
                 if (s !== ws && s.readyState === WebSocket.OPEN) s.send(msg);
               }

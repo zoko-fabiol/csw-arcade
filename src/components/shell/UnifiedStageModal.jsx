@@ -82,11 +82,24 @@ export function UnifiedStageModal({
     setLocalEmuReady(false);
     setRemoteEmuReady(false);
     setNetplaySyncReady(!session.isNetplay);
-    if (session.isNetplay) {
-      const safetyTimer = setTimeout(() => setNetplaySyncReady(true), 12000);
-      return () => clearTimeout(safetyTimer);
-    }
   }, [session?.gameId, session?.title, session?.isNetplay, bootKey]);
+
+  useEffect(() => {
+    if (!session?.isNetplay || netplaySyncReady || !localEmuReady || !remoteEmuReady) return;
+    const safetyTimer = setTimeout(() => setNetplaySyncReady(true), 18000);
+    return () => clearTimeout(safetyTimer);
+  }, [session?.isNetplay, netplaySyncReady, localEmuReady, remoteEmuReady]);
+
+  useEffect(() => {
+    if (session?.isNetplay && typeof p2pStats?.pingMs === 'number' && p2pStats.pingMs > 0) {
+      try {
+        iframeRef.current?.contentWindow?.postMessage(
+          { type: 'SET_PEER_PING', pingMs: p2pStats.pingMs },
+          window.location.origin
+        );
+      } catch {}
+    }
+  }, [session?.isNetplay, p2pStats?.pingMs]);
 
   const getMyDisplayName = () =>
     userProfileRef.current?.displayName ||
@@ -340,11 +353,6 @@ export function UnifiedStageModal({
               const stream = iframeRef.current?.contentWindow?.captureStageStream?.(30);
               if (stream) p2pEngine.attachMediaStream(stream);
             }
-            if (session.isNetplay && !session.isHost) {
-              setTimeout(() => {
-                p2pEngine?.notifyGuestEmuReady?.();
-              }, 200);
-            }
           } catch {
             /* noop */
           }
@@ -422,6 +430,8 @@ export function UnifiedStageModal({
         p2pEngine?.notifyGuestEmuReady?.();
       } else if (event.data.type === 'NETPLAY_FRAME0_ACK') {
         p2pEngine?.sendFrame0Ack?.(Number(event.data.syncFrame || 0));
+      } else if (event.data.type === 'NETPLAY_FRAME0_GO') {
+        p2pEngine?.sendFrame0Go?.(Number(event.data.syncFrame || 0));
       } else if (event.data.type === 'NETPLAY_SYNC_COMPLETE') {
         setNetplaySyncReady(true);
       } else if (event.data.type === 'ROLLBACK_TELEMETRY' && event.data.stats) {
@@ -532,6 +542,12 @@ export function UnifiedStageModal({
     p2pEngine.onFrame0Ack = (syncFrame = 0) => {
       iframeRef.current?.contentWindow?.postMessage(
         { type: 'NETPLAY_FRAME0_ACK', syncFrame: Number(syncFrame || 0) },
+        window.location.origin
+      );
+    };
+    p2pEngine.onFrame0Go = (syncFrame = 0) => {
+      iframeRef.current?.contentWindow?.postMessage(
+        { type: 'NETPLAY_FRAME0_GO', syncFrame: Number(syncFrame || 0) },
         window.location.origin
       );
     };
@@ -999,7 +1015,9 @@ export function UnifiedStageModal({
                   Synchronisation des 2 joueurs…
                 </h3>
                 <p className="text-xs text-neutral-300">
-                  Le premier joueur prêt patiente pour un départ simultané à la même milliseconde.
+                  {localEmuReady && remoteEmuReady
+                    ? 'Transfert & verrouillage de la Frame 0 pour un départ simultané…'
+                    : 'Le premier joueur prêt patiente jusqu’à la fin du chargement de son adversaire.'}
                 </p>
               </div>
               <div className="grid grid-cols-2 gap-2.5 text-xs">
