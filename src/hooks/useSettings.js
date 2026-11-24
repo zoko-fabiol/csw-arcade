@@ -78,7 +78,7 @@ export const DEFAULT_SETTINGS = {
     scale: 100, // 80, 100, 120
     portraitMode: 'pad-bottom', // 'pad-bottom' | 'overlay'
     dpadType: 'analog', // 'analog' (Joystick) | 'dpad' (Croix directionnelle classique)
-    joystickMode: 'floating', // 'floating' (Fortnite style dynamique) | 'fixed' (Classique fixe)
+    joystickMode: 'floating', // 'floating' (Dynamique flottant) | 'fixed' (Classique fixe)
     turboEnabled: true, // Affiche le bouton Turbo A pour Metal Slug
     macroAbEnabled: true, // Active le bouton L1 en macro A+B (Roulade)
     macroCdEnabled: true, // Active le bouton R1 en macro C+D (Projection)
@@ -98,11 +98,20 @@ export const DEFAULT_SETTINGS = {
   ui: {
     theme: 'dark' // 'dark' | 'light' | 'system'
   },
+  voice: {
+    privacy: 'friends', // 'everyone' | 'friends' | 'party' | 'off'
+    micMode: 'open', // 'open' | 'ptt'
+    pttKey: 'KeyV',
+    volume: 85,
+    sensitivity: 20, // 0 à 100
+    defaultMuted: false,
+    audioDucking: true
+  },
   consoleControls: DEFAULT_CONSOLE_CONTROLS
 };
 
 /**
- * Hook centralisant les préférences utilisateur NeoRAGEx avec persistance localStorage
+ * Hook centralisant les préférences utilisateur CSW Arcade avec persistance localStorage
  */
 export function useSettings() {
   const [settings, setSettings] = useState(() => {
@@ -137,6 +146,7 @@ export function useSettings() {
           performance: { ...DEFAULT_SETTINGS.performance, ...(parsed.performance || {}) },
           netplay: { ...DEFAULT_SETTINGS.netplay, ...(parsed.netplay || {}) },
           ui: { ...DEFAULT_SETTINGS.ui, ...(parsed.ui || {}) },
+          voice: { ...DEFAULT_SETTINGS.voice, ...(parsed.voice || {}) },
           consoleControls: mergedConsoles,
         };
       }
@@ -254,7 +264,7 @@ export function useSettings() {
   }, []);
 
   /**
-   * Met à jour les options Fightcade 2 / Rollback P2P
+   * Met à jour les options CSW Arcade / Rollback P2P
    */
   const updateNetplaySetting = useCallback((key, value) => {
     setSettings((prev) => ({
@@ -274,6 +284,19 @@ export function useSettings() {
       ...prev,
       ui: {
         ...(prev.ui || DEFAULT_SETTINGS.ui),
+        [key]: value
+      }
+    }));
+  }, []);
+
+  /**
+   * Met à jour les paramètres du Chat Vocal CSW Arcade
+   */
+  const updateVoiceSetting = useCallback((key, value) => {
+    setSettings((prev) => ({
+      ...prev,
+      voice: {
+        ...(prev.voice || DEFAULT_SETTINGS.voice),
         [key]: value
       }
     }));
@@ -375,7 +398,7 @@ export function useSettings() {
   }, []);
 
   /**
-   * Réinitialise l'ensemble des paramètres d'usine NeoRAGEx
+   * Réinitialise l'ensemble des paramètres d'usine CSW Arcade
    */
   const resetToDefaults = useCallback(() => {
     setSettings(DEFAULT_SETTINGS);
@@ -395,6 +418,7 @@ export function useSettings() {
     updatePerformanceSetting,
     updateNetplaySetting,
     updateUiSetting,
+    updateVoiceSetting,
     resetToDefaults
   };
 }

@@ -1838,6 +1838,574 @@ export function setupNetplayHub(server) {
     res.end(JSON.stringify({ ok: false }));
   });
 
+  // ============================================================================
+  // MESSAGERIE PRIVÉE DIRECTE ENTRE AMIS (/api/dm) & HUB VOCAL FORTNITE (/ws/voice)
+  // ============================================================================
+  const dmStorePath = path.join(socialDir, 'dm-threads.json');
+  const dmThreads = new Map(); // dmId -> Array<{ id, dmId, fromUid, fromName, fromPhotoURL, toUid, text, createdAtMs }>
+  const dmReadCursors = new Map(); // uid -> Record<peerUid, lastReadMs>
+  const dmRateLimits = new Map(); // uid -> Array<timestampMs>
+
+  const buildDmId = (a, b) => [String(a || ''), String(b || '')].sort().join('__');
+
+  try {
+    if (fs.existsSync(dmStorePath)) {
+      const parsedDm = JSON.parse(fs.readFileSync(dmStorePath, 'utf8'));
+      if (parsedDm?.threads && typeof parsedDm.threads === 'object') {
+        for (const [k, list] of Object.entries(parsedDm.threads)) {
+          if (Array.isArray(list)) dmThreads.set(k, list.slice(-100));
+        }
+      }
+      if (parsedDm?.readCursors && typeof parsedDm.readCursors === 'object') {
+        for (const [u, map] of Object.entries(parsedDm.readCursors)) {
+          if (map && typeof map === 'object') dmReadCursors.set(u, map);
+        }
+      }
+    }
+  } catch (e) {
+    console.warn('[CSW-Arcade DM] Erreur chargement dm-threads.json:', e?.message);
+  }
+
+  let dmSaveTimer = null;
+  const scheduleSaveDmStore = () => {
+    if (dmSaveTimer) return;
+    dmSaveTimer = setTimeout(() => {
+      dmSaveTimer = null;
+      try {
+        if (!fs.existsSync(socialDir)) fs.mkdirSync(socialDir, { recursive: true });
+        const payload = {
+          threads: Object.fromEntries(dmThreads.entries()),
+          readCursors: Object.fromEntries(dmReadCursors.entries()),
+        };
+        fs.writeFileSync(dmStorePath, JSON.stringify(payload), 'utf8');
+      } catch (e) {
+        console.warn('[CSW-Arcade DM] Échec écriture dm-threads.json:', e?.message);
+      }
+    }, 350);
+  };
+
+  const computeUnreadByPeer = (uid) => {
+    const unreadByPeer = {};
+    let totalUnread = 0;
+    const cursors = dmReadCursors.get(uid) || {};
+    for (const [dmId, msgs] of dmThreads.entries()) {
+      const parts = dmId.split('__');
+      if (parts.length !== 2) continue;
+      if (parts[0] !== uid && parts[1] !== uid) continue;
+      const peerUid = parts[0] === uid ? parts[1] : parts[0];
+      const lastRead = Number(cursors[peerUid] || 0);
+      let count = 0;
+      for (const m of msgs) {
+        if (m.toUid === uid && Number(m.createdAtMs || 0) > lastRead) count += 1;
+      }
+      if (count > 0) {
+        unreadByPeer[peerUid] = count;
+        totalUnread += count;
+      }
+    }
+    return { unreadByPeer, totalUnread };
+  };
+
+  // WebSocket Vocal & Groupe Salon CSW Arcade (6 joueurs max + Relais Audio VPS + Push DM temps réel)
+  const MAX_PARTY_SIZE = 6;
+  const voiceWss = new WebSocketServer({ noServer: true, maxPayload: 256 * 1024 });
+  const voiceClients = new Map(); // uid -> Set<ws>
+  const voiceProfiles = new Map(); // uid -> { uid, name, photoURL, rank, region, privacy, roomId, channel, ready, muted, speaking }
+  const voiceRooms = new Map(); // roomId -> { roomId, title, hostUid, members: Set<uid> }
+
+  const sendVoiceJson = (ws, obj) => {
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      try {
+        ws.send(JSON.stringify(obj));
+      } catch {}
+    }
+  };
+
+  const pushToVoiceUser = (uid, obj) => {
+    const sockets = voiceClients.get(String(uid || ''));
+    if (!sockets || sockets.size === 0) return false;
+    let delivered = false;
+    for (const ws of sockets) {
+      if (ws.readyState === WebSocket.OPEN) {
+        sendVoiceJson(ws, obj);
+        delivered = true;
+      }
+    }
+    return delivered;
+  };
+
+  const broadcastVoiceRoom = (roomId) => {
+    const room = voiceRooms.get(roomId);
+    if (!room) return;
+    const members = [];
+    for (const memberUid of room.members) {
+      const prof = voiceProfiles.get(memberUid);
+      if (prof) {
+        members.push({
+          uid: prof.uid,
+          name: prof.name,
+          photoURL: prof.photoURL || null,
+          rank: prof.rank || 'D',
+          region: prof.region || 'FR',
+          ready: Boolean(prof.ready),
+          muted: Boolean(prof.muted),
+          speaking: Boolean(prof.speaking),
+          channel: prof.channel || 'party',
+        });
+      }
+    }
+    const payload = {
+      type: 'room_state',
+      roomId: room.roomId,
+      title: room.title || 'Groupe CSW Arcade',
+      hostUid: room.hostUid,
+      maxMembers: MAX_PARTY_SIZE,
+      members,
+    };
+    for (const memberUid of room.members) {
+      pushToVoiceUser(memberUid, payload);
+    }
+  };
+
+  const removeFromVoiceRoom = (uid) => {
+    const prof = voiceProfiles.get(uid);
+    if (!prof?.roomId) return;
+    const oldRoomId = prof.roomId;
+    prof.roomId = null;
+    prof.speaking = false;
+    const room = voiceRooms.get(oldRoomId);
+    if (room) {
+      room.members.delete(uid);
+      if (room.members.size === 0) {
+        voiceRooms.delete(oldRoomId);
+      } else {
+        if (room.hostUid === uid) {
+          room.hostUid = Array.from(room.members)[0];
+        }
+        broadcastVoiceRoom(oldRoomId);
+      }
+    }
+  };
+
+  voiceWss.on('connection', (ws) => {
+    ws.voiceUid = null;
+    ws.on('message', (raw) => {
+      try {
+        const msg = JSON.parse(raw.toString());
+        if (!msg || typeof msg !== 'object') return;
+
+        if (msg.type === 'register') {
+          const uid = String(msg.uid || '').trim();
+          if (!uid) return;
+          ws.voiceUid = uid;
+          if (!voiceClients.has(uid)) voiceClients.set(uid, new Set());
+          voiceClients.get(uid).add(ws);
+          const existing = voiceProfiles.get(uid);
+          voiceProfiles.set(uid, {
+            uid,
+            name: String(msg.name || existing?.name || 'Joueur').slice(0, 40),
+            photoURL: msg.photoURL || existing?.photoURL || null,
+            rank: String(msg.rank || existing?.rank || 'D').slice(0, 6),
+            region: String(msg.region || existing?.region || 'FR').slice(0, 6),
+            privacy: ['everyone', 'friends', 'party', 'off'].includes(msg.privacy)
+              ? msg.privacy
+              : existing?.privacy || 'friends',
+            roomId: existing?.roomId || null,
+            channel: msg.channel === 'game' ? 'game' : existing?.channel || 'party',
+            ready: Boolean(existing?.ready),
+            muted: existing?.muted ?? true,
+            speaking: false,
+          });
+          sendVoiceJson(ws, { type: 'registered', uid, ...computeUnreadByPeer(uid) });
+          if (existing?.roomId && voiceRooms.has(existing.roomId)) {
+            broadcastVoiceRoom(existing.roomId);
+          }
+          return;
+        }
+
+        const uid = ws.voiceUid;
+        if (!uid) return;
+        const prof = voiceProfiles.get(uid);
+        if (!prof) return;
+
+        if (msg.type === 'update_privacy') {
+          if (['everyone', 'friends', 'party', 'off'].includes(msg.privacy)) {
+            prof.privacy = msg.privacy;
+            if (msg.privacy === 'off' && prof.roomId) {
+              removeFromVoiceRoom(uid);
+              sendVoiceJson(ws, { type: 'left_room', reason: 'privacy_off' });
+            }
+          }
+          return;
+        }
+
+        if (msg.type === 'join_room') {
+          if (prof.privacy === 'off') {
+            sendVoiceJson(ws, { type: 'voice_error', error: 'Le chat vocal est désactivé dans vos paramètres.' });
+            return;
+          }
+          const roomId = String(msg.roomId || `party_${uid}`).slice(0, 80);
+          if (prof.roomId && prof.roomId !== roomId) {
+            removeFromVoiceRoom(uid);
+          }
+          let room = voiceRooms.get(roomId);
+          if (!room) {
+            room = {
+              roomId,
+              title: String(msg.title || `Groupe de ${prof.name}`).slice(0, 60),
+              hostUid: uid,
+              members: new Set(),
+            };
+            voiceRooms.set(roomId, room);
+          }
+          if (!room.members.has(uid) && room.members.size >= MAX_PARTY_SIZE) {
+            sendVoiceJson(ws, { type: 'voice_error', error: `Groupe CSW Arcade complet (${MAX_PARTY_SIZE} joueurs max).` });
+            return;
+          }
+          room.members.add(uid);
+          prof.roomId = roomId;
+          prof.channel = msg.channel === 'game' ? 'game' : 'party';
+          if (typeof msg.muted === 'boolean') prof.muted = msg.muted;
+          prof.ready = false;
+          prof.speaking = false;
+          broadcastVoiceRoom(roomId);
+          return;
+        }
+
+        // Rejoindre directement le groupe/salon d'un autre joueur (max 6 personnes)
+        if (msg.type === 'join_user_party') {
+          if (prof.privacy === 'off') {
+            sendVoiceJson(ws, { type: 'voice_error', error: 'Activez le chat vocal dans Paramètres → Audio pour rejoindre un groupe.' });
+            return;
+          }
+          const targetUid = String(msg.targetUid || '').trim();
+          if (!targetUid || targetUid === uid) return;
+          const targetProf = voiceProfiles.get(targetUid);
+          const targetPrivacy = targetProf?.privacy || 'friends';
+          if (targetPrivacy === 'off') {
+            sendVoiceJson(ws, { type: 'voice_error', error: 'Ce joueur a désactivé le groupe vocal.' });
+            return;
+          }
+          const areFriends = Boolean(friendships.get(targetUid)?.has(uid) || friendships.get(uid)?.has(targetUid));
+          if (targetPrivacy === 'friends' && !areFriends) {
+            sendVoiceJson(ws, { type: 'voice_error', error: 'Ce joueur accepte uniquement ses amis dans son groupe.' });
+            return;
+          }
+          if (targetPrivacy === 'party' && !areFriends) {
+            sendVoiceJson(ws, { type: 'voice_error', error: 'Ce groupe est sur invitation uniquement.' });
+            return;
+          }
+
+          let targetRoomId = targetProf?.roomId || `party_${targetUid}`;
+          let room = voiceRooms.get(targetRoomId);
+          if (!room) {
+            room = {
+              roomId: targetRoomId,
+              title: `Groupe de ${targetProf?.name || msg.targetName || 'Joueur'}`,
+              hostUid: targetUid,
+              members: new Set(),
+            };
+            voiceRooms.set(targetRoomId, room);
+            if (targetProf) {
+              targetProf.roomId = targetRoomId;
+              room.members.add(targetUid);
+            }
+          }
+          if (!room.members.has(uid) && room.members.size >= MAX_PARTY_SIZE) {
+            sendVoiceJson(ws, { type: 'voice_error', error: `Le groupe est déjà complet (${MAX_PARTY_SIZE}/${MAX_PARTY_SIZE}).` });
+            return;
+          }
+          if (prof.roomId && prof.roomId !== targetRoomId) {
+            removeFromVoiceRoom(uid);
+          }
+          room.members.add(uid);
+          prof.roomId = targetRoomId;
+          prof.channel = 'party';
+          if (typeof msg.muted === 'boolean') prof.muted = msg.muted;
+          prof.ready = false;
+          prof.speaking = false;
+          broadcastVoiceRoom(targetRoomId);
+
+          // Notifier le joueur cible qu'on a rejoint son groupe salon
+          pushToVoiceUser(targetUid, {
+            type: 'voice_invite_received',
+            inviteId: `pjoin_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+            fromUid: uid,
+            fromName: prof.name,
+            fromPhotoURL: prof.photoURL || null,
+            roomId: targetRoomId,
+            roomTitle: room.title,
+            channel: 'party',
+            joinedDirectly: true,
+            createdAtMs: Date.now(),
+          });
+          return;
+        }
+
+        if (msg.type === 'set_ready') {
+          prof.ready = Boolean(msg.ready);
+          if (prof.roomId) broadcastVoiceRoom(prof.roomId);
+          return;
+        }
+
+        if (msg.type === 'kick_member') {
+          const targetUid = String(msg.targetUid || '').trim();
+          if (!prof.roomId || !targetUid || targetUid === uid) return;
+          const room = voiceRooms.get(prof.roomId);
+          if (!room || room.hostUid !== uid || !room.members.has(targetUid)) return;
+          removeFromVoiceRoom(targetUid);
+          pushToVoiceUser(targetUid, { type: 'left_room', reason: 'kicked' });
+          return;
+        }
+
+        if (msg.type === 'transfer_host') {
+          const targetUid = String(msg.targetUid || '').trim();
+          if (!prof.roomId || !targetUid || targetUid === uid) return;
+          const room = voiceRooms.get(prof.roomId);
+          if (!room || room.hostUid !== uid || !room.members.has(targetUid)) return;
+          room.hostUid = targetUid;
+          broadcastVoiceRoom(prof.roomId);
+          return;
+        }
+
+        if (msg.type === 'leave_room') {
+          removeFromVoiceRoom(uid);
+          sendVoiceJson(ws, { type: 'left_room', reason: 'user' });
+          return;
+        }
+
+        if (msg.type === 'voice_state') {
+          if (typeof msg.muted === 'boolean') prof.muted = msg.muted;
+          if (typeof msg.speaking === 'boolean') prof.speaking = prof.muted ? false : msg.speaking;
+          if (msg.channel === 'party' || msg.channel === 'game') prof.channel = msg.channel;
+          if (prof.roomId) broadcastVoiceRoom(prof.roomId);
+          return;
+        }
+
+        if (msg.type === 'voice_invite') {
+          const toUid = String(msg.toUid || '').trim();
+          if (!toUid || toUid === uid) return;
+          const targetProf = voiceProfiles.get(toUid);
+          const targetPrivacy = targetProf?.privacy || 'friends';
+          if (targetPrivacy === 'off') {
+            sendVoiceJson(ws, { type: 'voice_error', error: 'Ce joueur a désactivé le chat vocal.' });
+            return;
+          }
+          const areFriends = Boolean(friendships.get(toUid)?.has(uid) || friendships.get(uid)?.has(toUid));
+          if (targetPrivacy === 'friends' && !areFriends) {
+            sendVoiceJson(ws, { type: 'voice_error', error: 'Ce joueur accepte le vocal uniquement avec ses amis.' });
+            return;
+          }
+          if (targetPrivacy === 'party' && !areFriends && (!prof.roomId || targetProf?.roomId !== prof.roomId)) {
+            sendVoiceJson(ws, { type: 'voice_error', error: 'Ce joueur accepte uniquement les invitations de son groupe.' });
+            return;
+          }
+          const roomId = String(msg.roomId || prof.roomId || `party_${uid}`).slice(0, 80);
+          if (!prof.roomId) {
+            let room = voiceRooms.get(roomId);
+            if (!room) {
+              room = {
+                roomId,
+                title: String(msg.roomTitle || `Groupe de ${prof.name}`).slice(0, 60),
+                hostUid: uid,
+                members: new Set(),
+              };
+              voiceRooms.set(roomId, room);
+            }
+            room.members.add(uid);
+            prof.roomId = roomId;
+            broadcastVoiceRoom(roomId);
+          }
+          const delivered = pushToVoiceUser(toUid, {
+            type: 'voice_invite_received',
+            inviteId: `vinv_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+            fromUid: uid,
+            fromName: prof.name,
+            fromPhotoURL: prof.photoURL || null,
+            roomId,
+            roomTitle: String(msg.roomTitle || voiceRooms.get(roomId)?.title || `Groupe de ${prof.name}`),
+            channel: msg.channel === 'game' ? 'game' : 'party',
+            createdAtMs: Date.now(),
+          });
+          sendVoiceJson(ws, {
+            type: 'voice_invite_sent',
+            toUid,
+            delivered,
+            roomId,
+          });
+          return;
+        }
+
+        if (msg.type === 'webrtc_signal') {
+          const toUid = String(msg.toUid || '').trim();
+          if (!toUid || !prof.roomId) return;
+          pushToVoiceUser(toUid, {
+            type: 'webrtc_signal',
+            fromUid: uid,
+            fromName: prof.name,
+            roomId: prof.roomId,
+            signal: msg.signal,
+          });
+          return;
+        }
+
+        // Relais Audio VPS (Opus / WebM chunks) pour garantir 100 % de fonctionnement derrière NAT/4G
+        if (msg.type === 'voice_audio') {
+          if (!prof.roomId || prof.muted || !msg.chunk) return;
+          const room = voiceRooms.get(prof.roomId);
+          if (!room) return;
+          const out = {
+            type: 'voice_audio',
+            fromUid: uid,
+            fromName: prof.name,
+            roomId: prof.roomId,
+            channel: prof.channel || 'party',
+            mimeType: String(msg.mimeType || 'audio/webm;codecs=opus'),
+            chunk: msg.chunk,
+            ts: Date.now(),
+          };
+          for (const memberUid of room.members) {
+            if (memberUid === uid) continue;
+            const mProf = voiceProfiles.get(memberUid);
+            if (!mProf || mProf.privacy === 'off') continue;
+            if ((mProf.channel || 'party') !== (prof.channel || 'party')) continue;
+            pushToVoiceUser(memberUid, out);
+          }
+        }
+      } catch {
+        /* ignore malformed ws message */
+      }
+    });
+
+    ws.on('close', () => {
+      const uid = ws.voiceUid;
+      if (!uid) return;
+      const set = voiceClients.get(uid);
+      if (set) {
+        set.delete(ws);
+        if (set.size === 0) {
+          voiceClients.delete(uid);
+          removeFromVoiceRoom(uid);
+        }
+      }
+    });
+  });
+
+  // API REST Messagerie Privée Directe entre Amis (/api/dm)
+  server.middlewares.use('/api/dm', (req, res) => {
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    if (req.method === 'OPTIONS') {
+      res.statusCode = 204;
+      return res.end();
+    }
+
+    const reqUrl = new URL(req.url, 'http://localhost:3003');
+    if (req.method === 'GET') {
+      const uid = String(reqUrl.searchParams.get('uid') || '').trim();
+      const peerUid = String(reqUrl.searchParams.get('peerUid') || '').trim();
+      if (!uid) {
+        res.statusCode = 400;
+        return res.end(JSON.stringify({ ok: false, error: 'Missing uid' }));
+      }
+      if (peerUid) {
+        const dmId = buildDmId(uid, peerUid);
+        const messages = dmThreads.get(dmId) || [];
+        res.statusCode = 200;
+        return res.end(JSON.stringify({ ok: true, dmId, messages, ...computeUnreadByPeer(uid) }));
+      }
+      res.statusCode = 200;
+      return res.end(JSON.stringify({ ok: true, ...computeUnreadByPeer(uid) }));
+    }
+
+    if (req.method === 'POST') {
+      let raw = '';
+      req.on('data', (chunk) => {
+        raw += chunk.toString();
+        if (raw.length > 64 * 1024) raw = raw.slice(0, 64 * 1024);
+      });
+      req.on('end', () => {
+        try {
+          const body = raw ? JSON.parse(raw) : {};
+          const action = String(body.action || 'send');
+
+          if (action === 'mark_read') {
+            const uid = String(body.uid || '').trim();
+            const peerUid = String(body.peerUid || '').trim();
+            if (!uid || !peerUid) {
+              res.statusCode = 400;
+              return res.end(JSON.stringify({ ok: false, error: 'Missing uid/peerUid' }));
+            }
+            const cur = dmReadCursors.get(uid) || {};
+            cur[peerUid] = Date.now();
+            dmReadCursors.set(uid, cur);
+            scheduleSaveDmStore();
+            const unread = computeUnreadByPeer(uid);
+            pushToVoiceUser(uid, { type: 'dm_unread', ...unread });
+            res.statusCode = 200;
+            return res.end(JSON.stringify({ ok: true, ...unread }));
+          }
+
+          // Envoi d'un message privé (DM)
+          const fromUid = String(body.fromUid || '').trim();
+          const toUid = String(body.toUid || '').trim();
+          const text = String(body.text || '').trim().slice(0, 500);
+          if (!fromUid || !toUid || !text) {
+            res.statusCode = 400;
+            return res.end(JSON.stringify({ ok: false, error: 'Paramètres manquants' }));
+          }
+          // Rate-limit anti-spam (max 15 messages / 10s)
+          const now = Date.now();
+          const stamps = (dmRateLimits.get(fromUid) || []).filter((t) => now - t < 10000);
+          if (stamps.length >= 15) {
+            res.statusCode = 429;
+            return res.end(JSON.stringify({ ok: false, error: 'Trop de messages, patientez quelques secondes.' }));
+          }
+          stamps.push(now);
+          dmRateLimits.set(fromUid, stamps);
+
+          const dmId = buildDmId(fromUid, toUid);
+          const msgObj = {
+            id: `dm_${now}_${Math.random().toString(36).slice(2, 7)}`,
+            dmId,
+            fromUid,
+            fromName: String(body.fromName || 'Joueur').slice(0, 40),
+            fromPhotoURL: body.fromPhotoURL && !String(body.fromPhotoURL).startsWith('data:') ? body.fromPhotoURL : null,
+            toUid,
+            text,
+            createdAtMs: now,
+          };
+          const list = dmThreads.get(dmId) || [];
+          list.push(msgObj);
+          if (list.length > 100) list.splice(0, list.length - 100);
+          dmThreads.set(dmId, list);
+
+          // L'expéditeur a lu sa propre conversation
+          const senderCur = dmReadCursors.get(fromUid) || {};
+          senderCur[toUid] = now;
+          dmReadCursors.set(fromUid, senderCur);
+          scheduleSaveDmStore();
+
+          const recipientUnread = computeUnreadByPeer(toUid);
+          pushToVoiceUser(toUid, { type: 'dm_message', message: msgObj, ...recipientUnread });
+          pushToVoiceUser(fromUid, { type: 'dm_message', message: msgObj, ...computeUnreadByPeer(fromUid) });
+
+          res.statusCode = 200;
+          return res.end(JSON.stringify({ ok: true, message: msgObj }));
+        } catch (err) {
+          res.statusCode = 400;
+          return res.end(JSON.stringify({ ok: false, error: err?.message || 'Requête invalide' }));
+        }
+      });
+      return;
+    }
+
+    res.statusCode = 405;
+    res.end(JSON.stringify({ ok: false }));
+  });
+
   if (server.httpServer) {
     server.httpServer.on('upgrade', (request, socket, head) => {
       try {
@@ -1845,6 +2413,10 @@ export function setupNetplayHub(server) {
         if (url.pathname === '/ws/netplay') {
           wss.handleUpgrade(request, socket, head, (ws) => {
             wss.emit('connection', ws, request);
+          });
+        } else if (url.pathname === '/ws/voice') {
+          voiceWss.handleUpgrade(request, socket, head, (ws) => {
+            voiceWss.emit('connection', ws, request);
           });
         }
       } catch(e) {

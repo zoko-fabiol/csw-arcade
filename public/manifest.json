@@ -2,7 +2,7 @@
   "id": "/?source=pwa",
   "name": "CSW-Arcade - Neo Geo Arcade",
   "short_name": "CSW-Arcade",
-  "description": "Expérience NeoRAGEx modernisée en WebAssembly avec Netplay WebRTC et commandes tactiles fluides",
+  "description": "Expérience CSW Arcade modernisée en WebAssembly avec Netplay WebRTC et commandes tactiles fluides",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

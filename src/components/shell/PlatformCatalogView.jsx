@@ -479,7 +479,7 @@ export function PlatformCatalogView({ mode, onLaunchStage, onCacheChanged, onJoi
       if (neoragexVerified?.padFixable?.[rawZipKey]) {
         try {
           setDownloadingId('local-import');
-          setDownloadProgress('Adaptation NeoRAGEx…');
+          setDownloadProgress('Adaptation CSW Arcade…');
           finalBlob = await padNeoRAGExZipFile(file, neoragexVerified.padFixable[rawZipKey], resolvedFilename);
         } catch {
           finalBlob = file;
@@ -488,7 +488,7 @@ export function PlatformCatalogView({ mode, onLaunchStage, onCacheChanged, onJoi
           setDownloadProgress('');
         }
       } else if (!NATIVE_NEORAGEX_SET.has(rawZipKey)) {
-        // Les dumps décryptés NeoRAGEx dont les CRC diffèrent de FBNeo (ex: metalslug1, metalslug3, kof98)
+        // Les dumps décryptés CSW Arcade dont les CRC diffèrent de FBNeo (ex: metalslug1, metalslug3, kof98)
         // basculent automatiquement sur le romset FBNeo vérifié via /api/rom-proxy?source=fbneo si disponible.
         try {
           setDownloadingId('local-import');
@@ -903,8 +903,8 @@ export function PlatformCatalogView({ mode, onLaunchStage, onCacheChanged, onJoi
         {/* Corps scrollable (avec marge basse mobile pour la Bottom Navigation Bar) */}
         <div className="u-mobile-flow-scroll flex-1 overflow-y-auto p-3 md:p-4 pb-24 md:pb-6 space-y-4 md:space-y-5">
           {/* Barre Recherche Archive.org — Tablette/Desktop md+ */}
-          <form onSubmit={handleOnlineSearch} className="hidden md:flex gap-2 flex-wrap">
-            <div className="relative flex-1 min-w-[240px]">
+          <form onSubmit={handleOnlineSearch} className="hidden md:flex items-center gap-2 max-w-xl">
+            <div className="relative flex-1 min-w-0">
               <Globe className="w-4 h-4 u-accent-text absolute left-3 top-1/2 -translate-y-1/2" aria-hidden="true" />
               <input
                 type="search"
@@ -1043,7 +1043,7 @@ export function PlatformCatalogView({ mode, onLaunchStage, onCacheChanged, onJoi
                           <button
                             type="button"
                             onClick={() => onJoinChannel(matchedEntry)}
-                            title="Rejoindre le salon Fightcade 2"
+                            title="Rejoindre le salon CSW Arcade"
                             className={`arcade-focus-ring px-3 py-2 min-h-[44px] rounded-xl bg-purple-500/20 hover:bg-purple-500/35 border border-purple-400/45 text-purple-100 text-xs font-bold flex items-center justify-center gap-1.5 transition-colors shrink-0 ${
                               viewMode === 'list' ? 'sm:w-[92px]' : ''
                             }`}
@@ -1184,7 +1184,7 @@ export function PlatformCatalogView({ mode, onLaunchStage, onCacheChanged, onJoi
                             <button
                               type="button"
                               onClick={() => onJoinChannel(entry)}
-                              title="Rejoindre le salon Fightcade 2"
+                              title="Rejoindre le salon CSW Arcade"
                               className={`arcade-focus-ring px-3 py-2 min-h-[44px] rounded-xl bg-purple-500/20 hover:bg-purple-500/35 border border-purple-400/45 text-purple-100 text-xs font-bold flex items-center justify-center gap-1.5 transition-colors shrink-0 ${
                                 viewMode === 'list' ? 'sm:w-[96px]' : ''
                               }`}

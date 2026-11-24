@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
-  X, Users, UserPlus, Search, Copy, Check, Swords, Eye, UserMinus, Clock, MessageSquare, Sparkles
+  X, Users, UserPlus, Search, Copy, Check, Swords, Eye, UserMinus, Clock, MessageSquare, Sparkles, ArrowLeft, Send, PhoneCall
 } from 'lucide-react';
 import { PlayerAvatar } from '../common/PlayerAvatar';
 import { countryCodeToFlag } from '../../data/countries';
@@ -13,6 +13,11 @@ import {
   searchPlayersDirectory,
   sendFriendRequest,
 } from '../../services/friendsService';
+import {
+  markDirectMessagesRead,
+  sendDirectMessage,
+  subscribeDirectMessages,
+} from '../../services/directMessageService';
 import { supportsOnlineMultiplayer } from '../../utils/gameCapabilities';
 
 function describeFriendActivity(friend) {
@@ -36,11 +41,21 @@ export function FriendsDrawer({
   userProfile,
   friendsState = { friends: [], incomingRequests: [], outgoingRequests: [] },
   activeChannels = [],
+  unreadByPeer = {},
+  initialChatFriend = null,
+  voiceState = null,
   onChallengeFriend,
   onJoinFriendGameChannel,
   onSpectateFriend,
+  onInviteVoiceFriend,
+  onJoinFriendParty,
 }) {
   const [tab, setTab] = useState('friends'); // 'friends' | 'requests' | 'find'
+  const [activeChatFriend, setActiveChatFriend] = useState(null);
+  const [dmMessages, setDmMessages] = useState([]);
+  const [dmInput, setDmInput] = useState('');
+  const [dmSending, setDmSending] = useState(false);
+  const dmEndRef = useRef(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [searching, setSearching] = useState(false);
@@ -72,10 +87,31 @@ export function FriendsDrawer({
     if (!isOpen) return;
     setErrorMsg('');
     setConfirmRemoveUid(null);
-    if (incomingRequests.length > 0 && friends.length === 0) {
+    if (initialChatFriend?.uid) {
+      setActiveChatFriend(initialChatFriend);
+    } else if (incomingRequests.length > 0 && friends.length === 0) {
       setTab('requests');
     }
-  }, [isOpen]);
+  }, [isOpen, initialChatFriend?.uid]);
+
+  useEffect(() => {
+    if (!isOpen || !activeChatFriend?.uid || !userProfile?.uid) {
+      setDmMessages([]);
+      return undefined;
+    }
+    markDirectMessagesRead(userProfile.uid, activeChatFriend.uid);
+    const unsub = subscribeDirectMessages(userProfile.uid, activeChatFriend.uid, (list) => {
+      setDmMessages(list);
+      markDirectMessagesRead(userProfile.uid, activeChatFriend.uid);
+    });
+    return () => unsub?.();
+  }, [isOpen, activeChatFriend?.uid, userProfile?.uid]);
+
+  useEffect(() => {
+    if (activeChatFriend) {
+      dmEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [dmMessages.length, activeChatFriend?.uid]);
 
   useEffect(() => {
     if (!isOpen || tab !== 'find') return undefined;
@@ -225,7 +261,43 @@ export function FriendsDrawer({
             </div>
           </div>
 
-          <div className="flex items-center gap-1.5 shrink-0">
+          <div className="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">
+            {/* Bouton Écrire en privé (DM) */}
+            <button
+              type="button"
+              onClick={() => setActiveChatFriend(friend)}
+              title={`Écrire en privé à ${friend.displayName}`}
+              className="arcade-focus-ring relative p-2 min-w-[36px] min-h-[36px] rounded-xl bg-neutral-800 hover:bg-neutral-700 border border-white/10 u-accent-text flex items-center justify-center cursor-pointer transition-colors"
+            >
+              <MessageSquare aria-hidden="true" className="w-3.5 h-3.5" />
+              {Number(unreadByPeer?.[friend.uid] || 0) > 0 && (
+                <span className="absolute -top-1 -right-1 px-1.5 py-0.2 rounded-full bg-rose-500 text-white text-[9px] font-mono font-black leading-tight">
+                  {unreadByPeer[friend.uid]}
+                </span>
+              )}
+            </button>
+
+            {/* Bouton Rejoindre le Groupe Salon & Vocal (6 joueurs max) */}
+            {friend.isOnline && (onJoinFriendParty || onInviteVoiceFriend) && (
+              <button
+                type="button"
+                onClick={async () => {
+                  if (onJoinFriendParty) {
+                    await onJoinFriendParty(friend);
+                    showToast(`Vous avez rejoint le groupe vocal de ${friend.displayName} !`);
+                  } else {
+                    await onInviteVoiceFriend(friend);
+                    showToast(`Invitation vocale envoyée à ${friend.displayName} !`);
+                  }
+                }}
+                title={`Rejoindre le groupe salon & parler en vocal avec ${friend.displayName} (6 max)`}
+                className="arcade-focus-ring px-2 py-1.5 min-h-[36px] rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/35 text-emerald-300 text-[11px] font-bold flex items-center gap-1 cursor-pointer transition-colors"
+              >
+                <PhoneCall aria-hidden="true" className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Groupe</span>
+              </button>
+            )}
+
             {friend.isOnline && isPlayingMatch && (
               <>
                 {gameTarget && (
@@ -332,6 +404,146 @@ export function FriendsDrawer({
         aria-label="Système d'amitié CSW-Arcade"
         className="w-full max-w-md h-full bg-neutral-900 border-l u-accent-border sm:rounded-l-3xl shadow-2xl flex flex-col text-neutral-100 overflow-hidden"
       >
+        {/* Vue Conversation Privée Directe (DM) si un ami est sélectionné */}
+        {activeChatFriend ? (
+          <div className="flex flex-col h-full min-h-0">
+            <div className="u-banner px-3.5 py-3.5 border-b flex items-center justify-between gap-2 shrink-0">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <button
+                  type="button"
+                  onClick={() => setActiveChatFriend(null)}
+                  aria-label="Retour à la liste d'amis"
+                  className="arcade-focus-ring p-2 min-w-[40px] min-h-[40px] rounded-xl bg-white/5 hover:bg-white/15 border border-white/10 text-neutral-200 flex items-center justify-center shrink-0 cursor-pointer"
+                >
+                  <ArrowLeft className="w-4 h-4" aria-hidden="true" />
+                </button>
+                <PlayerAvatar
+                  photoURL={activeChatFriend.photoURL}
+                  name={activeChatFriend.displayName || activeChatFriend.name}
+                  size="sm"
+                  status={activeChatFriend.isOnline ? activeChatFriend.status || 'available' : 'offline'}
+                />
+                <div className="min-w-0">
+                  <div className="text-xs sm:text-sm font-black text-white truncate">
+                    {activeChatFriend.displayName || activeChatFriend.name}
+                  </div>
+                  <div className="text-[10px] font-mono text-neutral-300 truncate">
+                    {describeFriendActivity(activeChatFriend)}
+                  </div>
+                </div>
+              </div>
+              <div className="flex items-center gap-1.5 shrink-0">
+                {activeChatFriend.isOnline && onInviteVoiceFriend && (
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      await onInviteVoiceFriend(activeChatFriend);
+                      showToast(`Invitation vocale envoyée à ${activeChatFriend.displayName} !`);
+                    }}
+                    title="Inviter en chat vocal"
+                    className="arcade-focus-ring px-2.5 py-2 min-h-[38px] rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/40 text-emerald-300 text-[11px] font-bold flex items-center gap-1 cursor-pointer"
+                  >
+                    <PhoneCall className="w-3.5 h-3.5" aria-hidden="true" />
+                    <span className="hidden sm:inline">Vocal</span>
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={onClose}
+                  aria-label="Fermer le panneau Amis"
+                  className="arcade-focus-ring p-2 min-w-[38px] min-h-[38px] rounded-xl bg-white/5 hover:bg-white/15 border border-white/10 text-neutral-200 flex items-center justify-center cursor-pointer"
+                >
+                  <X className="w-4 h-4" aria-hidden="true" />
+                </button>
+              </div>
+            </div>
+
+            {feedback && (
+              <div className="mx-3 mt-2 px-3 py-2 rounded-xl bg-emerald-950/60 border border-emerald-500/40 text-emerald-300 text-xs font-semibold">
+                {feedback}
+              </div>
+            )}
+            {errorMsg && (
+              <div className="mx-3 mt-2 px-3 py-2 rounded-xl bg-rose-950/60 border border-rose-500/40 text-rose-300 text-xs font-semibold">
+                {errorMsg}
+              </div>
+            )}
+
+            <div className="flex-1 overflow-y-auto p-3.5 space-y-2.5 text-xs">
+              {dmMessages.length === 0 ? (
+                <div className="text-center py-10 px-4 text-neutral-400 font-mono text-[11px]">
+                  Démarrez une discussion privée avec <strong>{activeChatFriend.displayName}</strong> !
+                </div>
+              ) : (
+                dmMessages.map((m) => {
+                  const isMine = m.fromUid === userProfile?.uid;
+                  const timeStr = m.createdAtMs
+                    ? new Date(m.createdAtMs).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+                    : '';
+                  return (
+                    <div key={m.id} className={`flex flex-col ${isMine ? 'items-end' : 'items-start'}`}>
+                      <div
+                        className={`max-w-[84%] px-3 py-2 rounded-2xl border text-xs sm:text-[13px] leading-relaxed break-words ${
+                          isMine
+                            ? 'u-btn-primary rounded-br-sm'
+                            : 'bg-neutral-800/90 border-white/10 text-neutral-100 rounded-bl-sm'
+                        }`}
+                      >
+                        <p>{m.text}</p>
+                        {timeStr && (
+                          <span className={`block text-[9px] font-mono mt-1 text-right ${isMine ? 'opacity-80' : 'text-neutral-400'}`}>
+                            {timeStr}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+              <div ref={dmEndRef} />
+            </div>
+
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault();
+                const clean = dmInput.trim();
+                if (!clean || dmSending) return;
+                setDmSending(true);
+                setErrorMsg('');
+                try {
+                  const sent = await sendDirectMessage(userProfile, activeChatFriend.uid, clean);
+                  setDmInput('');
+                  if (sent) {
+                    setDmMessages((prev) => (prev.some((x) => x.id === sent.id) ? prev : [...prev, sent]));
+                  }
+                } catch (err) {
+                  setErrorMsg(err?.message || 'Échec de l’envoi.');
+                } finally {
+                  setDmSending(false);
+                }
+              }}
+              className="p-3 border-t border-white/10 bg-neutral-950/90 flex items-center gap-2 shrink-0 pb-safe"
+            >
+              <input
+                type="text"
+                value={dmInput}
+                onChange={(e) => setDmInput(e.target.value)}
+                placeholder={`Écrire à ${activeChatFriend.displayName}…`}
+                maxLength={500}
+                className="arcade-focus-ring flex-1 min-w-0 px-3.5 py-2.5 min-h-[42px] rounded-xl bg-neutral-900 border border-white/15 text-xs text-white placeholder:text-neutral-400"
+              />
+              <button
+                type="submit"
+                disabled={dmSending || !dmInput.trim()}
+                aria-label="Envoyer le message privé"
+                className="arcade-focus-ring px-3.5 py-2.5 min-h-[42px] rounded-xl u-btn-primary disabled:opacity-45 font-bold text-xs flex items-center justify-center gap-1.5 shrink-0 cursor-pointer"
+              >
+                <Send className="w-3.5 h-3.5" aria-hidden="true" />
+              </button>
+            </form>
+          </div>
+        ) : (
+        <>
         {/* En-tête Social — Thématisé selon la console active */}
         <div className="u-banner px-4 py-4 border-b flex items-center justify-between gap-3 shrink-0">
           <div className="flex items-center gap-3 min-w-0">
@@ -701,6 +913,8 @@ export function FriendsDrawer({
             </div>
           )}
         </div>
+        </>
+        )}
       </aside>
     </div>
   );

@@ -1,7 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
-  X, Maximize2, Minimize2, RotateCcw, Settings, Coins, Play, Pause, Sliders, Save, UploadCloud, Trophy, Award, Gamepad2, Trash2, Swords, MessageSquare, ShieldAlert, Radio, Send, Eye
+  X, Maximize2, Minimize2, RotateCcw, Settings, Coins, Play, Pause, Sliders, Save, UploadCloud, Trophy, Award, Gamepad2, Trash2, Swords, MessageSquare, ShieldAlert, Radio, Send, Eye, Mic, MicOff
 } from 'lucide-react';
+import { VoicePartyPill } from '../social/VoicePartyPill';
 import { addCoins, consumeCoin, hasCoins, setWalletCoins, subscribeWallet } from '../../services/walletService';
 import { getCurrentUserProfile, subscribeAuthProfile } from '../../services/authService';
 import {
@@ -34,6 +35,11 @@ export function UnifiedStageModal({
   activeChannels = [],
   incomingChallenge = null,
   onRespondChallenge,
+  voiceState = null,
+  onToggleVoiceMute = null,
+  onVoicePttChange = null,
+  onAcceptVoiceInvite = null,
+  onDismissVoiceInvite = null,
   onOpenSalon,
   onCloudCheckpoint,
   onInputDelayChange,
@@ -702,7 +708,7 @@ export function UnifiedStageModal({
     };
   }, [p2pEngine, session?.isNetplay, session?.isHost, session?.opponentName]);
 
-  // Pont Spectateur Live Fightcade 2 : demande/envoi savestate + flux d'inputs confirmés + arrêt propre fin de match
+  // Pont Spectateur Live CSW Arcade : demande/envoi savestate + flux d'inputs confirmés + arrêt propre fin de match
   useEffect(() => {
     if (!session?.isNetplay) return;
     const unsubSpectate = firebaseFightcadeService.subscribeSpectate((ev) => {
@@ -1145,6 +1151,24 @@ export function UnifiedStageModal({
             );
           })()}
 
+          {voiceState?.roomId && (
+            <button
+              type="button"
+              onClick={() => onToggleVoiceMute?.()}
+              title={voiceState.muted ? 'Activer votre micro (Vocal actif)' : 'Couper votre micro (Vocal actif)'}
+              className={`flex items-center gap-1 px-2.5 py-1.5 rounded-xl border text-xs font-bold transition-colors ${
+                voiceState.muted
+                  ? 'bg-rose-500/20 border-rose-500/50 text-rose-200'
+                  : voiceState.speaking
+                  ? 'bg-emerald-500 border-emerald-400 text-black'
+                  : 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300'
+              }`}
+            >
+              {voiceState.muted ? <MicOff className="w-3.5 h-3.5" /> : <Mic className="w-3.5 h-3.5" />}
+              <span className="hidden sm:inline">{voiceState.muted ? 'Muet' : 'Vocal'}</span>
+            </button>
+          )}
+
           {session.kind !== 'j2me' && !session.isNetplay && (
             <button
               type="button"
@@ -1201,7 +1225,7 @@ export function UnifiedStageModal({
                   </h3>
                   <p className="text-xs text-neutral-300 leading-relaxed">
                     {localEmuReady
-                      ? 'Réception du savestate live depuis l’Hôte et remplissage du tampon Fightcade (0 Coin requis)…'
+                      ? 'Réception du savestate live depuis l’Hôte et remplissage du tampon CSW Arcade (0 Coin requis)…'
                       : 'Préparation du moteur WASM en mode lecture seule pour observer le match…'}
                   </p>
                 </div>
@@ -2239,6 +2263,17 @@ export function UnifiedStageModal({
           </aside>
         )}
       </div>
+
+      {/* HUD Vocal Non-Intrusif en Jeu & Plein Écran (pastilles de parole uniquement + toast invitation) */}
+      <VoicePartyPill
+        inGame
+        voiceState={voiceState}
+        micMode={settings?.voice?.micMode || 'open'}
+        onToggleMute={onToggleVoiceMute}
+        onPttChange={onVoicePttChange}
+        onAcceptInvite={onAcceptVoiceInvite}
+        onDismissInvite={onDismissVoiceInvite}
+      />
 
       {/* Contrôleurs Tactiles Mobile Sur-Mesure par Plateforme (Arcade / PS1 / Nintendo / Sega / Java J2ME) */}
       {!isSpectator && touchPadVisible && (

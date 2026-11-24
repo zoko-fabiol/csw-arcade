@@ -25,7 +25,7 @@ export function FightcadeChannelsDock({
       {/* DOCK VERTICAL GAUCHE — DESKTOP & TABLETTE (md+) */}
       <nav
         className="hidden md:flex md:sticky md:top-0 md:h-[100dvh] w-[72px] lg:w-20 shrink-0 border-r border-white/10 arcade-glass flex-col items-center py-3 gap-3 z-20 overflow-y-auto no-scrollbar"
-        aria-label="Salons Fightcade 2 actifs (Lobby Global + max 3 jeux)"
+        aria-label="Salons CSW Arcade actifs (Lobby Global + max 3 jeux)"
       >
         <button
           type="button"
@@ -41,11 +41,11 @@ export function FightcadeChannelsDock({
           <span className="text-[9px] font-black">JEUX</span>
         </button>
 
-        {/* Bouton Salon Communautaire Global Fightcade 2 */}
+        {/* Bouton Salon Communautaire Global CSW Arcade */}
         <button
           type="button"
           onClick={() => onSelectChannel(GLOBAL_CHANNEL_ID)}
-          title="Salon Communautaire Global Fightcade 2 (Tous les joueurs & messages)"
+          title="Salon Communautaire Global CSW Arcade (Tous les joueurs & messages)"
           className={`arcade-focus-ring relative w-12 h-12 rounded-2xl flex flex-col items-center justify-center gap-0.5 transition-all border ${
             isGlobalSelected
               ? 'bg-emerald-500/20 border-emerald-400 text-emerald-200 shadow-lg shadow-emerald-500/20'
@@ -288,7 +288,7 @@ export function FightcadeChannelsDock({
               <div>
                 <h3 className="text-sm font-black text-white">Limite de 3 salons actifs atteinte</h3>
                 <p className="text-xs text-neutral-300 mt-1">
-                  Comme dans Fightcade 2, vous pouvez être actif sur <strong>3 jeux simultanément</strong>.
+                  Comme dans CSW Arcade, vous pouvez être actif sur <strong>3 jeux simultanément</strong>.
                   Fermez un salon ci-dessous pour activer <strong>{limitModalGame.title}</strong> :
                 </p>
               </div>

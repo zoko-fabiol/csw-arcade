@@ -1,5 +1,5 @@
 /**
- * Service Système d'Amitié (style Fortnite) pour CSW-Arcade
+ * Service Système d'Amitié (CSW Arcade) pour CSW-Arcade
  * - Code / Tag Ami unique (#XXXX) + recherche multi-critères (Pseudo, #Tag, Nom/Prénom, Email)
  * - Demandes d'amitié entrantes/sortantes, auto-acceptation mutuelle, suppression
  * - Présence temps réel (En ligne, En jeu + titre, En match P2P, Hors-ligne)

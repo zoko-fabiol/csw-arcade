@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
-  Swords, Eye, Send, Play, LogOut, Wifi, UserCheck, Globe, Megaphone, Sparkles, Gamepad2, Trophy, MessageSquare, Users, UserPlus, Check, Clock
+  Swords, Eye, Send, Play, LogOut, Wifi, UserCheck, Globe, Megaphone, Sparkles, Gamepad2, Trophy, MessageSquare, Users, UserPlus, Check, Clock, Terminal, PhoneCall, Mic, MicOff, Crown, PhoneOff
 } from 'lucide-react';
 import {
   firebaseFightcadeService,
@@ -54,6 +54,11 @@ export function FightcadeLobbyView({
   activeChannels = [],
   userProfile = null,
   friendsState = { friends: [], incomingRequests: [], outgoingRequests: [] },
+  voiceState = null,
+  onJoinUserParty,
+  onToggleVoiceMute,
+  onTogglePartyReady,
+  onLeaveVoiceParty,
   onChallengePlayer,
   onTestLocal,
   onLeaveChannel,
@@ -66,6 +71,7 @@ export function FightcadeLobbyView({
   const [leaderboard, setLeaderboard] = useState([]);
   const [rightTab, setRightTab] = useState('users'); // 'users' | 'scores'
   const [mobilePanel, setMobilePanel] = useState('chat'); // 'chat' | 'users' | 'scores'
+  const [chatFilter, setChatFilter] = useState('all'); // 'all' | 'chat' | 'system'
   const [chatInput, setChatInput] = useState('');
   const [pendingChallengeId, setPendingChallengeId] = useState(null);
   const chatEndRef = useRef(null);
@@ -101,7 +107,7 @@ export function FightcadeLobbyView({
     if (!raw) return;
     setChatInput('');
 
-    // Commandes slash Fightcade 2
+    // Commandes slash CSW Arcade
     if (raw.toLowerCase() === '/gg') {
       await firebaseFightcadeService.sendMessage(channel.gameId, '🏆 GG ! Bien joué !', 'chat');
       return;
@@ -199,9 +205,19 @@ export function FightcadeLobbyView({
     setChatInput((prev) => `${prev ? prev + ' ' : ''}@${name} `);
   };
 
+  const isSystemMsg = (m) => m?.type === 'system' || m?.type === 'challenge';
+  const realChatCount = messages.filter((m) => !isSystemMsg(m)).length;
+  const systemMsgCount = messages.length - realChatCount;
+  const filteredMessages =
+    chatFilter === 'chat'
+      ? messages.filter((m) => !isSystemMsg(m))
+      : chatFilter === 'system'
+      ? messages.filter((m) => isSystemMsg(m))
+      : messages;
+
   return (
     <div className="u-mobile-flow-container flex-1 min-w-0 w-full max-w-full flex flex-col min-h-0 overflow-x-hidden bg-transparent text-neutral-100 pb-20 md:pb-0">
-      {/* En-tête du salon Fightcade 2 — Zéro débordement sur mobile/tablette, thématisé par console */}
+      {/* En-tête du salon CSW Arcade — Zéro débordement sur mobile/tablette, thématisé par console */}
       <div className="u-banner w-full min-w-0 flex flex-col gap-2.5 px-3 md:px-4 py-2.5 md:py-3 backdrop-blur-md border-b shrink-0 overflow-hidden">
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-2.5">
           <div className="flex items-center gap-3 min-w-0 flex-1">
@@ -312,6 +328,88 @@ export function FightcadeLobbyView({
         </div>
       </div>
 
+      {/* Bandeau Groupe Salon CSW Arcade (jusqu'à 6 joueurs + Vocal en direct) */}
+      {voiceState?.roomId && (
+        <div className="px-3 md:px-4 py-2 bg-neutral-950/85 border-b u-accent-border flex flex-wrap items-center justify-between gap-2 shrink-0">
+          <div className="flex items-center gap-2 min-w-0 flex-wrap">
+            <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 text-[10px] font-mono font-black shrink-0">
+              <Users className="w-3 h-3" aria-hidden="true" />
+              <span>
+                GROUPE {voiceState.members?.length || 1}/{voiceState.maxMembers || 6}
+              </span>
+            </span>
+            <div className="flex items-center gap-1.5 flex-wrap">
+              {Array.from({ length: voiceState.maxMembers || 6 }).map((_, idx) => {
+                const member = voiceState.members?.[idx];
+                if (!member) {
+                  return (
+                    <span
+                      key={`empty-${idx}`}
+                      title="Emplacement libre (6 joueurs max)"
+                      className="w-7 h-7 rounded-full border border-dashed border-white/15 bg-white/[0.03] flex items-center justify-center text-[10px] font-mono text-neutral-500"
+                    >
+                      +
+                    </span>
+                  );
+                }
+                const isHostMember = member.uid === voiceState.hostUid;
+                return (
+                  <div
+                    key={member.uid}
+                    title={`${member.name}${isHostMember ? ' (Chef)' : ''}${member.ready ? ' · Prêt' : ''}`}
+                    className={`relative flex items-center gap-1 pl-0.5 pr-2 py-0.5 rounded-full border text-[10px] font-bold ${
+                      member.speaking && !member.muted
+                        ? 'bg-emerald-950/60 border-emerald-400 text-emerald-200 ring-1 ring-emerald-400/60'
+                        : 'bg-neutral-900 border-white/15 text-neutral-200'
+                    }`}
+                  >
+                    <PlayerAvatar photoURL={member.photoURL} name={member.name} size="xs" />
+                    <span className="truncate max-w-[70px]">{member.name}</span>
+                    {isHostMember && <Crown className="w-2.5 h-2.5 text-amber-400 shrink-0" aria-hidden="true" />}
+                    {member.ready && <Check className="w-2.5 h-2.5 text-emerald-400 shrink-0" aria-hidden="true" />}
+                    {member.muted && <MicOff className="w-2.5 h-2.5 text-rose-400 shrink-0" aria-hidden="true" />}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-1.5 shrink-0">
+            <button
+              type="button"
+              onClick={() => onTogglePartyReady?.()}
+              className={`px-2.5 py-1.5 rounded-xl border text-[11px] font-black transition-colors cursor-pointer ${
+                voiceState.ready
+                  ? 'bg-emerald-500 border-emerald-400 text-black'
+                  : 'bg-neutral-800 border-white/15 text-neutral-200 hover:bg-neutral-700'
+              }`}
+            >
+              {voiceState.ready ? 'Prêt ✓' : 'Se mettre prêt'}
+            </button>
+            <button
+              type="button"
+              onClick={() => onToggleVoiceMute?.()}
+              title={voiceState.muted ? 'Activer le micro' : 'Couper le micro'}
+              className={`p-1.5 rounded-xl border transition-colors cursor-pointer ${
+                voiceState.muted
+                  ? 'bg-rose-500/20 border-rose-500/40 text-rose-300'
+                  : 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300'
+              }`}
+            >
+              {voiceState.muted ? <MicOff className="w-3.5 h-3.5" /> : <Mic className="w-3.5 h-3.5" />}
+            </button>
+            <button
+              type="button"
+              onClick={() => onLeaveVoiceParty?.()}
+              title="Quitter le groupe vocal"
+              className="p-1.5 rounded-xl bg-rose-600/20 hover:bg-rose-600/35 border border-rose-500/40 text-rose-300 cursor-pointer"
+            >
+              <PhoneOff className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Onglets Mobile & Tablette (< lg) : bascule plein écran entre Chat / Joueurs / Records */}
       <div className="lg:hidden w-full min-w-0 grid grid-cols-3 border-b border-white/10 bg-neutral-900/60 text-xs font-bold shrink-0">
         <button
@@ -377,37 +475,112 @@ export function FightcadeLobbyView({
             mobilePanel === 'chat' ? 'flex' : 'hidden lg:flex'
           } lg:col-span-2 min-w-0 flex-col min-h-0 lg:border-r border-white/10`}
         >
-          <div className="flex flex-wrap px-3 md:px-4 py-1.5 md:py-2 bg-neutral-900/40 border-b border-white/10 items-center justify-between gap-2 text-[10px] md:text-[11px] font-mono uppercase tracking-wider text-neutral-300">
-            <span className="truncate">Chat — #{channel.gameId}</span>
-            <span className="text-[10px] text-neutral-400 truncate">
-              /gg · /ready · /afk · Toucher un pseudo pour @mentionner
+          <div className="flex flex-wrap px-3 md:px-4 py-1.5 md:py-2 bg-neutral-900/40 border-b border-white/10 items-center justify-between gap-2 text-[10px] md:text-[11px] font-mono">
+            <div className="flex items-center gap-2 min-w-0 flex-wrap">
+              <span className="uppercase tracking-wider text-neutral-300 font-bold truncate">
+                #{channel.gameId}
+              </span>
+              {/* Filtre rapide : Tous / Chat réel / Système */}
+              <div
+                className="inline-flex items-center rounded-lg bg-black/35 border border-white/10 p-0.5 gap-0.5"
+                role="tablist"
+                aria-label="Filtrer les messages du salon"
+              >
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={chatFilter === 'all'}
+                  onClick={() => setChatFilter('all')}
+                  className={`px-2 py-1 rounded-md text-[10px] font-sans font-bold transition-colors tabular-nums ${
+                    chatFilter === 'all'
+                      ? 'u-tab-active'
+                      : 'text-neutral-300 hover:text-white'
+                  }`}
+                >
+                  Tous ({messages.length})
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={chatFilter === 'chat'}
+                  onClick={() => setChatFilter('chat')}
+                  className={`inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-sans font-bold transition-colors tabular-nums ${
+                    chatFilter === 'chat'
+                      ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                      : 'text-neutral-300 hover:text-white border border-transparent'
+                  }`}
+                >
+                  <MessageSquare className="w-3 h-3 shrink-0" aria-hidden="true" />
+                  <span>Chat réel ({realChatCount})</span>
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={chatFilter === 'system'}
+                  onClick={() => setChatFilter('system')}
+                  className={`inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-sans font-bold transition-colors tabular-nums ${
+                    chatFilter === 'system'
+                      ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40'
+                      : 'text-neutral-300 hover:text-white border border-transparent'
+                  }`}
+                >
+                  <Terminal className="w-3 h-3 shrink-0" aria-hidden="true" />
+                  <span>Système ({systemMsgCount})</span>
+                </button>
+              </div>
+            </div>
+            <span className="hidden sm:inline text-[10px] text-neutral-400 truncate">
+              /gg · /ready · /afk · Cliquer un pseudo pour @mentionner
             </span>
           </div>
 
           <div className="flex-1 overflow-y-auto p-2.5 sm:p-4 space-y-2 text-xs">
-            {messages.length === 0 ? (
-              <div className="text-neutral-400 font-mono text-center py-8">
-                Bienvenue dans le salon {channel.title}. Dites bonjour, annoncez vos jeux actifs ou défiez un joueur !
+            {filteredMessages.length === 0 ? (
+              <div className="text-neutral-400 font-mono text-center py-8 px-4">
+                {chatFilter === 'chat'
+                  ? 'Aucun message de joueur pour le moment — soyez le premier à dire bonjour ou lancer un match !'
+                  : chatFilter === 'system'
+                  ? 'Aucun événement système ou défi enregistré dans ce salon.'
+                  : `Bienvenue dans le salon ${channel.title}. Dites bonjour, annoncez vos jeux actifs ou défiez un joueur !`}
               </div>
             ) : (
-              messages.map((m) => {
+              filteredMessages.map((m) => {
                 const isMentioned =
                   m.text && me.name && m.text.toLowerCase().includes(`@${me.name.toLowerCase()}`);
+                const isMine = Boolean(m.uid && me.uid && m.uid === me.uid);
                 const rankStyle = RANK_BADGE_STYLE[m.rank || 'B'] || RANK_BADGE_STYLE.B;
 
-                if (m.type === 'system' || m.type === 'challenge') {
+                /* === MESSAGES SYSTÈME & DÉFIS : discrets, compacts, badge SYSTÈME / DÉFI === */
+                if (isSystemMsg(m)) {
+                  const isChallenge = m.type === 'challenge';
                   return (
                     <div
                       key={m.id}
-                      className={`font-mono text-[11px] px-3 py-2 rounded-xl border flex items-center justify-between gap-2 ${
-                        m.type === 'challenge'
-                          ? 'bg-amber-950/30 border-amber-500/40 text-amber-200'
-                          : 'bg-cyan-950/25 border-cyan-500/25 text-cyan-200'
+                      className={`font-mono text-[11px] px-2.5 py-1.5 rounded-lg border border-dashed flex items-start sm:items-center justify-between gap-2 ${
+                        isChallenge
+                          ? 'bg-amber-950/25 border-amber-500/35 border-l-2 border-l-amber-400 text-amber-200'
+                          : 'bg-white/[0.03] border-white/10 border-l-2 border-l-cyan-500/50 text-neutral-400'
                       }`}
                     >
-                      <span className="min-w-0 break-words leading-relaxed">{m.text}</span>
+                      <div className="flex items-start sm:items-center gap-2 min-w-0">
+                        <span
+                          className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wider shrink-0 mt-0.5 sm:mt-0 ${
+                            isChallenge
+                              ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+                              : 'bg-white/10 text-neutral-300 border border-white/15'
+                          }`}
+                        >
+                          {isChallenge ? (
+                            <Swords className="w-2.5 h-2.5 shrink-0" aria-hidden="true" />
+                          ) : (
+                            <Terminal className="w-2.5 h-2.5 shrink-0" aria-hidden="true" />
+                          )}
+                          <span>{isChallenge ? 'DÉFI' : 'SYSTÈME'}</span>
+                        </span>
+                        <span className="min-w-0 break-words leading-snug">{m.text}</span>
+                      </div>
                       {m.createdAtMs && (
-                        <span className="text-[10px] text-neutral-400 shrink-0 tabular-nums">
+                        <span className="text-[10px] text-neutral-500 shrink-0 tabular-nums">
                           {formatTime(m.createdAtMs)}
                         </span>
                       )}
@@ -415,20 +588,38 @@ export function FightcadeLobbyView({
                   );
                 }
 
+                /* === VRAIS MESSAGES DE JOUEURS : bulles riches avec avatar, bordure accentuée & badge === */
                 return (
                   <div
                     key={m.id}
-                    className={`px-3 py-2 rounded-xl border transition-colors space-y-1 ${
+                    className={`px-3 py-2.5 rounded-2xl border border-l-[3px] transition-colors space-y-1.5 shadow-sm ${
                       isMentioned
-                        ? 'bg-amber-500/15 border-amber-500/40'
-                        : 'bg-neutral-900/45 border-white/5 hover:border-white/10'
+                        ? 'bg-amber-500/15 border-amber-500/40 border-l-amber-400'
+                        : isMine
+                        ? 'bg-emerald-950/30 border-emerald-500/30 border-l-emerald-400'
+                        : 'bg-neutral-900/75 border-white/10 u-accent-border'
                     }`}
                   >
                     <div className="flex items-center justify-between gap-2 flex-wrap">
                       <div className="flex items-center gap-1.5 min-w-0 flex-wrap">
-                        {m.createdAtMs && (
-                          <span className="text-[10px] font-mono text-neutral-400 shrink-0 tabular-nums">
-                            {formatTime(m.createdAtMs)}
+                        <PlayerAvatar
+                          photoURL={m.photoURL}
+                          name={m.name || 'Joueur'}
+                          size="xs"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleMentionUser(m.name)}
+                          className={`text-xs font-black hover:underline truncate ${
+                            isMine ? 'text-emerald-300' : 'u-accent-text'
+                          }`}
+                          title="Cliquer pour mentionner ce joueur"
+                        >
+                          {m.name}
+                        </button>
+                        {isMine && (
+                          <span className="px-1.5 py-0.2 rounded text-[9px] font-mono font-black uppercase bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shrink-0">
+                            MOI
                           </span>
                         )}
                         <span
@@ -441,14 +632,11 @@ export function FightcadeLobbyView({
                             {m.region}
                           </span>
                         )}
-                        <button
-                          type="button"
-                          onClick={() => handleMentionUser(m.name)}
-                          className="text-xs font-bold text-cyan-300 hover:underline truncate"
-                          title="Cliquer pour mentionner ce joueur"
-                        >
-                          {m.name}
-                        </button>
+                        {m.createdAtMs && (
+                          <span className="text-[10px] font-mono text-neutral-400 shrink-0 tabular-nums">
+                            · {formatTime(m.createdAtMs)}
+                          </span>
+                        )}
                       </div>
                       {m.currentGameTitle && (
                         <span className="inline-flex items-center gap-1 text-[10px] font-mono px-1.5 py-0.5 rounded bg-emerald-950/70 border border-emerald-500/30 text-emerald-300 max-w-full truncate">
@@ -457,7 +645,7 @@ export function FightcadeLobbyView({
                         </span>
                       )}
                     </div>
-                    <p className="text-xs sm:text-[13px] text-neutral-100 leading-relaxed break-words">
+                    <p className="text-xs sm:text-[13px] font-medium text-neutral-100 leading-relaxed break-words pl-7">
                       {m.text}
                     </p>
                   </div>
@@ -467,7 +655,7 @@ export function FightcadeLobbyView({
             <div ref={chatEndRef} />
           </div>
 
-          {/* Barre de raccourcis communautaires Fightcade 2 — 1 ligne scrollable propre */}
+          {/* Barre de raccourcis communautaires CSW Arcade — 1 ligne scrollable propre */}
           <div className="px-2.5 sm:px-3 py-1.5 border-t border-white/10 bg-neutral-900/40 flex items-center gap-1.5 overflow-x-auto no-scrollbar shrink-0">
             <button
               type="button"
@@ -713,6 +901,16 @@ export function FightcadeLobbyView({
 
                     {!isMe && (
                       <div className="flex items-center gap-1 shrink-0">
+                        {onJoinUserParty && (
+                          <button
+                            type="button"
+                            onClick={() => onJoinUserParty(u)}
+                            title={`Rejoindre le groupe salon & vocal de ${u.name} (max 6 joueurs)`}
+                            className="p-1.5 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/40 text-emerald-300 transition-colors cursor-pointer"
+                          >
+                            <PhoneCall className="w-3.5 h-3.5" aria-hidden="true" />
+                          </button>
+                        )}
                         {isFriend ? (
                           <span
                             title="Déjà dans vos amis"

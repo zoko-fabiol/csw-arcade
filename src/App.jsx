@@ -38,6 +38,8 @@ import { applyRemoteSyncedStats, getRankTierMeta } from './services/scoreRanking
 import { subscribeFriendsState } from './services/friendsService';
 import { PlayerAvatar } from './components/common/PlayerAvatar';
 import { FriendsDrawer } from './components/social/FriendsDrawer';
+import { VoicePartyPill } from './components/social/VoicePartyPill';
+import { voiceChatService } from './services/voiceChatService';
 import { countryCodeToFlag } from './data/countries';
 import { RollbackP2PEngine } from './services/rollbackP2P';
 import { isJ2meGame, parseMaxPlayers, supportsOnlineMultiplayer } from './utils/gameCapabilities';
@@ -76,8 +78,13 @@ export default function App() {
     updatePerformanceSetting,
     updateNetplaySetting,
     updateUiSetting,
+    updateVoiceSetting,
     resetToDefaults,
   } = useSettings();
+
+  const [voiceState, setVoiceState] = useState(() => ({ ...voiceChatService.state }));
+  const [activeDmFriend, setActiveDmFriend] = useState(null);
+  const [dmToast, setDmToast] = useState(null);
 
   const themePreference = settings?.ui?.theme || 'dark';
   const [resolvedTheme, setResolvedTheme] = useState(() => {
@@ -135,6 +142,69 @@ export default function App() {
   const [userProfile, setUserProfile] = useState(() => getCurrentUserProfile());
   const [friendsState, setFriendsState] = useState({ friends: [], incomingRequests: [], outgoingRequests: [] });
 
+  // Connexion temps réel au Hub Vocal VPS (/ws/voice) & notifications DM
+  const isFriendsOpenRef = useRef(false);
+  useEffect(() => {
+    isFriendsOpenRef.current = isFriendsOpen;
+    if (!isFriendsOpen) setActiveDmFriend(null);
+  }, [isFriendsOpen]);
+
+  useEffect(() => {
+    const unsub = voiceChatService.subscribe(setVoiceState);
+    const unsubDm = voiceChatService.onDmEvent((ev) => {
+      if (ev?.type === 'dm_message' && ev.message && ev.message.fromUid !== userProfileRef.current?.uid) {
+        if (!isFriendsOpenRef.current) {
+          setDmToast(ev.message);
+          setTimeout(() => {
+            setDmToast((cur) => (cur?.id === ev.message.id ? null : cur));
+          }, 5500);
+        }
+      }
+    });
+    return () => {
+      unsub?.();
+      unsubDm?.();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (userProfile?.uid) {
+      voiceChatService.connect(userProfile, settings?.voice);
+    }
+  }, [userProfile?.uid, userProfile?.displayName, userProfile?.photoURL]);
+
+  useEffect(() => {
+    if (settings?.voice) {
+      voiceChatService.updateSettings(settings.voice);
+    }
+  }, [settings?.voice]);
+
+  const handleInviteVoiceFriend = useCallback(
+    async (friend) => {
+      if (!friend?.uid) return;
+      await voiceChatService.inviteUser({
+        toUid: friend.uid,
+        roomTitle: `Groupe de ${userProfile?.displayName || 'Joueur'}`,
+        channel: 'party',
+      });
+    },
+    [userProfile?.displayName]
+  );
+
+  const handleAcceptVoiceInvite = useCallback(async (invite) => {
+    if (!invite?.roomId) return;
+    await voiceChatService.joinRoom({
+      roomId: invite.roomId,
+      title: invite.roomTitle || 'Groupe CSW Arcade',
+      channel: invite.channel || 'party',
+    });
+  }, []);
+
+  const handleJoinUserParty = useCallback(async (targetUser) => {
+    if (!targetUser?.uid) return;
+    await voiceChatService.joinUserParty(targetUser);
+  }, []);
+
   const [platformMode, setPlatformMode] = useState(() => {
     if (typeof window === 'undefined') return 'arcade';
     const m = new URLSearchParams(window.location.search).get('mode');
@@ -148,7 +218,7 @@ export default function App() {
   const [isSasPayOpen, setIsSasPayOpen] = useState(false);
   const [noCoinsModalOpen, setNoCoinsModalOpen] = useState(false);
 
-  // Fightcade 2 : Lobby Global + 3 salons actifs max, défis 15s & WebRTC Rollback P2P
+  // CSW Arcade : Lobby Global + 3 salons actifs max, défis 15s & WebRTC Rollback P2P
   const [activeChannels, setActiveChannels] = useState([]);
   const [selectedChannelId, setSelectedChannelId] = useState(null);
   const [onlineCount, setOnlineCount] = useState(1);
@@ -727,7 +797,7 @@ export default function App() {
     return () => unsub?.();
   }, [userProfile?.uid, userProfile?.displayName, userProfile?.photoURL, userProfile?.rank, userProfile?.region]);
 
-  // Écoute temps-réel du nombre de joueurs connectés aux Salons Fightcade 2
+  // Écoute temps-réel du nombre de joueurs connectés aux Salons CSW Arcade
   useEffect(() => {
     const unsub = firebaseFightcadeService.subscribeChannelUsers(GLOBAL_CHANNEL_ID, (users) => {
       if (Array.isArray(users)) {
@@ -772,7 +842,7 @@ export default function App() {
         setWalletCoins(sync.coins);
       }
 
-      // 2. Synchroniser les 3 Salons Fightcade 2 actifs uniquement s'ils proviennent d'un autre appareil/session
+      // 2. Synchroniser les 3 Salons CSW Arcade actifs uniquement s'ils proviennent d'un autre appareil/session
       if (
         Array.isArray(sync.activeChannels) &&
         sync.channelsUpdatedAtMs > lastRemoteChannelsTsRef.current &&
@@ -976,9 +1046,9 @@ export default function App() {
               className="arcade-focus-ring relative flex items-center justify-center w-11 h-11 rounded-xl bg-neutral-900 hover:bg-neutral-800 border border-white/15 u-accent-text transition-colors"
             >
               <Users className="w-4 h-4" aria-hidden="true" />
-              {friendsState.incomingRequests.length > 0 ? (
-                <span className="absolute -top-1 -right-1 px-1.5 py-0.5 rounded-full bg-amber-500 text-black text-[9px] font-black leading-none">
-                  {friendsState.incomingRequests.length}
+              {friendsState.incomingRequests.length + (voiceState.totalUnreadDm || 0) > 0 ? (
+                <span className="absolute -top-1 -right-1 px-1.5 py-0.5 rounded-full bg-rose-500 text-white text-[9px] font-black leading-none">
+                  {friendsState.incomingRequests.length + (voiceState.totalUnreadDm || 0)}
                 </span>
               ) : friendsState.friends.some((f) => f.isOnline) ? (
                 <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-emerald-400" aria-hidden="true" />
@@ -1054,6 +1124,11 @@ export default function App() {
               {friendsState.incomingRequests.length > 0 && (
                 <span className="px-1.5 py-0.2 rounded-full bg-amber-500 text-black text-[10px] font-mono font-black">
                   +{friendsState.incomingRequests.length}
+                </span>
+              )}
+              {(voiceState.totalUnreadDm || 0) > 0 && (
+                <span className="px-1.5 py-0.2 rounded-full bg-rose-500 text-white text-[10px] font-mono font-black">
+                  {voiceState.totalUnreadDm}
                 </span>
               )}
             </button>
@@ -1274,7 +1349,7 @@ export default function App() {
         )}
       </header>
 
-      {/* Corps Unifié : Dock Salons Fightcade 2 (Desktop gauche / Mobile Bottom Bar) + Vue Active */}
+      {/* Corps Unifié : Dock Salons CSW Arcade (Desktop gauche / Mobile Bottom Bar) + Vue Active */}
       <div className="u-mobile-flow-container flex flex-1 min-h-0 overflow-hidden relative">
         <FightcadeChannelsDock
           activeChannels={activeChannels}
@@ -1296,7 +1371,7 @@ export default function App() {
             <div className="pointer-events-auto w-full md:w-80 rounded-2xl bg-neutral-900 border-2 u-accent-border p-4 shadow-2xl space-y-3">
               <div className="flex items-center gap-2 u-accent-text font-black text-xs uppercase">
                 <Swords className="w-4 h-4 animate-pulse" aria-hidden="true" />
-                <span>Défi Fightcade 2 reçu !</span>
+                <span>Défi CSW Arcade reçu !</span>
               </div>
               <p className="text-xs text-neutral-100">
                 <strong>{incomingChallenge.fromName}</strong> vous défie sur <strong>{incomingChallenge.gameTitle}</strong> (Match offert par l&apos;hôte · 0 Coin requis).
@@ -1405,6 +1480,11 @@ export default function App() {
             activeChannels={activeChannels}
             userProfile={userProfile}
             friendsState={friendsState}
+            voiceState={voiceState}
+            onJoinUserParty={handleJoinUserParty}
+            onToggleVoiceMute={() => voiceChatService.toggleMute()}
+            onTogglePartyReady={() => voiceChatService.setReady(!voiceState.ready)}
+            onLeaveVoiceParty={() => voiceChatService.leaveRoom()}
             onChallengePlayer={handleChallengePlayer}
             onSelectChannel={(id) => setSelectedChannelId(id)}
             onOpenAuth={() => setIsAuthOpen(true)}
@@ -1432,7 +1512,7 @@ export default function App() {
         )}
       </div>
 
-      {/* Modale Login / Sign-Up / Profil Firebase Fightcade 2 */}
+      {/* Modale Login / Sign-Up / Profil Firebase CSW Arcade */}
       <AuthModal
         isOpen={isAuthOpen}
         onClose={() => setIsAuthOpen(false)}
@@ -1440,13 +1520,18 @@ export default function App() {
         activeChannels={activeChannels}
       />
 
-      {/* Panneau Amis & Social style Fortnite */}
+      {/* Panneau Amis & Social CSW Arcade */}
       <FriendsDrawer
         isOpen={isFriendsOpen}
         onClose={() => setIsFriendsOpen(false)}
         userProfile={userProfile}
         friendsState={friendsState}
         activeChannels={activeChannels}
+        unreadByPeer={voiceState.unreadByPeer}
+        initialChatFriend={activeDmFriend}
+        voiceState={voiceState}
+        onInviteVoiceFriend={handleInviteVoiceFriend}
+        onJoinFriendParty={handleJoinUserParty}
         onChallengeFriend={(friend, gameCandidate) => {
           const entry = gameCandidate?.entry || gameCandidate;
           if (!entry) return;
@@ -1542,7 +1627,7 @@ export default function App() {
 
       {/* Les overlays Défi Entrant & Reprise Multi-Appareils sont regroupés dans la pile flottante ci-dessus */}
 
-      {/* Paramètres Unifiés (Contrôles, Vidéo, Audio, BIOS, Fightcade 2 & Cache) */}
+      {/* Paramètres Unifiés (Contrôles, Vidéo, Audio, BIOS, CSW Arcade & Cache) */}
       <SettingsModal
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
@@ -1560,6 +1645,7 @@ export default function App() {
         updatePerformanceSetting={updatePerformanceSetting}
         updateNetplaySetting={updateNetplaySetting}
         updateUiSetting={updateUiSetting}
+        updateVoiceSetting={updateVoiceSetting}
         onCacheCleared={refreshPlatformCache}
         resetToDefaults={resetToDefaults}
       />
@@ -1576,6 +1662,47 @@ export default function App() {
         </div>
       )}
 
+      {/* Toast non-intrusif Message Privé (DM) hors jeu */}
+      {!stageSession && dmToast && !isFriendsOpen && (
+        <button
+          type="button"
+          onClick={() => {
+            const matched =
+              friendsState.friends.find((f) => f.uid === dmToast.fromUid) || {
+                uid: dmToast.fromUid,
+                displayName: dmToast.fromName,
+                name: dmToast.fromName,
+                photoURL: dmToast.fromPhotoURL || null,
+                isOnline: true,
+              };
+            setDmToast(null);
+            setActiveDmFriend(matched);
+            setIsFriendsOpen(true);
+          }}
+          className="fixed top-20 right-3 z-[155] max-w-xs rounded-2xl bg-neutral-900/95 backdrop-blur-md border-2 u-accent-border px-3.5 py-2.5 shadow-2xl text-left space-y-0.5 cursor-pointer"
+        >
+          <div className="text-[11px] font-black u-accent-text truncate">
+            💬 Message privé · {dmToast.fromName}
+          </div>
+          <div className="text-xs text-neutral-100 line-clamp-2">{dmToast.text}</div>
+        </button>
+      )}
+
+      {/* Pilule Vocale Non-Intrusive CSW Arcade (Hors-Jeu / Salon) */}
+      {!stageSession && (
+        <VoicePartyPill
+          voiceState={voiceState}
+          micMode={settings?.voice?.micMode || 'open'}
+          onToggleMute={() => voiceChatService.toggleMute()}
+          onLeave={() => voiceChatService.leaveRoom()}
+          onChangeChannel={(ch) => voiceChatService.setChannel(ch)}
+          onTogglePeerMute={(uid) => voiceChatService.togglePeerMute(uid)}
+          onPttChange={(pressed) => voiceChatService.setPushToTalkPressed(pressed)}
+          onAcceptInvite={handleAcceptVoiceInvite}
+          onDismissInvite={() => voiceChatService.dismissInvite()}
+        />
+      )}
+
       {/* Lecteur Unifié EmulatorJS / J2ME */}
       <UnifiedStageModal
         session={stageSession}
@@ -1583,6 +1710,11 @@ export default function App() {
         p2pEngine={p2pEngineRef.current}
         p2pStats={settings?.netplay?.showHud === false ? null : p2pStats}
         activeChannels={activeChannels}
+        voiceState={voiceState}
+        onToggleVoiceMute={() => voiceChatService.toggleMute()}
+        onVoicePttChange={(pressed) => voiceChatService.setPushToTalkPressed(pressed)}
+        onAcceptVoiceInvite={handleAcceptVoiceInvite}
+        onDismissVoiceInvite={() => voiceChatService.dismissInvite()}
         incomingChallenge={
           incomingChallenge && incomingChallenge.fromUid !== userProfile?.uid && !activeMatchSync
             ? incomingChallenge

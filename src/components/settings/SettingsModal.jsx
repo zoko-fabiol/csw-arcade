@@ -24,6 +24,9 @@ import {
   Sun,
   Moon,
   Monitor,
+  Mic,
+  MicOff,
+  Headphones,
 } from 'lucide-react';
 import { getPlayerIdentity, setPlayerDisplayName } from '../../services/firebaseFightcadeService';
 import { formatBytes, getPlatformCacheStats, listCachedRoms, removeCachedRom } from '../../services/platformRomService';
@@ -87,7 +90,7 @@ const NAV_TABS = [
   { id: 'video', label: 'Affichage & CRT', short: 'Vidéo', desc: 'Shaders, Ratio & Stream', icon: Tv },
   { id: 'audio', label: 'Audio', short: 'Audio', desc: 'Volume & Sortie son', icon: Volume2 },
   { id: 'system', label: 'Système & BIOS', short: 'BIOS', desc: 'MVS/AES & Région', icon: Cpu },
-  { id: 'netplay', label: 'Salon & Cache', short: 'Salon', desc: 'Fightcade 2, P2P & ROMs', icon: Swords },
+  { id: 'netplay', label: 'Salon & Cache', short: 'Salon', desc: 'CSW Arcade, P2P & ROMs', icon: Swords },
 ];
 
 export function SettingsModal({
@@ -107,6 +110,7 @@ export function SettingsModal({
   updatePerformanceSetting,
   updateNetplaySetting,
   updateUiSetting,
+  updateVoiceSetting,
   onCacheCleared,
   resetToDefaults,
   resetSettings,
@@ -1070,6 +1074,118 @@ export function SettingsModal({
                   checked={Boolean(settings.audio.muted)}
                   onChange={(val) => updateAudioSetting('muted', val)}
                 />
+
+                {/* Chat Vocal CSW Arcade (VPS · Opus 24 kbps) */}
+                <div className="p-4 rounded-2xl bg-neutral-950/80 border border-white/10 space-y-3.5">
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <div className="flex items-center gap-2">
+                      <Headphones className="w-4 h-4 u-accent-text shrink-0" aria-hidden="true" />
+                      <h4 className="font-bold text-white text-xs sm:text-[13px]">
+                        Chat Vocal (CSW Arcade · VPS)
+                      </h4>
+                    </div>
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded-lg u-badge font-bold">
+                      Opus 24 kbps · Zéro Lag
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-neutral-400">
+                    Discutez dès le salon jusqu&apos;en pleine partie sans coupure. Choisissez qui peut vous inviter ou vous parler.
+                  </p>
+
+                  {/* Confidentialité */}
+                  <div className="space-y-1.5">
+                    <span className="text-[11px] font-bold text-neutral-200 block">
+                      Qui peut me parler / m&apos;inviter en vocal ?
+                    </span>
+                    <div className="grid grid-cols-2 gap-2">
+                      {[
+                        { id: 'everyone', label: 'Tout le monde', sub: 'Salons, matchs & amis' },
+                        { id: 'friends', label: 'Amis uniquement', sub: 'Recommandé' },
+                        { id: 'party', label: 'Groupe uniquement', sub: 'Invités du groupe' },
+                        { id: 'off', label: 'Désactivé', sub: 'Personne' },
+                      ].map((opt) => {
+                        const cur = settings?.voice?.privacy || 'friends';
+                        const active = cur === opt.id;
+                        return (
+                          <button
+                            key={opt.id}
+                            type="button"
+                            onClick={() => updateVoiceSetting?.('privacy', opt.id)}
+                            aria-pressed={active}
+                            className={`arcade-focus-ring py-2 px-3 min-h-[44px] rounded-xl text-left border transition-all ${
+                              active
+                                ? 'u-tab-active'
+                                : 'bg-neutral-900 border-white/10 text-neutral-300 hover:border-white/25'
+                            }`}
+                          >
+                            <span className="font-bold text-xs block">{opt.label}</span>
+                            <span className="text-[10px] text-neutral-400 block">{opt.sub}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Mode Microphone */}
+                  <div className="space-y-1.5">
+                    <span className="text-[11px] font-bold text-neutral-200 block">
+                      Mode Microphone
+                    </span>
+                    <div className="grid grid-cols-2 gap-2">
+                      {[
+                        { id: 'open', label: 'Micro Ouvert', sub: 'Détection vocale auto' },
+                        { id: 'ptt', label: 'Appuyer pour parler', sub: 'Touche V / Bouton tactile' },
+                      ].map((opt) => {
+                        const cur = settings?.voice?.micMode || 'open';
+                        const active = cur === opt.id;
+                        return (
+                          <button
+                            key={opt.id}
+                            type="button"
+                            onClick={() => updateVoiceSetting?.('micMode', opt.id)}
+                            aria-pressed={active}
+                            className={`arcade-focus-ring py-2 px-3 min-h-[44px] rounded-xl text-left border transition-all ${
+                              active
+                                ? 'u-tab-active'
+                                : 'bg-neutral-900 border-white/10 text-neutral-300 hover:border-white/25'
+                            }`}
+                          >
+                            <span className="font-bold text-xs block">{opt.label}</span>
+                            <span className="text-[10px] text-neutral-400 block">{opt.sub}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Volume Chat Vocal */}
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="font-bold text-neutral-200">Volume des voix</span>
+                      <span className="font-mono u-accent-text font-bold tabular-nums">
+                        {settings?.voice?.volume ?? 85}%
+                      </span>
+                    </div>
+                    <input
+                      type="range"
+                      min="0"
+                      max="100"
+                      aria-label="Volume du chat vocal"
+                      value={settings?.voice?.volume ?? 85}
+                      onChange={(e) => updateVoiceSetting?.('volume', Number(e.target.value))}
+                      style={{ accentColor: 'var(--u-accent)' }}
+                      className="w-full cursor-pointer h-2 bg-neutral-800 rounded-lg"
+                    />
+                  </div>
+
+                  <SettingsSwitch
+                    icon={MicOff}
+                    label="Micro coupé par défaut à l'entrée"
+                    description="Vous rejoignez les groupes vocaux en silencieux jusqu'à ce que vous activiez votre micro."
+                    checked={Boolean(settings?.voice?.defaultMuted)}
+                    onChange={(val) => updateVoiceSetting?.('defaultMuted', val)}
+                  />
+                </div>
               </div>
             )}
 
@@ -1136,7 +1252,7 @@ export function SettingsModal({
               <div className="space-y-4">
                 <div className="p-4 rounded-2xl bg-neutral-950/80 border border-white/10 space-y-2.5">
                   <label htmlFor="settings-player-name" className="font-bold text-white text-xs sm:text-[13px] block">
-                    Pseudo dans les Salons Fightcade 2
+                    Pseudo dans les Salons CSW Arcade
                   </label>
                   <input
                     id="settings-player-name"
@@ -1185,7 +1301,7 @@ export function SettingsModal({
                 />
 
                 <SettingsSwitch
-                  label="Son d'alerte lors d'un défi Fightcade"
+                  label="Son d'alerte lors d'un défi CSW Arcade"
                   description="Joue une notification sonore lorsqu'un joueur vous défie au salon"
                   checked={settings?.netplay?.challengeSound ?? true}
                   onChange={(val) => updateNetplaySetting?.('challengeSound', val)}

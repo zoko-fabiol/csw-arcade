@@ -252,7 +252,7 @@ export function TouchOverlay({
       clampedY = (dy / distance) * maxRadius;
     }
 
-    // Suivi dynamique de socle (Smooth Follow style Fortnite / COD Mobile) :
+    // Suivi dynamique de socle (Smooth Follow CSW Arcade / COD Mobile) :
     // Quand le pouce se déplace loin, le socle glisse doucement vers le doigt
     // pour garantir une réversibilité immédiate sans latence de retour
     if (isFloating && distance > maxFollowRadius) {
@@ -1051,7 +1051,7 @@ export function TouchOverlay({
         )}
       </div>
 
-      {/* ZONE TACTILE GAUCHE PLEIN ÉCRAN (JOYSTICK FLOTTANT DYNAMIQUE FORTNITE) - UNIQUEMENT EN MODE ANALOGIQUE */}
+      {/* ZONE TACTILE GAUCHE PLEIN ÉCRAN (JOYSTICK FLOTTANT DYNAMIQUE CSW Arcade) - UNIQUEMENT EN MODE ANALOGIQUE */}
       {!isDpadMode && isFloatingMode && !isEditMode && (
         <div
           className="absolute top-16 bottom-0 left-0 w-1/2 pointer-events-auto touch-none select-none z-10"
@@ -1242,7 +1242,7 @@ export function TouchOverlay({
         </button>
       </div>
 
-      {/* Joystick Flottant Dynamique actif sous le doigt en mode Overlay (Style Fortnite - mode analogique uniquement) */}
+      {/* Joystick Flottant Dynamique actif sous le doigt en mode Overlay (CSW Arcade - mode analogique uniquement) */}
       {!isDpadMode && isFloatingMode && isStickActive && floatingOrigin && (
         <div
           style={{
