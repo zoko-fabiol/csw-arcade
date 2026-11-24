@@ -980,8 +980,8 @@ export default function App() {
       data-universe={platformMode}
       className="u-shell-bg u-mobile-flow-root flex flex-col h-[100dvh] w-screen overflow-hidden font-sans text-neutral-100 pt-safe-pwa"
     >
-      {/* Topbar Unifiée Thématisée par Console — Fixe en haut (sticky) sur mobile & desktop */}
-      <header className="u-header-bg sticky top-0 border-b shrink-0 z-30 px-2.5 sm:px-4 py-1.5 sm:py-2 space-y-1.5">
+      {/* Topbar Unifiée Thématisée par Console — Fixe en haut sur mobile portrait, flux normal sans masquage sur paysage/tablette */}
+      <header className="u-header-bg sticky top-0 md:static border-b shrink-0 z-30 px-2.5 sm:px-4 py-1.5 sm:py-2 space-y-1.5">
         {/* Ligne 1 : Identité Console + Statut Système + Actions */}
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2 min-w-0">

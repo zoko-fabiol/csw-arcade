@@ -38,6 +38,54 @@
       max-height: none !important;
       object-fit: fill !important;
     }
+    body.pixel-perfect #game canvas {
+      width: auto !important;
+      height: auto !important;
+      max-width: 100% !important;
+      max-height: 100% !important;
+      aspect-ratio: 1 / 1;
+      object-fit: contain !important;
+      image-rendering: pixelated !important;
+    }
+    /* Shaders HD & CRT (Rendu visuel garanti + shaders GLSL natifs EmulatorJS) */
+    body.shader-2xhq #game canvas {
+      image-rendering: auto !important;
+      filter: contrast(1.06) saturate(1.07);
+    }
+    body.shader-4xhq #game canvas {
+      image-rendering: auto !important;
+      filter: contrast(1.12) saturate(1.14) brightness(1.03);
+    }
+    body.shader-crt-easy #game canvas {
+      filter: contrast(1.1) saturate(1.12);
+    }
+    body.shader-crt-geom #game canvas {
+      border-radius: 22px;
+      filter: contrast(1.14) saturate(1.15);
+      box-shadow: 0 0 0 4px #0b0d14, inset 0 0 48px rgba(0, 0, 0, 0.78);
+    }
+    body.shader-crt-easy #crt-overlay,
+    body.shader-crt-geom #crt-overlay {
+      opacity: 1;
+      background:
+        repeating-linear-gradient(
+          to bottom,
+          rgba(0, 0, 0, 0) 0px,
+          rgba(0, 0, 0, 0) 2px,
+          rgba(0, 0, 0, 0.32) 3px,
+          rgba(0, 0, 0, 0.32) 4px
+        ),
+        repeating-linear-gradient(
+          to right,
+          rgba(255, 0, 0, 0.045) 0px,
+          rgba(0, 255, 0, 0.03) 1px,
+          rgba(0, 120, 255, 0.045) 2px,
+          transparent 3px
+        );
+    }
+    body.shader-crt-geom #crt-overlay {
+      box-shadow: inset 0 0 90px rgba(0, 0, 0, 0.72);
+    }
     #boot-msg {
       position: fixed;
       inset: 0;
@@ -398,13 +446,33 @@
       };
     }
 
+    function applyShaderMode(shaderId, streamMode = false) {
+      const id = streamMode ? 'none' : String(shaderId || 'none');
+      document.body.classList.remove('shader-2xhq', 'shader-4xhq', 'shader-crt-easy', 'shader-crt-geom');
+      if (id === '2xScaleHQ.glslp') document.body.classList.add('shader-2xhq');
+      else if (id === '4xScaleHQ.glslp') document.body.classList.add('shader-4xhq');
+      else if (id === 'crt-easymode.glslp') document.body.classList.add('shader-crt-easy');
+      else if (id === 'crt-geom.glslp') document.body.classList.add('shader-crt-geom');
+
+      if (window.EJS_emulator && typeof window.EJS_emulator.changeSettingOption === 'function') {
+        try {
+          const ejsShader = id === 'none' ? 'disabled' : id;
+          window.EJS_emulator.changeSettingOption('shader', ejsShader);
+        } catch {}
+      }
+    }
+
     function applyHardwareSettings(hw) {
       if (!hw) return;
+      const isStream = Boolean(hw.performance?.streamMode);
       if (hw.video) {
-        if (hw.video.filter) document.body.classList.toggle('smooth', hw.video.filter === 'smooth');
-        if (hw.video.aspectRatio) document.body.classList.toggle('stretch', hw.video.aspectRatio === '16:9');
+        const smoothOn = hw.video.filter === 'smooth' || hw.video.shader === '2xScaleHQ.glslp' || hw.video.shader === '4xScaleHQ.glslp';
+        document.body.classList.toggle('smooth', smoothOn);
+        document.body.classList.toggle('stretch', hw.video.aspectRatio === '16:9');
+        document.body.classList.toggle('pixel-perfect', hw.video.aspectRatio === 'pixel-perfect');
         const crtOn = Boolean(hw.video.scanlines || hw.video.crt || hw.video.crtEnabled);
         document.body.classList.toggle('crt-on', crtOn);
+        applyShaderMode(hw.video.shader || 'none', isStream);
       }
       if (hw.audio && window.EJS_emulator) {
         const isMuted = Boolean(hw.audio.muted);
@@ -440,9 +508,23 @@
       }
     });
 
-    function applyDisplay({ filter, ratio, volume, muted }) {
-      if (filter) document.body.classList.toggle('smooth', filter === 'smooth');
-      if (ratio) document.body.classList.toggle('stretch', ratio === 'stretch');
+    function applyDisplay({ filter, ratio, shader, scanlines, streamMode, volume, muted }) {
+      if (filter) {
+        document.body.classList.toggle('smooth', filter === 'smooth');
+      }
+      if (ratio) {
+        document.body.classList.toggle('stretch', ratio === 'stretch' || ratio === '16:9');
+        document.body.classList.toggle('pixel-perfect', ratio === 'pixel-perfect');
+      }
+      if (typeof scanlines === 'boolean') {
+        document.body.classList.toggle('crt-on', scanlines);
+      }
+      if (typeof shader === 'string') {
+        applyShaderMode(shader, Boolean(streamMode));
+        if (shader === '2xScaleHQ.glslp' || shader === '4xScaleHQ.glslp') {
+          document.body.classList.add('smooth');
+        }
+      }
         const effectiveVol = muted ? 0 : (typeof volume === 'number' ? Math.max(0, Math.min(1, volume / 100)) : null);
         window.__cswDesiredAudio = {
           muted: Boolean(muted),
@@ -3327,20 +3409,34 @@
           window.EJS_startOnLoaded = true;
           window.EJS_color = msg.accent || '#3b82f6';
           if (ctrlCfg) window.EJS_defaultControls = ctrlCfg;
-          // Activation automatique des Multitaps pour les jeux 3-4+ joueurs (PS1, Sega 4-Way Play, SNES)
+          // Options natives EmulatorJS : Multitaps (3-4+ joueurs), Shaders HD, BIOS MVS/AES & Région, Mode Stream
+          const normCore = String(window.EJS_core || '').toLowerCase();
+          const bootOpts = { ...(window.EJS_defaultOptions || {}) };
           const maxPlayers = Math.max(2, Number(msg.maxPlayers || 2));
           if (maxPlayers >= 3) {
-            const normCore = String(window.EJS_core || '').toLowerCase();
-            const mtOpts = { ...(window.EJS_defaultOptions || {}) };
             if (normCore === 'psx' || normCore === 'pcsx_rearmed') {
-              mtOpts['pcsx_rearmed_multitap1'] = 'enabled';
+              bootOpts['pcsx_rearmed_multitap1'] = 'enabled';
             } else if (normCore === 'segamd' || normCore === 'genesis_plus_gx') {
-              mtOpts['genesis_plus_gx_port_1_type'] = '4-way play';
+              bootOpts['genesis_plus_gx_port_1_type'] = '4-way play';
             } else if (normCore === 'snes' || normCore === 'snes9x') {
-              mtOpts['snes9x_multitap'] = 'enabled';
+              bootOpts['snes9x_multitap'] = 'enabled';
             }
-            window.EJS_defaultOptions = mtOpts;
           }
+          const isStreamBoot = Boolean(hw.performance?.streamMode);
+          const wantedShader = isStreamBoot ? 'none' : (hw.video?.shader || 'none');
+          bootOpts['shader'] = wantedShader === 'none' ? 'disabled' : wantedShader;
+          if (normCore === 'fbneo' || normCore === 'arcade') {
+            const biosMode = hw.system?.biosMode === 'aes' ? 'AES' : 'MVS';
+            bootOpts['fbneo-neogeo-mode'] = biosMode === 'AES' ? 'UNIBIOS' : 'MVS';
+            if (hw.system?.region) {
+              const regMap = { europe: 'Europe', usa: 'USA', japan: 'Japan' };
+              bootOpts['fbneo-dipswitch-region'] = regMap[hw.system.region] || 'Europe';
+            }
+          }
+          if (isStreamBoot) {
+            bootOpts['vsync'] = 'disabled';
+          }
+          window.EJS_defaultOptions = bootOpts;
           const effectiveMuted = msg.muted ?? hw.audio?.muted ?? false;
           const effectiveVol = typeof msg.volume === 'number' ? msg.volume : (hw.audio?.volume ?? 80);
           window.__cswDesiredAudio = { muted: Boolean(effectiveMuted), vol: Math.max(0, Math.min(1, effectiveVol / 100)) };

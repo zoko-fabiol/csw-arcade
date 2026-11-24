@@ -216,7 +216,7 @@ export function FightcadeLobbyView({
       : messages;
 
   return (
-    <div className="u-mobile-flow-container flex-1 min-w-0 w-full max-w-full flex flex-col min-h-0 overflow-x-hidden bg-transparent text-neutral-100 pb-20 md:pb-0">
+    <div className="flex-1 min-w-0 w-full max-w-full flex flex-col min-h-0 overflow-x-hidden bg-transparent text-neutral-100 pb-16 md:pb-0">
       {/* En-tête du salon CSW Arcade — Zéro débordement sur mobile/tablette, thématisé par console */}
       <div className="u-banner w-full min-w-0 flex flex-col gap-2.5 px-3 md:px-4 py-2.5 md:py-3 backdrop-blur-md border-b shrink-0 overflow-hidden">
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-2.5">

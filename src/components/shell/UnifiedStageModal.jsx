@@ -16,6 +16,7 @@ import { firebaseFightcadeService, GLOBAL_CHANNEL_ID } from '../../services/fire
 import { deleteGameSlot, listGameSlots, loadGameSlot, saveGameSlot } from '../../services/gameSaveService';
 import { countryCodeToFlag } from '../../data/countries';
 import { MobilePlatformController } from './MobilePlatformController';
+import PerfOverlay from '../PerfOverlay';
 import { supportsOnlineMultiplayer } from '../../utils/gameCapabilities';
 
 function detectDefaultTouchPad() {
@@ -51,7 +52,13 @@ export function UnifiedStageModal({
   const [statusText, setStatusText] = useState('Initialisation…');
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [filter, setFilter] = useState(settings?.video?.filter === 'smooth' ? 'smooth' : 'sharp');
-  const [ratio, setRatio] = useState(settings?.video?.aspectRatio === '16:9' ? 'stretch' : 'fit');
+  const [ratio, setRatio] = useState(
+    settings?.video?.aspectRatio === '16:9'
+      ? 'stretch'
+      : settings?.video?.aspectRatio === 'pixel-perfect'
+      ? 'pixel-perfect'
+      : 'fit'
+  );
   const [bootKey, setBootKey] = useState(0);
   const [coins, setCoins] = useState(0);
   const [coinLocked, setCoinLocked] = useState(false);
@@ -71,7 +78,7 @@ export function UnifiedStageModal({
   const sessionActivityLoggedRef = useRef(false);
   const [savedState, setSavedState] = useState(null);
   const [savedSlots, setSavedSlots] = useState([]);
-  const [inputDelay, setInputDelay] = useState(p2pStats?.inputDelay ?? 2);
+  const [inputDelay, setInputDelay] = useState(p2pStats?.inputDelay ?? settings?.netplay?.inputDelay ?? 1);
   const [autoHealSync, setAutoHealSync] = useState(true);
   const [touchPadVisible, setTouchPadVisible] = useState(() => detectDefaultTouchPad());
   const [netplayPanelOpen, setNetplayPanelOpen] = useState(false);
@@ -798,19 +805,69 @@ export function UnifiedStageModal({
     };
   }, [session?.isNetplay, session?.opponentUid, session?.challengeId, isSpectator, p2pEngine]);
 
+  // Synchroniser en direct les changements effectués dans SettingsModal (Lissage, Ratio 4:3 / 16:9 / 1:1)
+  useEffect(() => {
+    setFilter(settings?.video?.filter === 'smooth' ? 'smooth' : 'sharp');
+  }, [settings?.video?.filter]);
+
+  useEffect(() => {
+    const ar = settings?.video?.aspectRatio;
+    setRatio(ar === '16:9' ? 'stretch' : ar === 'pixel-perfect' ? 'pixel-perfect' : 'fit');
+  }, [settings?.video?.aspectRatio]);
+
+  // Masquage automatique du pad tactile lorsqu'une manette physique est branchée
+  useEffect(() => {
+    if (!session || settings?.touch?.autoHideOnGamepad === false) return undefined;
+    const syncGamepadHide = () => {
+      try {
+        const pads = navigator.getGamepads ? Array.from(navigator.getGamepads()).filter(Boolean) : [];
+        if (pads.length > 0) setTouchPadVisible(false);
+        else setTouchPadVisible(detectDefaultTouchPad());
+      } catch {}
+    };
+    syncGamepadHide();
+    window.addEventListener('gamepadconnected', syncGamepadHide);
+    window.addEventListener('gamepaddisconnected', syncGamepadHide);
+    return () => {
+      window.removeEventListener('gamepadconnected', syncGamepadHide);
+      window.removeEventListener('gamepaddisconnected', syncGamepadHide);
+    };
+  }, [session, settings?.touch?.autoHideOnGamepad]);
+
+  const someoneSpeakingInVoice = Boolean(
+    voiceState?.roomId &&
+      settings?.voice?.audioDucking !== false &&
+      (voiceState.members || []).some((m) => m.speaking && !m.muted)
+  );
+
   useEffect(() => {
     if (!session || !iframeRef.current?.contentWindow) return;
+    const baseVol = settings?.audio?.volume ?? 80;
+    const effectiveVol = someoneSpeakingInVoice ? Math.round(baseVol * 0.6) : baseVol;
     iframeRef.current.contentWindow.postMessage(
       {
         type: 'UPDATE_DISPLAY',
         filter,
         ratio,
-        volume: settings?.audio?.volume ?? 80,
+        shader: settings?.video?.shader || 'none',
+        scanlines: Boolean(settings?.video?.scanlines),
+        streamMode: Boolean(settings?.performance?.streamMode),
+        volume: effectiveVol,
         muted: Boolean(settings?.audio?.muted),
       },
       window.location.origin
     );
-  }, [session, filter, ratio, settings?.audio?.volume, settings?.audio?.muted]);
+  }, [
+    session,
+    filter,
+    ratio,
+    settings?.video?.shader,
+    settings?.video?.scanlines,
+    settings?.performance?.streamMode,
+    settings?.audio?.volume,
+    settings?.audio?.muted,
+    someoneSpeakingInVoice,
+  ]);
 
   if (!session) return null;
 
@@ -2263,6 +2320,9 @@ export function UnifiedStageModal({
           </aside>
         )}
       </div>
+
+      {/* Overlay FPS & Frame Time si activé dans les Paramètres Performance */}
+      {settings?.performance?.showOverlay && <PerfOverlay visible />}
 
       {/* HUD Vocal Non-Intrusif en Jeu & Plein Écran (pastilles de parole uniquement + toast invitation) */}
       <VoicePartyPill
