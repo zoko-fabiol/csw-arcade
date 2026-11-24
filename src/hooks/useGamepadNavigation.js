@@ -214,12 +214,14 @@ export function useGamepadNavigation({ isGameplayActive = false } = {}) {
         const pads = Array.from(navigator.getGamepads() || []).filter(Boolean);
         if (pads.length > 0) {
           const scopeRoot = getActiveScopeRoot();
-          const hasExplicitOverlay =
-            scopeRoot !== document.body ||
-            Boolean(document.querySelector('[data-gamepad-scope], [role="dialog"][aria-modal="true"]'));
+          const hasExplicitOverlay = Array.from(document.querySelectorAll('[data-gamepad-scope]')).some(isElementVisible);
 
           // En jeu actif sans menu/modale ouvert, laisser 100 % des contrôles à l'émulateur
           const pausedForGame = stateRef.current.isGameplayActive && !hasExplicitOverlay;
+
+          if (pausedForGame) {
+            document.documentElement.classList.remove('gamepad-nav-active');
+          }
 
           if (!pausedForGame) {
             const now = performance.now();
