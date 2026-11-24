@@ -43,7 +43,7 @@ export function PlayerAvatar({
   return (
     <div className={`relative inline-flex shrink-0 ${className}`}>
       <div
-        className={`${sizeClass} ${shapeClass} overflow-hidden bg-gradient-to-br from-cyan-950 via-neutral-900 to-indigo-950 flex items-center justify-center font-black text-cyan-200 select-none shadow-inner`}
+        className={`keep-dark ${sizeClass} ${shapeClass} overflow-hidden bg-gradient-to-br from-cyan-950 via-neutral-900 to-indigo-950 flex items-center justify-center font-black text-cyan-200 select-none shadow-inner`}
       >
         {hasPhoto ? (
           <img

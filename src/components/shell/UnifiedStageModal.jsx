@@ -32,6 +32,8 @@ export function UnifiedStageModal({
   p2pEngine = null,
   p2pStats = null,
   activeChannels = [],
+  incomingChallenge = null,
+  onRespondChallenge,
   onOpenSalon,
   onCloudCheckpoint,
   onInputDelayChange,
@@ -83,12 +85,26 @@ export function UnifiedStageModal({
 
   useEffect(() => {
     if (!session) return;
+    setOpponentLeftModal(null);
+    // DROP-IN SANS REDÉMARRAGE : si l'hôte joue déjà à ce jeu, on garde l'émulateur vivant sans écran d'attente !
+    if (session.isLiveDropIn && session.isHost) {
+      setLocalEmuReady(true);
+      setNetplaySyncReady(true);
+      try {
+        iframeRef.current?.contentWindow?.postMessage(
+          { type: 'ENABLE_LIVE_NETPLAY', playerIndex: 0 },
+          window.location.origin
+        );
+        p2pEngine?.notifyEmuReady?.(true);
+      } catch {}
+      showRamToast('record', `${session.opponentName || 'Un joueur'} rejoint votre partie en direct !`);
+      return;
+    }
     setLocalEmuReady(false);
     setRemoteEmuReady(false);
     setSpectatorsCount(0);
-    setOpponentLeftModal(null);
     setNetplaySyncReady(!session.isNetplay);
-  }, [session?.gameId, session?.title, session?.isNetplay, session?.isSpectator, bootKey]);
+  }, [session?.gameId, session?.title, session?.isNetplay, session?.isSpectator, session?.isLiveDropIn, bootKey]);
 
   useEffect(() => {
     if (!session?.isNetplay || isSpectator || netplaySyncReady || !localEmuReady || !remoteEmuReady) return;
@@ -609,6 +625,14 @@ export function UnifiedStageModal({
     };
     p2pEngine.onPeerEmuReady = () => {
       setRemoteEmuReady(true);
+      if (session?.isLiveDropIn && session?.isHost) {
+        try {
+          iframeRef.current?.contentWindow?.postMessage(
+            { type: 'EXPORT_NETPLAY_SYNC', slot: 'frame0' },
+            window.location.origin
+          );
+        } catch {}
+      }
     };
     p2pEngine.onNetplayEvent = (ev) => {
       if (!ev || !ev.event) return;
@@ -967,7 +991,7 @@ export function UnifiedStageModal({
   return (
     <div
       ref={stageRef}
-      className="fixed inset-0 h-[100dvh] z-50 flex flex-col bg-neutral-950 text-neutral-100 pt-safe pb-safe"
+      className="keep-dark fixed inset-0 h-[100dvh] z-50 flex flex-col bg-neutral-950 text-neutral-100 pt-safe pb-safe"
       role="dialog"
       aria-modal="true"
     >
@@ -1303,6 +1327,45 @@ export function UnifiedStageModal({
                   Quitter le match
                 </button>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* TOAST INVITATION / DROP-IN IN-GAME (dans stageRef -> 100% visible même en mode Plein Écran) */}
+        {incomingChallenge && (
+          <div
+            className="absolute top-3 right-3 sm:top-4 sm:right-4 z-[95] w-[calc(100%-1.5rem)] max-w-sm rounded-2xl bg-neutral-950/95 backdrop-blur-xl border-2 u-accent-border p-4 shadow-2xl space-y-3 animate-fade-in"
+            role="alertdialog"
+            aria-label="Invitation à rejoindre votre partie"
+          >
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 u-accent-text font-black text-xs uppercase">
+                <Swords className="w-4 h-4 animate-pulse shrink-0" aria-hidden="true" />
+                <span>Demande de Drop-In reçue !</span>
+              </div>
+              <span className="px-2 py-0.5 rounded-md bg-emerald-500/20 border border-emerald-400/50 text-emerald-300 text-[10px] font-mono font-bold">
+                Sans redémarrer
+              </span>
+            </div>
+            <p className="text-xs text-neutral-100 leading-relaxed">
+              <strong className="text-white">{incomingChallenge.fromName}</strong> veut rejoindre{' '}
+              <strong className="u-accent-text">{incomingChallenge.gameTitle}</strong> directement là où vous êtes (J2 · il appuie juste sur Start).
+            </p>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => onRespondChallenge?.(true)}
+                className="arcade-focus-ring flex-1 py-2.5 px-3 min-h-[44px] rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-black transition-colors"
+              >
+                Accepter (Continuer ici)
+              </button>
+              <button
+                type="button"
+                onClick={() => onRespondChallenge?.(false)}
+                className="arcade-focus-ring px-3.5 py-2.5 min-h-[44px] rounded-xl bg-neutral-800 hover:bg-rose-950 border border-white/15 text-neutral-200 hover:text-rose-200 text-xs font-bold transition-colors"
+              >
+                Refuser
+              </button>
             </div>
           </div>
         )}

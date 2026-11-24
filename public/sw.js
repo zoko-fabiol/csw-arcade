@@ -1,4 +1,4 @@
-const SHELL_CACHE_NAME = 'csw-arcade-shell-v26-neogeo-bios-neoragex';
+const SHELL_CACHE_NAME = 'csw-arcade-shell-v27-pwa-orientation';
 const ENGINE_CACHE_NAME = 'csw-arcade-engine-v7';
 
 // Assets essentiels du moteur WebAssembly (FBNeo + EmulatorJS)

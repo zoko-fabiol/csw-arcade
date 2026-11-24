@@ -665,7 +665,7 @@ export function PlatformCatalogView({ mode, onLaunchStage, onCacheChanged, onJoi
   const visibleItems = filteredCatalog.slice(0, visibleLimit);
 
   return (
-    <div className="flex flex-1 min-w-0 w-full min-h-0 overflow-hidden bg-transparent text-neutral-100">
+    <div className="u-mobile-flow-container flex flex-1 min-w-0 w-full min-h-0 overflow-hidden bg-transparent text-neutral-100">
       {/* Sidebar Filtres — Desktop lg+ uniquement (sur tablette < 1024px, barre horizontale pour éviter d'écraser les cartes) */}
       {showDesktopSidebar && (
         <aside className="hidden lg:flex w-60 xl:w-64 shrink-0 flex-col border-r border-white/10 u-surface/80 p-3 overflow-y-auto">
@@ -701,7 +701,7 @@ export function PlatformCatalogView({ mode, onLaunchStage, onCacheChanged, onJoi
       )}
 
       {/* Contenu Principal */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+      <div className="u-mobile-flow-container flex-1 flex flex-col min-w-0 overflow-hidden">
         {/* Bannière En-tête Univers Console — Thématisée, lisible, zéro collision tablette/mobile */}
         <div className="u-banner px-3 md:px-4 py-2.5 md:py-3 border-b backdrop-blur-md space-y-2.5 shrink-0">
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-2.5">
@@ -901,7 +901,7 @@ export function PlatformCatalogView({ mode, onLaunchStage, onCacheChanged, onJoi
         </div>
 
         {/* Corps scrollable (avec marge basse mobile pour la Bottom Navigation Bar) */}
-        <div className="flex-1 overflow-y-auto p-3 md:p-4 pb-24 md:pb-4 space-y-4 md:space-y-5">
+        <div className="u-mobile-flow-scroll flex-1 overflow-y-auto p-3 md:p-4 pb-24 md:pb-6 space-y-4 md:space-y-5">
           {/* Barre Recherche Archive.org — Tablette/Desktop md+ */}
           <form onSubmit={handleOnlineSearch} className="hidden md:flex gap-2 flex-wrap">
             <div className="relative flex-1 min-w-[240px]">

@@ -24,7 +24,7 @@ export function FightcadeChannelsDock({
     <>
       {/* DOCK VERTICAL GAUCHE — DESKTOP & TABLETTE (md+) */}
       <nav
-        className="hidden md:flex w-[72px] lg:w-20 shrink-0 border-r border-white/10 arcade-glass flex-col items-center py-3 gap-3 z-20"
+        className="hidden md:flex md:sticky md:top-0 md:h-[100dvh] w-[72px] lg:w-20 shrink-0 border-r border-white/10 arcade-glass flex-col items-center py-3 gap-3 z-20 overflow-y-auto no-scrollbar"
         aria-label="Salons Fightcade 2 actifs (Lobby Global + max 3 jeux)"
       >
         <button

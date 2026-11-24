@@ -95,6 +95,9 @@ export const DEFAULT_SETTINGS = {
     showHud: true,
     challengeSound: true
   },
+  ui: {
+    theme: 'dark' // 'dark' | 'light' | 'system'
+  },
   consoleControls: DEFAULT_CONSOLE_CONTROLS
 };
 
@@ -132,6 +135,8 @@ export function useSettings() {
           system: { ...DEFAULT_SETTINGS.system, ...(parsed.system || {}) },
           touch: { ...DEFAULT_SETTINGS.touch, ...(parsed.touch || {}) },
           performance: { ...DEFAULT_SETTINGS.performance, ...(parsed.performance || {}) },
+          netplay: { ...DEFAULT_SETTINGS.netplay, ...(parsed.netplay || {}) },
+          ui: { ...DEFAULT_SETTINGS.ui, ...(parsed.ui || {}) },
           consoleControls: mergedConsoles,
         };
       }
@@ -145,6 +150,7 @@ export function useSettings() {
   useEffect(() => {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+      localStorage.setItem('csw_arcade_theme', settings?.ui?.theme || 'dark');
     } catch (e) {
       console.error('[useSettings] Échec écriture localStorage:', e);
     }
@@ -255,6 +261,19 @@ export function useSettings() {
       ...prev,
       netplay: {
         ...(prev.netplay || DEFAULT_SETTINGS.netplay),
+        [key]: value
+      }
+    }));
+  }, []);
+
+  /**
+   * Met à jour les options d'interface (thème clair / sombre / système)
+   */
+  const updateUiSetting = useCallback((key, value) => {
+    setSettings((prev) => ({
+      ...prev,
+      ui: {
+        ...(prev.ui || DEFAULT_SETTINGS.ui),
         [key]: value
       }
     }));
@@ -375,6 +394,7 @@ export function useSettings() {
     updateTouchSetting,
     updatePerformanceSetting,
     updateNetplaySetting,
+    updateUiSetting,
     resetToDefaults
   };
 }

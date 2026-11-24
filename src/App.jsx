@@ -43,7 +43,7 @@ import { RollbackP2PEngine } from './services/rollbackP2P';
 import { isJ2meGame, parseMaxPlayers, supportsOnlineMultiplayer } from './utils/gameCapabilities';
 import { getUniverseTheme } from './data/universeThemes';
 import {
-  Gamepad2, Disc, Cpu, Coffee, Settings, Joystick, Coins, Layers, Swords, UserCheck, Cloud, Play, X, Plus, Wifi, WifiOff, Database, Users
+  Gamepad2, Disc, Cpu, Coffee, Settings, Joystick, Coins, Layers, Swords, UserCheck, Cloud, Play, X, Plus, Wifi, WifiOff, Database, Users, Sun, Moon
 } from 'lucide-react';
 
 // ============================================================================
@@ -75,8 +75,58 @@ export default function App() {
     updateTouchSetting,
     updatePerformanceSetting,
     updateNetplaySetting,
+    updateUiSetting,
     resetToDefaults,
   } = useSettings();
+
+  const themePreference = settings?.ui?.theme || 'dark';
+  const [resolvedTheme, setResolvedTheme] = useState(() => {
+    if (typeof window === 'undefined') return 'dark';
+    if (themePreference === 'system') {
+      return window.matchMedia?.('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+    }
+    return themePreference === 'light' ? 'light' : 'dark';
+  });
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof document === 'undefined') return undefined;
+    const mql = window.matchMedia?.('(prefers-color-scheme: light)');
+    const applyTheme = () => {
+      const next =
+        themePreference === 'system'
+          ? mql?.matches
+            ? 'light'
+            : 'dark'
+          : themePreference === 'light'
+          ? 'light'
+          : 'dark';
+      setResolvedTheme(next);
+      const root = document.documentElement;
+      root.dataset.theme = next;
+      if (next === 'light') {
+        root.classList.remove('dark');
+        root.classList.add('light');
+      } else {
+        root.classList.remove('light');
+        root.classList.add('dark');
+      }
+      const metaTheme = document.querySelector('meta[name="theme-color"]');
+      if (metaTheme) {
+        metaTheme.setAttribute('content', next === 'light' ? '#f2f6fb' : '#090b10');
+      }
+    };
+
+    applyTheme();
+    if (themePreference === 'system' && mql) {
+      mql.addEventListener?.('change', applyTheme);
+      return () => mql.removeEventListener?.('change', applyTheme);
+    }
+    return undefined;
+  }, [themePreference]);
+
+  const handleToggleTheme = useCallback(() => {
+    updateUiSetting('theme', resolvedTheme === 'light' ? 'dark' : 'light');
+  }, [resolvedTheme, updateUiSetting]);
 
   const isOnline = useOnlineStatus();
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -334,6 +384,7 @@ export default function App() {
     preloadedBlob = null,
     opponentName = null,
     opponentUid = null,
+    preserveRunningGame = false,
   }) => {
     p2pEngineRef.current?.destroy();
     const engine = new RollbackP2PEngine({
@@ -441,19 +492,42 @@ export default function App() {
       }
       const maxP = parseMaxPlayers(gameEntry) || 2;
       const pIdx = isHost ? 0 : 1;
-      await launchEntryWithRom(gameEntry, {
-        isNetplay: true,
-        isHost,
-        isSpectator: false,
-        playerIndex: pIdx,
-        maxPlayers: maxP,
-        badgeSuffix: `${isHost ? 'P1 HÔTE' : `P${pIdx + 1} INVITÉ`} · NETPLAY ${maxP}J`,
-        preloadedBlob,
-        opponentName,
-        opponentUid,
-        hostUid: resolvedHostUid,
-        challengeId,
-      });
+
+      // DROP-IN SANS REDÉMARRAGE : si l'hôte joue déjà à ce jeu (ex: Mission 3 Metal Slug), on garde l'émulateur vivant !
+      if (preserveRunningGame && isHost && stageSessionRef.current) {
+        setStageSession((prev) =>
+          prev
+            ? {
+                ...prev,
+                isNetplay: true,
+                isHost: true,
+                isSpectator: false,
+                isLiveDropIn: true,
+                playerIndex: 0,
+                maxPlayers: maxP,
+                badgeSuffix: `P1 HÔTE · DROP-IN LIVE (${opponentName})`,
+                opponentName,
+                opponentUid,
+                hostUid: resolvedHostUid,
+                challengeId,
+              }
+            : prev
+        );
+      } else {
+        await launchEntryWithRom(gameEntry, {
+          isNetplay: true,
+          isHost,
+          isSpectator: false,
+          playerIndex: pIdx,
+          maxPlayers: maxP,
+          badgeSuffix: `${isHost ? 'P1 HÔTE' : `P${pIdx + 1} INVITÉ`} · NETPLAY ${maxP}J`,
+          preloadedBlob,
+          opponentName,
+          opponentUid,
+          hostUid: resolvedHostUid,
+          challengeId,
+        });
+      }
     }
   };
 
@@ -492,8 +566,14 @@ export default function App() {
       setTimeout(() => setBootNotice(''), 3500);
       return;
     }
-    // Règle CSW-Arcade : L'hôte doit disposer de 2 Coins pour inviter
-    if (!hasCoins(2)) {
+    const targetIsAlreadyPlaying = Boolean(
+      targetUser?.status === 'in_game_available' ||
+      targetUser?.status === 'playing' ||
+      targetUser?.currentGame
+    );
+    // En mode Drop-In (rejoindre quelqu'un déjà en partie), seul 1 Coin est requis (sinon 2 Coins pour un défi classique)
+    const requiredCoins = targetIsAlreadyPlaying ? 1 : 2;
+    if (!hasCoins(requiredCoins)) {
       setNoCoinsModalOpen(true);
       return;
     }
@@ -507,12 +587,14 @@ export default function App() {
         gameTitle: channel.title,
         gameEntry: channel.entry,
         fromUid: userProfileRef.current?.uid,
-        fromName: userProfileRef.current?.displayName || userProfileRef.current?.name || 'Hôte',
+        fromName: userProfileRef.current?.displayName || userProfileRef.current?.name || 'Joueur',
         toUid: targetUser.uid,
         toName: targetUser.name,
+        isDropIn: targetIsAlreadyPlaying,
         status: 'pending',
       },
-      isHost: true,
+      // Si la cible joue déjà (ex: Mission 3 Metal Slug), ELLE reste l'Hôte P1 pour ne jamais redémarrer sa partie !
+      isHost: !targetIsAlreadyPlaying,
     });
   };
 
@@ -522,10 +604,32 @@ export default function App() {
     const channel = activeChannels.find((c) => c.gameId === ch.gameId);
     const resolvedGameEntry = ch.gameEntry || channel?.entry || { id: ch.gameId, title: ch.gameTitle };
     const allowAccept = Boolean(accept) && supportsOnlineMultiplayer(resolvedGameEntry);
-    // L'invité NE PAIE RIEN : 0 Coin débité chez l'invité (l'hôte a payé pour les deux)
     setIncomingChallenge(null);
     await firebaseFightcadeService.respondChallenge(ch.challengeId, allowAccept, ch.fromUid);
     if (allowAccept) {
+      const curStage = stageSessionRef.current;
+      const isAlreadyPlayingSameGame = Boolean(
+        curStage &&
+        !curStage.isSpectator &&
+        curStage.kind !== 'j2me' &&
+        (normalizeGameChannelId(curStage) === normalizeGameChannelId(resolvedGameEntry) ||
+          String(curStage.title || '').toLowerCase() === String(resolvedGameEntry.title || ch.gameTitle || '').toLowerCase())
+      );
+
+      // ZERO-REBOOT DROP-IN : si le joueur est DÉJÀ en partie sur ce jeu (sélection perso ou Mission 3 Metal Slug),
+      // il reste Hôte P1 sans fermer ni redémarrer l'émulateur et envoie son savestate live à J2 !
+      if (isAlreadyPlayingSameGame) {
+        await startRollbackP2PMatch({
+          challengeId: ch.challengeId,
+          isHost: true,
+          gameEntry: resolvedGameEntry,
+          opponentName: ch.fromName,
+          opponentUid: ch.fromUid,
+          preserveRunningGame: true,
+        });
+        return;
+      }
+
       setActiveMatchSync({
         challengeId: ch.challengeId,
         challenge: {
@@ -804,10 +908,10 @@ export default function App() {
   return (
     <div
       data-universe={platformMode}
-      className="u-shell-bg flex flex-col h-[100dvh] w-screen overflow-hidden font-sans text-neutral-100 pt-safe-pwa"
+      className="u-shell-bg u-mobile-flow-root flex flex-col h-[100dvh] w-screen overflow-hidden font-sans text-neutral-100 pt-safe-pwa"
     >
-      {/* Topbar Unifiée Thématisée par Console — Lisible, structurée & ergonomique */}
-      <header className="u-header-bg border-b shrink-0 z-30 px-2.5 sm:px-4 py-1.5 sm:py-2 space-y-1.5">
+      {/* Topbar Unifiée Thématisée par Console — Fixe en haut (sticky) sur mobile & desktop */}
+      <header className="u-header-bg sticky top-0 border-b shrink-0 z-30 px-2.5 sm:px-4 py-1.5 sm:py-2 space-y-1.5">
         {/* Ligne 1 : Identité Console + Statut Système + Actions */}
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2 min-w-0">
@@ -879,6 +983,20 @@ export default function App() {
               ) : friendsState.friends.some((f) => f.isOnline) ? (
                 <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-emerald-400" aria-hidden="true" />
               ) : null}
+            </button>
+
+            <button
+              type="button"
+              onClick={handleToggleTheme}
+              aria-label={resolvedTheme === 'light' ? 'Passer en mode sombre' : 'Passer en mode clair'}
+              title={resolvedTheme === 'light' ? 'Mode sombre' : 'Mode clair'}
+              className="arcade-focus-ring flex items-center justify-center w-11 h-11 rounded-xl bg-neutral-900 hover:bg-neutral-800 border border-white/15 text-neutral-100 transition-colors"
+            >
+              {resolvedTheme === 'light' ? (
+                <Moon className="w-4 h-4 u-accent-text" aria-hidden="true" />
+              ) : (
+                <Sun className="w-4 h-4 text-amber-300" aria-hidden="true" />
+              )}
             </button>
 
             <button
@@ -986,6 +1104,19 @@ export default function App() {
               {isOnline ? <Wifi className="w-3 h-3" aria-hidden="true" /> : <WifiOff className="w-3 h-3" aria-hidden="true" />}
               <span>{isOnline ? 'En ligne' : 'Hors-ligne'}</span>
             </span>
+            <button
+              type="button"
+              onClick={handleToggleTheme}
+              aria-label={resolvedTheme === 'light' ? 'Passer en mode sombre' : 'Passer en mode clair'}
+              title={resolvedTheme === 'light' ? 'Passer en mode sombre' : 'Passer en mode clair'}
+              className="arcade-focus-ring flex items-center justify-center w-10 h-10 rounded-xl bg-neutral-900 hover:bg-neutral-800 border border-white/15 text-neutral-100 transition-colors"
+            >
+              {resolvedTheme === 'light' ? (
+                <Moon className="w-4 h-4 u-accent-text" aria-hidden="true" />
+              ) : (
+                <Sun className="w-4 h-4 text-amber-300" aria-hidden="true" />
+              )}
+            </button>
             <button
               type="button"
               onClick={() => setIsSettingsOpen(true)}
@@ -1144,7 +1275,7 @@ export default function App() {
       </header>
 
       {/* Corps Unifié : Dock Salons Fightcade 2 (Desktop gauche / Mobile Bottom Bar) + Vue Active */}
-      <div className="flex flex-1 min-h-0 overflow-hidden relative">
+      <div className="u-mobile-flow-container flex flex-1 min-h-0 overflow-hidden relative">
         <FightcadeChannelsDock
           activeChannels={activeChannels}
           selectedChannelId={selectedChannelId}
@@ -1159,9 +1290,9 @@ export default function App() {
           onReplaceChannel={handleReplaceFightcadeChannel}
         />
 
-        {/* Pile d'overlays flottants en bas à droite — visible même en jeu (z-150) pour Drop-In Join */}
+        {/* Pile d'overlays flottants en bas à droite (masque le toast défi quand un jeu est ouvert car il est affiché DANS la scène plein écran) */}
         <div className="fixed bottom-[76px] md:bottom-6 left-3 right-3 md:left-auto md:right-6 z-[150] flex flex-col items-end gap-2.5 pointer-events-none">
-          {incomingChallenge && incomingChallenge.fromUid !== userProfile?.uid && !activeMatchSync && (
+          {!stageSession && incomingChallenge && incomingChallenge.fromUid !== userProfile?.uid && !activeMatchSync && (
             <div className="pointer-events-auto w-full md:w-80 rounded-2xl bg-neutral-900 border-2 u-accent-border p-4 shadow-2xl space-y-3">
               <div className="flex items-center gap-2 u-accent-text font-black text-xs uppercase">
                 <Swords className="w-4 h-4 animate-pulse" aria-hidden="true" />
@@ -1428,6 +1559,7 @@ export default function App() {
         updateTouchSetting={updateTouchSetting}
         updatePerformanceSetting={updatePerformanceSetting}
         updateNetplaySetting={updateNetplaySetting}
+        updateUiSetting={updateUiSetting}
         onCacheCleared={refreshPlatformCache}
         resetToDefaults={resetToDefaults}
       />
@@ -1451,6 +1583,12 @@ export default function App() {
         p2pEngine={p2pEngineRef.current}
         p2pStats={settings?.netplay?.showHud === false ? null : p2pStats}
         activeChannels={activeChannels}
+        incomingChallenge={
+          incomingChallenge && incomingChallenge.fromUid !== userProfile?.uid && !activeMatchSync
+            ? incomingChallenge
+            : null
+        }
+        onRespondChallenge={handleRespondChallenge}
         onCloudCheckpoint={(stateBase64) => {
           const uid = userProfileRef.current?.uid;
           const curSess = stageSessionRef.current;

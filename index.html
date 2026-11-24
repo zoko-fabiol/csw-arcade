@@ -23,6 +23,22 @@
     <script>
       (function () {
         try {
+          var pref = localStorage.getItem('csw_arcade_theme') || 'dark';
+          var resolved = pref;
+          if (pref === 'system') {
+            resolved = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+          }
+          var root = document.documentElement;
+          root.dataset.theme = resolved;
+          if (resolved === 'light') {
+            root.classList.remove('dark');
+            root.classList.add('light');
+            var meta = document.querySelector('meta[name="theme-color"]');
+            if (meta) meta.setAttribute('content', '#f2f6fb');
+          } else {
+            root.classList.remove('light');
+            root.classList.add('dark');
+          }
           var isStandalone =
             (window.matchMedia &&
               (window.matchMedia('(display-mode: standalone)').matches ||
@@ -30,7 +46,7 @@
                window.matchMedia('(display-mode: minimal-ui)').matches)) ||
             window.navigator.standalone === true;
           if (isStandalone) {
-            document.documentElement.classList.add('is-pwa-standalone');
+            root.classList.add('is-pwa-standalone');
           }
         } catch (e) {}
       })();
@@ -47,7 +63,7 @@
       }
     </script>
   </head>
-  <body class="bg-neutral-950 text-neutral-100 antialiased overflow-hidden select-none">
+  <body class="antialiased lg:overflow-hidden select-none">
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>

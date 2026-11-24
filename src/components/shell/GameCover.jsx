@@ -106,7 +106,7 @@ export function GameCover({ title, platformLabel, filename, imageUrl, compact = 
 
   return (
     <div
-      className={`relative overflow-hidden rounded-lg border ${theme.coverBorder} bg-gradient-to-br ${theme.coverGradient} flex items-center justify-center shrink-0 ${
+      className={`keep-dark relative overflow-hidden rounded-lg border ${theme.coverBorder} bg-gradient-to-br ${theme.coverGradient} flex items-center justify-center shrink-0 ${
         compact ? 'w-24 aspect-[4/3]' : 'w-full aspect-[16/10]'
       }`}
     >

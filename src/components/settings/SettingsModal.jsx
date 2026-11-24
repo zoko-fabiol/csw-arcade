@@ -21,6 +21,9 @@ import {
   Swords,
   Database,
   Trash2,
+  Sun,
+  Moon,
+  Monitor,
 } from 'lucide-react';
 import { getPlayerIdentity, setPlayerDisplayName } from '../../services/firebaseFightcadeService';
 import { formatBytes, getPlatformCacheStats, listCachedRoms, removeCachedRom } from '../../services/platformRomService';
@@ -103,6 +106,7 @@ export function SettingsModal({
   updateTouchSetting,
   updatePerformanceSetting,
   updateNetplaySetting,
+  updateUiSetting,
   onCacheCleared,
   resetToDefaults,
   resetSettings,
@@ -830,6 +834,54 @@ export function SettingsModal({
             {/* ================= ONGLET 2 : AFFICHAGE & CRT ================= */}
             {activeTab === 'video' && (
               <div className="space-y-4">
+                {/* Apparence & Mode Clair / Sombre / Système */}
+                <div className="p-4 rounded-2xl bg-neutral-950/80 border border-white/10 space-y-2.5">
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <div className="flex items-center gap-2">
+                      <Sun className="w-4 h-4 u-accent-text shrink-0" aria-hidden="true" />
+                      <h4 className="font-bold text-white text-xs sm:text-[13px]">
+                        Apparence de l&apos;interface
+                      </h4>
+                    </div>
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded-lg u-badge font-bold">
+                      6 Univers Adaptatifs
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-neutral-400">
+                    Adapte automatiquement les couleurs de chaque console tout en gardant l&apos;écran de jeu en mode cinéma sombre.
+                  </p>
+                  <div className="grid grid-cols-3 gap-2">
+                    {[
+                      { id: 'dark', label: 'Sombre', sub: 'Néon Arcade', icon: Moon },
+                      { id: 'light', label: 'Clair', sub: 'Jour Haute Lisibilité', icon: Sun },
+                      { id: 'system', label: 'Système', sub: 'Auto OS', icon: Monitor },
+                    ].map((opt) => {
+                      const OptIcon = opt.icon;
+                      const currentTheme = settings?.ui?.theme || 'dark';
+                      const isActive = currentTheme === opt.id;
+                      return (
+                        <button
+                          key={opt.id}
+                          type="button"
+                          onClick={() => updateUiSetting?.('theme', opt.id)}
+                          aria-pressed={isActive}
+                          className={`arcade-focus-ring py-2.5 px-3 min-h-[48px] rounded-xl text-left border transition-all flex items-center gap-2.5 ${
+                            isActive
+                              ? 'u-tab-active'
+                              : 'bg-neutral-900 border-white/10 text-neutral-300 hover:border-white/25'
+                          }`}
+                        >
+                          <OptIcon className={`w-4 h-4 shrink-0 ${isActive ? 'u-accent-text' : 'text-neutral-400'}`} aria-hidden="true" />
+                          <div className="min-w-0">
+                            <span className="font-bold text-xs block truncate">{opt.label}</span>
+                            <span className="text-[10px] text-neutral-400 block truncate">{opt.sub}</span>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
                 <SettingsSwitch
                   icon={ShieldAlert}
                   accentTone="amber"

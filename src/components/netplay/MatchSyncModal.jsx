@@ -56,8 +56,11 @@ export function MatchSyncModal({
   const localBlobRef = useRef(null);
   const acceptedRef = useRef(false);
 
-  const opponentUid = isHost ? challenge?.toUid : challenge?.fromUid;
-  const opponentName = isHost ? challenge?.toName : challenge?.fromName;
+  const myUid = userProfile?.uid;
+  const isInitiator = Boolean(myUid && challenge?.fromUid === myUid);
+  const isDropInGuest = Boolean(challenge?.isDropIn && !isHost);
+  const opponentUid = isInitiator ? challenge?.toUid : challenge?.fromUid;
+  const opponentName = isInitiator ? challenge?.toName : challenge?.fromName;
   const gameTitle = challenge?.gameTitle || challenge?.gameEntry?.title || 'Jeu Arcade';
   const platformLabel = challenge?.gameEntry?.platformLabel || 'Arcade FBNeo';
 
@@ -95,9 +98,14 @@ export function MatchSyncModal({
       return;
     }
 
-    if (isHost) {
+    if (isHost || isDropInGuest) {
       if (challenge.status === 'accepted') {
         setPhase('syncing');
+        if (isDropInGuest) {
+          setRemoteRomPct(100);
+          setRemoteRomReady(true);
+          setRemoteReady(true);
+        }
       } else {
         setPhase('waiting_opponent');
         setWaitTimer(20);
@@ -136,6 +144,11 @@ export function MatchSyncModal({
         if (ch.status === 'accepted') {
           acceptedRef.current = true;
           clearInterval(waitTimerRef.current);
+          if (isDropInGuest) {
+            setRemoteRomPct(100);
+            setRemoteRomReady(true);
+            setRemoteReady(true);
+          }
           setPhase((prev) => (prev === 'waiting_opponent' ? 'syncing' : prev));
         } else if (ch.status === 'declined' && (acceptedRef.current || !isHost)) {
           // Réponse "declined" obsolète/tardive après acceptation : ignorée
@@ -249,16 +262,30 @@ export function MatchSyncModal({
     };
   }, [phase, challenge?.challengeId, opponentUid]);
 
-  // 4. Déclenchement du compte à rebours lorsque les DEUX joueurs sont 100% prêts
+  // 4. Déclenchement du compte à rebours (ou lancement Drop-In immédiat si on rejoint une partie déjà en cours)
   useEffect(() => {
     if (phase === 'syncing' && localReady && remoteReady && countdown === null) {
+      if (isDropInGuest && !isLaunchingRef.current) {
+        isLaunchingRef.current = true;
+        const latest = latestMatchDataRef.current;
+        latest.onLaunchMatch?.({
+          gameEntry: latest.challenge?.gameEntry,
+          fileBlob: localBlobRef.current,
+          isHost: false,
+          playerIndex: 1,
+          challengeId: latest.challenge?.challengeId,
+          opponentName: latest.opponentName,
+          opponentUid: latest.opponentUid,
+        });
+        return;
+      }
       if (isHost) {
         // L'hôte donne le top départ du compte à rebours
         firebaseFightcadeService.sendMatchCountdownStart(challenge.challengeId, opponentUid);
         startCountdownSequence();
       }
     }
-  }, [phase, localReady, remoteReady, countdown, isHost, challenge?.challengeId, opponentUid]);
+  }, [phase, localReady, remoteReady, countdown, isHost, isDropInGuest, challenge?.challengeId, opponentUid]);
 
   const startCountdownSequence = () => {
     if (countdownIntervalRef.current) return;
