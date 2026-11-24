@@ -266,18 +266,24 @@ export async function getPlatformCacheStats() {
  * puis vide les caches IndexedDB pour libérer l'espace du navigateur.
  */
 export async function transferAllCacheToDirectory() {
-  let dirInfo = await romStorage.getSavedDirectoryInfo();
-  if (!dirInfo.supported) {
+  if (!romStorage.isDirectoryPickerSupported()) {
     throw new Error('Votre navigateur ne supporte pas le transfert direct vers un dossier.');
   }
-  if (!dirInfo.configured) {
-    throw new Error('Veuillez d’abord sélectionner un dossier ROMs.');
-  }
-  if (dirInfo.permission !== 'granted') {
-    const auth = await romStorage.reauthorizeDirectory();
-    if (!auth.granted) {
-      throw new Error('Permission d’écriture refusée sur le dossier sélectionné.');
+
+  let auth = await romStorage.reauthorizeDirectory('readwrite', false);
+  if (!auth.granted) {
+    try {
+      await romStorage.pickRomsDirectory();
+      auth = await romStorage.reauthorizeDirectory('readwrite', false);
+    } catch (e) {
+      if (e?.name === 'AbortError') {
+        throw new Error('Sélection du dossier annulée.');
+      }
+      throw new Error(`Permission d’écriture refusée (${auth.reason || e?.message || 'accès bloqué'}).`);
     }
+  }
+  if (!auth.granted) {
+    throw new Error(`Permission d’écriture refusée (${auth.reason || 'accès bloqué'}).`);
   }
 
   const manifest = await romStorage.readManifestFromLinkedDirectory();

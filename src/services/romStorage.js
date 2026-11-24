@@ -329,7 +329,7 @@ export const romStorage = {
   /**
    * Redemande la permission d'accès au dossier mémorisé (utile après redémarrage du navigateur)
    */
-  async reauthorizeDirectory(mode = 'readwrite') {
+  async reauthorizeDirectory(mode = 'readwrite', autoSync = true) {
     const handle = memoryDirHandle || (await getStoredDirHandle());
     if (!handle) return { granted: false, reason: 'no-handle', imported: 0, exported: 0 };
     try {
@@ -340,7 +340,7 @@ export const romStorage = {
       if (perm !== 'granted') {
         return { granted: false, reason: `perm-${perm}`, imported: 0, exported: 0 };
       }
-      if (mode === 'readwrite') {
+      if (mode === 'readwrite' && autoSync) {
         const syncStats = await this.syncWithDirectory(handle);
         return { granted: true, name: handle.name, ...syncStats };
       }
