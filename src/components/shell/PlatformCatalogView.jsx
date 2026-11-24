@@ -816,6 +816,7 @@ export function PlatformCatalogView({ mode, onLaunchStage, onCacheChanged, onJoi
                     setVisibleLimit(PAGE_SIZE);
                   }}
                   placeholder={cfg.searchPlaceholder}
+                  data-gamepad-search
                   className="arcade-focus-ring pl-8 pr-3 py-2 min-h-[38px] rounded-xl bg-neutral-950/85 border border-white/15 text-xs text-white placeholder:text-neutral-400 w-52 xl:w-64"
                 />
               </div>

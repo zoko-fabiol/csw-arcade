@@ -369,6 +369,19 @@ html[data-theme="light"] .keep-dark .u-banner {
   --tw-ring-offset-color: var(--csw-ring-offset);
 }
 
+html.gamepad-nav-active .arcade-focus-ring:focus,
+html.gamepad-nav-active button:focus,
+html.gamepad-nav-active a:focus,
+html.gamepad-nav-active input:focus,
+html.gamepad-nav-active select:focus,
+html.gamepad-nav-active [role="button"]:focus,
+html.gamepad-nav-active [role="tab"]:focus,
+html.gamepad-nav-active [role="switch"]:focus {
+  outline: 2.5px solid var(--u-accent, #00f0ff) !important;
+  outline-offset: 2px !important;
+  box-shadow: 0 0 0 4px rgba(0, 240, 255, 0.2) !important;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;

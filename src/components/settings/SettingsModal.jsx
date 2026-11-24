@@ -254,6 +254,7 @@ export function SettingsModal({
   return createPortal(
     <div
       data-universe={platformMode}
+      data-gamepad-scope="settings"
       className="fixed inset-0 z-[9999] flex items-end md:items-center justify-center bg-black/80 backdrop-blur-md p-0 md:p-4 font-sans select-none cursor-pointer"
       onClick={onClose}
       role="dialog"
@@ -322,6 +323,8 @@ export function SettingsModal({
                 <button
                   key={tab.id}
                   type="button"
+                  data-gamepad-tab
+                  data-active={active ? 'true' : 'false'}
                   onClick={() => {
                     setActiveTab(tab.id);
                     setListeningAction(null);
@@ -355,6 +358,8 @@ export function SettingsModal({
                 <button
                   key={tab.id}
                   type="button"
+                  data-gamepad-tab
+                  data-active={active ? 'true' : 'false'}
                   onClick={() => {
                     setActiveTab(tab.id);
                     setListeningAction(null);

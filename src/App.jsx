@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useSettings } from './hooks/useSettings';
 import { SettingsModal } from './components/settings/SettingsModal';
 import { useMobileNavigation, useOnlineStatus } from './hooks/useMobileNavigation';
+import { useGamepadNavigation } from './hooks/useGamepadNavigation';
 import {
   downloadAndCacheRom,
   formatBytes,
@@ -240,6 +241,7 @@ export default function App() {
   const channelsTouchedRef = useRef(false);
   const stageSessionRef = useRef(null);
   stageSessionRef.current = stageSession;
+  useGamepadNavigation({ isGameplayActive: Boolean(stageSession) });
   const userProfileRef = useRef(userProfile);
   userProfileRef.current = userProfile;
 
@@ -1297,6 +1299,8 @@ export default function App() {
                   type="button"
                   role="tab"
                   aria-selected={active}
+                  data-gamepad-universe-tab
+                  data-active={active ? 'true' : 'false'}
                   title={`${m.label} (Alt+${idx + 1})`}
                   onClick={() => {
                     setSelectedChannelId(null);
@@ -1767,6 +1771,7 @@ export default function App() {
           setSelectedChannelId(targetId);
         }}
         onInputDelayChange={(d) => p2pEngineRef.current?.setInputDelay(d)}
+        onUpdateVideoSetting={updateVideoSetting}
         onClose={handleCloseStage}
         onOpenSettings={() => setIsSettingsOpen(true)}
       />

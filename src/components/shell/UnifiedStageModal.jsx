@@ -1818,7 +1818,10 @@ export function UnifiedStageModal({
           const gameRankMeta = getRankTierMeta(myStat?.gameRank || 'D');
 
           return (
-            <aside className="absolute inset-y-0 right-0 w-96 max-w-full bg-neutral-950/95 backdrop-blur-xl border-l border-amber-500/40 p-4 flex flex-col gap-3.5 z-40 shadow-2xl overflow-y-auto">
+            <aside
+              data-gamepad-scope="stage-score"
+              className="absolute inset-y-0 right-0 w-96 max-w-full bg-neutral-950/95 backdrop-blur-xl border-l border-amber-500/40 p-4 flex flex-col gap-3.5 z-40 shadow-2xl overflow-y-auto"
+            >
               <div className="flex items-center justify-between border-b border-neutral-800 pb-3">
                 <div className="flex items-center gap-2">
                   <Trophy className="w-5 h-5 text-amber-400" />
@@ -1950,7 +1953,10 @@ export function UnifiedStageModal({
 
         {/* MENU PAUSE STYLE PPSSPP (Jeu figé + 5 États de sauvegarde avec aperçu + Paramètres directs) */}
         {pauseMenuOpen && (
-          <div className="absolute inset-0 z-50 bg-neutral-950/90 backdrop-blur-lg flex flex-col p-3 sm:p-6 overflow-y-auto">
+          <div
+            data-gamepad-scope="stage-pause"
+            className="absolute inset-0 z-50 bg-neutral-950/90 backdrop-blur-lg flex flex-col p-3 sm:p-6 overflow-y-auto"
+          >
             <div className="max-w-5xl w-full mx-auto flex flex-col gap-4 sm:gap-5 my-auto">
               {/* En-tête PPSSPP */}
               <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-neutral-800">
@@ -2235,7 +2241,10 @@ export function UnifiedStageModal({
 
         {/* Quick Menu Overlay (Style Guide Xbox / PS) */}
         {quickMenuOpen && (
-          <aside className="absolute inset-y-0 right-0 w-80 max-w-full bg-neutral-950/92 backdrop-blur-xl border-l border-cyan-500/30 p-4 flex flex-col gap-4 z-40 shadow-2xl">
+          <aside
+            data-gamepad-scope="stage-quick"
+            className="absolute inset-y-0 right-0 w-80 max-w-full bg-neutral-950/92 backdrop-blur-xl border-l border-cyan-500/30 p-4 flex flex-col gap-4 z-40 shadow-2xl"
+          >
             <div className="flex items-center justify-between border-b border-neutral-800 pb-3">
               <div>
                 <h3 className="text-sm font-black text-white">QUICK MENU</h3>
