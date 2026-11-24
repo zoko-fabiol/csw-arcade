@@ -283,6 +283,10 @@ export default defineConfig({
     host: true,
     port: 3003,
     strictPort: true,
+    headers: {
+      'Cross-Origin-Opener-Policy': 'same-origin',
+      'Cross-Origin-Embedder-Policy': 'credentialless',
+    },
     watch: {
       ignored: ['**/public/**', '**/release/**', '**/dist/**', '**/dist-electron/**', '**/.csw-data/**']
     },

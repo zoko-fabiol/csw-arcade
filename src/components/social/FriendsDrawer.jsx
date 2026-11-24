@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
-  X, Users, UserPlus, Search, Copy, Check, Swords, Eye, UserMinus, Clock, MessageSquare, Sparkles, ArrowLeft, Send, PhoneCall
+  X, Users, UserPlus, Search, Copy, Check, Swords, Eye, UserMinus, Clock, MessageSquare, Sparkles, ArrowLeft, Send, PhoneCall, Hash
 } from 'lucide-react';
 import { PlayerAvatar } from '../common/PlayerAvatar';
 import { countryCodeToFlag } from '../../data/countries';
@@ -346,10 +346,10 @@ export function FriendsDrawer({
                 <button
                   type="button"
                   onClick={() => onJoinFriendGameChannel?.(gameTarget)}
-                  title={`Rejoindre le salon ${gameTarget.title}`}
-                  className="arcade-focus-ring p-2 min-w-[36px] min-h-[36px] rounded-xl bg-neutral-800 hover:bg-neutral-700 u-accent-text flex items-center justify-center cursor-pointer"
+                  title={`Ouvrir le salon du jeu ${gameTarget.title}`}
+                  className="arcade-focus-ring p-2 min-w-[36px] min-h-[36px] rounded-xl bg-neutral-800 hover:bg-neutral-700 border border-white/10 u-accent-text flex items-center justify-center cursor-pointer"
                 >
-                  <MessageSquare aria-hidden="true" className="w-3.5 h-3.5" />
+                  <Hash aria-hidden="true" className="w-3.5 h-3.5" />
                 </button>
               </>
             )}

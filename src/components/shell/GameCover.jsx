@@ -16,6 +16,7 @@ const LIBRETRO_SYSTEM_MAP = [
   [/game\s*boy\s*color|\bgbc\b/i, 'Nintendo - Game Boy Color'],
   [/game\s*boy|\bgb\b|gambatte/i, 'Nintendo - Game Boy'],
   [/nintendo\s*ds|\bnds\b|desmume|melonds/i, 'Nintendo - Nintendo DS'],
+  [/ps\s*vita|psvita|vita3k/i, 'Sony - PlayStation Vita'],
   [/\bpsp\b|ppsspp|portable/i, 'Sony - PlayStation Portable'],
   [/playstation|\bps1\b|\bpsx\b|pcsx/i, 'Sony - PlayStation'],
   [/arcade|fbneo|mame|neo\s*geo/i, 'FBNeo - Arcade Games'],
@@ -44,7 +45,7 @@ function resolveCoverCandidates({ title, platformLabel, filename, imageUrl }) {
   const names = [];
   if (filename) {
     const noExt = String(filename).replace(
-      /\.(zip|7z|rar|bin|iso|chd|pbp|md|gen|nes|sfc|smc|gba|gbc|gb|z64|n64|nds|sms|gg)$/i,
+      /\.(zip|7z|rar|bin|iso|cso|vpk|chd|pbp|md|gen|nes|sfc|smc|gba|gbc|gb|z64|n64|nds|sms|gg)$/i,
       ''
     );
     if (noExt) names.push(sanitizeLibretroName(noExt));

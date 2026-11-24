@@ -38,22 +38,22 @@
   --sal: env(safe-area-inset-left, 0px);
   --sar: env(safe-area-inset-right, 0px);
 
-  /* Tokens sémantiques globaux (Sombre par défaut) */
+  /* Tokens sémantiques globaux (Sombre AMOLED pur #000000 par défaut) */
   --csw-text-1: #f3f4f6;
   --csw-text-2: #cbd5e1;
   --csw-text-3: #94a3b8;
   --csw-border: rgba(255, 255, 255, 0.1);
   --csw-card-border: rgba(255, 255, 255, 0.09);
-  --csw-ring-offset: #090b10;
-  --csw-scroll-track: #0d0d11;
-  --csw-scroll-thumb: #2e3242;
-  --csw-elevated-bg: linear-gradient(180deg, rgba(24, 26, 36, 0.94) 0%, rgba(14, 15, 21, 0.98) 100%);
+  --csw-ring-offset: #000000;
+  --csw-scroll-track: #000000;
+  --csw-scroll-thumb: #262936;
+  --csw-elevated-bg: linear-gradient(180deg, rgba(12, 13, 18, 0.96) 0%, rgba(0, 0, 0, 0.99) 100%);
 
-  /* Univers par défaut : Cyber-Arcade Prism */
-  --u-bg: #090b10;
-  --u-surface: #111622;
-  --u-surface-2: #171e2e;
-  --u-header-tint: rgba(12, 18, 30, 0.94);
+  /* Univers par défaut : Cyber-Arcade Prism (AMOLED #000000) */
+  --u-bg: #000000;
+  --u-surface: #090b10;
+  --u-surface-2: #111520;
+  --u-header-tint: rgba(0, 0, 0, 0.95);
   --u-accent: #22d3ee;
   --u-accent-hover: #67e8f9;
   --u-accent-fg: #041014;
@@ -61,17 +61,17 @@
   --u-accent-soft: rgba(34, 211, 238, 0.14);
   --u-accent-border: rgba(34, 211, 238, 0.42);
   --u-accent-glow: rgba(34, 211, 238, 0.22);
-  --u-banner-bg: radial-gradient(circle at 12% 0%, rgba(34, 211, 238, 0.16), transparent 55%), linear-gradient(135deg, rgba(17, 22, 34, 0.96), rgba(9, 11, 16, 0.98));
-  --u-pattern: radial-gradient(rgba(34, 211, 238, 0.055) 1px, transparent 1px);
+  --u-banner-bg: radial-gradient(circle at 12% 0%, rgba(34, 211, 238, 0.14), transparent 55%), linear-gradient(135deg, rgba(10, 12, 18, 0.98), rgba(0, 0, 0, 1));
+  --u-pattern: radial-gradient(rgba(34, 211, 238, 0.045) 1px, transparent 1px);
   --u-pattern-size: 22px 22px;
 }
 
-/* Univers Arcade / Neo Geo MVS Gold */
+/* Univers Arcade / Neo Geo MVS Gold (AMOLED) */
 [data-universe="arcade"] {
-  --u-bg: #0b0a08;
-  --u-surface: #17140e;
-  --u-surface-2: #211c13;
-  --u-header-tint: rgba(23, 19, 12, 0.95);
+  --u-bg: #000000;
+  --u-surface: #0b0a07;
+  --u-surface-2: #16130d;
+  --u-header-tint: rgba(0, 0, 0, 0.96);
   --u-accent: #fbbf24;
   --u-accent-hover: #fcd34d;
   --u-accent-fg: #140d02;
@@ -79,17 +79,17 @@
   --u-accent-soft: rgba(251, 191, 36, 0.14);
   --u-accent-border: rgba(251, 191, 36, 0.45);
   --u-accent-glow: rgba(251, 191, 36, 0.24);
-  --u-banner-bg: radial-gradient(circle at 12% 0%, rgba(251, 191, 36, 0.2), transparent 55%), linear-gradient(135deg, rgba(28, 22, 12, 0.96), rgba(11, 10, 8, 0.98));
-  --u-pattern: repeating-linear-gradient(0deg, rgba(251, 191, 36, 0.03) 0px, rgba(251, 191, 36, 0.03) 1px, transparent 1px, transparent 4px);
+  --u-banner-bg: radial-gradient(circle at 12% 0%, rgba(251, 191, 36, 0.18), transparent 55%), linear-gradient(135deg, rgba(18, 14, 8, 0.98), rgba(0, 0, 0, 1));
+  --u-pattern: repeating-linear-gradient(0deg, rgba(251, 191, 36, 0.025) 0px, rgba(251, 191, 36, 0.025) 1px, transparent 1px, transparent 4px);
   --u-pattern-size: 100% 4px;
 }
 
-/* Univers PlayStation Cobalt & Titanium */
+/* Univers PlayStation Cobalt & Titanium (AMOLED) */
 [data-universe="playstation"] {
-  --u-bg: #070a14;
-  --u-surface: #101629;
-  --u-surface-2: #17203b;
-  --u-header-tint: rgba(13, 19, 38, 0.95);
+  --u-bg: #000000;
+  --u-surface: #070a14;
+  --u-surface-2: #10172b;
+  --u-header-tint: rgba(0, 0, 0, 0.96);
   --u-accent: #60a5fa;
   --u-accent-hover: #93c5fd;
   --u-accent-fg: #050d1f;
@@ -97,17 +97,17 @@
   --u-accent-soft: rgba(96, 165, 250, 0.16);
   --u-accent-border: rgba(96, 165, 250, 0.46);
   --u-accent-glow: rgba(59, 130, 246, 0.26);
-  --u-banner-bg: radial-gradient(circle at 12% 0%, rgba(59, 130, 246, 0.24), transparent 55%), linear-gradient(135deg, rgba(16, 23, 44, 0.96), rgba(7, 10, 20, 0.98));
-  --u-pattern: radial-gradient(rgba(96, 165, 250, 0.06) 1px, transparent 1px);
+  --u-banner-bg: radial-gradient(circle at 12% 0%, rgba(59, 130, 246, 0.2), transparent 55%), linear-gradient(135deg, rgba(10, 15, 28, 0.98), rgba(0, 0, 0, 1));
+  --u-pattern: radial-gradient(rgba(96, 165, 250, 0.05) 1px, transparent 1px);
   --u-pattern-size: 20px 20px;
 }
 
-/* Univers Nintendo Famicom / SNES Crimson */
+/* Univers Nintendo Famicom / SNES Crimson (AMOLED) */
 [data-universe="nintendo"] {
-  --u-bg: #10080a;
-  --u-surface: #1c1013;
-  --u-surface-2: #27161a;
-  --u-header-tint: rgba(28, 14, 18, 0.95);
+  --u-bg: #000000;
+  --u-surface: #0e0709;
+  --u-surface-2: #1a0e12;
+  --u-header-tint: rgba(0, 0, 0, 0.96);
   --u-accent: #dc2626;
   --u-accent-hover: #ef4444;
   --u-accent-fg: #ffffff;
@@ -115,17 +115,17 @@
   --u-accent-soft: rgba(220, 38, 38, 0.18);
   --u-accent-border: rgba(248, 113, 113, 0.45);
   --u-accent-glow: rgba(220, 38, 38, 0.26);
-  --u-banner-bg: radial-gradient(circle at 12% 0%, rgba(220, 38, 38, 0.24), transparent 55%), linear-gradient(135deg, rgba(34, 15, 19, 0.96), rgba(16, 8, 10, 0.98));
-  --u-pattern: radial-gradient(rgba(248, 113, 113, 0.055) 1px, transparent 1px);
+  --u-banner-bg: radial-gradient(circle at 12% 0%, rgba(220, 38, 38, 0.2), transparent 55%), linear-gradient(135deg, rgba(22, 9, 12, 0.98), rgba(0, 0, 0, 1));
+  --u-pattern: radial-gradient(rgba(248, 113, 113, 0.045) 1px, transparent 1px);
   --u-pattern-size: 18px 18px;
 }
 
-/* Univers Sega Mega Drive 16-Bit Electric Blue */
+/* Univers Sega Mega Drive 16-Bit Electric Blue (AMOLED) */
 [data-universe="sega"] {
-  --u-bg: #060b12;
-  --u-surface: #0e1726;
-  --u-surface-2: #142238;
-  --u-header-tint: rgba(11, 20, 34, 0.95);
+  --u-bg: #000000;
+  --u-surface: #060b14;
+  --u-surface-2: #0d1829;
+  --u-header-tint: rgba(0, 0, 0, 0.96);
   --u-accent: #38bdf8;
   --u-accent-hover: #7dd3fc;
   --u-accent-fg: #04111c;
@@ -133,17 +133,17 @@
   --u-accent-soft: rgba(56, 189, 248, 0.16);
   --u-accent-border: rgba(56, 189, 248, 0.46);
   --u-accent-glow: rgba(14, 165, 233, 0.25);
-  --u-banner-bg: radial-gradient(circle at 12% 0%, rgba(14, 165, 233, 0.24), transparent 55%), linear-gradient(135deg, rgba(13, 25, 43, 0.96), rgba(6, 11, 18, 0.98));
-  --u-pattern: repeating-linear-gradient(-45deg, rgba(56, 189, 248, 0.03) 0px, rgba(56, 189, 248, 0.03) 2px, transparent 2px, transparent 14px);
+  --u-banner-bg: radial-gradient(circle at 12% 0%, rgba(14, 165, 233, 0.2), transparent 55%), linear-gradient(135deg, rgba(8, 16, 28, 0.98), rgba(0, 0, 0, 1));
+  --u-pattern: repeating-linear-gradient(-45deg, rgba(56, 189, 248, 0.025) 0px, rgba(56, 189, 248, 0.025) 2px, transparent 2px, transparent 14px);
   --u-pattern-size: 20px 20px;
 }
 
-/* Univers Mobile / Java J2ME Amber LCD */
+/* Univers Mobile / Java J2ME Amber LCD (AMOLED) */
 [data-universe="java"] {
-  --u-bg: #0b0a06;
-  --u-surface: #18150c;
-  --u-surface-2: #241f11;
-  --u-header-tint: rgba(24, 20, 10, 0.95);
+  --u-bg: #000000;
+  --u-surface: #0b0905;
+  --u-surface-2: #17130a;
+  --u-header-tint: rgba(0, 0, 0, 0.96);
   --u-accent: #f59e0b;
   --u-accent-hover: #fbbf24;
   --u-accent-fg: #120b02;
@@ -151,9 +151,20 @@
   --u-accent-soft: rgba(245, 158, 11, 0.16);
   --u-accent-border: rgba(245, 158, 11, 0.46);
   --u-accent-glow: rgba(245, 158, 11, 0.24);
-  --u-banner-bg: radial-gradient(circle at 12% 0%, rgba(245, 158, 11, 0.22), transparent 55%), linear-gradient(135deg, rgba(30, 24, 11, 0.96), rgba(11, 10, 6, 0.98));
-  --u-pattern: radial-gradient(rgba(251, 191, 36, 0.06) 1px, transparent 1px);
+  --u-banner-bg: radial-gradient(circle at 12% 0%, rgba(245, 158, 11, 0.18), transparent 55%), linear-gradient(135deg, rgba(18, 14, 6, 0.98), rgba(0, 0, 0, 1));
+  --u-pattern: radial-gradient(rgba(251, 191, 36, 0.05) 1px, transparent 1px);
   --u-pattern-size: 10px 10px;
+}
+
+/* Vrai Noir AMOLED (#000000) pour les surfaces profondes en Mode Sombre */
+html:not([data-theme="light"]) :where(.bg-neutral-950, .bg-slate-950, .bg-zinc-950) {
+  background-color: #000000;
+}
+html:not([data-theme="light"]) :where(.bg-neutral-950\/95, .bg-neutral-950\/90) {
+  background-color: rgba(0, 0, 0, 0.96);
+}
+html:not([data-theme="light"]) :where(.bg-neutral-900) {
+  background-color: #090a0f;
 }
 
 .pt-safe { padding-top: env(safe-area-inset-top, 0px); }
@@ -640,29 +651,29 @@ html[data-theme="light"] :where(.hover\:text-rose-200:hover, .hover\:text-red-20
 }
 
 /* 4. Badges & bannières sombres teintés (*-950/* et *-900/*) -> pastels propres en mode clair */
-html[data-theme="light"] :where(.bg-emerald-950, .bg-emerald-950\/30, .bg-emerald-950\/40, .bg-emerald-950\/50, .bg-emerald-950\/60, .bg-emerald-950\/70, .bg-emerald-950\/80, .bg-emerald-950\/90, .bg-emerald-900\/30, .bg-emerald-900\/40):not(.keep-dark):not(.keep-dark *) {
+html[data-theme="light"] :where(.bg-emerald-950, .bg-emerald-950\/20, .bg-emerald-950\/25, .bg-emerald-950\/30, .bg-emerald-950\/40, .bg-emerald-950\/50, .bg-emerald-950\/60, .bg-emerald-950\/70, .bg-emerald-950\/80, .bg-emerald-950\/90, .bg-emerald-900\/30, .bg-emerald-900\/40, .bg-emerald-900\/70):not(.keep-dark):not(.keep-dark *) {
   background-color: #ecfdf5 !important;
-  border-color: rgba(5, 150, 105, 0.28) !important;
+  border-color: rgba(5, 150, 105, 0.3) !important;
 }
-html[data-theme="light"] :where(.bg-amber-950, .bg-amber-950\/20, .bg-amber-950\/30, .bg-amber-950\/40, .bg-amber-950\/50, .bg-amber-950\/60, .bg-amber-950\/80, .bg-amber-900\/30, .bg-amber-900\/40):not(.keep-dark):not(.keep-dark *) {
+html[data-theme="light"] :where(.bg-amber-950, .bg-amber-950\/20, .bg-amber-950\/25, .bg-amber-950\/30, .bg-amber-950\/40, .bg-amber-950\/50, .bg-amber-950\/60, .bg-amber-950\/70, .bg-amber-950\/80, .bg-amber-900\/30, .bg-amber-900\/40, .bg-amber-900\/70):not(.keep-dark):not(.keep-dark *) {
   background-color: #fffbeb !important;
-  border-color: rgba(180, 83, 9, 0.28) !important;
+  border-color: rgba(180, 83, 9, 0.32) !important;
 }
-html[data-theme="light"] :where(.bg-cyan-950, .bg-cyan-950\/30, .bg-cyan-950\/40, .bg-cyan-950\/50, .bg-cyan-950\/60, .bg-cyan-950\/80, .bg-cyan-900\/30, .bg-cyan-900\/40):not(.keep-dark):not(.keep-dark *) {
+html[data-theme="light"] :where(.bg-cyan-950, .bg-cyan-950\/20, .bg-cyan-950\/25, .bg-cyan-950\/30, .bg-cyan-950\/40, .bg-cyan-950\/50, .bg-cyan-950\/60, .bg-cyan-950\/70, .bg-cyan-950\/80, .bg-cyan-900\/30, .bg-cyan-900\/40, .bg-cyan-900\/70, .hover\:bg-cyan-900\/70:hover):not(.keep-dark):not(.keep-dark *) {
   background-color: #ecfeff !important;
-  border-color: rgba(8, 145, 178, 0.28) !important;
+  border-color: rgba(8, 145, 178, 0.32) !important;
 }
-html[data-theme="light"] :where(.bg-purple-950, .bg-purple-950\/30, .bg-purple-950\/40, .bg-purple-950\/50, .bg-purple-950\/60, .bg-purple-900\/30, .bg-purple-900\/40, .bg-indigo-950\/40, .bg-indigo-950\/50):not(.keep-dark):not(.keep-dark *) {
+html[data-theme="light"] :where(.bg-purple-950, .bg-purple-950\/20, .bg-purple-950\/25, .bg-purple-950\/30, .bg-purple-950\/40, .bg-purple-950\/50, .bg-purple-950\/60, .bg-purple-950\/70, .bg-purple-900\/30, .bg-purple-900\/40, .bg-indigo-950\/40, .bg-indigo-950\/50, .bg-indigo-950\/70):not(.keep-dark):not(.keep-dark *) {
   background-color: #f5f3ff !important;
-  border-color: rgba(109, 40, 217, 0.25) !important;
+  border-color: rgba(109, 40, 217, 0.28) !important;
 }
-html[data-theme="light"] :where(.bg-red-950, .bg-red-950\/30, .bg-red-950\/40, .bg-red-950\/50, .bg-red-950\/60, .bg-red-900\/30, .bg-red-900\/40, .bg-rose-950\/40):not(.keep-dark):not(.keep-dark *) {
+html[data-theme="light"] :where(.bg-red-950, .bg-red-950\/25, .bg-red-950\/30, .bg-red-950\/40, .bg-red-950\/50, .bg-red-950\/60, .bg-red-950\/70, .bg-red-900\/30, .bg-red-900\/40, .bg-rose-950\/40, .bg-rose-950\/50, .bg-rose-950\/60, .bg-rose-950\/70):not(.keep-dark):not(.keep-dark *) {
   background-color: #fef2f2 !important;
-  border-color: rgba(185, 28, 28, 0.25) !important;
+  border-color: rgba(185, 28, 28, 0.28) !important;
 }
-html[data-theme="light"] :where(.bg-blue-950, .bg-blue-950\/30, .bg-blue-950\/40, .bg-blue-950\/50, .bg-sky-950\/40):not(.keep-dark):not(.keep-dark *) {
+html[data-theme="light"] :where(.bg-blue-950, .bg-blue-950\/25, .bg-blue-950\/30, .bg-blue-950\/40, .bg-blue-950\/50, .bg-blue-950\/70, .bg-sky-950\/40, .bg-sky-950\/70):not(.keep-dark):not(.keep-dark *) {
   background-color: #eff6ff !important;
-  border-color: rgba(29, 78, 216, 0.25) !important;
+  border-color: rgba(29, 78, 216, 0.28) !important;
 }
 
 /* 5. Inputs, Selects & Focus en Mode Clair */

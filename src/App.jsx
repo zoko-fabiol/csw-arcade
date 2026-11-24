@@ -57,7 +57,7 @@ export const ENABLE_DEV_TEST_COINS = true;
 const SHELL_MODES = [
   { id: 'all', label: 'Tous les jeux', subtitle: 'Game Mode Unifié · Tous Univers', icon: Layers },
   { id: 'arcade', label: 'Arcade / Neo Geo', subtitle: 'Neo Geo MVS · MAME 2003-Plus · Rollback P2P', icon: Joystick },
-  { id: 'playstation', label: 'PlayStation', subtitle: 'PS1 (Web HLE) · Téléchargement Auto CHD', icon: Disc },
+  { id: 'playstation', label: 'PlayStation', subtitle: 'PS1 · PSP (PPSSPP) · PS Vita (Vita3K)', icon: Disc },
   { id: 'nintendo', label: 'Nintendo', subtitle: 'NES · SNES · GB · GBC · GBA · Nintendo 64', icon: Gamepad2 },
   { id: 'sega', label: 'Sega', subtitle: 'Mega Drive / Genesis · Master System · Game Gear', icon: Cpu },
   { id: 'java', label: 'Mobile / J2ME', subtitle: 'J2ME (.jar) · Gameloft Classics (Solo)', icon: Coffee },
@@ -542,6 +542,19 @@ export default function App() {
       engine.addCleanup(unsubIce);
       engine.addCleanup(unsubCh);
     }
+
+    // Calibration automatique du stabilisateur de ping VPS selon les continents des deux joueurs
+    const myReg = settings?.system?.region || userProfileRef.current?.region || 'europe';
+    const oppFriend = friendsState.friends.find((f) => f.uid === opponentUid);
+    const oppReg = oppFriend?.region || myReg;
+    fetch(`/api/netplay-profile?r1=${encodeURIComponent(myReg)}&r2=${encodeURIComponent(oppReg)}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (data?.ok && data.profile && p2pEngineRef.current === engine) {
+          engine.applyRegionalProfile(data.profile);
+        }
+      })
+      .catch(() => {});
 
     if (gameEntry) {
       const myUid = userProfileRef.current?.uid || null;
@@ -1365,8 +1378,8 @@ export default function App() {
           onReplaceChannel={handleReplaceFightcadeChannel}
         />
 
-        {/* Pile d'overlays flottants en bas à droite (masque le toast défi quand un jeu est ouvert car il est affiché DANS la scène plein écran) */}
-        <div className="fixed bottom-[76px] md:bottom-6 left-3 right-3 md:left-auto md:right-6 z-[150] flex flex-col items-end gap-2.5 pointer-events-none">
+        {/* Pile d'overlays flottants au premier plan (z-[200] — toujours devant les tiroirs et modales) */}
+        <div className="fixed bottom-[76px] md:bottom-6 left-3 right-3 md:left-auto md:right-6 z-[200] flex flex-col items-end gap-2.5 pointer-events-none">
           {!stageSession && incomingChallenge && incomingChallenge.fromUid !== userProfile?.uid && !activeMatchSync && (
             <div className="pointer-events-auto w-full md:w-80 rounded-2xl bg-neutral-900 border-2 u-accent-border p-4 shadow-2xl space-y-3">
               <div className="flex items-center gap-2 u-accent-text font-black text-xs uppercase">

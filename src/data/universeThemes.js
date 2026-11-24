@@ -44,12 +44,12 @@ export const UNIVERSE_THEMES = {
     brandName: 'PLAYSTATION',
     consoleTitle: 'Univers PlayStation',
     settingsTitle: 'Configuration Matérielle PlayStation',
-    settingsSubtitle: 'PS1 Web HLE, DualShock, Rendu 32-Bit & Mémoire',
+    settingsSubtitle: 'PS1 · PSP (PPSSPP) · PS Vita (Vita3K), DualShock & Rendu 3D',
     accentHex: '#60a5fa',
     accentFgHex: '#050d1f',
     accentTextHex: '#93c5fd',
-    badgeLabel: 'PS1 · 32-BIT',
-    hardwareTag: 'SONY · PSX HLE',
+    badgeLabel: 'PS1 · PSP · VITA',
+    hardwareTag: 'SONY · PSX / PSP / VITA',
     motif: 'playstation',
     // Les 4 symboles iconiques PlayStation : △ (Vert), ○ (Rouge), × (Bleu), □ (Rose)
     symbols: [
@@ -124,7 +124,7 @@ export function getUniverseTheme(mode) {
 export function getUniverseFromCore(core = '') {
   const c = String(core || '').toLowerCase();
   if (c === 'j2me' || c === 'java') return 'java';
-  if (c === 'psx' || c === 'ps1' || c === 'playstation') return 'playstation';
+  if (['psx', 'ps1', 'playstation', 'psp', 'ppsspp', 'psvita'].includes(c)) return 'playstation';
   if (['nes', 'snes', 'gb', 'gbc', 'gba', 'n64', 'nds'].includes(c)) return 'nintendo';
   if (['sega', 'segamd', 'megadrive', 'genesis', 'sms', 'gg', 'sega32x', 'segacd', 'saturn'].includes(c)) return 'sega';
   if (['fbneo', 'neogeo', 'mame2003_plus', 'mame', 'arcade', 'cps1', 'cps2'].includes(c)) return 'arcade';

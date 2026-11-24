@@ -2407,9 +2407,92 @@ export function setupNetplayHub(server) {
     res.end(JSON.stringify({ ok: false }));
   });
 
+  // Profil de stabilisation de ping inter-continents sur le VPS (/api/netplay-profile)
+  const normalizeContinent = (raw = '') => {
+    const v = String(raw || '').trim().toLowerCase();
+    if (['africa', 'afrique', 'cm', 'ci', 'sn', 'ma', 'dz', 'tn', 'ng', 'gh', 'ke', 'za', 'cd', 'cg', 'ga', 'bf', 'ml', 'bj', 'tg', 'mg', 'eg'].includes(v)) return 'africa';
+    if (['europe', 'fr', 'be', 'ch', 'de', 'es', 'it', 'gb', 'uk', 'pt', 'nl', 'pl', 'se', 'no', 'fi', 'dk', 'ie', 'at', 'gr', 'ro'].includes(v)) return 'europe';
+    if (['north_america', 'usa', 'us', 'ca', 'mx'].includes(v)) return 'north_america';
+    if (['south_america', 'br', 'ar', 'cl', 'co', 'pe', 'uy', 've'].includes(v)) return 'south_america';
+    if (['asia', 'japan', 'jp', 'kr', 'cn', 'tw', 'hk', 'sg', 'in', 'th', 'vn', 'ph', 'id', 'ae', 'sa'].includes(v)) return 'asia';
+    if (['oceania', 'au', 'nz'].includes(v)) return 'oceania';
+    return 'europe';
+  };
+
+  const computeRegionalNetplayProfile = (r1, r2, rttMs = 0) => {
+    const c1 = normalizeContinent(r1);
+    const c2 = normalizeContinent(r2);
+    const pair = [c1, c2].sort().join(':');
+    const adjacentPairs = new Set([
+      'africa:europe',
+      'europe:north_america',
+      'north_america:south_america',
+      'asia:oceania',
+      'asia:europe',
+    ]);
+
+    let tier = 'long_distance';
+    let label = 'Intercontinental';
+    let minDelay = 2;
+    let recommendedDelay = 3;
+    let jitterMarginMs = 28;
+    let ewmaAlpha = 0.2;
+
+    if (c1 === c2) {
+      tier = 'same_continent';
+      label = 'Même continent';
+      minDelay = 1;
+      recommendedDelay = rttMs > 75 ? 2 : 1;
+      jitterMarginMs = 12;
+      ewmaAlpha = 0.25;
+    } else if (adjacentPairs.has(pair)) {
+      tier = 'adjacent_continent';
+      label = 'Continents voisins';
+      minDelay = 2;
+      recommendedDelay = rttMs > 140 ? 3 : 2;
+      jitterMarginMs = 20;
+      ewmaAlpha = 0.22;
+    } else if (rttMs > 200) {
+      recommendedDelay = 4;
+    }
+
+    return {
+      c1,
+      c2,
+      tier,
+      label,
+      minDelay,
+      maxDelay: 4,
+      recommendedDelay,
+      jitterMarginMs,
+      ewmaAlpha,
+    };
+  };
+
+  server.middlewares.use('/api/netplay-profile', (req, res) => {
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    if (req.method === 'OPTIONS') {
+      res.statusCode = 204;
+      return res.end();
+    }
+    const reqUrl = new URL(req.url, 'http://localhost:3003');
+    const r1 = reqUrl.searchParams.get('r1') || 'europe';
+    const r2 = reqUrl.searchParams.get('r2') || r1;
+    const rtt = Number(reqUrl.searchParams.get('rtt') || 0);
+    const profile = computeRegionalNetplayProfile(r1, r2, rtt);
+    res.statusCode = 200;
+    res.end(JSON.stringify({ ok: true, profile }));
+  });
+
   if (server.httpServer) {
     server.httpServer.on('upgrade', (request, socket, head) => {
       try {
+        // TCP_NODELAY + KeepAlive sur le VPS : supprime Nagle (-20 à -40ms de jitter) et stabilise les connexions 4G/intercontinentales
+        try {
+          socket.setNoDelay?.(true);
+          socket.setKeepAlive?.(true, 10000);
+        } catch {}
         const url = new URL(request.url, 'http://localhost:3003');
         if (url.pathname === '/ws/netplay') {
           wss.handleUpgrade(request, socket, head, (ws) => {

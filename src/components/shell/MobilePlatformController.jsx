@@ -361,7 +361,7 @@ export function MobilePlatformController({
   const profile =
     kind === 'j2me' || lowerCore === 'j2me'
       ? 'j2me'
-      : lowerCore === 'psx' || lowerCore === 'ps1'
+      : lowerCore === 'psx' || lowerCore === 'ps1' || lowerCore === 'psp' || lowerCore === 'ppsspp'
       ? 'playstation'
       : lowerCore.startsWith('sega')
       ? 'sega'

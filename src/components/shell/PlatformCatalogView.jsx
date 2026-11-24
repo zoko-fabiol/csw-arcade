@@ -1,7 +1,22 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
-  Search, Grid, List, Upload, Globe, Database, Play, Download, Trash2, Menu, X, Swords
+  Search, Grid, List, Upload, Globe, Database, Play, Download, Trash2, Menu, X, Swords, Layers, Joystick, Gamepad2, Disc, Cpu, Users, Smartphone
 } from 'lucide-react';
+
+function getCategoryIcon(filter) {
+  const id = String(filter?.id || '').toLowerCase();
+  const label = String(filter?.label || '').toLowerCase();
+  if (id === 'all') return Layers;
+  if (id === 'multi4p' || label.includes('3–4') || label.includes('4+')) return Users;
+  if (id === 'multiplayer' || label.includes('multijoueur')) return Swords;
+  if (id === 'cached' || label.includes('cache')) return Database;
+  if (id.includes('ps1') || id.includes('psx') || id.includes('psp') || label.includes('playstation')) return Disc;
+  if (id.includes('j2me') || id.includes('java') || label.includes('j2me') || label.includes('mobile') || label.includes('gameloft')) return Smartphone;
+  if (id.includes('sega') || id.includes('sms') || id.includes('gg') || label.includes('mega drive') || label.includes('sega') || label.includes('master system')) return Cpu;
+  if (id.includes('n64') || id.includes('snes') || id.includes('nes') || id.includes('gba') || id.includes('gb') || id.includes('nds') || label.includes('nintendo') || label.includes('game boy') || label.includes('gba')) return Gamepad2;
+  if (id.includes('neogeo') || id.includes('mame') || id.includes('fbneo') || id.includes('arcade') || label.includes('neo geo') || label.includes('mame') || label.includes('arcade')) return Joystick;
+  return Gamepad2;
+}
 import {
   NINTENDO_CATALOG,
   PLAYSTATION_CATALOG,
@@ -71,7 +86,7 @@ const MODE_CONFIG = {
     accent: '#00f0ff',
     cacheMode: null,
     defaultCore: 'mame2003_plus',
-    accept: '.zip,.chd,.pbp,.bin,.iso,.nes,.sfc,.smc,.gba,.gb,.gbc,.n64,.z64,.md,.sms,.gg,.jar',
+    accept: '.zip,.chd,.pbp,.bin,.iso,.cso,.vpk,.nes,.sfc,.smc,.gba,.gb,.gbc,.n64,.z64,.md,.sms,.gg,.jar',
     extractExts: ['.nes', '.sfc', '.smc', '.gba', '.gb', '.gbc', '.n64', '.z64', '.md', '.sms', '.gg', '.jar'],
     searchPlaceholder: 'Filtrer parmi tous les univers…',
     onlinePlaceholder: 'Rechercher n’importe quelle ROM sur Archive.org…',
@@ -81,7 +96,9 @@ const MODE_CONFIG = {
       { id: 'multi4p', label: '3–4+ Joueurs' },
       { id: 'fbneo', label: 'Neo Geo MVS' },
       { id: 'mame2003_plus', label: 'MAME 2003-Plus' },
-      { id: 'ps1', label: 'PlayStation' },
+      { id: 'ps1', label: 'PlayStation (PS1)' },
+      { id: 'psp', label: 'PSP (Portable)' },
+      { id: 'psvita', label: 'PS Vita (Vita3K)' },
       { id: 'segaMD', label: 'Sega Mega Drive' },
       { id: 'snes', label: 'Super Nintendo' },
       { id: 'n64', label: 'Nintendo 64' },
@@ -114,15 +131,17 @@ const MODE_CONFIG = {
     accent: '#3b82f6',
     cacheMode: 'playstation',
     defaultCore: 'psx',
-    accept: '.chd,.pbp,.bin,.img,.iso,.zip',
-    extractExts: ['.chd', '.pbp', '.bin', '.img', '.iso'],
-    searchPlaceholder: 'Filtrer le catalogue PlayStation…',
-    onlinePlaceholder: 'Rechercher un jeu PS1 sur Archive.org (ex: Tekken, Crash)…',
+    accept: '.chd,.pbp,.bin,.img,.iso,.cso,.vpk,.zip',
+    extractExts: ['.chd', '.pbp', '.bin', '.img', '.iso', '.cso', '.vpk'],
+    searchPlaceholder: 'Filtrer PS1, PSP & PS Vita…',
+    onlinePlaceholder: 'Rechercher un jeu PS1 ou PSP sur Archive.org (ex: Tekken, God of War, DBZ)…',
     filters: [
       { id: 'all', label: 'Tout le catalogue' },
       { id: 'multiplayer', label: 'Multijoueur en ligne' },
       { id: 'multi4p', label: '3–4+ Joueurs' },
       { id: 'ps1', label: 'PlayStation (PS1)' },
+      { id: 'psp', label: 'PSP (PlayStation Portable)' },
+      { id: 'psvita', label: 'PS Vita (Natif Vita3K)' },
       { id: 'local', label: 'En cache IndexedDB' },
     ],
   },
@@ -282,6 +301,8 @@ export function PlatformCatalogView({ mode, onLaunchStage, onCacheChanged, onJoi
   const [downloadingId, setDownloadingId] = useState(null);
   const [downloadProgress, setDownloadProgress] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
+  const [vitaBridgeEntry, setVitaBridgeEntry] = useState(null);
+  const [vitaLaunchStatus, setVitaLaunchStatus] = useState('');
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [mobileOnlineMode, setMobileOnlineMode] = useState(false);
   const [focusedIdx, setFocusedIdx] = useState(0);
@@ -511,6 +532,19 @@ export function PlatformCatalogView({ mode, onLaunchStage, onCacheChanged, onJoi
     }
 
     const isLocalImport = !entryOverride;
+    if (resolvedCore === 'psvita' || ext === 'vpk') {
+      setVitaLaunchStatus('');
+      setVitaBridgeEntry(
+        entryOverride || {
+          id: `vpk-${file.name}`,
+          title: titleOverride || file.name.replace(/\.vpk$/i, ''),
+          filename: file.name,
+          platformLabel: 'PS Vita · Vita3K',
+          core: 'psvita',
+        }
+      );
+      return;
+    }
     const isJ2me = resolvedCore === 'j2me' || mode === 'java' || ext === 'jar';
     const canMulti =
       !isLocalImport &&
@@ -536,6 +570,11 @@ export function PlatformCatalogView({ mode, onLaunchStage, onCacheChanged, onJoi
   };
 
   const handleLaunchCatalogEntry = async (entry) => {
+    if (entry?.core === 'psvita' || entry?.requiresNativeLauncher || entry?.engine === 'native:vita3k') {
+      setVitaLaunchStatus('');
+      setVitaBridgeEntry(entry);
+      return;
+    }
     if (onRequireCoin && !onRequireCoin()) return;
     if (!entry.urls?.length) {
       setErrorMsg(`Ce titre (${entry.title}) nécessite une image locale : cliquez sur « Importer ROM ».`);
@@ -675,6 +714,7 @@ export function PlatformCatalogView({ mode, onLaunchStage, onCacheChanged, onJoi
           <div className="space-y-1">
             {dedupedFilters.map((f) => {
               const active = activeFilter === f.id;
+              const CatIcon = getCategoryIcon(f);
               return (
                 <button
                   key={f.id}
@@ -689,7 +729,10 @@ export function PlatformCatalogView({ mode, onLaunchStage, onCacheChanged, onJoi
                       : 'text-neutral-200 hover:bg-white/5 border-transparent'
                   }`}
                 >
-                  <span className="truncate">{f.label}</span>
+                  <span className="flex items-center gap-2 min-w-0">
+                    <CatIcon className={`w-3.5 h-3.5 shrink-0 ${active ? 'u-accent-text' : 'opacity-75'}`} aria-hidden="true" />
+                    <span className="truncate">{f.label}</span>
+                  </span>
                   <span className="font-mono text-[10px] px-1.5 py-0.5 rounded bg-black/50 text-neutral-300 shrink-0 ml-2 tabular-nums">
                     {f.count}
                   </span>
@@ -873,6 +916,7 @@ export function PlatformCatalogView({ mode, onLaunchStage, onCacheChanged, onJoi
               <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-0.5 pr-6">
                 {mobileSubFilters.map((f) => {
                   const active = activeFilter === f.id;
+                  const CatIcon = getCategoryIcon(f);
                   return (
                     <button
                       key={f.id}
@@ -881,13 +925,14 @@ export function PlatformCatalogView({ mode, onLaunchStage, onCacheChanged, onJoi
                         setActiveFilter(f.id);
                         setVisibleLimit(PAGE_SIZE);
                       }}
-                      className={`arcade-focus-ring px-3.5 py-1.5 min-h-[40px] rounded-full text-xs font-bold shrink-0 border transition-colors tabular-nums ${
+                      className={`arcade-focus-ring inline-flex items-center gap-1.5 px-3.5 py-1.5 min-h-[40px] rounded-full text-xs font-bold shrink-0 border transition-colors tabular-nums ${
                         active
                           ? 'u-btn-primary'
                           : 'bg-neutral-950/80 border-white/15 text-neutral-200 hover:text-white'
                       }`}
                     >
-                      {f.label} <span className="opacity-80 font-mono">({f.count})</span>
+                      <CatIcon className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+                      <span>{f.label}</span> <span className="opacity-80 font-mono">({f.count})</span>
                     </button>
                   );
                 })}
@@ -1096,8 +1141,12 @@ export function PlatformCatalogView({ mode, onLaunchStage, onCacheChanged, onJoi
                     const isCached = cachedIds.has(entry.id);
                     const isBusy = downloadingId === entry.id;
                     const isFocused = focusedIdx === idx;
-                    const showPlatformBadge = mode === 'all' || mode === 'arcade' || mode === 'nintendo' || mode === 'sega';
+                    const showPlatformBadge = mode === 'all' || mode === 'arcade' || mode === 'playstation' || mode === 'nintendo' || mode === 'sega';
                     const badgeMeta = getMultiplayerBadgeMeta(entry, { mode });
+                    const romSizeLabel =
+                      entry.estimatedSize ||
+                      (typeof entry.size === 'number' && entry.size > 0 ? formatBytes(entry.size) : null) ||
+                      (typeof entry.fileSize === 'number' && entry.fileSize > 0 ? formatBytes(entry.fileSize) : null);
                     const metaParts = [];
                     if (showPlatformBadge && entry.platformLabel) metaParts.push(entry.platformLabel);
                     if (entry.year) metaParts.push(String(entry.year));
@@ -1107,6 +1156,7 @@ export function PlatformCatalogView({ mode, onLaunchStage, onCacheChanged, onJoi
                     ) {
                       metaParts.push(entry.genre);
                     }
+                    if (romSizeLabel) metaParts.push(romSizeLabel);
                     return (
                       <article
                         key={entry.id}
@@ -1228,6 +1278,100 @@ export function PlatformCatalogView({ mode, onLaunchStage, onCacheChanged, onJoi
           <span className="text-neutral-300 shrink-0">Game Mode · Clavier, Tactile &amp; Manette</span>
         </footer>
       </div>
+      {/* Modale Passerelle Native PS Vita (Vita3K PC / Android) */}
+      {vitaBridgeEntry && (
+        <div
+          className="fixed inset-0 z-[130] flex items-center justify-center bg-black/75 backdrop-blur-md p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Lancement PS Vita via Vita3K"
+          onClick={() => setVitaBridgeEntry(null)}
+        >
+          <div
+            className="w-full max-w-md rounded-3xl bg-neutral-900 border u-accent-border shadow-2xl overflow-hidden text-neutral-100"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="u-banner px-5 py-4 border-b flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <div className="text-[10px] font-mono font-bold uppercase u-accent-text">
+                  PS Vita · Lanceur Natif Vita3K
+                </div>
+                <h3 className="text-sm sm:text-base font-black text-white truncate">
+                  {vitaBridgeEntry.title}
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setVitaBridgeEntry(null)}
+                aria-label="Fermer"
+                className="p-2 rounded-xl bg-white/5 hover:bg-white/15 border border-white/10 text-neutral-200 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="p-5 space-y-4 text-xs">
+              <p className="text-neutral-300 leading-relaxed">
+                Les jeux <strong>PS Vita</strong> nécessitent l&apos;accélération Vulkan/OpenGL ES native de <strong>Vita3K</strong> (aucun émulateur navigateur WebAssembly n&apos;existe pour la Vita).
+              </p>
+              {vitaBridgeEntry.titleId && (
+                <div className="px-3 py-2 rounded-xl bg-neutral-950/80 border border-white/10 font-mono text-[11px] flex items-center justify-between">
+                  <span className="text-neutral-400">Title ID Vita3K</span>
+                  <span className="font-bold u-accent-text">{vitaBridgeEntry.titleId}</span>
+                </div>
+              )}
+              {vitaLaunchStatus && (
+                <div className="px-3 py-2 rounded-xl bg-amber-950/50 border border-amber-500/40 text-amber-200 text-[11px]">
+                  {vitaLaunchStatus}
+                </div>
+              )}
+              <div className="flex flex-col gap-2">
+                <button
+                  type="button"
+                  onClick={async () => {
+                    setVitaLaunchStatus('Tentative de lancement de Vita3K sur votre PC…');
+                    try {
+                      const res = await fetch('/api/launch-native', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                          emulator: 'vita3k',
+                          titleId: vitaBridgeEntry.titleId || '',
+                          filename: vitaBridgeEntry.filename || '',
+                        }),
+                      });
+                      const data = await res.json().catch(() => ({}));
+                      if (res.ok && data?.ok) {
+                        setVitaLaunchStatus('Vita3K lancé avec succès !');
+                      } else {
+                        setVitaLaunchStatus(
+                          data?.error ||
+                            'Vita3K non détecté sur cet appareil. Installez Vita3K (PC ou Android) ci-dessous.'
+                        );
+                      }
+                    } catch {
+                      setVitaLaunchStatus(
+                        'Lanceur PC local indisponible ici : ouvrez Vita3K directement sur votre appareil.'
+                      );
+                    }
+                  }}
+                  className="arcade-focus-ring w-full py-2.5 min-h-[44px] rounded-xl u-btn-primary font-black text-xs cursor-pointer"
+                >
+                  Lancer dans Vita3K (PC / Electron)
+                </button>
+                <a
+                  href="https://vita3k.org/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="arcade-focus-ring w-full py-2.5 min-h-[44px] rounded-xl bg-neutral-800 hover:bg-neutral-700 border border-white/15 text-neutral-100 font-bold text-xs flex items-center justify-center gap-1.5"
+                >
+                  <Download className="w-3.5 h-3.5" aria-hidden="true" />
+                  <span>Télécharger Vita3K (Android / Windows / macOS)</span>
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

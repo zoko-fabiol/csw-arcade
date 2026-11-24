@@ -1122,7 +1122,7 @@ class FirebaseFightcadeService {
       filename: gameEntry?.filename || fallbackTargetGame?.filename || '',
       core: gameEntry?.core || gameEntry?.platform || fallbackTargetGame?.core || 'fbneo',
     };
-    if (isJ2meGame(mergedEntry) || !supportsOnlineMultiplayer(mergedEntry)) {
+    if (isJ2meGame(mergedEntry)) {
       return null;
     }
     const gameTitle = mergedEntry.title || targetUser?.currentGame?.title || gameId;
@@ -1147,19 +1147,21 @@ class FirebaseFightcadeService {
       toUid: targetUser.uid,
       toName: targetUser.name,
       status: 'pending', // 'pending' | 'accepted' | 'declined' | 'expired'
-      expiresAt: Date.now() + 15000,
+      expiresAt: Date.now() + 30000,
       createdAt: Date.now(),
       offer: null,
       answer: null,
     };
 
-    // 1. Relais serveur VPS (HTTP + WebSocket instantané)
-    fetch('/api/fc-challenge', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'create', challenge: challengeObj }),
-    }).catch(() => {});
+    // 1. Relais serveur VPS (HTTP fiable + WebSocket instantané)
     this.sendWs({ type: 'CHALLENGE_INVITE', challenge: challengeObj });
+    try {
+      await fetch('/api/fc-challenge', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'create', challenge: challengeObj }),
+      });
+    } catch {}
 
     // 2. Synchronisation Firebase Firestore
     const ref = doc(db, 'fc_challenges', challengeId);
@@ -1209,8 +1211,8 @@ class FirebaseFightcadeService {
 
     pullRelay();
     const pollId = setInterval(() => {
-      if (!this.wsConnected) pullRelay();
-    }, 8000);
+      pullRelay();
+    }, 2500);
 
     const q = query(
       collection(db, 'fc_challenges'),

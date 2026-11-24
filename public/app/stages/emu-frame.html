@@ -368,7 +368,7 @@
     function resolveConsoleIdFromCore(coreName) {
       const c = String(coreName || '').toLowerCase();
       if (['fbneo', 'arcade', 'mame2003_plus'].includes(c)) return 'arcade';
-      if (['psx', 'ps1', 'pcsx_rearmed'].includes(c)) return 'playstation';
+      if (['psx', 'ps1', 'pcsx_rearmed', 'psp', 'ppsspp'].includes(c)) return 'playstation';
       if (['segamd', 'genesis_plus_gx', 'picodrive', 'sms', 'gg', 'sega'].includes(c)) return 'sega';
       if (['nes', 'fceumm', 'nestopia', 'snes', 'snes9x', 'gba', 'mgba', 'gb', 'gbc', 'gambatte', 'n64', 'mupen64plus_next', 'nds', 'melonds'].includes(c)) return 'nintendo';
       return 'arcade';
@@ -453,13 +453,6 @@
       else if (id === '4xScaleHQ.glslp') document.body.classList.add('shader-4xhq');
       else if (id === 'crt-easymode.glslp') document.body.classList.add('shader-crt-easy');
       else if (id === 'crt-geom.glslp') document.body.classList.add('shader-crt-geom');
-
-      if (window.EJS_emulator && typeof window.EJS_emulator.changeSettingOption === 'function') {
-        try {
-          const ejsShader = id === 'none' ? 'disabled' : id;
-          window.EJS_emulator.changeSettingOption('shader', ejsShader);
-        } catch {}
-      }
     }
 
     function applyHardwareSettings(hw) {
@@ -788,7 +781,7 @@
       if (isNetplaySession && (netplayPlayerIndex === 2 || window.__cswGgpoEngine?.isActive())) return;
       const myPort = netplayPlayerIndex === 1 ? 1 : 0;
       const lowerCore = String(currentCoreName || '').toLowerCase();
-      const isAnalogConsole = ['n64', 'mupen64plus_next', 'psx', 'ps1', 'pcsx_rearmed', 'nds', 'melonds'].includes(lowerCore);
+      const isAnalogConsole = ['n64', 'mupen64plus_next', 'psx', 'ps1', 'pcsx_rearmed', 'psp', 'ppsspp', 'nds', 'melonds'].includes(lowerCore);
 
       // Flèches directionnelles -> fonctionnent aussi comme DPAD + Stick Analogique
       if (code === 'ArrowUp' || keyCode === 38) {
@@ -1183,7 +1176,7 @@
         }
 
         const lowerCore = String(currentCoreName || '').toLowerCase();
-        if (['n64', 'mupen64plus_next', 'psx', 'ps1', 'pcsx_rearmed', 'nds', 'melonds'].includes(lowerCore)) {
+        if (['n64', 'mupen64plus_next', 'psx', 'ps1', 'pcsx_rearmed', 'psp', 'ppsspp', 'nds', 'melonds'].includes(lowerCore)) {
           if (forceAll || ((prev ^ mask) & (1 << 4))) sim.call(ctx, pIdx, 19, mask & (1 << 4) ? 32767 : 0);
           if (forceAll || ((prev ^ mask) & (1 << 5))) sim.call(ctx, pIdx, 18, mask & (1 << 5) ? 32767 : 0);
           if (forceAll || ((prev ^ mask) & (1 << 6))) sim.call(ctx, pIdx, 17, mask & (1 << 6) ? 32767 : 0);
@@ -2844,7 +2837,7 @@
     }
 
     function isHeavy3dCore(core) {
-      return ['n64', 'mupen64plus_next', 'psx', 'ps1', 'pcsx_rearmed', 'nds', 'melonds', 'desmume'].includes(
+      return ['n64', 'mupen64plus_next', 'psx', 'ps1', 'pcsx_rearmed', 'psp', 'ppsspp', 'nds', 'melonds', 'desmume'].includes(
         String(core || '').toLowerCase()
       );
     }
@@ -3007,7 +3000,7 @@
         return;
       }
 
-      // Transition à chaud Solo -> Netplay lors d'un Drop-In Join (J2/J3/J4 rejoint la partie en cours)
+      // Transition à chaud Solo -> Netplay lors d'un Drop-In Join (J2/J3/J4 rejoint la partie en cours SANS redémarrer)
       if (msg.type === 'ENABLE_LIVE_NETPLAY') {
         try {
           isNetplaySession = true;
@@ -3016,7 +3009,25 @@
             clearInterval(cswRamTelemetry.timer);
             cswRamTelemetry.timer = null;
           }
-          window.__cswGgpoEngine?.start?.();
+          const ggpo = window.__cswGgpoEngine;
+          if (ggpo) {
+            ggpo.matchAborted = false;
+            ggpo.waitingForFrame0 = false;
+            ggpo.waitingForFrame0Ack = false;
+            ggpo.waitingForGoAck = false;
+            ggpo.hostWaitingForGuestEmu = false;
+            ggpo.initialFrame0Sent = false;
+            ggpo.hasRemotePeer = false;
+            if (!ggpo.isRunning) {
+              ggpo.start();
+            }
+            // Le jeu tourne déjà (ex: Mission 3 Metal Slug) : pas besoin d'attendre 30 frames de warmup ni un cold-boot setup !
+            ggpo.localWarmupDone = true;
+            ggpo.warmupFramesLeft = 0;
+            ggpo.hostSetupCompleted = true;
+            ggpo.setSyncWaitMute(false);
+            ggpo.pendingHostExportSlot = 'frame0';
+          }
         } catch {}
         return;
       }
@@ -3362,6 +3373,7 @@
             const lower = String(raw || 'fbneo').trim().toLowerCase();
             if (lower === 'fbneo' || lower === 'arcade') return 'arcade';
             if (lower === 'ps1' || lower === 'psx' || lower === 'playstation' || lower === 'pcsx_rearmed') return 'psx';
+            if (lower === 'psp' || lower === 'ppsspp') return 'psp';
             if (lower === 'gbc') return 'gb';
             if (lower === 'parallel-n64') return 'parallel_n64';
             return raw || 'arcade';
@@ -3407,36 +3419,36 @@
             window.EJS_pathtodata = CDN_DATA;
           }
           window.EJS_startOnLoaded = true;
+          window.EJS_threads = (String(window.EJS_core || '').toLowerCase() === 'psp' || String(window.EJS_core || '').toLowerCase() === 'ppsspp') && typeof SharedArrayBuffer !== 'undefined';
           window.EJS_color = msg.accent || '#3b82f6';
           if (ctrlCfg) window.EJS_defaultControls = ctrlCfg;
-          // Options natives EmulatorJS : Multitaps (3-4+ joueurs), Shaders HD, BIOS MVS/AES & Région, Mode Stream
+          // Options natives EmulatorJS : uniquement les clés libretro valides par cœur (Multitaps 3-4+ joueurs & BIOS FBNeo)
           const normCore = String(window.EJS_core || '').toLowerCase();
           const bootOpts = { ...(window.EJS_defaultOptions || {}) };
+          let hasBootOpts = Object.keys(bootOpts).length > 0;
           const maxPlayers = Math.max(2, Number(msg.maxPlayers || 2));
           if (maxPlayers >= 3) {
             if (normCore === 'psx' || normCore === 'pcsx_rearmed') {
               bootOpts['pcsx_rearmed_multitap1'] = 'enabled';
+              hasBootOpts = true;
             } else if (normCore === 'segamd' || normCore === 'genesis_plus_gx') {
               bootOpts['genesis_plus_gx_port_1_type'] = '4-way play';
+              hasBootOpts = true;
             } else if (normCore === 'snes' || normCore === 'snes9x') {
               bootOpts['snes9x_multitap'] = 'enabled';
+              hasBootOpts = true;
             }
           }
-          const isStreamBoot = Boolean(hw.performance?.streamMode);
-          const wantedShader = isStreamBoot ? 'none' : (hw.video?.shader || 'none');
-          bootOpts['shader'] = wantedShader === 'none' ? 'disabled' : wantedShader;
           if (normCore === 'fbneo' || normCore === 'arcade') {
             const biosMode = hw.system?.biosMode === 'aes' ? 'AES' : 'MVS';
-            bootOpts['fbneo-neogeo-mode'] = biosMode === 'AES' ? 'UNIBIOS' : 'MVS';
-            if (hw.system?.region) {
-              const regMap = { europe: 'Europe', usa: 'USA', japan: 'Japan' };
-              bootOpts['fbneo-dipswitch-region'] = regMap[hw.system.region] || 'Europe';
+            if (biosMode === 'AES') {
+              bootOpts['fbneo-neogeo-mode'] = 'UNIBIOS';
+              hasBootOpts = true;
             }
           }
-          if (isStreamBoot) {
-            bootOpts['vsync'] = 'disabled';
+          if (hasBootOpts) {
+            window.EJS_defaultOptions = bootOpts;
           }
-          window.EJS_defaultOptions = bootOpts;
           const effectiveMuted = msg.muted ?? hw.audio?.muted ?? false;
           const effectiveVol = typeof msg.volume === 'number' ? msg.volume : (hw.audio?.volume ?? 80);
           window.__cswDesiredAudio = { muted: Boolean(effectiveMuted), vol: Math.max(0, Math.min(1, effectiveVol / 100)) };

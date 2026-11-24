@@ -630,7 +630,7 @@ export function UnifiedStageModal({
       if (session?.isNetplay && session?.isHost) {
         try {
           iframeRef.current?.contentWindow?.postMessage(
-            { type: 'EXPORT_NETPLAY_SYNC', slot: 'frame0' },
+            { type: 'EXPORT_NETPLAY_SYNC', slot: 'frame0', force: Boolean(session?.isLiveDropIn) },
             window.location.origin
           );
         } catch {}
@@ -641,7 +641,7 @@ export function UnifiedStageModal({
       if (session?.isLiveDropIn && session?.isHost) {
         try {
           iframeRef.current?.contentWindow?.postMessage(
-            { type: 'EXPORT_NETPLAY_SYNC', slot: 'frame0' },
+            { type: 'EXPORT_NETPLAY_SYNC', slot: 'frame0', force: true },
             window.location.origin
           );
         } catch {}
@@ -1412,10 +1412,10 @@ export function UnifiedStageModal({
           </div>
         )}
 
-        {/* TOAST INVITATION / DROP-IN IN-GAME (dans stageRef -> 100% visible même en mode Plein Écran) */}
+        {/* TOAST INVITATION / DROP-IN IN-GAME (dans stageRef -> z-[220] toujours au premier plan même en Plein Écran) */}
         {incomingChallenge && (
           <div
-            className="absolute top-3 right-3 sm:top-4 sm:right-4 z-[95] w-[calc(100%-1.5rem)] max-w-sm rounded-2xl bg-neutral-950/95 backdrop-blur-xl border-2 u-accent-border p-4 shadow-2xl space-y-3 animate-fade-in"
+            className="fixed top-14 left-1/2 -translate-x-1/2 sm:left-auto sm:translate-x-0 sm:right-4 z-[220] w-[calc(100%-1.5rem)] max-w-sm rounded-2xl bg-neutral-950/95 backdrop-blur-xl border-2 border-emerald-400 p-4 shadow-2xl ring-4 ring-emerald-500/30 space-y-3 animate-fade-in"
             role="alertdialog"
             aria-label="Invitation à rejoindre votre partie"
           >

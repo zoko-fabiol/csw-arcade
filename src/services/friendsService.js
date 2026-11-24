@@ -222,7 +222,7 @@ export function subscribeFriendsState(userProfile, cb) {
   registerDirectoryProfile(userProfile);
   pullRelay();
 
-  const pollId = setInterval(pullRelay, 20000);
+  const pollId = setInterval(pullRelay, 3000);
   const onEvent = () => pullRelay();
   if (typeof window !== 'undefined') {
     window.addEventListener('csw-friend-event', onEvent);

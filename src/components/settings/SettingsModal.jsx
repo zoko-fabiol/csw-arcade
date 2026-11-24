@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   X,
   Gamepad2,
@@ -27,9 +27,14 @@ import {
   Mic,
   MicOff,
   Headphones,
+  FolderOpen,
+  Upload,
+  Download,
+  RefreshCw,
 } from 'lucide-react';
 import { getPlayerIdentity, setPlayerDisplayName } from '../../services/firebaseFightcadeService';
 import { formatBytes, getPlatformCacheStats, listCachedRoms, removeCachedRom } from '../../services/platformRomService';
+import { romStorage } from '../../services/romStorage';
 import { GamepadVisualizer } from './GamepadVisualizer';
 import { CONSOLE_CONTROL_PROFILES, getConsoleControlProfile } from '../../data/consoleControlProfiles';
 import { useDeviceType } from '../../utils/deviceDetector';
@@ -119,6 +124,10 @@ export function SettingsModal({
   const [activeTab, setActiveTab] = useState('controls');
   const [playerName, setPlayerName] = useState(() => getPlayerIdentity().name);
   const [cacheInfo, setCacheInfo] = useState({ count: 0, totalBytes: 0 });
+  const [arcadeStats, setArcadeStats] = useState({ count: 0, totalMB: '0.0' });
+  const [dirInfo, setDirInfo] = useState({ supported: false, configured: false, name: null, permission: 'none' });
+  const [isSyncingRoms, setIsSyncingRoms] = useState(false);
+  const romImportInputRef = useRef(null);
   const [controlSubTab, setControlSubTab] = useState('touch');
   const [selectedConsoleId, setSelectedConsoleId] = useState('arcade');
   const [activePlayer, setActivePlayer] = useState('p1');
@@ -137,6 +146,8 @@ export function SettingsModal({
       setSelectedConsoleId(platformMode);
     }
     getPlatformCacheStats().then(setCacheInfo).catch(() => {});
+    romStorage.getStorageStats().then(setArcadeStats).catch(() => {});
+    romStorage.getSavedDirectoryInfo().then(setDirInfo).catch(() => {});
   }, [isOpen, platformMode]);
 
   useEffect(() => {
@@ -1222,26 +1233,42 @@ export function SettingsModal({
                 </div>
 
                 <div className="p-4 rounded-2xl bg-neutral-950/80 border border-white/10 space-y-2.5">
-                  <h4 className="font-bold text-white text-xs sm:text-[13px]">Région du BIOS</h4>
-                  <div className="grid grid-cols-3 gap-2">
+                  <div>
+                    <h4 className="font-bold text-white text-xs sm:text-[13px]">Région / Continent (BIOS &amp; Serveur)</h4>
+                    <p className="text-[11px] text-neutral-400 mt-0.5">
+                      Adapte le standard BIOS (PAL / NTSC) et la région affichée selon votre continent.
+                    </p>
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                     {[
-                      { id: 'europe', label: 'Europe' },
-                      { id: 'usa', label: 'USA' },
-                      { id: 'japan', label: 'Japon' },
-                    ].map((reg) => (
-                      <button
-                        key={reg.id}
-                        type="button"
-                        onClick={() => updateSystemSetting('region', reg.id)}
-                        className={`arcade-focus-ring py-2.5 px-3 min-h-[44px] rounded-xl text-xs font-bold uppercase border transition-all ${
-                          settings.system.region === reg.id
-                            ? 'u-tab-active'
-                            : 'bg-neutral-900 border-white/10 text-neutral-300 hover:text-white'
-                        }`}
-                      >
-                        {reg.label}
-                      </button>
-                    ))}
+                      { id: 'africa', label: 'Afrique', sub: 'PAL · 50/60 Hz' },
+                      { id: 'europe', label: 'Europe', sub: 'PAL · 50/60 Hz' },
+                      { id: 'north_america', label: 'Amérique du Nord', sub: 'NTSC-U · 60 Hz' },
+                      { id: 'south_america', label: 'Amérique du Sud', sub: 'NTSC · 60 Hz' },
+                      { id: 'asia', label: 'Asie', sub: 'NTSC-J · 60 Hz' },
+                      { id: 'oceania', label: 'Océanie', sub: 'PAL · 50/60 Hz' },
+                    ].map((reg) => {
+                      const cur = settings.system.region || 'europe';
+                      const isSelected =
+                        cur === reg.id ||
+                        (cur === 'usa' && reg.id === 'north_america') ||
+                        (cur === 'japan' && reg.id === 'asia');
+                      return (
+                        <button
+                          key={reg.id}
+                          type="button"
+                          onClick={() => updateSystemSetting('region', reg.id)}
+                          className={`arcade-focus-ring py-2.5 px-3 min-h-[48px] rounded-xl text-left border transition-all ${
+                            isSelected
+                              ? 'u-tab-active'
+                              : 'bg-neutral-900 border-white/10 text-neutral-300 hover:text-white'
+                          }`}
+                        >
+                          <span className="font-bold text-xs block">{reg.label}</span>
+                          <span className="text-[10px] text-neutral-400 block">{reg.sub}</span>
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
               </div>
@@ -1343,6 +1370,191 @@ export function SettingsModal({
                       <Trash2 className="w-3.5 h-3.5" aria-hidden="true" />
                       <span>Vider</span>
                     </button>
+                  </div>
+                </div>
+
+                {/* Dossier ROMs Partagé (Multi-navigateurs : macOS, Windows, Android, iOS) */}
+                <div className="p-4 rounded-2xl bg-neutral-950/80 border border-white/10 space-y-3">
+                  <div className="flex items-start justify-between gap-3 flex-wrap">
+                    <div className="flex items-start gap-3">
+                      <div className="w-9 h-9 rounded-xl bg-sky-500/15 border border-sky-500/35 flex items-center justify-center shrink-0 mt-0.5">
+                        <FolderOpen className="w-4 h-4 text-sky-400" aria-hidden="true" />
+                      </div>
+                      <div>
+                        <div className="font-bold text-white text-xs sm:text-[13px]">
+                          Dossier ROMs Partagé (Multi-navigateurs)
+                        </div>
+                        <div className="text-[11px] font-mono text-neutral-300 tabular-nums mt-0.5">
+                          {arcadeStats.count} archive(s) Arcade · {arcadeStats.totalMB} Mo
+                        </div>
+                        <p className="text-[11px] text-neutral-400 mt-1 leading-relaxed">
+                          {dirInfo.supported
+                            ? 'Liez un dossier sur votre appareil : chaque ROM téléchargée y est enregistrée et vous retrouvez vos jeux en changeant de navigateur.'
+                            : 'Sur Android, iOS ou Safari, importez vos fichiers .zip depuis votre dossier Fichiers / iCloud Drive sans rien re-télécharger.'}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {dirInfo.supported && dirInfo.configured && (
+                    <div className="px-3 py-2.5 rounded-xl bg-neutral-900/90 border border-white/10 flex items-center justify-between gap-2 flex-wrap">
+                      <div className="text-xs text-neutral-200 flex items-center gap-2 min-w-0">
+                        <FolderOpen className="w-3.5 h-3.5 text-sky-400 shrink-0" aria-hidden="true" />
+                        <span className="truncate font-semibold">{dirInfo.name}</span>
+                        <span
+                          className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase ${
+                            dirInfo.permission === 'granted'
+                              ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                              : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                          }`}
+                        >
+                          {dirInfo.permission === 'granted' ? 'Connecté' : 'À réautoriser'}
+                        </span>
+                      </div>
+                      <div className="flex gap-1.5">
+                        {dirInfo.permission !== 'granted' ? (
+                          <button
+                            type="button"
+                            disabled={isSyncingRoms}
+                            onClick={async () => {
+                              setIsSyncingRoms(true);
+                              try {
+                                const res = await romStorage.reauthorizeDirectory();
+                                const [info, stats] = await Promise.all([
+                                  romStorage.getSavedDirectoryInfo(),
+                                  romStorage.getStorageStats(),
+                                ]);
+                                setDirInfo(info);
+                                setArcadeStats(stats);
+                                if (res.granted) {
+                                  setInlineNotice(`Dossier réautorisé : ${res.imported} importée(s), ${res.exported} exportée(s).`);
+                                }
+                              } finally {
+                                setIsSyncingRoms(false);
+                              }
+                            }}
+                            className="arcade-focus-ring px-3 py-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-200 text-[11px] font-bold transition-colors"
+                          >
+                            Réautoriser
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            disabled={isSyncingRoms}
+                            onClick={async () => {
+                              setIsSyncingRoms(true);
+                              try {
+                                const res = await romStorage.syncWithDirectory();
+                                const stats = await romStorage.getStorageStats();
+                                setArcadeStats(stats);
+                                setInlineNotice(`Synchronisé : ${res.imported} importée(s), ${res.exported} exportée(s).`);
+                              } finally {
+                                setIsSyncingRoms(false);
+                              }
+                            }}
+                            className="arcade-focus-ring flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-neutral-800 hover:bg-neutral-700 border border-white/10 text-neutral-200 text-[11px] font-bold transition-colors"
+                          >
+                            <RefreshCw className={`w-3 h-3 ${isSyncingRoms ? 'animate-spin' : ''}`} aria-hidden="true" />
+                            <span>Sync</span>
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            await romStorage.clearDirectory();
+                            setDirInfo(await romStorage.getSavedDirectoryInfo());
+                            setInlineNotice('Dossier dissocié (vos fichiers restent sur le disque).');
+                          }}
+                          className="arcade-focus-ring px-2.5 py-1.5 rounded-lg bg-neutral-800 hover:bg-rose-950/50 border border-white/10 hover:border-rose-500/40 text-neutral-300 hover:text-rose-200 text-[11px] font-bold transition-colors"
+                        >
+                          Dissocier
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="flex flex-wrap gap-2">
+                    {dirInfo.supported && (
+                      <button
+                        type="button"
+                        disabled={isSyncingRoms}
+                        onClick={async () => {
+                          setIsSyncingRoms(true);
+                          try {
+                            const res = await romStorage.pickRomsDirectory();
+                            const [info, stats] = await Promise.all([
+                              romStorage.getSavedDirectoryInfo(),
+                              romStorage.getStorageStats(),
+                            ]);
+                            setDirInfo(info);
+                            setArcadeStats(stats);
+                            setInlineNotice(`Dossier « ${res.name} » lié : ${res.imported} importée(s), ${res.exported} exportée(s).`);
+                          } catch (err) {
+                            if (err?.name !== 'AbortError') {
+                              setInlineNotice(err?.message || 'Impossible de lier ce dossier.');
+                            }
+                          } finally {
+                            setIsSyncingRoms(false);
+                          }
+                        }}
+                        className="arcade-focus-ring flex items-center justify-center gap-1.5 px-3.5 py-2 min-h-[42px] rounded-xl u-btn-primary text-xs font-bold transition-all"
+                      >
+                        <FolderOpen className="w-3.5 h-3.5" aria-hidden="true" />
+                        <span>{dirInfo.configured ? 'Changer de dossier' : 'Choisir le dossier ROMs'}</span>
+                      </button>
+                    )}
+
+                    <input
+                      ref={romImportInputRef}
+                      type="file"
+                      multiple
+                      accept=".zip,.7z,.nes,.sfc,.smc,.gba,.gb,.gbc,.n64,.z64,.v64,.md,.gen,.bin,.sms,.gg,.pce,.nds,.iso,.pbp,.chd,.jar"
+                      className="hidden"
+                      onChange={async (e) => {
+                        const files = e.target.files;
+                        if (!files || files.length === 0) return;
+                        setIsSyncingRoms(true);
+                        try {
+                          const res = await romStorage.importFilesToStorage(files);
+                          const stats = await romStorage.getStorageStats();
+                          setArcadeStats(stats);
+                          setInlineNotice(`${res.imported} ROM(s) importée(s) localement (${formatBytes(res.totalBytes)}).`);
+                        } finally {
+                          setIsSyncingRoms(false);
+                          e.target.value = '';
+                        }
+                      }}
+                    />
+
+                    <button
+                      type="button"
+                      disabled={isSyncingRoms}
+                      onClick={() => romImportInputRef.current?.click()}
+                      className="arcade-focus-ring flex items-center justify-center gap-1.5 px-3.5 py-2 min-h-[42px] rounded-xl bg-neutral-800 hover:bg-neutral-700 border border-white/10 text-xs font-bold text-neutral-100 transition-colors"
+                    >
+                      <Upload className="w-3.5 h-3.5" aria-hidden="true" />
+                      <span>Importer des ROMs (.zip)</span>
+                    </button>
+
+                    {arcadeStats.count > 0 && (
+                      <button
+                        type="button"
+                        disabled={isSyncingRoms}
+                        onClick={async () => {
+                          setIsSyncingRoms(true);
+                          try {
+                            const count = await romStorage.exportAllSavedRoms();
+                            setInlineNotice(`${count} archive(s) exportée(s) vers vos téléchargements.`);
+                          } finally {
+                            setIsSyncingRoms(false);
+                          }
+                        }}
+                        className="arcade-focus-ring flex items-center justify-center gap-1.5 px-3.5 py-2 min-h-[42px] rounded-xl bg-neutral-800 hover:bg-neutral-700 border border-white/10 text-xs font-bold text-neutral-100 transition-colors"
+                      >
+                        <Download className="w-3.5 h-3.5" aria-hidden="true" />
+                        <span>Exporter (.zip)</span>
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>

@@ -29,6 +29,17 @@ function buildIceServers() {
   } catch {
     /* ignore non-vite env */
   }
+  // Relais TURN/TURNS port 443 TCP/TLS pour traverser les NAT mobiles (4G/MTN/Orange) quand STUN seul échoue
+  servers.push({
+    urls: [
+      'turn:openrelay.metered.ca:80',
+      'turn:openrelay.metered.ca:443',
+      'turn:openrelay.metered.ca:443?transport=tcp',
+      'turns:openrelay.metered.ca:443?transport=tcp',
+    ],
+    username: 'openrelayproject',
+    credential: 'openrelayproject',
+  });
   return servers;
 }
 
@@ -100,8 +111,22 @@ export class RollbackP2PEngine {
     this.frame0FallbackTimer = null;
 
     this.rttSamples = [];
+    this.smoothedRttMs = 0;
+    this.jitterMs = 0;
+    this.lastAutoDelayAdjustMs = 0;
+    this.regionalProfile = {
+      tier: 'same_continent',
+      label: 'Auto',
+      minDelay: 0,
+      maxDelay: 4,
+      recommendedDelay: this.inputDelay,
+      jitterMarginMs: 12,
+      ewmaAlpha: 0.25,
+    };
     this.stats = {
       pingMs: 0,
+      jitterMs: 0,
+      regionTier: 'Auto',
       rollbackFrames: 0,
       totalRollbacks: 0,
       frameAdvantage: 0,
@@ -113,14 +138,56 @@ export class RollbackP2PEngine {
     };
   }
 
+  applyRegionalProfile(profile) {
+    if (!profile || typeof profile !== 'object') return;
+    this.regionalProfile = { ...this.regionalProfile, ...profile };
+    this.stats.regionTier = this.regionalProfile.label || 'Auto';
+    const target = Math.max(
+      this.regionalProfile.minDelay || 0,
+      Math.min(this.regionalProfile.maxDelay || 4, Number(this.regionalProfile.recommendedDelay ?? this.inputDelay))
+    );
+    if (target > this.inputDelay) {
+      this.setInputDelay(target);
+    } else {
+      this.emitStats();
+    }
+  }
+
   _recordRttSample(rawRttMs) {
     const clamped = Math.max(1, Math.min(2500, Math.round(rawRttMs)));
     this.rttSamples.push(clamped);
-    if (this.rttSamples.length > 5) this.rttSamples.shift();
+    if (this.rttSamples.length > 7) this.rttSamples.shift();
     const sorted = [...this.rttSamples].sort((a, b) => a - b);
     const median = sorted[Math.floor(sorted.length / 2)];
-    this.stats.pingMs = median;
-    this.stats.recommendedDelay = median < 35 ? 0 : median < 85 ? 1 : median < 145 ? 2 : 3;
+
+    // Lissage EWMA + calcul du jitter pour stabiliser le ping entre continents
+    const alpha = Number(this.regionalProfile?.ewmaAlpha || 0.22);
+    if (!this.smoothedRttMs) {
+      this.smoothedRttMs = median;
+      this.jitterMs = 0;
+    } else {
+      const diff = Math.abs(median - this.smoothedRttMs);
+      this.jitterMs = Math.round(this.jitterMs * 0.75 + diff * 0.25);
+      this.smoothedRttMs = Math.round(this.smoothedRttMs * (1 - alpha) + median * alpha);
+    }
+
+    const effectiveRtt = this.smoothedRttMs + Math.round(this.jitterMs * 1.1);
+    const rawRec = effectiveRtt < 40 ? 0 : effectiveRtt < 90 ? 1 : effectiveRtt < 150 ? 2 : effectiveRtt < 210 ? 3 : 4;
+    const minD = Number(this.regionalProfile?.minDelay || 0);
+    const maxD = Number(this.regionalProfile?.maxDelay || 4);
+    const stabilizedRec = Math.max(minD, Math.min(maxD, rawRec));
+
+    this.stats.pingMs = this.smoothedRttMs;
+    this.stats.jitterMs = this.jitterMs;
+    this.stats.recommendedDelay = stabilizedRec;
+
+    // Auto-stabilisation douce avec hystérésis de 6s pour absorber les pics sans osciller
+    const now = performance.now();
+    if (stabilizedRec !== this.inputDelay && now - this.lastAutoDelayAdjustMs > 6000 && this.rttSamples.length >= 4) {
+      this.lastAutoDelayAdjustMs = now;
+      this.inputDelay = stabilizedRec;
+      this.stats.inputDelay = stabilizedRec;
+    }
     this.emitStats();
   }
 
@@ -131,7 +198,7 @@ export class RollbackP2PEngine {
   }
 
   setInputDelay(delay) {
-    this.inputDelay = Math.min(3, Math.max(0, Number(delay) || 0));
+    this.inputDelay = Math.min(4, Math.max(0, Number(delay) || 0));
     this.stats.inputDelay = this.inputDelay;
     this.emitStats();
   }
