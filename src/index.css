@@ -297,6 +297,11 @@ html.is-pwa-standalone .pt-safe-pwa {
   border-color: var(--u-accent-border);
 }
 
+html[data-theme="light"] .keep-dark .u-banner {
+  background: rgba(255, 255, 255, 0.05) !important;
+  border-color: var(--u-accent-border) !important;
+}
+
 .u-surface {
   background-color: var(--u-surface);
 }

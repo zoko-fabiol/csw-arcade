@@ -44,6 +44,7 @@ export function UnifiedStageModal({
   onOpenSalon,
   onCloudCheckpoint,
   onInputDelayChange,
+  onUpdateVideoSetting,
   onClose,
   onOpenSettings,
 }) {
@@ -1226,11 +1227,55 @@ export function UnifiedStageModal({
             </button>
           )}
 
+          {session.kind !== 'j2me' && !isSpectator && (
+            <button
+              type="button"
+              onClick={() => {
+                sendButton('coin');
+                showRamToast('record', `🪙 Crédits synchronisés (${String(coins).padStart(2, '0')}/99)`);
+              }}
+              title="Synchroniser vos crédits / insérer un crédit"
+              className="flex items-center gap-1 px-2 sm:px-2.5 py-1.5 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/40 text-amber-300 text-xs font-bold transition-colors shrink-0"
+            >
+              <Coins className="w-3.5 h-3.5 shrink-0" />
+              <span className="hidden md:inline">Sync Crédits</span>
+            </button>
+          )}
+
+          <button
+            type="button"
+            onClick={() => {
+              const next = ratio === 'fit' ? 'stretch' : ratio === 'stretch' ? 'pixel-perfect' : 'fit';
+              setRatio(next);
+              const savedVal = next === 'stretch' ? '16:9' : next === 'pixel-perfect' ? 'pixel-perfect' : '4:3';
+              onUpdateVideoSetting?.('aspectRatio', savedVal);
+              showRamToast(
+                'record',
+                `🖥️ Taille d'écran : ${next === 'stretch' ? '16:9 Plein Écran' : next === 'pixel-perfect' ? '1:1 Pixel Perfect' : '4:3 Arcade'}`
+              );
+            }}
+            title="Changer la taille d'écran (4:3 · 16:9 · 1:1)"
+            className="flex items-center gap-1 px-2 sm:px-2.5 py-1.5 rounded-xl bg-neutral-800/90 hover:bg-neutral-700 border border-white/15 text-neutral-100 text-[11px] font-mono font-bold transition-colors shrink-0"
+          >
+            <span>{ratio === 'stretch' ? '16:9' : ratio === 'pixel-perfect' ? '1:1' : '4:3'}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={toggleFullscreen}
+            title={isFullscreen ? 'Quitter le plein écran' : 'Plein écran'}
+            aria-label={isFullscreen ? 'Quitter le plein écran' : 'Plein écran'}
+            className="flex items-center justify-center p-1.5 sm:px-2.5 sm:py-1.5 rounded-xl bg-neutral-800/90 hover:bg-neutral-700 border border-white/15 text-neutral-100 text-xs font-bold transition-colors shrink-0"
+          >
+            {isFullscreen ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
+          </button>
+
           {session.kind !== 'j2me' && !session.isNetplay && (
             <button
               type="button"
               onClick={() => sendButton('start')}
-              title="Démarrer / Start (Touche 1)"
+              onDoubleClick={() => (pauseMenuOpen ? closePauseMenuAndResume() : openPauseMenu())}
+              title="Démarrer / Start (Touche 1 · Double-clic : Menu du jeu)"
               className="hidden sm:flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/40 text-emerald-300 text-xs font-bold transition-colors"
             >
               <Play className="w-3.5 h-3.5" />
