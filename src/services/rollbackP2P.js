@@ -29,17 +29,9 @@ function buildIceServers() {
   } catch {
     /* ignore non-vite env */
   }
-  // Relais TURN/TURNS port 443 TCP/TLS pour traverser les NAT mobiles (4G/MTN/Orange) quand STUN seul échoue
-  servers.push({
-    urls: [
-      'turn:openrelay.metered.ca:80',
-      'turn:openrelay.metered.ca:443',
-      'turn:openrelay.metered.ca:443?transport=tcp',
-      'turns:openrelay.metered.ca:443?transport=tcp',
-    ],
-    username: 'openrelayproject',
-    credential: 'openrelayproject',
-  });
+  // Ne pas injecter de relais TURN public gratuit (openrelay.metered.ca) par défaut :
+  // il ajoute +250 à +350 ms de latence. Sans VITE_TURN_URLS (coturn sur votre VPS),
+  // WebRTC tente d'abord le P2P direct (STUN) puis bascule sur le relais VPS rapide.
   return servers;
 }
 
