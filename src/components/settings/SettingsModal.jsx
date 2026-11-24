@@ -253,6 +253,7 @@ export function SettingsModal({
 
   return createPortal(
     <div
+      data-universe={platformMode}
       className="fixed inset-0 z-[9999] flex items-end md:items-center justify-center bg-black/80 backdrop-blur-md p-0 md:p-4 font-sans select-none cursor-pointer"
       onClick={onClose}
       role="dialog"
