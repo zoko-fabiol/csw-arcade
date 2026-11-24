@@ -342,18 +342,25 @@ export async function transferAllCacheToDirectory() {
  * tous les jeux présents dans le dossier lié (utile lors d'un changement de navigateur).
  */
 export async function restoreAllRomsFromDirectory() {
-  let dirInfo = await romStorage.getSavedDirectoryInfo();
-  if (!dirInfo.supported) {
+  if (!romStorage.isDirectoryPickerSupported()) {
     throw new Error('Votre navigateur ne supporte pas la lecture directe d’un dossier.');
   }
-  if (!dirInfo.configured) {
-    throw new Error('Veuillez d’abord sélectionner un dossier ROMs.');
-  }
-  if (dirInfo.permission !== 'granted') {
-    const auth = await romStorage.reauthorizeDirectory();
-    if (!auth.granted) {
+
+  let auth = await romStorage.reauthorizeDirectory('read');
+  if (!auth.granted) {
+    // Si l'autorisation précédente a été révoquée, redemander la sélection du dossier
+    try {
+      await romStorage.pickRomsDirectory();
+      auth = await romStorage.reauthorizeDirectory('read');
+    } catch (e) {
+      if (e?.name === 'AbortError') {
+        throw new Error('Sélection du dossier annulée.');
+      }
       throw new Error('Permission de lecture refusée sur le dossier sélectionné.');
     }
+  }
+  if (!auth.granted) {
+    throw new Error('Permission de lecture refusée sur le dossier sélectionné.');
   }
 
   const manifest = await romStorage.readManifestFromLinkedDirectory();

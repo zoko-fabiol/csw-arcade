@@ -196,7 +196,7 @@ export const romStorage = {
     try {
       const handle = await getStoredDirHandle();
       if (handle) {
-        const perm = await handle.queryPermission({ mode: 'readwrite' });
+        const perm = await handle.queryPermission({ mode: 'read' });
         if (perm === 'granted') {
           for await (const [entryName, entryHandle] of handle.entries()) {
             if (entryHandle.kind === 'file' && ROM_FILE_REGEX.test(entryName)) {
@@ -323,15 +323,21 @@ export const romStorage = {
   /**
    * Redemande la permission d'accès au dossier mémorisé (utile après redémarrage du navigateur)
    */
-  async reauthorizeDirectory() {
+  async reauthorizeDirectory(mode = 'readwrite') {
     const handle = await getStoredDirHandle();
     if (!handle) return { granted: false, imported: 0, exported: 0 };
-    const perm = await handle.requestPermission({ mode: 'readwrite' });
+    let perm = await handle.queryPermission({ mode });
+    if (perm !== 'granted') {
+      perm = await handle.requestPermission({ mode });
+    }
     if (perm !== 'granted') {
       return { granted: false, imported: 0, exported: 0 };
     }
-    const syncStats = await this.syncWithDirectory(handle);
-    return { granted: true, name: handle.name, ...syncStats };
+    if (mode === 'readwrite') {
+      const syncStats = await this.syncWithDirectory(handle);
+      return { granted: true, name: handle.name, ...syncStats };
+    }
+    return { granted: true, name: handle.name, imported: 0, exported: 0 };
   },
 
   /**
@@ -363,7 +369,7 @@ export const romStorage = {
     const handle = await getStoredDirHandle();
     if (!handle || !filename) return null;
     try {
-      const perm = await handle.queryPermission({ mode: 'readwrite' });
+      const perm = await handle.queryPermission({ mode: 'read' });
       if (perm !== 'granted') return null;
       const fileHandle = await handle.getFileHandle(filename);
       const file = await fileHandle.getFile();
@@ -420,8 +426,9 @@ export const romStorage = {
     const handle = explicitHandle || (await getStoredDirHandle());
     if (!handle) return { imported: 0, exported: 0 };
 
-    const perm = await handle.queryPermission({ mode: 'readwrite' });
-    if (perm !== 'granted') return { imported: 0, exported: 0 };
+    const readPerm = await handle.queryPermission({ mode: 'read' });
+    if (readPerm !== 'granted') return { imported: 0, exported: 0 };
+    const writePerm = await handle.queryPermission({ mode: 'readwrite' });
 
     const existingIdb = new Set(await this.listSavedRoms());
     const existingDir = new Set();
