@@ -447,6 +447,14 @@ export class LocalFirestoreDatabase {
 
   async _rpc(payload, timeoutMs = 2600) {
     if (!this._canTryServer()) return null;
+    if (
+      payload &&
+      ['setDoc', 'updateDoc', 'addDoc', 'deleteDoc'].includes(payload.op) &&
+      typeof payload.path === 'string' &&
+      (payload.path === 'wallets' || payload.path.startsWith('wallets/'))
+    ) {
+      return null;
+    }
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
     try {
