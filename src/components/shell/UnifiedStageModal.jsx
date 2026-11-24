@@ -836,15 +836,6 @@ export function UnifiedStageModal({
   }, [session, settings?.touch?.autoHideOnGamepad]);
 
   const gamepadActionRef = useRef({});
-  gamepadActionRef.current = {
-    pauseMenuOpen,
-    coins,
-    isSpectator,
-    openPauseMenu,
-    closePauseMenuAndResume,
-    sendButton,
-    showRamToast,
-  };
 
   // Raccourcis manette physique : Select = Sync Crédits (Coin), Double Start = Menu du jeu
   useEffect(() => {
@@ -952,6 +943,16 @@ export function UnifiedStageModal({
     if (!iframeRef.current?.contentWindow) return;
     iframeRef.current.focus();
     iframeRef.current.contentWindow.postMessage({ type: 'PRESS_BUTTON', button }, window.location.origin);
+  };
+
+  gamepadActionRef.current = {
+    pauseMenuOpen,
+    coins,
+    isSpectator,
+    openPauseMenu,
+    closePauseMenuAndResume,
+    sendButton,
+    showRamToast,
   };
 
   const toggleFullscreen = async () => {
