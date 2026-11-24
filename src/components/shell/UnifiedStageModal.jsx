@@ -835,6 +835,69 @@ export function UnifiedStageModal({
     };
   }, [session, settings?.touch?.autoHideOnGamepad]);
 
+  const gamepadActionRef = useRef({});
+  gamepadActionRef.current = {
+    pauseMenuOpen,
+    coins,
+    isSpectator,
+    openPauseMenu,
+    closePauseMenuAndResume,
+    sendButton,
+    showRamToast,
+  };
+
+  // Raccourcis manette physique : Select = Sync Crédits (Coin), Double Start = Menu du jeu
+  useEffect(() => {
+    if (!session || session.kind === 'j2me' || typeof navigator === 'undefined' || !navigator.getGamepads) {
+      return undefined;
+    }
+    let rafId = 0;
+    let prevSelect = false;
+    let prevStart = false;
+    let lastStartTapAt = 0;
+
+    const pollPad = () => {
+      try {
+        const pads = navigator.getGamepads();
+        let selectNow = false;
+        let startNow = false;
+        for (let i = 0; i < pads.length; i += 1) {
+          const p = pads[i];
+          if (!p?.buttons) continue;
+          if (p.buttons[8]?.pressed) selectNow = true;
+          if (p.buttons[9]?.pressed) startNow = true;
+        }
+
+        const actions = gamepadActionRef.current;
+
+        if (selectNow && !prevSelect && !actions.isSpectator && !actions.pauseMenuOpen) {
+          actions.sendButton('coin');
+          actions.showRamToast('record', `🪙 Crédits synchronisés (${String(actions.coins).padStart(2, '0')}/99)`);
+        }
+
+        if (startNow && !prevStart) {
+          const now = performance.now();
+          if (now - lastStartTapAt <= 400) {
+            lastStartTapAt = 0;
+            if (actions.pauseMenuOpen) actions.closePauseMenuAndResume();
+            else actions.openPauseMenu();
+          } else {
+            lastStartTapAt = now;
+          }
+        }
+
+        prevSelect = selectNow;
+        prevStart = startNow;
+      } catch {}
+      rafId = requestAnimationFrame(pollPad);
+    };
+
+    rafId = requestAnimationFrame(pollPad);
+    return () => {
+      if (rafId) cancelAnimationFrame(rafId);
+    };
+  }, [session]);
+
   const someoneSpeakingInVoice = Boolean(
     voiceState?.roomId &&
       settings?.voice?.audioDucking !== false &&
