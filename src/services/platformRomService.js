@@ -348,7 +348,7 @@ export async function restoreAllRomsFromDirectory() {
 
   let auth = await romStorage.reauthorizeDirectory('read');
   if (!auth.granted) {
-    // Si l'autorisation précédente a été révoquée, redemander la sélection du dossier
+    // Si l'autorisation précédente a été révoquée ou absente, redemander la sélection du dossier
     try {
       await romStorage.pickRomsDirectory();
       auth = await romStorage.reauthorizeDirectory('read');
@@ -356,11 +356,11 @@ export async function restoreAllRomsFromDirectory() {
       if (e?.name === 'AbortError') {
         throw new Error('Sélection du dossier annulée.');
       }
-      throw new Error('Permission de lecture refusée sur le dossier sélectionné.');
+      throw new Error(`Permission de lecture refusée (${auth.reason || e?.message || 'accès bloqué'}).`);
     }
   }
   if (!auth.granted) {
-    throw new Error('Permission de lecture refusée sur le dossier sélectionné.');
+    throw new Error(`Permission de lecture refusée (${auth.reason || 'accès bloqué'}).`);
   }
 
   const manifest = await romStorage.readManifestFromLinkedDirectory();

@@ -11,6 +11,7 @@ const FS_DB_NAME = 'csw_arcade_fs_handles_db';
 const FS_STORE_NAME = 'handles';
 const FS_DIR_KEY = 'roms_dir';
 const ROM_FILE_REGEX = /\.(zip|7z|nes|sfc|smc|gba|gb|gbc|n64|z64|v64|md|gen|bin|sms|gg|pce|nds|iso|pbp|chd|jar)$/i;
+let memoryDirHandle = null;
 
 function openFsDatabase() {
   return new Promise((resolve, reject) => {
@@ -30,12 +31,16 @@ function openFsDatabase() {
 }
 
 async function getStoredDirHandle() {
+  if (memoryDirHandle) return memoryDirHandle;
   try {
     const db = await openFsDatabase();
     return await new Promise((resolve) => {
       const tx = db.transaction(FS_STORE_NAME, 'readonly');
       const req = tx.objectStore(FS_STORE_NAME).get(FS_DIR_KEY);
-      req.onsuccess = () => resolve(req.result || null);
+      req.onsuccess = () => {
+        memoryDirHandle = req.result || null;
+        resolve(memoryDirHandle);
+      };
       req.onerror = () => resolve(null);
     });
   } catch {
@@ -44,6 +49,7 @@ async function getStoredDirHandle() {
 }
 
 async function setStoredDirHandle(handle) {
+  memoryDirHandle = handle || null;
   const db = await openFsDatabase();
   return new Promise((resolve, reject) => {
     const tx = db.transaction(FS_STORE_NAME, 'readwrite');
@@ -324,20 +330,25 @@ export const romStorage = {
    * Redemande la permission d'accès au dossier mémorisé (utile après redémarrage du navigateur)
    */
   async reauthorizeDirectory(mode = 'readwrite') {
-    const handle = await getStoredDirHandle();
-    if (!handle) return { granted: false, imported: 0, exported: 0 };
-    let perm = await handle.queryPermission({ mode });
-    if (perm !== 'granted') {
-      perm = await handle.requestPermission({ mode });
+    const handle = memoryDirHandle || (await getStoredDirHandle());
+    if (!handle) return { granted: false, reason: 'no-handle', imported: 0, exported: 0 };
+    try {
+      let perm = await handle.queryPermission({ mode });
+      if (perm !== 'granted') {
+        perm = await handle.requestPermission({ mode });
+      }
+      if (perm !== 'granted') {
+        return { granted: false, reason: `perm-${perm}`, imported: 0, exported: 0 };
+      }
+      if (mode === 'readwrite') {
+        const syncStats = await this.syncWithDirectory(handle);
+        return { granted: true, name: handle.name, ...syncStats };
+      }
+      return { granted: true, name: handle.name, imported: 0, exported: 0 };
+    } catch (e) {
+      console.error('[romStorage] reauthorizeDirectory error:', e);
+      return { granted: false, reason: e?.message || 'error', imported: 0, exported: 0 };
     }
-    if (perm !== 'granted') {
-      return { granted: false, imported: 0, exported: 0 };
-    }
-    if (mode === 'readwrite') {
-      const syncStats = await this.syncWithDirectory(handle);
-      return { granted: true, name: handle.name, ...syncStats };
-    }
-    return { granted: true, name: handle.name, imported: 0, exported: 0 };
   },
 
   /**
