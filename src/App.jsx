@@ -1464,7 +1464,7 @@ export default function App() {
             <button
               type="button"
               onClick={() => setSelectedChannelId(GLOBAL_CHANNEL_ID)}
-              className="pointer-events-auto arcade-focus-ring px-4 py-2.5 min-h-[44px] rounded-full bg-emerald-500 hover:bg-emerald-400 text-black font-black text-xs shadow-2xl shadow-emerald-500/25 flex items-center gap-2 transition-transform active:scale-95 border-2 border-neutral-950"
+              className="pointer-events-auto arcade-focus-ring hidden md:flex px-4 py-2.5 min-h-[44px] rounded-full bg-emerald-500 hover:bg-emerald-400 text-black font-black text-xs shadow-2xl shadow-emerald-500/25 items-center gap-2 transition-transform active:scale-95 border-2 border-neutral-950"
               title="Des joueurs sont actuellement connectés au salon. Cliquez pour les rejoindre !"
             >
               <span className="w-2.5 h-2.5 rounded-full bg-black animate-ping shrink-0" aria-hidden="true" />
