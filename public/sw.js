@@ -1,4 +1,4 @@
-const SHELL_CACHE_NAME = 'csw-arcade-shell-v28-sega-cue-fix';
+const SHELL_CACHE_NAME = 'csw-arcade-shell-v29-sega-picodrive-fix';
 const ENGINE_CACHE_NAME = 'csw-arcade-engine-v7';
 
 // Assets essentiels du moteur WebAssembly (FBNeo + EmulatorJS)

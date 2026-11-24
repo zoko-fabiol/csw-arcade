@@ -504,9 +504,12 @@ export function PlatformCatalogView({ mode, onLaunchStage, onCacheChanged, onJoi
     const resolvedCore =
       coreOverride ||
       (ext === 'jar' ? 'j2me' : isKnownNeoZip ? 'fbneo' : RETRO_EXT_CORE_MAP[ext] || cfg.defaultCore);
+    const isArcadeCore = resolvedCore === 'fbneo' || resolvedCore === 'mame2003_plus' || resolvedCore === 'arcade';
     const resolvedFilename =
-      entryOverride?.filename ||
-      (isKnownNeoZip ? `${mappedNeoKey || rawZipKey}.zip` : file.name);
+      (!isArcadeCore && file?.name)
+        ? file.name
+        : (entryOverride?.filename ||
+          (isKnownNeoZip ? `${mappedNeoKey || rawZipKey}.zip` : file.name));
     const matchedNeoMeta =
       !entryOverride && isKnownNeoZip
         ? (Array.isArray(neoGeoGames)
