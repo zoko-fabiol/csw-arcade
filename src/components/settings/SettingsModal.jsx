@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import {
   X,
   Gamepad2,
@@ -129,6 +130,7 @@ export function SettingsModal({
   const [dirInfo, setDirInfo] = useState({ supported: false, configured: false, name: null, permission: 'none' });
   const [isSyncingRoms, setIsSyncingRoms] = useState(false);
   const romImportInputRef = useRef(null);
+  const [portalTarget, setPortalTarget] = useState(() => (typeof document !== 'undefined' ? document.body : null));
   const [controlSubTab, setControlSubTab] = useState('touch');
   const [selectedConsoleId, setSelectedConsoleId] = useState('arcade');
   const [activePlayer, setActivePlayer] = useState('p1');
@@ -216,7 +218,31 @@ export function SettingsModal({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, listeningAction, onClose]);
 
-  if (!isOpen) return null;
+  useEffect(() => {
+    if (!isOpen || typeof document === 'undefined') return;
+    const resolveTarget = () => {
+      const fsEl = document.fullscreenElement || document.webkitFullscreenElement;
+      if (fsEl && fsEl.tagName !== 'IFRAME') {
+        setPortalTarget(fsEl);
+      } else {
+        if (fsEl?.tagName === 'IFRAME') {
+          try {
+            (document.exitFullscreen || document.webkitExitFullscreen)?.call(document);
+          } catch {}
+        }
+        setPortalTarget(document.body);
+      }
+    };
+    resolveTarget();
+    document.addEventListener('fullscreenchange', resolveTarget);
+    document.addEventListener('webkitfullscreenchange', resolveTarget);
+    return () => {
+      document.removeEventListener('fullscreenchange', resolveTarget);
+      document.removeEventListener('webkitfullscreenchange', resolveTarget);
+    };
+  }, [isOpen]);
+
+  if (!isOpen || !portalTarget) return null;
 
   const selectedConsoleProfile = getConsoleControlProfile(selectedConsoleId);
   const universeTheme = getUniverseTheme(platformMode);
@@ -225,9 +251,9 @@ export function SettingsModal({
     settings?.controls?.[activePlayer] ||
     {};
 
-  return (
+  return createPortal(
     <div
-      className="fixed inset-0 z-[100] flex items-end md:items-center justify-center bg-black/80 backdrop-blur-md p-0 md:p-4 font-sans select-none cursor-pointer"
+      className="fixed inset-0 z-[9999] flex items-end md:items-center justify-center bg-black/80 backdrop-blur-md p-0 md:p-4 font-sans select-none cursor-pointer"
       onClick={onClose}
       role="dialog"
       aria-modal="true"
@@ -1667,6 +1693,7 @@ export function SettingsModal({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    portalTarget
   );
 }
