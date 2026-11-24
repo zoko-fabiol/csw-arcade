@@ -86,8 +86,8 @@ const MODE_CONFIG = {
     accent: '#00f0ff',
     cacheMode: null,
     defaultCore: 'mame2003_plus',
-    accept: '.zip,.chd,.pbp,.bin,.iso,.cso,.vpk,.nes,.sfc,.smc,.gba,.gb,.gbc,.n64,.z64,.md,.sms,.gg,.jar',
-    extractExts: ['.nes', '.sfc', '.smc', '.gba', '.gb', '.gbc', '.n64', '.z64', '.md', '.sms', '.gg', '.jar'],
+    accept: '.zip,.chd,.pbp,.bin,.iso,.cso,.vpk,.nes,.sfc,.smc,.gba,.gb,.gbc,.n64,.z64,.v64,.md,.gen,.smd,.32x,.sms,.gg,.pce,.nds,.jar',
+    extractExts: ['.nes', '.sfc', '.smc', '.gba', '.gb', '.gbc', '.n64', '.z64', '.v64', '.md', '.gen', '.bin', '.smd', '.32x', '.sms', '.gg', '.pce', '.nds', '.chd', '.pbp', '.img', '.iso', '.cso', '.vpk', '.jar'],
     searchPlaceholder: 'Filtrer parmi tous les univers…',
     onlinePlaceholder: 'Rechercher n’importe quelle ROM sur Archive.org…',
     filters: [
@@ -150,8 +150,8 @@ const MODE_CONFIG = {
     accent: '#0ea5e9',
     cacheMode: 'sega',
     defaultCore: 'segaMD',
-    accept: '.md,.gen,.bin,.sms,.gg,.zip',
-    extractExts: ['.md', '.gen', '.bin', '.sms', '.gg'],
+    accept: '.md,.gen,.bin,.smd,.32x,.sms,.gg,.zip',
+    extractExts: ['.md', '.gen', '.bin', '.smd', '.32x', '.sms', '.gg'],
     searchPlaceholder: 'Filtrer le catalogue Sega…',
     onlinePlaceholder: 'Rechercher un jeu Sega sur Archive.org (ex: Sonic, Aladdin)…',
     filters: [
@@ -345,15 +345,21 @@ export function PlatformCatalogView({ mode, onLaunchStage, onCacheChanged, onJoi
         const hasCachedAll =
           CATALOG_JSON_CACHE.has('./app/data/arcade-catalog.json') &&
           CATALOG_JSON_CACHE.has('./app/data/extended-catalogs.json') &&
+          CATALOG_JSON_CACHE.has('./app/data/psp-catalog.json') &&
           CATALOG_JSON_CACHE.has('./app/data/java-catalog.json');
         if (!hasCachedAll) setCatalog(base);
         try {
-          const [arcJson, extJson, javaJson] = await Promise.all([
+          const [arcJson, extJson, pspJson, javaJson] = await Promise.all([
             fetchCachedCatalogJson('./app/data/arcade-catalog.json'),
             fetchCachedCatalogJson('./app/data/extended-catalogs.json'),
+            fetchCachedCatalogJson('./app/data/psp-catalog.json'),
             fetchCachedCatalogJson('./app/data/java-catalog.json'),
           ]);
           const arc = buildMergedArcade(arcJson || {});
+          const baseTitles = new Set(base.map((g) => String(g.title || '').toLowerCase()));
+          const extraPsp = Array.isArray(pspJson)
+            ? pspJson.filter((g) => !baseTitles.has(String(g.title || '').toLowerCase()))
+            : [];
           if (!cancelled) {
             setCatalog([
               ...arc.neogeo,
@@ -361,6 +367,7 @@ export function PlatformCatalogView({ mode, onLaunchStage, onCacheChanged, onJoi
               ...arc.retro64_32,
               ...(Array.isArray(extJson?.segaMD) ? extJson.segaMD : []),
               ...base,
+              ...extraPsp,
               ...(Array.isArray(javaJson) ? javaJson : []),
             ]);
           }
@@ -387,7 +394,23 @@ export function PlatformCatalogView({ mode, onLaunchStage, onCacheChanged, onJoi
           /* keep base */
         }
       } else if (mode === 'playstation') {
-        setCatalog(PLAYSTATION_CATALOG);
+        if (!CATALOG_JSON_CACHE.has('./app/data/psp-catalog.json')) {
+          setCatalog(PLAYSTATION_CATALOG);
+        }
+        try {
+          const pspJson = await fetchCachedCatalogJson('./app/data/psp-catalog.json');
+          if (!cancelled && Array.isArray(pspJson)) {
+            const baseTitles = new Set(PLAYSTATION_CATALOG.map((g) => String(g.title || '').toLowerCase()));
+            setCatalog([
+              ...PLAYSTATION_CATALOG,
+              ...pspJson.filter((g) => !baseTitles.has(String(g.title || '').toLowerCase())),
+            ]);
+          } else if (!cancelled) {
+            setCatalog(PLAYSTATION_CATALOG);
+          }
+        } catch {
+          if (!cancelled) setCatalog(PLAYSTATION_CATALOG);
+        }
       } else if (mode === 'sega') {
         if (!CATALOG_JSON_CACHE.has('./app/data/extended-catalogs.json')) {
           setCatalog(SEGA_CATALOG);

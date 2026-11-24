@@ -1,6 +1,7 @@
 /**
  * Service React unifié pour le cache IndexedDB, la recherche Archive.org et le téléchargement des ROMs.
  */
+import JSZip from 'jszip';
 import { NINTENDO_CATALOG, PLAYSTATION_CATALOG, SEGA_CATALOG } from '../data/platformCatalogs';
 import fbneoMapping from '../data/fbneoMapping.json';
 import { romStorage } from './romStorage';
@@ -172,6 +173,13 @@ export async function getCachedRom(id) {
         /* ignore cleanup error */
       }
       return null;
+    }
+    const extracted = await extractRomFromZipIfNeeded(record.data, record.filename, record.core);
+    if (extracted.extracted) {
+      record.data = extracted.buffer;
+      record.filename = extracted.filename;
+      record.size = extracted.buffer.byteLength;
+      saveCachedRom(id, extracted.buffer, record).catch(() => {});
     }
     return record;
   } catch {
@@ -399,19 +407,110 @@ export async function restoreAllRomsFromDirectory() {
   };
 }
 
-let jsZipPromise = null;
 async function ensureJSZip() {
-  if (typeof window !== 'undefined' && window.JSZip) return window.JSZip;
-  if (!jsZipPromise) {
-    jsZipPromise = new Promise((resolve, reject) => {
-      const s = document.createElement('script');
-      s.src = 'https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js';
-      s.onload = () => (window.JSZip ? resolve(window.JSZip) : reject(new Error('JSZip indisponible')));
-      s.onerror = () => reject(new Error('Échec chargement JSZip'));
-      document.head.append(s);
-    });
+  return JSZip;
+}
+
+const ARCADE_ZIP_CORES = new Set(['fbneo', 'arcade', 'mame2003_plus', 'mame2003', 'mame']);
+
+const CORE_EXTRACT_EXTENSIONS = {
+  segamd: ['.md', '.gen', '.bin', '.smd', '.32x'],
+  genesis_plus_gx: ['.md', '.gen', '.bin', '.smd', '.32x', '.sms', '.gg'],
+  picodrive: ['.md', '.gen', '.bin', '.smd', '.32x'],
+  sega32x: ['.32x', '.bin', '.md'],
+  segams: ['.sms', '.bin'],
+  smsplus: ['.sms', '.gg', '.bin'],
+  segagg: ['.gg', '.bin'],
+  nes: ['.nes', '.fds', '.unf'],
+  fceumm: ['.nes', '.fds', '.unf'],
+  nestopia: ['.nes', '.fds', '.unf'],
+  snes: ['.sfc', '.smc', '.fig', '.swc'],
+  snes9x: ['.sfc', '.smc', '.fig', '.swc'],
+  gba: ['.gba'],
+  mgba: ['.gba', '.gb', '.gbc'],
+  gb: ['.gb', '.gbc'],
+  gbc: ['.gbc', '.gb'],
+  gambatte: ['.gb', '.gbc'],
+  n64: ['.z64', '.n64', '.v64'],
+  mupen64plus_next: ['.z64', '.n64', '.v64'],
+  parallel_n64: ['.z64', '.n64', '.v64'],
+  pce: ['.pce', '.bin'],
+  mednafen_pce: ['.pce', '.bin'],
+  nds: ['.nds'],
+  melonds: ['.nds'],
+  desmume: ['.nds'],
+  psx: ['.chd', '.pbp', '.bin', '.img', '.iso'],
+  ps1: ['.chd', '.pbp', '.bin', '.img', '.iso'],
+  pcsx_rearmed: ['.chd', '.pbp', '.bin', '.img', '.iso'],
+  mednafen_psx_hw: ['.chd', '.pbp', '.bin', '.img', '.iso'],
+  psp: ['.iso', '.cso', '.pbp'],
+  ppsspp: ['.iso', '.cso', '.pbp'],
+  j2me: ['.jar'],
+};
+
+const IGNORED_ZIP_EXTS = ['.txt', '.nfo', '.diz', '.url', '.htm', '.html', '.md5', '.sfv', '.png', '.jpg', '.jpeg', '.pdf'];
+
+function isZipBuffer(buffer) {
+  if (!buffer || buffer.byteLength < 4) return false;
+  const h = new Uint8Array(buffer, 0, 4);
+  return h[0] === 0x50 && h[1] === 0x4b && (h[2] === 0x03 || h[2] === 0x05);
+}
+
+async function extractRomFromZipIfNeeded(buffer, filename, core, explicitExts = []) {
+  const normCore = String(core || '').trim().toLowerCase();
+  if (ARCADE_ZIP_CORES.has(normCore)) {
+    return { buffer, filename, extracted: false };
   }
-  return jsZipPromise;
+  const lowerName = String(filename || '').toLowerCase();
+  if (!lowerName.endsWith('.zip') && !isZipBuffer(buffer)) {
+    return { buffer, filename, extracted: false };
+  }
+
+  const coreExts = CORE_EXTRACT_EXTENSIONS[normCore] || [];
+  const allowedExts = Array.from(new Set([...(explicitExts || []), ...coreExts].map((e) => String(e).toLowerCase())));
+  if (allowedExts.length === 0) {
+    return { buffer, filename, extracted: false };
+  }
+
+  try {
+    const zip = await JSZip.loadAsync(buffer);
+    const candidates = Object.values(zip.files).filter((f) => {
+      if (f.dir) return false;
+      const n = f.name.toLowerCase();
+      if (n.startsWith('__macosx/') || n.split('/').pop().startsWith('._')) return false;
+      return !IGNORED_ZIP_EXTS.some((ext) => n.endsWith(ext));
+    });
+
+    const extMatches = candidates.filter((f) => {
+      const n = f.name.toLowerCase();
+      return allowedExts.some((ext) => n.endsWith(ext));
+    });
+
+    const pool = extMatches.length > 0 ? extMatches : candidates;
+    if (pool.length === 0) {
+      return { buffer, filename, extracted: false };
+    }
+
+    // Choisir le plus gros fichier ROM valide (évite les petits .cue / readme)
+    let best = pool[0];
+    let bestSize = best._data?.uncompressedSize ?? 0;
+    for (const item of pool.slice(1)) {
+      const sz = item._data?.uncompressedSize ?? 0;
+      if (sz > bestSize) {
+        best = item;
+        bestSize = sz;
+      }
+    }
+
+    const extractedBuf = await best.async('arraybuffer');
+    const extractedName = best.name.split('/').pop() || filename;
+    if (extractedBuf && extractedBuf.byteLength >= 256) {
+      return { buffer: extractedBuf, filename: extractedName, extracted: true };
+    }
+  } catch (e) {
+    console.warn('[platformRomService] Extraction ZIP échouée, conservation archive:', e?.message);
+  }
+  return { buffer, filename, extracted: false };
 }
 
 export async function padNeoRAGExZipFile(file, padSpec, targetFilename) {
@@ -638,24 +737,14 @@ export async function downloadAndCacheRom(entry, { mode = 'retro', core = 'nes',
 
   verifiedRomIds.add(entryId);
 
-  let finalFilename = entry.filename || `${entryId || 'game'}.zip`;
-  let finalBuffer = buffer;
-
-  if (finalFilename.toLowerCase().endsWith('.zip') && Array.isArray(extractExtensions) && extractExtensions.length > 0) {
-    try {
-      const JSZip = await ensureJSZip();
-      const zip = await JSZip.loadAsync(buffer);
-      const match = Object.values(zip.files).find(
-        (f) => !f.dir && !f.name.startsWith('__MACOSX/') && extractExtensions.some((ext) => f.name.toLowerCase().endsWith(ext))
-      );
-      if (match) {
-        finalBuffer = await match.async('arraybuffer');
-        finalFilename = match.name.split('/').pop();
-      }
-    } catch {
-      /* keep zip as fallback */
-    }
-  }
+  const extResult = await extractRomFromZipIfNeeded(
+    buffer,
+    entry.filename || `${entryId || 'game'}.zip`,
+    entry.core || core,
+    extractExtensions
+  );
+  const finalFilename = extResult.filename;
+  const finalBuffer = extResult.buffer;
 
   if (entryId) {
     await saveCachedRom(entryId, finalBuffer, {

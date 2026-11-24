@@ -15,18 +15,25 @@
       font-family: system-ui, -apple-system, sans-serif;
       overflow: hidden;
     }
-    #game {
-      width: 100%;
-      height: 100%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
+    #game,
+    #game .ejs_game_parent,
+    #game .ejs_canvas_parent {
+      width: 100% !important;
+      height: 100% !important;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      background: #000 !important;
     }
     #game canvas {
+      width: auto !important;
+      height: 100% !important;
       max-width: 100% !important;
       max-height: 100% !important;
-      object-fit: contain;
+      aspect-ratio: 4 / 3;
+      object-fit: contain !important;
       image-rendering: pixelated;
+      margin: auto !important;
     }
     body.smooth #game canvas {
       image-rendering: auto !important;
@@ -36,14 +43,15 @@
       height: 100% !important;
       max-width: none !important;
       max-height: none !important;
+      aspect-ratio: auto !important;
       object-fit: fill !important;
     }
     body.pixel-perfect #game canvas {
       width: auto !important;
-      height: auto !important;
+      height: 100% !important;
       max-width: 100% !important;
       max-height: 100% !important;
-      aspect-ratio: 1 / 1;
+      aspect-ratio: 1 / 1 !important;
       object-fit: contain !important;
       image-rendering: pixelated !important;
     }
@@ -126,6 +134,23 @@
     body.csw-touch-pad .ejs_virtualGamepad_parent,
     body.csw-touch-pad .ejs_virtualGamepad_button {
       display: none !important;
+      pointer-events: none !important;
+    }
+    /* Masquer 100 % des menus, barres d'outils et popups natifs EmulatorJS : uniquement l'image du jeu */
+    #game .ejs_menu_bar,
+    #game .ejs_menu_bar_hidden,
+    #game .ejs_context_menu,
+    #game .ejs_popup_box,
+    #game .ejs_settings_parent,
+    #game .ejs_cheats_parent,
+    #game .ejs_control_bar,
+    #game .ejs_message,
+    #game .ejs_start_button,
+    #game .ejs_loading_text,
+    #game .ejs_ad_iframe {
+      display: none !important;
+      opacity: 0 !important;
+      visibility: hidden !important;
       pointer-events: none !important;
     }
     #credits-hud {
@@ -3336,9 +3361,21 @@
               const u = rawU.toLowerCase();
               const serveBuf = (bytes) => {
                 const buf = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
+                const respType = String(this.responseType || '').toLowerCase();
+                let respValue = buf;
+                if (respType === 'blob') {
+                  respValue = new Blob([buf], { type: 'application/octet-stream' });
+                } else if (respType === 'text' || respType === '') {
+                  try { respValue = new TextDecoder().decode(buf); } catch { respValue = buf; }
+                } else if (respType === 'json') {
+                  try { respValue = JSON.parse(new TextDecoder().decode(buf)); } catch { respValue = null; }
+                }
                 Object.defineProperty(this, 'status', { get: () => 200 });
                 Object.defineProperty(this, 'statusText', { get: () => 'OK' });
-                Object.defineProperty(this, 'response', { get: () => buf });
+                Object.defineProperty(this, 'response', { get: () => respValue });
+                if (respType === 'text' || respType === '') {
+                  Object.defineProperty(this, 'responseText', { get: () => String(respValue || '') });
+                }
                 Object.defineProperty(this, 'readyState', { get: () => 4 });
                 this.getResponseHeader = (h) => {
                   if (!h) return null;
@@ -3419,6 +3456,26 @@
             window.EJS_pathtodata = CDN_DATA;
           }
           window.EJS_startOnLoaded = true;
+          window.EJS_disableDatabases = true;
+          window.EJS_Buttons = {
+            playPause: false,
+            restart: false,
+            mute: false,
+            settings: false,
+            fullscreen: false,
+            saveState: false,
+            loadState: false,
+            screenRecord: false,
+            gamepad: false,
+            cheat: false,
+            volume: false,
+            saveSavFiles: false,
+            loadSavFiles: false,
+            quickSave: false,
+            quickLoad: false,
+            screenshot: false,
+            cacheManager: false,
+          };
           window.EJS_threads = (String(window.EJS_core || '').toLowerCase() === 'psp' || String(window.EJS_core || '').toLowerCase() === 'ppsspp') && typeof SharedArrayBuffer !== 'undefined';
           window.EJS_color = msg.accent || '#3b82f6';
           if (ctrlCfg) window.EJS_defaultControls = ctrlCfg;
