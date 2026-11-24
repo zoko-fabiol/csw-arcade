@@ -33,7 +33,7 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import { getPlayerIdentity, setPlayerDisplayName } from '../../services/firebaseFightcadeService';
-import { formatBytes, getPlatformCacheStats, listCachedRoms, removeCachedRom, transferAllCacheToDirectory } from '../../services/platformRomService';
+import { formatBytes, getPlatformCacheStats, listCachedRoms, removeCachedRom, transferAllCacheToDirectory, restoreAllRomsFromDirectory } from '../../services/platformRomService';
 import { romStorage } from '../../services/romStorage';
 import { GamepadVisualizer } from './GamepadVisualizer';
 import { CONSOLE_CONTROL_PROFILES, getConsoleControlProfile } from '../../data/consoleControlProfiles';
@@ -1530,6 +1530,42 @@ export function SettingsModal({
                         }
                       }}
                     />
+
+                    {dirInfo.supported && dirInfo.configured && (
+                      <button
+                        type="button"
+                        disabled={isSyncingRoms}
+                        onClick={async () => {
+                          setIsSyncingRoms(true);
+                          try {
+                            const res = await restoreAllRomsFromDirectory();
+                            const [pStats, aStats, info] = await Promise.all([
+                              getPlatformCacheStats(),
+                              romStorage.getStorageStats(),
+                              romStorage.getSavedDirectoryInfo(),
+                            ]);
+                            setCacheInfo(pStats);
+                            setArcadeStats(aStats);
+                            setDirInfo(info);
+                            onCacheCleared?.();
+                            const totalRestored = (res.restoredPlatform || 0) + (res.restoredArcade || 0);
+                            setInlineNotice(
+                              totalRestored > 0
+                                ? `${totalRestored} jeu(x) restauré(s) dans l’émulateur depuis « ${info.name} » (${formatBytes(res.totalBytes)}).`
+                                : `Aucune nouvelle ROM à restaurer dans « ${info.name} ».`
+                            );
+                          } catch (err) {
+                            setInlineNotice(err?.message || 'Erreur lors de la restauration des ROMs.');
+                          } finally {
+                            setIsSyncingRoms(false);
+                          }
+                        }}
+                        className="arcade-focus-ring flex items-center justify-center gap-1.5 px-3.5 py-2 min-h-[42px] rounded-xl bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold transition-colors"
+                      >
+                        <RefreshCw className={`w-3.5 h-3.5 ${isSyncingRoms ? 'animate-spin' : ''}`} aria-hidden="true" />
+                        <span>Restaurer les ROMs</span>
+                      </button>
+                    )}
 
                     {dirInfo.supported && dirInfo.configured && (cacheInfo.count > 0 || Number(arcadeStats.count) > 0) && (
                       <button

@@ -337,6 +337,55 @@ export async function transferAllCacheToDirectory() {
   return { transferred, failed, totalBytes };
 }
 
+/**
+ * Restaure dans les caches de l'émulateur (csw_platform_roms_db + csw_arcade_roms_db)
+ * tous les jeux présents dans le dossier lié (utile lors d'un changement de navigateur).
+ */
+export async function restoreAllRomsFromDirectory() {
+  let dirInfo = await romStorage.getSavedDirectoryInfo();
+  if (!dirInfo.supported) {
+    throw new Error('Votre navigateur ne supporte pas la lecture directe d’un dossier.');
+  }
+  if (!dirInfo.configured) {
+    throw new Error('Veuillez d’abord sélectionner un dossier ROMs.');
+  }
+  if (dirInfo.permission !== 'granted') {
+    const auth = await romStorage.reauthorizeDirectory();
+    if (!auth.granted) {
+      throw new Error('Permission de lecture refusée sur le dossier sélectionné.');
+    }
+  }
+
+  const manifest = await romStorage.readManifestFromLinkedDirectory();
+  const entries = Object.values(manifest || {}).filter((m) => m && m.id && m.filename);
+
+  let restoredPlatform = 0;
+  let totalBytes = 0;
+
+  for (const meta of entries) {
+    const buffer = await romStorage.readFileFromLinkedDirectory(meta.filename);
+    if (!buffer || !isValidRomBuffer(buffer, meta.filename)) continue;
+    const saved = await saveCachedRom(meta.id, buffer, meta);
+    if (saved) {
+      restoredPlatform += 1;
+      totalBytes += buffer.byteLength || 0;
+    }
+  }
+
+  // Restaure aussi les archives Arcade/NeoGeo (.zip) dans csw_arcade_roms_db
+  const arcadeSync = await romStorage.syncWithDirectory();
+
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('rom-downloaded', { detail: { filename: 'restore' } }));
+  }
+
+  return {
+    restoredPlatform,
+    restoredArcade: arcadeSync?.imported || 0,
+    totalBytes,
+  };
+}
+
 let jsZipPromise = null;
 async function ensureJSZip() {
   if (typeof window !== 'undefined' && window.JSZip) return window.JSZip;
