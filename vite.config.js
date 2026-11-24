@@ -91,9 +91,38 @@ function nativeLauncherPlugin() {
     name: 'native-launcher-middleware',
     configureServer(server) {
       server.middlewares.use('/api/launch-native', (req, res) => {
+        const remoteAddr = req.socket?.remoteAddress || '';
+        const isLoopback = remoteAddr === '127.0.0.1' || remoteAddr === '::1' || remoteAddr === '::ffff:127.0.0.1';
+        if (!isLoopback) {
+          res.statusCode = 403;
+          res.setHeader('Content-Type', 'application/json');
+          return res.end(JSON.stringify({ success: false, error: 'Accès réservé à la machine locale' }));
+        }
+        if (req.method !== 'POST') {
+          res.statusCode = 405;
+          res.setHeader('Content-Type', 'application/json');
+          return res.end(JSON.stringify({ success: false, error: 'Méthode POST requise' }));
+        }
+        const origin = req.headers.origin;
+        if (origin && !/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(origin)) {
+          res.statusCode = 403;
+          res.setHeader('Content-Type', 'application/json');
+          return res.end(JSON.stringify({ success: false, error: 'Origine non autorisée' }));
+        }
         let body = '';
-        req.on('data', chunk => { body += chunk; });
+        let aborted = false;
+        req.on('data', chunk => {
+          if (aborted) return;
+          body += chunk;
+          if (body.length > 16 * 1024) {
+            aborted = true;
+            res.statusCode = 413;
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify({ success: false, error: 'Payload trop volumineux' }));
+          }
+        });
         req.on('end', () => {
+          if (aborted) return;
           try {
             const data = body ? JSON.parse(body) : {};
             syncNeoRAGExIni(data.settings);
@@ -114,7 +143,7 @@ function nativeLauncherPlugin() {
             res.end(JSON.stringify({ success: true, pid: child.pid }));
           } catch (err) {
             res.statusCode = 500;
-            res.end(JSON.stringify({ success: false, error: err.message }));
+            res.end(JSON.stringify({ success: false, error: 'Erreur lancement émulateur natif' }));
           }
         });
       });

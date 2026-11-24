@@ -1757,6 +1757,7 @@
 
       // Écoute des mises à jour dynamiques depuis CSW-Arcade (SettingsModal) et transferts de touches
       window.addEventListener('message', (event) => {
+        if (event.origin && window.location.origin && event.origin !== window.location.origin) return;
         if (!event.data) return;
         if (event.data.type === 'UPDATE_SETTINGS' && event.data.settings) {
           applyLiveSettings(event.data.settings);

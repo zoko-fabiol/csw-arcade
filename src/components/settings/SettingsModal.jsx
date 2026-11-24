@@ -1,14 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  X, 
-  Gamepad2, 
-  Tv, 
-  Volume2, 
-  VolumeX, 
-  Cpu, 
-  RotateCcw, 
-  Check, 
-  Sliders, 
+import {
+  X,
+  Gamepad2,
+  Tv,
+  Volume2,
+  VolumeX,
+  Cpu,
+  RotateCcw,
+  Check,
+  Sliders,
   Keyboard,
   Smartphone,
   Vibrate,
@@ -18,11 +18,9 @@ import {
   Move,
   Sparkles,
   ShieldAlert,
-  Layers,
-  Lock,
   Swords,
   Database,
-  Trash2
+  Trash2,
 } from 'lucide-react';
 import { getPlayerIdentity, setPlayerDisplayName } from '../../services/firebaseFightcadeService';
 import { formatBytes, getPlatformCacheStats, listCachedRoms, removeCachedRom } from '../../services/platformRomService';
@@ -30,25 +28,84 @@ import { GamepadVisualizer } from './GamepadVisualizer';
 import { CONSOLE_CONTROL_PROFILES, getConsoleControlProfile } from '../../data/consoleControlProfiles';
 import { useDeviceType } from '../../utils/deviceDetector';
 import { SHADER_PRESETS, resolveProfile } from '../../utils/performanceProfile';
+import { getUniverseTheme } from '../../data/universeThemes';
 
-export function SettingsModal({ 
-  isOpen, 
-  onClose, 
-  settings, 
-  updateKeyBinding, 
+function SettingsSwitch({ checked, onChange, label, description, icon: Icon, accentTone = 'universe' }) {
+  const activeStyle =
+    accentTone === 'amber'
+      ? { backgroundColor: '#f59e0b' }
+      : { backgroundColor: 'var(--u-accent)' };
+
+  return (
+    <div className="p-3.5 rounded-2xl bg-neutral-950/80 border border-white/10 hover:border-white/20 transition-colors flex items-center justify-between gap-3">
+      <div className="flex items-start gap-3 min-w-0">
+        {Icon && (
+          <div className="w-8 h-8 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center shrink-0 mt-0.5">
+            <Icon
+              className={`w-4 h-4 ${accentTone === 'amber' ? 'text-amber-400' : 'u-accent-text'}`}
+              aria-hidden="true"
+            />
+          </div>
+        )}
+        <div className="min-w-0">
+          <span className="font-bold text-neutral-100 block text-xs sm:text-[13px] leading-snug">
+            {label}
+          </span>
+          {description && (
+            <span className="text-[11px] text-neutral-400 block mt-0.5 leading-relaxed">
+              {description}
+            </span>
+          )}
+        </div>
+      </div>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={Boolean(checked)}
+        aria-label={label}
+        onClick={() => onChange(!checked)}
+        style={checked ? activeStyle : undefined}
+        className={`arcade-focus-ring relative inline-flex h-7 w-12 shrink-0 items-center rounded-full border transition-colors ${
+          checked ? 'border-transparent' : 'bg-neutral-800 border-white/15'
+        }`}
+      >
+        <span
+          className={`inline-block h-5 w-5 rounded-full bg-white shadow-md transition-transform ${
+            checked ? 'translate-x-6' : 'translate-x-1'
+          }`}
+        />
+      </button>
+    </div>
+  );
+}
+
+const NAV_TABS = [
+  { id: 'controls', label: 'Contrôles', short: 'Contrôles', desc: 'Tactile, Manette & Clavier', icon: Gamepad2 },
+  { id: 'video', label: 'Affichage & CRT', short: 'Vidéo', desc: 'Shaders, Ratio & Stream', icon: Tv },
+  { id: 'audio', label: 'Audio', short: 'Audio', desc: 'Volume & Sortie son', icon: Volume2 },
+  { id: 'system', label: 'Système & BIOS', short: 'BIOS', desc: 'MVS/AES & Région', icon: Cpu },
+  { id: 'netplay', label: 'Salon & Cache', short: 'Salon', desc: 'Fightcade 2, P2P & ROMs', icon: Swords },
+];
+
+export function SettingsModal({
+  isOpen,
+  onClose,
+  platformMode = 'all',
+  settings,
+  updateKeyBinding,
   updateConsoleKeyBinding,
   updateConsoleGamepadBinding,
   resetConsoleControls,
-  updateVideoSetting, 
-  updateAudioSetting, 
-  updateSystemSetting, 
+  updateVideoSetting,
+  updateAudioSetting,
+  updateSystemSetting,
   updateGamepadSetting,
   updateTouchSetting,
   updatePerformanceSetting,
   updateNetplaySetting,
   onCacheCleared,
   resetToDefaults,
-  resetSettings 
+  resetSettings,
 }) {
   const handleReset = resetToDefaults || resetSettings;
   const [activeTab, setActiveTab] = useState('controls');
@@ -59,10 +116,26 @@ export function SettingsModal({
   const [activePlayer, setActivePlayer] = useState('p1');
   const [listeningAction, setListeningAction] = useState(null);
   const [connectedGamepad, setConnectedGamepad] = useState(null);
+  const [inlineNotice, setInlineNotice] = useState('');
   const { isMobile } = useDeviceType();
   const currentProfile = resolveProfile(settings?.performance?.profile ?? 'auto');
   const isStreamMode = !!settings?.performance?.streamMode;
   const currentShaderId = settings?.video?.shader || 'none';
+
+  // Synchroniser le profil de console sélectionné avec l'univers actif à l'ouverture
+  useEffect(() => {
+    if (!isOpen) return;
+    if (CONSOLE_CONTROL_PROFILES.some((p) => p.id === platformMode)) {
+      setSelectedConsoleId(platformMode);
+    }
+    getPlatformCacheStats().then(setCacheInfo).catch(() => {});
+  }, [isOpen, platformMode]);
+
+  useEffect(() => {
+    if (!inlineNotice) return;
+    const t = setTimeout(() => setInlineNotice(''), 3000);
+    return () => clearTimeout(t);
+  }, [inlineNotice]);
 
   // Détection des manettes connectées
   useEffect(() => {
@@ -70,11 +143,7 @@ export function SettingsModal({
       if (typeof navigator !== 'undefined' && navigator.getGamepads) {
         const gps = navigator.getGamepads();
         const gp = gps[0] || gps[1];
-        if (gp) {
-          setConnectedGamepad(gp.id);
-        } else {
-          setConnectedGamepad(null);
-        }
+        setConnectedGamepad(gp ? gp.id : null);
       }
     };
 
@@ -96,13 +165,11 @@ export function SettingsModal({
       e.preventDefault();
       e.stopPropagation();
 
-      // Touche Escape pour annuler
       if (e.code === 'Escape') {
         setListeningAction(null);
         return;
       }
 
-      // Assignation de la touche pour la console sélectionnée
       if (updateConsoleKeyBinding) {
         updateConsoleKeyBinding(selectedConsoleId, activePlayer, listeningAction, e.code);
       } else {
@@ -132,862 +199,895 @@ export function SettingsModal({
   if (!isOpen) return null;
 
   const selectedConsoleProfile = getConsoleControlProfile(selectedConsoleId);
+  const universeTheme = getUniverseTheme(platformMode);
   const activeKeyboardMap =
     settings?.consoleControls?.[selectedConsoleId]?.keyboard?.[activePlayer] ||
     settings?.controls?.[activePlayer] ||
     {};
 
   return (
-    <div 
-      className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center bg-black/80 backdrop-blur-md p-0 sm:p-4 font-mono select-none cursor-pointer"
+    <div
+      className="fixed inset-0 z-[100] flex items-end md:items-center justify-center bg-black/80 backdrop-blur-md p-0 md:p-4 font-sans select-none cursor-pointer"
       onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="settings-modal-title"
     >
-      <div 
-        className="relative w-full max-w-3xl bg-neutral-900 border-t sm:border border-neutral-800 rounded-t-2xl sm:rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[94dvh] pb-safe cursor-default"
+      <div
+        className="relative w-full max-w-4xl bg-neutral-900 border-t md:border border-white/15 rounded-t-3xl md:rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[94dvh] md:h-[82dvh] pb-safe cursor-default"
         onClick={(e) => e.stopPropagation()}
       >
-        
-        {/* Header Modale */}
-        <div className="p-3.5 sm:p-5 border-b border-neutral-800 flex items-center justify-between bg-neutral-950/60">
-          <div className="flex items-center gap-2.5 sm:gap-3">
-            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-cyan-500/20 border border-cyan-500/40 flex items-center justify-center text-cyan-400 shrink-0">
-              <Sliders className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+        {/* Header Modale — Thématisé par la console active */}
+        <div className="u-banner px-4 sm:px-6 py-3.5 sm:py-4 border-b flex items-center justify-between gap-3 shrink-0">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-10 h-10 rounded-2xl u-badge flex items-center justify-center shrink-0">
+              <Sliders className="w-4 h-4" aria-hidden="true" />
             </div>
-            <div>
-              <h3 className="text-xs sm:text-sm font-bold text-white uppercase tracking-wider">
-                <span className="hidden sm:inline">Configuration Matérielle NeoRAGEx</span>
-                <span className="sm:hidden">PARAMÈTRES NEORAGEX</span>
-              </h3>
-              <p className="text-[9px] sm:text-[10px] text-neutral-400">
-                Inputs, CRT & MVS/AES
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3
+                  id="settings-modal-title"
+                  className="text-sm sm:text-base font-black text-white tracking-tight truncate"
+                >
+                  {universeTheme.settingsTitle}
+                </h3>
+                <span className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-md u-badge text-[10px] font-mono font-bold shrink-0">
+                  {universeTheme.symbols ? (
+                    <span className="inline-flex items-center gap-0.5" aria-hidden="true">
+                      {universeTheme.symbols.map((s) => (
+                        <span key={s.label} style={{ color: s.color }}>{s.glyph}</span>
+                      ))}
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-0.5" aria-hidden="true">
+                      {universeTheme.jewels.map((hex, i) => (
+                        <span key={i} className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: hex }} />
+                      ))}
+                    </span>
+                  )}
+                  <span>{universeTheme.hardwareTag}</span>
+                </span>
+              </div>
+              <p className="text-[11px] sm:text-xs text-neutral-300 truncate mt-0.5">
+                {universeTheme.settingsSubtitle}
               </p>
             </div>
           </div>
 
           <button
+            type="button"
             onClick={onClose}
-            className="p-1.5 rounded-lg text-neutral-400 hover:text-white hover:bg-neutral-800 transition-colors"
+            aria-label="Fermer les paramètres"
+            title="Fermer (Échap)"
+            className="arcade-focus-ring p-2 min-w-[44px] min-h-[44px] rounded-xl bg-white/5 hover:bg-white/15 border border-white/10 text-neutral-200 hover:text-white flex items-center justify-center transition-colors shrink-0"
           >
-            <X className="w-5 h-5" />
+            <X className="w-5 h-5" aria-hidden="true" />
           </button>
         </div>
 
-        {/* Onglets Principaux Responsive */}
-        <div className="grid grid-cols-5 border-b border-neutral-800 bg-neutral-950 text-[10px] sm:text-xs font-bold text-center">
-          {[
-            { id: 'controls', full: 'CONTRÔLES', short: 'CONTRÔLE', icon: Gamepad2 },
-            { id: 'video', full: 'AFFICHAGE & CRT', short: 'VIDÉO', icon: Tv },
-            { id: 'audio', full: 'AUDIO', short: 'AUDIO', icon: Volume2 },
-            { id: 'system', full: 'SYSTÈME & BIOS', short: 'BIOS', icon: Cpu },
-            { id: 'netplay', full: 'FIGHTCADE & CACHE', short: 'FC2', icon: Swords }
-          ].map((tab) => {
-            const Icon = tab.icon;
-            const active = activeTab === tab.id;
-            return (
-              <button
-                key={tab.id}
-                onClick={() => { setActiveTab(tab.id); setListeningAction(null); }}
-                className={`py-2.5 sm:py-3 flex items-center justify-center gap-1.5 sm:gap-2 border-b-2 transition-all ${
-                  active 
-                    ? 'border-cyan-400 text-cyan-400 bg-cyan-950/20' 
-                    : 'border-transparent text-neutral-400 hover:text-white'
-                }`}
-              >
-                <Icon className="w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0" />
-                <span className="hidden sm:inline">{tab.full}</span>
-                <span className="sm:hidden">{tab.short}</span>
-              </button>
-            );
-          })}
+        {/* Navigation Mobile (< md) — Pilules horizontales tactiles 44px */}
+        <div className="md:hidden relative border-b border-white/10 bg-neutral-950/90 shrink-0">
+          <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar px-3 py-2 pr-8">
+            {NAV_TABS.map((tab) => {
+              const Icon = tab.icon;
+              const active = activeTab === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => {
+                    setActiveTab(tab.id);
+                    setListeningAction(null);
+                  }}
+                  className={`arcade-focus-ring px-3.5 py-2 min-h-[44px] rounded-xl text-xs font-bold shrink-0 flex items-center gap-1.5 border transition-all ${
+                    active
+                      ? 'u-btn-primary'
+                      : 'bg-neutral-900 border-white/10 text-neutral-200 hover:text-white'
+                  }`}
+                >
+                  <Icon className="w-4 h-4 shrink-0" aria-hidden="true" />
+                  <span>{tab.short}</span>
+                </button>
+              );
+            })}
+          </div>
+          <div
+            className="pointer-events-none absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-neutral-950 to-transparent"
+            aria-hidden="true"
+          />
         </div>
 
-        {/* Corps de la Modale */}
-        <div className="p-3.5 sm:p-6 flex-1 overflow-y-auto space-y-4 sm:space-y-6 text-xs">
-          
-          {/* ================= ONGLET 1 : CONTRÔLES ================= */}
-          {activeTab === 'controls' && (
-            <div className="space-y-4 sm:space-y-5">
-              {/* Sous-navigation Contrôles : Tactile / Manette / Clavier */}
-              <div className="grid grid-cols-3 gap-1.5 sm:gap-2 p-1 bg-neutral-950 rounded-xl border border-neutral-800 text-[11px] sm:text-xs font-bold">
+        {/* Corps principal : Sidebar gauche (Desktop md+) + Contenu scrollable */}
+        <div className="flex flex-1 min-h-0 overflow-hidden">
+          {/* Sidebar Desktop (md+) */}
+          <aside className="hidden md:flex w-60 shrink-0 flex-col gap-1.5 p-3 border-r border-white/10 bg-neutral-950/60 overflow-y-auto">
+            {NAV_TABS.map((tab) => {
+              const Icon = tab.icon;
+              const active = activeTab === tab.id;
+              return (
                 <button
-                  onClick={() => setControlSubTab('touch')}
-                  className={`py-1.5 sm:py-2 px-2 sm:px-3 rounded-lg flex items-center justify-center gap-1.5 sm:gap-2 transition-all ${
-                    controlSubTab === 'touch'
-                      ? 'bg-cyan-500 text-black shadow-md'
-                      : 'text-neutral-400 hover:text-white hover:bg-neutral-900'
+                  key={tab.id}
+                  type="button"
+                  onClick={() => {
+                    setActiveTab(tab.id);
+                    setListeningAction(null);
+                  }}
+                  className={`arcade-focus-ring w-full text-left px-3 py-2.5 rounded-2xl border transition-all flex items-center gap-3 ${
+                    active
+                      ? 'u-tab-active'
+                      : 'border-transparent text-neutral-300 hover:text-white hover:bg-white/5'
                   }`}
                 >
-                  <Smartphone className="w-3.5 h-3.5 shrink-0" />
-                  <span className="hidden sm:inline">TACTILE MOBILE</span>
-                  <span className="sm:hidden">TACTILE</span>
-                </button>
-
-                <button
-                  onClick={() => setControlSubTab('gamepad')}
-                  className={`py-1.5 sm:py-2 px-2 sm:px-3 rounded-lg flex items-center justify-center gap-1.5 sm:gap-2 transition-all ${
-                    controlSubTab === 'gamepad'
-                      ? 'bg-cyan-500 text-black shadow-md'
-                      : 'text-neutral-400 hover:text-white hover:bg-neutral-900'
-                  }`}
-                >
-                  <Gamepad2 className="w-3.5 h-3.5 shrink-0" />
-                  <span className="hidden sm:inline">MANETTE (BLUETOOTH)</span>
-                  <span className="sm:hidden">MANETTE</span>
-                </button>
-
-                <button
-                  onClick={() => setControlSubTab('keyboard')}
-                  className={`py-1.5 sm:py-2 px-2 sm:px-3 rounded-lg flex items-center justify-center gap-1.5 sm:gap-2 transition-all ${
-                    controlSubTab === 'keyboard'
-                      ? 'bg-cyan-500 text-black shadow-md'
-                      : 'text-neutral-400 hover:text-white hover:bg-neutral-900'
-                  }`}
-                >
-                  <Keyboard className="w-3.5 h-3.5 shrink-0" />
-                  <span className="hidden sm:inline">CLAVIER (P1 / P2)</span>
-                  <span className="sm:hidden">CLAVIER</span>
-                </button>
-              </div>
-
-              {/* Sélecteur de Console (Arcade, Nintendo, PlayStation, Sega, Java) pour Manette & Clavier */}
-              {(controlSubTab === 'gamepad' || controlSubTab === 'keyboard') && (
-                <div className="p-2.5 rounded-xl bg-neutral-950 border border-neutral-800 space-y-2">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-[10px] font-mono uppercase text-neutral-400">
-                      Console à configurer ({controlSubTab === 'keyboard' ? 'Clavier' : 'Manette'}) :
-                    </span>
-                    {resetConsoleControls && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          resetConsoleControls(selectedConsoleId);
-                          setListeningAction(null);
-                        }}
-                        className="text-[10px] font-bold text-amber-300 hover:text-amber-200 flex items-center gap-1"
-                      >
-                        <RotateCcw className="w-3 h-3" />
-                        <span>Réinitialiser {selectedConsoleProfile.shortLabel}</span>
-                      </button>
-                    )}
-                  </div>
-                  <div className="grid grid-cols-5 gap-1.5">
-                    {CONSOLE_CONTROL_PROFILES.map((prof) => {
-                      const active = prof.id === selectedConsoleId;
-                      return (
-                        <button
-                          key={prof.id}
-                          type="button"
-                          onClick={() => {
-                            setSelectedConsoleId(prof.id);
-                            setListeningAction(null);
-                          }}
-                          className={`py-1.5 px-2 rounded-lg text-[10px] sm:text-[11px] font-bold border transition-all truncate ${
-                            active
-                              ? 'bg-cyan-500/20 border-cyan-400 text-cyan-200 shadow-sm'
-                              : 'bg-neutral-900 border-neutral-800 text-neutral-400 hover:text-white hover:border-neutral-700'
-                          }`}
-                          title={prof.description}
-                        >
-                          {prof.shortLabel}
-                        </button>
-                      );
-                    })}
-                  </div>
-                  <p className="text-[10px] text-neutral-500 font-mono">
-                    {selectedConsoleProfile.description}
-                  </p>
-                </div>
-              )}
-
-              {/* Sous-onglet 1 : MANETTE INTERACTIVE */}
-              {controlSubTab === 'gamepad' && (
-                <GamepadVisualizer
-                  settings={settings}
-                  onUpdateGamepadSetting={updateGamepadSetting}
-                  consoleProfile={selectedConsoleProfile}
-                  consoleGamepadButtons={settings?.consoleControls?.[selectedConsoleId]?.gamepad || {}}
-                  onUpdateConsoleGamepadButton={(actionKey, physIdx) =>
-                    updateConsoleGamepadBinding?.(selectedConsoleId, actionKey, physIdx)
-                  }
-                />
-              )}
-
-              {/* Sous-onglet 2 : CLAVIER */}
-              {controlSubTab === 'keyboard' && (
-                <div className="space-y-4">
-                  {/* Sélecteur Joueur 1 / Joueur 2 */}
-                  <div className="flex items-center justify-between bg-neutral-950 p-2 rounded-xl border border-neutral-800">
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => { setActivePlayer('p1'); setListeningAction(null); }}
-                        className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                          activePlayer === 'p1' 
-                            ? 'bg-cyan-500 text-black shadow-sm' 
-                            : 'text-neutral-400 hover:text-white'
-                        }`}
-                      >
-                        JOUEUR 1
-                      </button>
-                      <button
-                        onClick={() => { setActivePlayer('p2'); setListeningAction(null); }}
-                        className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                          activePlayer === 'p2' 
-                            ? 'bg-red-500 text-black shadow-sm' 
-                            : 'text-neutral-400 hover:text-white'
-                        }`}
-                      >
-                        JOUEUR 2
-                      </button>
-                    </div>
-
-                    <div className="text-[11px] flex items-center gap-2 text-neutral-400">
-                      <Gamepad2 className="w-3.5 h-3.5 text-cyan-400" />
-                      {connectedGamepad ? (
-                        <span className="text-emerald-400 font-bold truncate max-w-[200px]" title={connectedGamepad}>
-                          {connectedGamepad}
-                        </span>
-                      ) : (
-                        <span className="text-neutral-500">Aucune manette détectée</span>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Message instructif si écoute de touche */}
-                  {listeningAction && (
-                    <div className="p-3 bg-cyan-950/80 border border-cyan-500 rounded-xl text-center text-cyan-300 animate-pulse font-bold">
-                      Appuyez sur la touche souhaitée pour [{selectedConsoleProfile.label}] « {listeningAction.toUpperCase()} » (ou Échap pour annuler)...
-                    </div>
-                  )}
-
-                  {/* Grille de Mapping des Touches pour la console sélectionnée */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                    {selectedConsoleProfile.actions.map(({ key, label }) => {
-                      const currentCode = activeKeyboardMap[key] || 'Non assigné';
-                      const isListening = listeningAction === key;
-
-                      return (
-                        <div 
-                          key={key}
-                          className="p-3 bg-neutral-950 border border-neutral-800 rounded-xl flex items-center justify-between gap-2 hover:border-neutral-700 transition-colors"
-                        >
-                          <span className="text-neutral-300 text-[11px] font-medium">{label}</span>
-                          <button
-                            onClick={() => setListeningAction(key)}
-                            className={`px-3 py-1.5 rounded-lg text-xs font-bold font-mono shrink-0 transition-all ${
-                              isListening 
-                                ? 'bg-cyan-500 text-black animate-bounce' 
-                                : 'bg-neutral-800 hover:bg-neutral-700 text-white'
-                            }`}
-                          >
-                            {isListening ? 'Appuyez...' : String(currentCode).replace('Key', '').replace('Digit', '')}
-                          </button>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
-              {/* Sous-onglet 3 : TACTILE MOBILE */}
-              {controlSubTab === 'touch' && (
-                <div className="space-y-4 p-4 rounded-xl bg-neutral-950 border border-neutral-800">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h4 className="text-xs font-bold text-white uppercase flex items-center gap-2">
-                        <Smartphone className="w-4 h-4 text-cyan-400" />
-                        Options Tactiles & Ergonomie Mobile
-                      </h4>
-                      <p className="text-[11px] text-neutral-400 mt-0.5">
-                        Personnalisez le contrôleur virtuel pour une expérience arcade optimale
-                      </p>
-                    </div>
-                    <span className="px-2.5 py-1 rounded-full text-[10px] bg-cyan-950 border border-cyan-500/40 text-cyan-300 font-bold">
-                      A, B, X, Y
-                    </span>
-                  </div>
-
-                  {/* 1. Retour Haptique (Vibration) */}
-                  <div className="p-3 bg-neutral-900/90 border border-neutral-800 rounded-xl flex items-center justify-between">
-                    <div className="flex items-center gap-2.5">
-                      <Vibrate className="w-4 h-4 text-cyan-400 shrink-0" />
-                      <div>
-                        <span className="font-bold text-neutral-200 block text-xs">Vibration Haptique</span>
-                        <span className="text-[10px] text-neutral-400">Micro-vibration à chaque appui pour simuler de vrais boutons</span>
-                      </div>
-                    </div>
-                    <input
-                      type="checkbox"
-                      checked={settings.touch?.vibration ?? true}
-                      onChange={(e) => updateTouchSetting('vibration', e.target.checked)}
-                      className="w-5 h-5 accent-cyan-500 cursor-pointer rounded"
-                    />
-                  </div>
-
-                  {/* 2. Opacité des Touches */}
-                  <div className="p-3 bg-neutral-900/90 border border-neutral-800 rounded-xl space-y-2">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2.5">
-                        <Eye className="w-4 h-4 text-cyan-400 shrink-0" />
-                        <div>
-                          <span className="font-bold text-neutral-200 block text-xs">Opacité des Touches</span>
-                          <span className="text-[10px] text-neutral-400">Transparence des contrôles sur l'écran</span>
-                        </div>
-                      </div>
-                      <span className="text-xs font-mono font-bold text-cyan-400">
-                        {settings.touch?.opacity ?? 75}%
-                      </span>
-                    </div>
-                    <input
-                      type="range"
-                      min="20"
-                      max="100"
-                      step="5"
-                      value={settings.touch?.opacity ?? 75}
-                      onChange={(e) => updateTouchSetting('opacity', Number(e.target.value))}
-                      className="w-full accent-cyan-500 cursor-pointer h-1.5 bg-neutral-800 rounded-lg"
-                    />
-                  </div>
-
-                  {/* 3. Taille des Touches */}
-                  <div className="p-3 bg-neutral-900/90 border border-neutral-800 rounded-xl space-y-2">
-                    <span className="font-bold text-neutral-200 block text-xs">Taille des Boutons & D-Pad</span>
-                    <div className="grid grid-cols-3 gap-2">
-                      {[
-                        { val: 80, label: 'Compact (80%)' },
-                        { val: 100, label: 'Normal (100%)' },
-                        { val: 120, label: 'Grand (120%)' }
-                      ].map((item) => (
-                        <button
-                          key={item.val}
-                          onClick={() => updateTouchSetting('scale', item.val)}
-                          className={`py-1.5 px-2 rounded-lg text-[11px] font-bold border transition-all ${
-                            (settings.touch?.scale ?? 100) === item.val
-                              ? 'bg-cyan-500/20 border-cyan-500 text-cyan-300'
-                              : 'bg-neutral-950 border-neutral-800 text-neutral-400 hover:text-white'
-                          }`}
-                        >
-                          {item.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* 4. Type de Contrôle Directionnel (Croix D-Pad vs Analogue) */}
-                  <div className="p-3 bg-neutral-900/90 border border-neutral-800 rounded-xl space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="font-bold text-neutral-200 block text-xs">Type de Contrôle Directionnel</span>
-                      <span className="text-[10px] text-cyan-400 font-mono font-bold">
-                        {(settings.touch?.dpadType ?? 'analog') === 'dpad' ? 'CROIX D-PAD' : 'JOYSTICK'}
-                      </span>
-                    </div>
-                    <div className="grid grid-cols-2 gap-2">
-                      <button
-                        onClick={() => updateTouchSetting('dpadType', 'dpad')}
-                        className={`py-2 px-2.5 rounded-lg text-[11px] font-bold border text-left transition-all ${
-                          (settings.touch?.dpadType ?? 'analog') === 'dpad'
-                            ? 'bg-cyan-500/20 border-cyan-500 text-cyan-300 shadow-sm'
-                            : 'bg-neutral-950 border-neutral-800 text-neutral-400 hover:text-white'
-                        }`}
-                      >
-                        <span className="flex items-center gap-1.5 font-bold">
-                          <Move className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
-                          <span>Croix D-Pad Classique</span>
-                        </span>
-                        <span className="text-[9px] text-neutral-400 font-normal block mt-0.5">
-                          Croix directionnelle rétro 4/8 directions
-                        </span>
-                      </button>
-
-                      <button
-                        onClick={() => updateTouchSetting('dpadType', 'analog')}
-                        className={`py-2 px-2.5 rounded-lg text-[11px] font-bold border text-left transition-all ${
-                          (settings.touch?.dpadType ?? 'analog') === 'analog'
-                            ? 'bg-cyan-500/20 border-cyan-500 text-cyan-300 shadow-sm'
-                            : 'bg-neutral-950 border-neutral-800 text-neutral-400 hover:text-white'
-                        }`}
-                      >
-                        <span className="flex items-center gap-1.5 font-bold">
-                          <Compass className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
-                          <span>Joystick Analogue Virtuel</span>
-                        </span>
-                        <span className="text-[9px] text-neutral-400 font-normal block mt-0.5">
-                          Stick rotatif 360° avec centrage
-                        </span>
-                      </button>
-                    </div>
-
-                    {/* Si Joystick Analogue est sélectionné : Choix Flottant vs Fixe */}
-                    {(settings.touch?.dpadType ?? 'analog') === 'analog' && (
-                      <div className="pt-2 border-t border-neutral-800/80 space-y-1.5">
-                        <span className="text-[10px] text-neutral-400 block font-semibold">Comportement du stick :</span>
-                        <div className="grid grid-cols-2 gap-2">
-                          <button
-                            onClick={() => updateTouchSetting('joystickMode', 'floating')}
-                            className={`py-1.5 px-2 rounded-lg text-[10px] font-bold border text-left transition-all ${
-                              (settings.touch?.joystickMode ?? 'floating') === 'floating'
-                                ? 'bg-cyan-500/20 border-cyan-500 text-cyan-300'
-                                : 'bg-neutral-950 border-neutral-800 text-neutral-400 hover:text-white'
-                            }`}
-                          >
-                            Flottant (Fortnite style)
-                          </button>
-                          <button
-                            onClick={() => updateTouchSetting('joystickMode', 'fixed')}
-                            className={`py-1.5 px-2 rounded-lg text-[10px] font-bold border text-left transition-all ${
-                              (settings.touch?.joystickMode ?? 'floating') === 'fixed'
-                                ? 'bg-cyan-500/20 border-cyan-500 text-cyan-300'
-                                : 'bg-neutral-950 border-neutral-800 text-neutral-400 hover:text-white'
-                            }`}
-                          >
-                            Position Fixe
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* 5. Guide & Configuration des Touches Tactiles Neo Geo (8 Touches) */}
-                  <div className="p-3 bg-neutral-900/90 border border-neutral-800 rounded-xl space-y-3">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <Gamepad2 className="w-4 h-4 text-cyan-400 shrink-0" />
-                        <div>
-                          <span className="font-bold text-neutral-200 block text-xs">Rôle des Touches Tactiles (Disposition 8 Touches)</span>
-                          <span className="text-[10px] text-neutral-400">Guide des actions pour les jeux de combat et Metal Slug</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[10px]">
-                      {/* Bouton A */}
-                      <div className="p-2 rounded-lg bg-neutral-950 border border-neutral-800 flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <span className="w-6 h-6 rounded-full bg-emerald-500 text-black font-black flex items-center justify-center text-[10px]">A</span>
-                          <div>
-                            <span className="font-bold text-emerald-300 block">Bouton A (Vert)</span>
-                            <span className="text-neutral-400 text-[9px]">Poing Faible (KOF) • Tir (Metal Slug)</span>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Bouton B */}
-                      <div className="p-2 rounded-lg bg-neutral-950 border border-neutral-800 flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <span className="w-6 h-6 rounded-full bg-rose-500 text-white font-black flex items-center justify-center text-[10px]">B</span>
-                          <div>
-                            <span className="font-bold text-rose-300 block">Bouton B (Rose)</span>
-                            <span className="text-neutral-400 text-[9px]">Pied Faible (KOF) • Saut (Metal Slug)</span>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Bouton X / C */}
-                      <div className="p-2 rounded-lg bg-neutral-950 border border-neutral-800 flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <span className="w-6 h-6 rounded-full bg-cyan-400 text-black font-black flex items-center justify-center text-[10px]">X</span>
-                          <div>
-                            <span className="font-bold text-cyan-300 block">Bouton X (Neo Geo C)</span>
-                            <span className="text-neutral-400 text-[9px]">Poing Fort (KOF) • Grenades / Bombes</span>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Bouton Y / D */}
-                      <div className="p-2 rounded-lg bg-neutral-950 border border-neutral-800 flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <span className="w-6 h-6 rounded-full bg-amber-400 text-black font-black flex items-center justify-center text-[10px]">Y</span>
-                          <div>
-                            <span className="font-bold text-amber-300 block">Bouton Y (Neo Geo D)</span>
-                            <span className="text-neutral-400 text-[9px]">Pied Fort (KOF) • Coup Violent / Spécial</span>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Touche L1 : Macro A+B */}
-                      <div className="p-2 rounded-lg bg-neutral-950 border border-neutral-800 flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <span className="px-2 py-0.5 rounded bg-neutral-800 border border-cyan-500/50 text-cyan-300 font-bold text-[9px]">L1</span>
-                          <div>
-                            <span className="font-bold text-white block">Touche 5 : Macro A+B (Roulade)</span>
-                            <span className="text-neutral-400 text-[9px]">Esquive / Roulade rapide KOF '98/'2002</span>
-                          </div>
-                        </div>
-                        <input
-                          type="checkbox"
-                          checked={settings.touch?.macroAbEnabled ?? true}
-                          onChange={(e) => updateTouchSetting('macroAbEnabled', e.target.checked)}
-                          className="w-4 h-4 accent-cyan-500 cursor-pointer rounded"
-                        />
-                      </div>
-
-                      {/* Touche R1 : Macro C+D */}
-                      <div className="p-2 rounded-lg bg-neutral-950 border border-neutral-800 flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <span className="px-2 py-0.5 rounded bg-neutral-800 border border-cyan-500/50 text-cyan-300 font-bold text-[9px]">R1</span>
-                          <div>
-                            <span className="font-bold text-white block">Touche 6 : Macro C+D (Projection)</span>
-                            <span className="text-neutral-400 text-[9px]">Attaque lourde Blowback de repoussement</span>
-                          </div>
-                        </div>
-                        <input
-                          type="checkbox"
-                          checked={settings.touch?.macroCdEnabled ?? true}
-                          onChange={(e) => updateTouchSetting('macroCdEnabled', e.target.checked)}
-                          className="w-4 h-4 accent-cyan-500 cursor-pointer rounded"
-                        />
-                      </div>
-
-                      {/* Touche Turbo A */}
-                      <div className="p-2 rounded-lg bg-neutral-950 border border-neutral-800 flex items-center justify-between sm:col-span-2">
-                        <div className="flex items-center gap-2">
-                          <span className="px-2 py-0.5 rounded bg-amber-500/20 border border-amber-500/60 text-amber-300 font-bold text-[9px] flex items-center gap-1">
-                            <Zap className="w-3 h-3 text-amber-400" />
-                            TURBO A
-                          </span>
-                          <div>
-                            <span className="font-bold text-white block">Touche 8 : Turbo 30 Hz (Metal Slug)</span>
-                            <span className="text-neutral-400 text-[9px]">Tir continu ultra-rapide tant que le bouton est maintenu</span>
-                          </div>
-                        </div>
-                        <input
-                          type="checkbox"
-                          checked={settings.touch?.turboEnabled ?? true}
-                          onChange={(e) => updateTouchSetting('turboEnabled', e.target.checked)}
-                          className="w-4 h-4 accent-cyan-500 cursor-pointer rounded"
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* 4. Mode Portrait Smartphone */}
-                  <div className="p-3 bg-neutral-900/90 border border-neutral-800 rounded-xl space-y-2">
-                    <span className="font-bold text-neutral-200 block text-xs">Disposition en Mode Portrait (Smartphone)</span>
-                    <div className="grid grid-cols-2 gap-2">
-                      <button
-                        onClick={() => updateTouchSetting('portraitMode', 'pad-bottom')}
-                        className={`py-2 px-2.5 rounded-lg text-[11px] font-bold border text-left transition-all ${
-                          (settings.touch?.portraitMode ?? 'pad-bottom') === 'pad-bottom'
-                            ? 'bg-cyan-500/20 border-cyan-500 text-cyan-300'
-                            : 'bg-neutral-950 border-neutral-800 text-neutral-400 hover:text-white'
-                        }`}
-                      >
-                        <span className="flex items-center gap-1.5 font-bold">
-                          <Gamepad2 className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
-                          <span>Arcade Pad Bas</span>
-                        </span>
-                        <span className="text-[9px] text-neutral-400 font-normal">Écran 4:3 en haut, manette en bas sans masquer le jeu</span>
-                      </button>
-
-                      <button
-                        onClick={() => updateTouchSetting('portraitMode', 'overlay')}
-                        className={`py-2 px-2.5 rounded-lg text-[11px] font-bold border text-left transition-all ${
-                          (settings.touch?.portraitMode ?? 'pad-bottom') === 'overlay'
-                            ? 'bg-cyan-500/20 border-cyan-500 text-cyan-300'
-                            : 'bg-neutral-950 border-neutral-800 text-neutral-400 hover:text-white'
-                        }`}
-                      >
-                        <span className="flex items-center gap-1.5 font-bold">
-                          <Smartphone className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
-                          <span>Superposé</span>
-                        </span>
-                        <span className="text-[9px] text-neutral-400 font-normal">Contrôles transparents sur toute la hauteur</span>
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* 5. Auto-masquer si Manette Détectée */}
-                  <div className="p-3 bg-neutral-900/90 border border-neutral-800 rounded-xl flex items-center justify-between">
-                    <div>
-                      <span className="font-bold text-neutral-200 block text-xs">Masquer si Manette Connectée</span>
-                      <span className="text-[10px] text-neutral-400">Cache le tactile dès qu'une manette Bluetooth / USB est active</span>
-                    </div>
-                    <input
-                      type="checkbox"
-                      checked={settings.touch?.autoHideOnGamepad ?? true}
-                      onChange={(e) => updateTouchSetting('autoHideOnGamepad', e.target.checked)}
-                      className="w-5 h-5 accent-cyan-500 cursor-pointer rounded"
-                    />
-                  </div>
-
-                  <button
-                    onClick={() => {
-                      try {
-                        localStorage.removeItem('csw_touch_layout_v3');
-                        updateTouchSetting('opacity', 75);
-                        updateTouchSetting('scale', 100);
-                        updateTouchSetting('vibration', true);
-                        updateTouchSetting('portraitMode', 'pad-bottom');
-                        alert('Paramètres et positions tactiles réinitialisés aux valeurs optimales !');
-                      } catch(e) {}
-                    }}
-                    className="flex items-center gap-2 px-3 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-xs font-bold transition-all w-full justify-center"
+                  <div
+                    className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${
+                      active ? 'bg-black/30' : 'bg-white/5'
+                    }`}
                   >
-                    <RotateCcw className="w-3.5 h-3.5" />
-                    Réinitialiser les réglages tactiles par défaut
-                  </button>
+                    <Icon className="w-4 h-4" aria-hidden="true" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-xs font-bold leading-tight truncate">{tab.label}</div>
+                    <div className="text-[10px] text-neutral-400 truncate mt-0.5">{tab.desc}</div>
+                  </div>
+                </button>
+              );
+            })}
+
+            {/* Carte statut manette en bas de sidebar */}
+            <div className="mt-auto pt-3 border-t border-white/10">
+              <div className="p-3 rounded-2xl bg-neutral-900/90 border border-white/10 space-y-1">
+                <div className="flex items-center gap-1.5 text-[10px] font-mono uppercase tracking-wider text-neutral-400">
+                  <Gamepad2 className="w-3.5 h-3.5 u-accent-text" aria-hidden="true" />
+                  <span>Manette détectée</span>
                 </div>
-              )}
+                <div className="text-xs font-semibold truncate text-neutral-200" title={connectedGamepad || 'Aucune'}>
+                  {connectedGamepad ? (
+                    <span className="text-emerald-300">{connectedGamepad}</span>
+                  ) : (
+                    <span className="text-neutral-400">Aucune manette active</span>
+                  )}
+                </div>
+              </div>
             </div>
-          )}
+          </aside>
 
-          {/* ================= ONGLET 2 : AFFICHAGE & CRT ================= */}
-          {activeTab === 'video' && (
-            <div className="space-y-4">
-              {/* Mode Stream externe (Streamlabs / OBS sur le même appareil) */}
-              <div className="p-4 bg-neutral-950 border border-amber-500/40 rounded-xl flex items-center justify-between gap-3">
-                <div>
-                  <h4 className="font-bold text-amber-300 text-xs">Mode Stream (Streamlabs, OBS, enregistreur d'écran)</h4>
-                  <p className="text-[11px] text-neutral-400 mt-0.5">
-                    À activer si tu streames depuis le même téléphone. Allège l'affichage (30 i/s visibles, résolution réduite, son 22 kHz)
-                    pour laisser la puissance à l'application de stream. Le jeu garde sa vitesse normale. S'applique au prochain lancement du jeu.
-                  </p>
-                </div>
-                <input
-                  type="checkbox"
-                  checked={!!settings.performance?.streamMode}
-                  onChange={(e) => updatePerformanceSetting?.('streamMode', e.target.checked)}
-                  className="w-5 h-5 accent-amber-500 cursor-pointer shrink-0"
-                />
+          {/* Panneau de contenu actif */}
+          <div className="flex-1 min-w-0 overflow-y-auto p-4 sm:p-6 space-y-4 text-xs">
+            {inlineNotice && (
+              <div className="px-3.5 py-2.5 rounded-xl bg-emerald-950/70 border border-emerald-500/40 text-emerald-200 text-xs font-semibold flex items-center gap-2">
+                <Check className="w-4 h-4 text-emerald-400 shrink-0" aria-hidden="true" />
+                <span>{inlineNotice}</span>
               </div>
+            )}
 
-              {/* Scanlines CRT Toggle */}
-              <div className="p-4 bg-neutral-950 border border-neutral-800 rounded-xl flex items-center justify-between">
-                <div>
-                  <h4 className="font-bold text-white text-xs">Filtre Scanlines CRT (Cathodique)</h4>
-                  <p className="text-[11px] text-neutral-400 mt-0.5">
-                    Reproduit les lignes de balayage caractéristiques des bornes d'arcade des années 90.
-                  </p>
-                </div>
-                <input
-                  type="checkbox"
-                  checked={settings.video.scanlines}
-                  onChange={(e) => updateVideoSetting('scanlines', e.target.checked)}
-                  className="w-5 h-5 accent-cyan-500 cursor-pointer"
-                />
-              </div>
-
-              {/* Textures & Rendu Visuel Haute Définition (Shaders) */}
-              <div className="p-4 bg-neutral-950 border border-neutral-800 rounded-xl space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Sparkles className="w-4 h-4 text-cyan-400" />
-                    <h4 className="font-bold text-white text-xs">Textures & Rendu Visuel Haute Définition</h4>
-                  </div>
-                  <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-neutral-900 border border-neutral-800 text-cyan-400">
-                    Profil : {currentProfile.label}
-                  </span>
-                </div>
-                <p className="text-[11px] text-neutral-400">
-                  Améliorez la qualité graphique : lissage HD des sprites, émulation de borne d'arcade rétro ou vitre 3D cathodique incurvée ultra-réaliste. Les textures avancées nécessitent un processeur/GPU puissant.
-                </p>
-
-                {isStreamMode && (
-                  <div className="p-2.5 rounded-lg bg-amber-950/60 border border-amber-500/50 flex items-center gap-2 text-amber-300 text-[11px]">
-                    <ShieldAlert className="w-4 h-4 shrink-0 text-amber-400" />
-                    <span>Mode Stream actif : textures lourdes désactivées pour laisser 100% du GPU à Streamlabs.</span>
-                  </div>
-                )}
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
-                  {SHADER_PRESETS.map((preset) => {
-                    const isSelected = currentShaderId === preset.id;
-                    const isLockedByStream = isStreamMode && preset.id !== 'none';
-                    const isDemanding = preset.tier > currentProfile.maxShaderTier;
-
+            {/* ================= ONGLET 1 : CONTRÔLES ================= */}
+            {activeTab === 'controls' && (
+              <div className="space-y-4">
+                {/* Sous-navigation Contrôles : Tactile / Manette / Clavier */}
+                <div className="grid grid-cols-3 gap-1.5 p-1.5 bg-neutral-950 rounded-2xl border border-white/10 text-xs font-bold">
+                  {[
+                    { id: 'touch', full: 'Tactile Mobile', short: 'Tactile', icon: Smartphone },
+                    { id: 'gamepad', full: 'Manette BT/USB', short: 'Manette', icon: Gamepad2 },
+                    { id: 'keyboard', full: 'Clavier (P1/P2)', short: 'Clavier', icon: Keyboard },
+                  ].map((sub) => {
+                    const SubIcon = sub.icon;
+                    const active = controlSubTab === sub.id;
                     return (
                       <button
-                        key={preset.id}
-                        disabled={isLockedByStream}
-                        onClick={() => updateVideoSetting('shader', preset.id)}
-                        className={`p-3 rounded-xl border text-left transition-all flex flex-col justify-between relative group ${
-                          isLockedByStream
-                            ? 'opacity-40 cursor-not-allowed bg-neutral-900/50 border-neutral-800'
-                            : isSelected
-                            ? 'bg-cyan-500/15 border-cyan-400 text-white shadow-lg shadow-cyan-500/10'
-                            : 'bg-neutral-900/80 border-neutral-800 text-neutral-300 hover:border-neutral-700 hover:bg-neutral-900'
+                        key={sub.id}
+                        type="button"
+                        onClick={() => setControlSubTab(sub.id)}
+                        className={`arcade-focus-ring py-2 px-2.5 min-h-[42px] rounded-xl flex items-center justify-center gap-1.5 transition-all ${
+                          active
+                            ? 'u-btn-primary'
+                            : 'text-neutral-300 hover:text-white hover:bg-white/5'
                         }`}
                       >
-                        <div className="flex items-start justify-between gap-2 mb-1">
-                          <div className="flex items-center gap-1.5">
-                            <span className="font-bold text-xs text-white">{preset.label}</span>
-                            {isSelected && <Check className="w-3.5 h-3.5 text-cyan-400 shrink-0" />}
-                          </div>
-                          <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider shrink-0 ${
-                            preset.tier === 1 
-                              ? 'bg-emerald-950/80 text-emerald-400 border border-emerald-500/30' 
-                              : preset.tier === 2 
-                              ? 'bg-cyan-950/80 text-cyan-300 border border-cyan-500/30' 
-                              : 'bg-purple-950/80 text-purple-300 border border-purple-500/30'
-                          }`}>
-                            {preset.badge}
-                          </span>
-                        </div>
-
-                        <p className="text-[10px] text-neutral-400 leading-snug mb-2">
-                          {preset.desc}
-                        </p>
-
-                        <div className="flex items-center justify-between text-[9px] font-mono text-neutral-500 pt-1 border-t border-neutral-800/80">
-                          <span>Impact GPU: <b className={preset.tier === 1 ? 'text-emerald-400' : preset.tier === 2 ? 'text-amber-400' : 'text-rose-400'}>{preset.cost}</b></span>
-                          {isDemanding && !isLockedByStream && (
-                            <span className="text-amber-400 font-sans font-bold flex items-center gap-1">
-                              ⚠ Appareil puissant requis
-                            </span>
-                          )}
-                        </div>
+                        <SubIcon className="w-4 h-4 shrink-0" aria-hidden="true" />
+                        <span className="hidden sm:inline">{sub.full}</span>
+                        <span className="sm:hidden">{sub.short}</span>
                       </button>
                     );
                   })}
                 </div>
-              </div>
 
-              {/* Ratio d'Aspect */}
-              <div className="p-4 bg-neutral-950 border border-neutral-800 rounded-xl space-y-2">
-                <h4 className="font-bold text-white text-xs">Ratio d'Aspect de l'Écran</h4>
-                <div className="grid grid-cols-3 gap-2 pt-1">
-                  {[
-                    { id: '4:3', label: '4:3 (Arcade Authentique)' },
-                    { id: '16:9', label: '16:9 (Plein Écran Étiré)' },
-                    { id: 'pixel-perfect', label: '1:1 Pixel Perfect' }
-                  ].map((ratio) => (
+                {/* Sélecteur de Console pour Manette & Clavier (scrollable sur mobile) */}
+                {(controlSubTab === 'gamepad' || controlSubTab === 'keyboard') && (
+                  <div className="p-3.5 rounded-2xl bg-neutral-950/80 border border-white/10 space-y-2.5">
+                    <div className="flex items-center justify-between gap-2 flex-wrap">
+                      <span className="text-[11px] font-mono uppercase tracking-wider text-neutral-300 font-semibold">
+                        Console ({controlSubTab === 'keyboard' ? 'Clavier' : 'Manette'})
+                      </span>
+                      {resetConsoleControls && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            resetConsoleControls(selectedConsoleId);
+                            setListeningAction(null);
+                            setInlineNotice(`Touches ${selectedConsoleProfile.shortLabel} réinitialisées.`);
+                          }}
+                          className="arcade-focus-ring px-2.5 py-1 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-[11px] font-bold text-amber-300 flex items-center gap-1"
+                        >
+                          <RotateCcw className="w-3 h-3" aria-hidden="true" />
+                          <span>Réinitialiser {selectedConsoleProfile.shortLabel}</span>
+                        </button>
+                      )}
+                    </div>
+                    <div className="flex sm:grid sm:grid-cols-5 gap-1.5 overflow-x-auto no-scrollbar">
+                      {CONSOLE_CONTROL_PROFILES.map((prof) => {
+                        const active = prof.id === selectedConsoleId;
+                        return (
+                          <button
+                            key={prof.id}
+                            type="button"
+                            onClick={() => {
+                              setSelectedConsoleId(prof.id);
+                              setListeningAction(null);
+                            }}
+                            className={`arcade-focus-ring py-2 px-3 min-h-[40px] rounded-xl text-xs font-bold border transition-all shrink-0 truncate ${
+                              active
+                                ? 'u-tab-active'
+                                : 'bg-neutral-900 border-white/10 text-neutral-300 hover:text-white hover:border-white/25'
+                            }`}
+                            title={prof.description}
+                          >
+                            {prof.shortLabel}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <p className="text-[11px] text-neutral-400">
+                      {selectedConsoleProfile.description}
+                    </p>
+                  </div>
+                )}
+
+                {/* Sous-onglet : MANETTE INTERACTIVE */}
+                {controlSubTab === 'gamepad' && (
+                  <GamepadVisualizer
+                    settings={settings}
+                    onUpdateGamepadSetting={updateGamepadSetting}
+                    consoleProfile={selectedConsoleProfile}
+                    consoleGamepadButtons={settings?.consoleControls?.[selectedConsoleId]?.gamepad || {}}
+                    onUpdateConsoleGamepadButton={(actionKey, physIdx) =>
+                      updateConsoleGamepadBinding?.(selectedConsoleId, actionKey, physIdx)
+                    }
+                  />
+                )}
+
+                {/* Sous-onglet : CLAVIER */}
+                {controlSubTab === 'keyboard' && (
+                  <div className="space-y-3.5">
+                    <div className="flex items-center justify-between gap-2 flex-wrap bg-neutral-950/80 p-2.5 rounded-2xl border border-white/10">
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setActivePlayer('p1');
+                            setListeningAction(null);
+                          }}
+                          className={`arcade-focus-ring px-4 py-2 min-h-[40px] rounded-xl text-xs font-bold transition-all ${
+                            activePlayer === 'p1'
+                              ? 'u-btn-primary'
+                              : 'bg-neutral-900 text-neutral-300 hover:text-white border border-white/10'
+                          }`}
+                        >
+                          Joueur 1
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setActivePlayer('p2');
+                            setListeningAction(null);
+                          }}
+                          className={`arcade-focus-ring px-4 py-2 min-h-[40px] rounded-xl text-xs font-bold transition-all ${
+                            activePlayer === 'p2'
+                              ? 'bg-rose-500 text-white shadow-sm'
+                              : 'bg-neutral-900 text-neutral-300 hover:text-white border border-white/10'
+                          }`}
+                        >
+                          Joueur 2
+                        </button>
+                      </div>
+                      <span className="text-[11px] text-neutral-400">
+                        Cliquez sur une touche pour la réassigner
+                      </span>
+                    </div>
+
+                    {listeningAction && (
+                      <div className="p-3.5 u-tab-active rounded-2xl text-center font-bold animate-pulse">
+                        Appuyez sur une touche pour [{selectedConsoleProfile.label}] « {listeningAction.toUpperCase()} » (Échap pour annuler)…
+                      </div>
+                    )}
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                      {selectedConsoleProfile.actions.map(({ key, label }) => {
+                        const currentCode = activeKeyboardMap[key] || 'Non assigné';
+                        const isListening = listeningAction === key;
+                        return (
+                          <div
+                            key={key}
+                            className="p-3 bg-neutral-950/80 border border-white/10 rounded-2xl flex items-center justify-between gap-2 hover:border-white/20 transition-colors"
+                          >
+                            <span className="text-neutral-200 text-xs font-semibold truncate">{label}</span>
+                            <button
+                              type="button"
+                              onClick={() => setListeningAction(key)}
+                              className={`arcade-focus-ring px-3 py-1.5 min-h-[38px] min-w-[72px] rounded-xl text-xs font-bold font-mono shrink-0 transition-all border ${
+                                isListening
+                                  ? 'u-btn-primary animate-pulse'
+                                  : 'bg-neutral-900 hover:bg-neutral-800 border-white/15 text-white'
+                              }`}
+                            >
+                              {isListening ? 'Écoute…' : String(currentCode).replace('Key', '').replace('Digit', '')}
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Sous-onglet : TACTILE MOBILE */}
+                {controlSubTab === 'touch' && (
+                  <div className="space-y-3.5">
+                    <div className="p-4 rounded-2xl u-banner border flex items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <h4 className="text-xs sm:text-sm font-black text-white flex items-center gap-2">
+                          <Smartphone className="w-4 h-4 u-accent-text shrink-0" aria-hidden="true" />
+                          <span>Contrôleur Tactile &amp; Ergonomie</span>
+                        </h4>
+                        <p className="text-[11px] text-neutral-300 mt-0.5">
+                          Personnalisez votre pad virtuel sur smartphone et tablette
+                        </p>
+                      </div>
+                      <span className="px-2.5 py-1 rounded-lg u-badge text-[10px] font-mono font-bold whitespace-nowrap shrink-0">
+                        A · B · X · Y
+                      </span>
+                    </div>
+
+                    <SettingsSwitch
+                      icon={Vibrate}
+                      label="Vibration Haptique"
+                      description="Micro-vibration à chaque appui pour simuler de vrais boutons arcade"
+                      checked={settings.touch?.vibration ?? true}
+                      onChange={(val) => updateTouchSetting('vibration', val)}
+                    />
+
+                    {/* Opacité des Touches */}
+                    <div className="p-3.5 rounded-2xl bg-neutral-950/80 border border-white/10 space-y-2.5">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-8 h-8 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center shrink-0">
+                            <Eye className="w-4 h-4 u-accent-text" aria-hidden="true" />
+                          </div>
+                          <div>
+                            <span className="font-bold text-neutral-100 block text-xs sm:text-[13px]">Opacité des Touches</span>
+                            <span className="text-[11px] text-neutral-400">Transparence des contrôles sur l&apos;écran</span>
+                          </div>
+                        </div>
+                        <span className="px-2.5 py-1 rounded-lg u-badge text-xs font-mono font-bold tabular-nums">
+                          {settings.touch?.opacity ?? 75}%
+                        </span>
+                      </div>
+                      <input
+                        type="range"
+                        min="20"
+                        max="100"
+                        step="5"
+                        aria-label="Opacité des touches tactiles"
+                        value={settings.touch?.opacity ?? 75}
+                        onChange={(e) => updateTouchSetting('opacity', Number(e.target.value))}
+                        style={{ accentColor: 'var(--u-accent)' }}
+                        className="w-full cursor-pointer h-2 bg-neutral-800 rounded-lg"
+                      />
+                    </div>
+
+                    {/* Taille des Touches */}
+                    <div className="p-3.5 rounded-2xl bg-neutral-950/80 border border-white/10 space-y-2.5">
+                      <span className="font-bold text-neutral-100 block text-xs sm:text-[13px]">
+                        Taille des Boutons &amp; D-Pad
+                      </span>
+                      <div className="grid grid-cols-3 gap-2">
+                        {[
+                          { val: 80, label: 'Compact', sub: '80%' },
+                          { val: 100, label: 'Normal', sub: '100%' },
+                          { val: 120, label: 'Grand', sub: '120%' },
+                        ].map((item) => (
+                          <button
+                            key={item.val}
+                            type="button"
+                            onClick={() => updateTouchSetting('scale', item.val)}
+                            className={`arcade-focus-ring py-2.5 px-2 min-h-[44px] rounded-xl text-xs font-bold border transition-all flex flex-col items-center justify-center ${
+                              (settings.touch?.scale ?? 100) === item.val
+                                ? 'u-tab-active'
+                                : 'bg-neutral-900 border-white/10 text-neutral-300 hover:text-white'
+                            }`}
+                          >
+                            <span>{item.label}</span>
+                            <span className="text-[10px] font-mono opacity-80">{item.sub}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Type de Contrôle Directionnel */}
+                    <div className="p-3.5 rounded-2xl bg-neutral-950/80 border border-white/10 space-y-2.5">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-bold text-neutral-100 text-xs sm:text-[13px]">Contrôle Directionnel</span>
+                        <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-md u-badge">
+                          {(settings.touch?.dpadType ?? 'analog') === 'dpad' ? 'CROIX D-PAD' : 'JOYSTICK'}
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => updateTouchSetting('dpadType', 'dpad')}
+                          className={`arcade-focus-ring p-3 min-h-[48px] rounded-xl border text-left transition-all ${
+                            (settings.touch?.dpadType ?? 'analog') === 'dpad'
+                              ? 'u-tab-active'
+                              : 'bg-neutral-900 border-white/10 text-neutral-300 hover:text-white'
+                          }`}
+                        >
+                          <span className="flex items-center gap-1.5 font-bold text-xs">
+                            <Move className="w-3.5 h-3.5 u-accent-text shrink-0" aria-hidden="true" />
+                            <span>Croix D-Pad Classique</span>
+                          </span>
+                          <span className="text-[11px] text-neutral-400 block mt-0.5">
+                            Croix rétro précise 4/8 directions
+                          </span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => updateTouchSetting('dpadType', 'analog')}
+                          className={`arcade-focus-ring p-3 min-h-[48px] rounded-xl border text-left transition-all ${
+                            (settings.touch?.dpadType ?? 'analog') === 'analog'
+                              ? 'u-tab-active'
+                              : 'bg-neutral-900 border-white/10 text-neutral-300 hover:text-white'
+                          }`}
+                        >
+                          <span className="flex items-center gap-1.5 font-bold text-xs">
+                            <Compass className="w-3.5 h-3.5 u-accent-text shrink-0" aria-hidden="true" />
+                            <span>Joystick Analogue Virtuel</span>
+                          </span>
+                          <span className="text-[11px] text-neutral-400 block mt-0.5">
+                            Stick rotatif 360° avec centrage
+                          </span>
+                        </button>
+                      </div>
+
+                      {(settings.touch?.dpadType ?? 'analog') === 'analog' && (
+                        <div className="pt-2.5 border-t border-white/10 space-y-2">
+                          <span className="text-[11px] text-neutral-300 block font-semibold">Comportement du stick :</span>
+                          <div className="grid grid-cols-2 gap-2">
+                            <button
+                              type="button"
+                              onClick={() => updateTouchSetting('joystickMode', 'floating')}
+                              className={`arcade-focus-ring py-2 px-3 min-h-[40px] rounded-xl text-xs font-bold border transition-all ${
+                                (settings.touch?.joystickMode ?? 'floating') === 'floating'
+                                  ? 'u-tab-active'
+                                  : 'bg-neutral-900 border-white/10 text-neutral-300 hover:text-white'
+                              }`}
+                            >
+                              Flottant (dynamique)
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => updateTouchSetting('joystickMode', 'fixed')}
+                              className={`arcade-focus-ring py-2 px-3 min-h-[40px] rounded-xl text-xs font-bold border transition-all ${
+                                (settings.touch?.joystickMode ?? 'floating') === 'fixed'
+                                  ? 'u-tab-active'
+                                  : 'bg-neutral-900 border-white/10 text-neutral-300 hover:text-white'
+                              }`}
+                            >
+                              Position Fixe
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Guide & Macros 8 Touches */}
+                    <div className="p-3.5 rounded-2xl bg-neutral-950/80 border border-white/10 space-y-3">
+                      <div>
+                        <span className="font-bold text-neutral-100 block text-xs sm:text-[13px]">
+                          Boutons &amp; Macros Arcade (8 Touches)
+                        </span>
+                        <span className="text-[11px] text-neutral-400">
+                          Disposition optimisée pour jeux de combat (KOF) et Metal Slug
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2 text-[11px]">
+                        <div className="p-2.5 rounded-xl bg-neutral-900 border border-white/10 flex items-center gap-2">
+                          <span className="w-6 h-6 rounded-full bg-emerald-500 text-black font-black flex items-center justify-center text-[10px] shrink-0">A</span>
+                          <div className="min-w-0">
+                            <span className="font-bold text-emerald-300 block truncate">Bouton A</span>
+                            <span className="text-neutral-400 text-[10px] block truncate">Poing faible · Tir</span>
+                          </div>
+                        </div>
+                        <div className="p-2.5 rounded-xl bg-neutral-900 border border-white/10 flex items-center gap-2">
+                          <span className="w-6 h-6 rounded-full bg-rose-500 text-white font-black flex items-center justify-center text-[10px] shrink-0">B</span>
+                          <div className="min-w-0">
+                            <span className="font-bold text-rose-300 block truncate">Bouton B</span>
+                            <span className="text-neutral-400 text-[10px] block truncate">Pied faible · Saut</span>
+                          </div>
+                        </div>
+                        <div className="p-2.5 rounded-xl bg-neutral-900 border border-white/10 flex items-center gap-2">
+                          <span className="w-6 h-6 rounded-full bg-sky-400 text-black font-black flex items-center justify-center text-[10px] shrink-0">X</span>
+                          <div className="min-w-0">
+                            <span className="font-bold text-sky-300 block truncate">Bouton X (C)</span>
+                            <span className="text-neutral-400 text-[10px] block truncate">Poing fort · Grenade</span>
+                          </div>
+                        </div>
+                        <div className="p-2.5 rounded-xl bg-neutral-900 border border-white/10 flex items-center gap-2">
+                          <span className="w-6 h-6 rounded-full bg-amber-400 text-black font-black flex items-center justify-center text-[10px] shrink-0">Y</span>
+                          <div className="min-w-0">
+                            <span className="font-bold text-amber-300 block truncate">Bouton Y (D)</span>
+                            <span className="text-neutral-400 text-[10px] block truncate">Pied fort · Spécial</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="space-y-2 pt-1">
+                        <SettingsSwitch
+                          label="L1 — Macro A+B (Roulade / Esquive)"
+                          description="Esquive rapide KOF '98 / '2002"
+                          checked={settings.touch?.macroAbEnabled ?? true}
+                          onChange={(val) => updateTouchSetting('macroAbEnabled', val)}
+                        />
+                        <SettingsSwitch
+                          label="R1 — Macro C+D (Projection)"
+                          description="Attaque lourde Blowback de repoussement"
+                          checked={settings.touch?.macroCdEnabled ?? true}
+                          onChange={(val) => updateTouchSetting('macroCdEnabled', val)}
+                        />
+                        <SettingsSwitch
+                          icon={Zap}
+                          accentTone="amber"
+                          label="Turbo A — Tir Continu 30 Hz (Metal Slug)"
+                          description="Tir automatique ultra-rapide tant que le bouton est maintenu"
+                          checked={settings.touch?.turboEnabled ?? true}
+                          onChange={(val) => updateTouchSetting('turboEnabled', val)}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Disposition Portrait Smartphone */}
+                    <div className="p-3.5 rounded-2xl bg-neutral-950/80 border border-white/10 space-y-2.5">
+                      <span className="font-bold text-neutral-100 block text-xs sm:text-[13px]">
+                        Disposition en Mode Portrait
+                      </span>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => updateTouchSetting('portraitMode', 'pad-bottom')}
+                          className={`arcade-focus-ring p-3 min-h-[48px] rounded-xl border text-left transition-all ${
+                            (settings.touch?.portraitMode ?? 'pad-bottom') === 'pad-bottom'
+                              ? 'u-tab-active'
+                              : 'bg-neutral-900 border-white/10 text-neutral-300 hover:text-white'
+                          }`}
+                        >
+                          <span className="flex items-center gap-1.5 font-bold text-xs">
+                            <Gamepad2 className="w-3.5 h-3.5 u-accent-text shrink-0" aria-hidden="true" />
+                            <span>Arcade Pad Bas</span>
+                          </span>
+                          <span className="text-[11px] text-neutral-400 block mt-0.5">
+                            Écran 4:3 en haut, manette en bas sans masquer le jeu
+                          </span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => updateTouchSetting('portraitMode', 'overlay')}
+                          className={`arcade-focus-ring p-3 min-h-[48px] rounded-xl border text-left transition-all ${
+                            (settings.touch?.portraitMode ?? 'pad-bottom') === 'overlay'
+                              ? 'u-tab-active'
+                              : 'bg-neutral-900 border-white/10 text-neutral-300 hover:text-white'
+                          }`}
+                        >
+                          <span className="flex items-center gap-1.5 font-bold text-xs">
+                            <Smartphone className="w-3.5 h-3.5 u-accent-text shrink-0" aria-hidden="true" />
+                            <span>Superposé</span>
+                          </span>
+                          <span className="text-[11px] text-neutral-400 block mt-0.5">
+                            Contrôles transparents sur toute la hauteur
+                          </span>
+                        </button>
+                      </div>
+                    </div>
+
+                    <SettingsSwitch
+                      label="Masquer si Manette Connectée"
+                      description="Cache automatiquement le tactile dès qu'une manette Bluetooth / USB est active"
+                      checked={settings.touch?.autoHideOnGamepad ?? true}
+                      onChange={(val) => updateTouchSetting('autoHideOnGamepad', val)}
+                    />
+
                     <button
-                      key={ratio.id}
-                      onClick={() => updateVideoSetting('aspectRatio', ratio.id)}
-                      className={`py-2 px-3 rounded-lg text-xs font-bold border transition-all ${
-                        settings.video.aspectRatio === ratio.id 
-                          ? 'bg-cyan-500/20 border-cyan-500 text-cyan-300' 
-                          : 'bg-neutral-900 border-neutral-800 text-neutral-400 hover:text-white'
-                      }`}
+                      type="button"
+                      onClick={() => {
+                        try {
+                          localStorage.removeItem('csw_touch_layout_v3');
+                          updateTouchSetting('opacity', 75);
+                          updateTouchSetting('scale', 100);
+                          updateTouchSetting('vibration', true);
+                          updateTouchSetting('portraitMode', 'pad-bottom');
+                          setInlineNotice('Réglages et positions tactiles réinitialisés aux valeurs optimales.');
+                        } catch {}
+                      }}
+                      className="arcade-focus-ring flex items-center justify-center gap-2 px-4 py-2.5 min-h-[44px] rounded-xl bg-neutral-800 hover:bg-neutral-700 border border-white/10 text-neutral-100 text-xs font-bold transition-colors w-full"
                     >
-                      {ratio.label}
+                      <RotateCcw className="w-3.5 h-3.5" aria-hidden="true" />
+                      <span>Réinitialiser les réglages tactiles par défaut</span>
                     </button>
-                  ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ================= ONGLET 2 : AFFICHAGE & CRT ================= */}
+            {activeTab === 'video' && (
+              <div className="space-y-4">
+                <SettingsSwitch
+                  icon={ShieldAlert}
+                  accentTone="amber"
+                  label="Mode Stream (Streamlabs, OBS, enregistreur d'écran)"
+                  description="Allège l'affichage (30 i/s visibles, résolution réduite, son 22 kHz) pour laisser la puissance à votre app de stream. S'applique au prochain lancement."
+                  checked={!!settings.performance?.streamMode}
+                  onChange={(val) => updatePerformanceSetting?.('streamMode', val)}
+                />
+
+                <SettingsSwitch
+                  icon={Tv}
+                  label="Filtre Scanlines CRT (Cathodique)"
+                  description="Reproduit les lignes de balayage caractéristiques des bornes d'arcade des années 90."
+                  checked={settings.video.scanlines}
+                  onChange={(val) => updateVideoSetting('scanlines', val)}
+                />
+
+                {/* Textures & Shaders HD */}
+                <div className="p-4 rounded-2xl bg-neutral-950/80 border border-white/10 space-y-3">
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <div className="flex items-center gap-2">
+                      <Sparkles className="w-4 h-4 u-accent-text shrink-0" aria-hidden="true" />
+                      <h4 className="font-bold text-white text-xs sm:text-[13px]">
+                        Textures &amp; Rendu Haute Définition
+                      </h4>
+                    </div>
+                    <span className="text-[10px] font-mono px-2.5 py-0.5 rounded-lg u-badge font-bold">
+                      Profil : {currentProfile.label}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-neutral-400 leading-relaxed">
+                    Lissage HD des sprites, rendu borne rétro ou écran CRT incurvé. Les shaders avancés nécessitent un GPU plus puissant.
+                  </p>
+
+                  {isStreamMode && (
+                    <div className="p-3 rounded-xl bg-amber-950/60 border border-amber-500/50 flex items-center gap-2 text-amber-200 text-[11px]">
+                      <ShieldAlert className="w-4 h-4 shrink-0 text-amber-400" aria-hidden="true" />
+                      <span>Mode Stream actif : textures lourdes désactivées pour préserver le GPU.</span>
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+                    {SHADER_PRESETS.map((preset) => {
+                      const isSelected = currentShaderId === preset.id;
+                      const isLockedByStream = isStreamMode && preset.id !== 'none';
+                      const isDemanding = preset.tier > currentProfile.maxShaderTier;
+
+                      return (
+                        <button
+                          key={preset.id}
+                          type="button"
+                          disabled={isLockedByStream}
+                          onClick={() => updateVideoSetting('shader', preset.id)}
+                          className={`arcade-focus-ring p-3.5 rounded-2xl border text-left transition-all flex flex-col justify-between ${
+                            isLockedByStream
+                              ? 'opacity-40 cursor-not-allowed bg-neutral-900/50 border-white/5'
+                              : isSelected
+                              ? 'u-tab-active'
+                              : 'bg-neutral-900/90 border-white/10 text-neutral-200 hover:border-white/25'
+                          }`}
+                        >
+                          <div className="flex items-start justify-between gap-2 mb-1.5">
+                            <div className="flex items-center gap-1.5">
+                              <span className="font-bold text-xs text-white">{preset.label}</span>
+                              {isSelected && <Check className="w-3.5 h-3.5 u-accent-text shrink-0" aria-hidden="true" />}
+                            </div>
+                            <span
+                              className={`text-[9px] font-mono font-bold px-1.5 py-0.5 rounded uppercase tracking-wider shrink-0 ${
+                                preset.tier === 1
+                                  ? 'bg-emerald-950/80 text-emerald-300 border border-emerald-500/35'
+                                  : preset.tier === 2
+                                  ? 'u-badge'
+                                  : 'bg-purple-950/80 text-purple-200 border border-purple-500/35'
+                              }`}
+                            >
+                              {preset.badge}
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-neutral-400 leading-snug mb-2">{preset.desc}</p>
+                          <div className="flex items-center justify-between text-[10px] font-mono text-neutral-400 pt-1.5 border-t border-white/10">
+                            <span>
+                              GPU :{' '}
+                              <b className={preset.tier === 1 ? 'text-emerald-400' : preset.tier === 2 ? 'text-amber-300' : 'text-rose-400'}>
+                                {preset.cost}
+                              </b>
+                            </span>
+                            {isDemanding && !isLockedByStream && (
+                              <span className="text-amber-300 font-sans font-bold">Appareil puissant requis</span>
+                            )}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Ratio d'Aspect */}
+                <div className="p-4 rounded-2xl bg-neutral-950/80 border border-white/10 space-y-2.5">
+                  <h4 className="font-bold text-white text-xs sm:text-[13px]">Ratio d&apos;Aspect de l&apos;Écran</h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                    {[
+                      { id: '4:3', label: '4:3 Arcade', sub: 'Ratio authentique' },
+                      { id: '16:9', label: '16:9 Plein Écran', sub: 'Image étirée' },
+                      { id: 'pixel-perfect', label: '1:1 Pixel Perfect', sub: 'Netteté exacte' },
+                    ].map((ratio) => (
+                      <button
+                        key={ratio.id}
+                        type="button"
+                        onClick={() => updateVideoSetting('aspectRatio', ratio.id)}
+                        className={`arcade-focus-ring py-2.5 px-3 min-h-[44px] rounded-xl text-left border transition-all ${
+                          settings.video.aspectRatio === ratio.id
+                            ? 'u-tab-active'
+                            : 'bg-neutral-900 border-white/10 text-neutral-300 hover:text-white'
+                        }`}
+                      >
+                        <span className="font-bold text-xs block">{ratio.label}</span>
+                        <span className="text-[10px] text-neutral-400">{ratio.sub}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Lissage Graphique */}
+                <div className="p-4 rounded-2xl bg-neutral-950/80 border border-white/10 space-y-2.5">
+                  <h4 className="font-bold text-white text-xs sm:text-[13px]">Lissage Graphique</h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {[
+                      { id: 'pixelated', label: 'Pixel Art Brut', sub: 'Sharp Nearest-Neighbor' },
+                      { id: 'smooth', label: 'Lissé Bilinéaire', sub: 'Bilinear Interpolation' },
+                    ].map((f) => (
+                      <button
+                        key={f.id}
+                        type="button"
+                        onClick={() => updateVideoSetting('filter', f.id)}
+                        className={`arcade-focus-ring py-2.5 px-3 min-h-[44px] rounded-xl text-left border transition-all ${
+                          settings.video.filter === f.id
+                            ? 'u-tab-active'
+                            : 'bg-neutral-900 border-white/10 text-neutral-300 hover:text-white'
+                        }`}
+                      >
+                        <span className="font-bold text-xs block">{f.label}</span>
+                        <span className="text-[10px] text-neutral-400">{f.sub}</span>
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
+            )}
 
-              {/* Rendu Pixels */}
-              <div className="p-4 bg-neutral-950 border border-neutral-800 rounded-xl space-y-2">
-                <h4 className="font-bold text-white text-xs">Lissage Graphique</h4>
-                <div className="grid grid-cols-2 gap-2 pt-1">
-                  {[
-                    { id: 'pixelated', label: 'Pixel Art Brut (Sharp Nearest-Neighbor)' },
-                    { id: 'smooth', label: 'Lissé Bilinéaire (Bilinear Interpolation)' }
-                  ].map((f) => (
-                    <button
-                      key={f.id}
-                      onClick={() => updateVideoSetting('filter', f.id)}
-                      className={`py-2 px-3 rounded-lg text-xs font-bold border transition-all ${
-                        settings.video.filter === f.id 
-                          ? 'bg-cyan-500/20 border-cyan-500 text-cyan-300' 
-                          : 'bg-neutral-900 border-neutral-800 text-neutral-400 hover:text-white'
-                      }`}
-                    >
-                      {f.label}
-                    </button>
-                  ))}
+            {/* ================= ONGLET 3 : AUDIO ================= */}
+            {activeTab === 'audio' && (
+              <div className="space-y-4">
+                <div className="p-4 rounded-2xl bg-neutral-950/80 border border-white/10 space-y-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center shrink-0">
+                        <Volume2 className="w-4 h-4 u-accent-text" aria-hidden="true" />
+                      </div>
+                      <div>
+                        <span className="font-bold text-white block text-xs sm:text-[13px]">
+                          Volume Général de l&apos;Émulateur
+                        </span>
+                        <span className="text-[11px] text-neutral-400">Sortie Web Audio API</span>
+                      </div>
+                    </div>
+                    <span className="px-2.5 py-1 rounded-lg u-badge font-mono font-bold text-xs tabular-nums">
+                      {settings.audio.volume}%
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min="0"
+                    max="100"
+                    aria-label="Volume général"
+                    value={settings.audio.volume}
+                    onChange={(e) => updateAudioSetting('volume', Number(e.target.value))}
+                    style={{ accentColor: 'var(--u-accent)' }}
+                    className="w-full cursor-pointer h-2 bg-neutral-800 rounded-lg"
+                  />
                 </div>
-              </div>
-            </div>
-          )}
 
-          {/* ================= ONGLET 3 : AUDIO ================= */}
-          {activeTab === 'audio' && (
-            <div className="space-y-4">
-              <div className="p-4 bg-neutral-950 border border-neutral-800 rounded-xl space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="font-bold text-white text-xs">Volume Général de l'Émulateur</span>
-                  <span className="text-cyan-400 font-bold">{settings.audio.volume}%</span>
-                </div>
-                <input
-                  type="range"
-                  min="0"
-                  max="100"
-                  value={settings.audio.volume}
-                  onChange={(e) => updateAudioSetting('volume', Number(e.target.value))}
-                  className="w-full accent-cyan-500 cursor-pointer"
+                <SettingsSwitch
+                  icon={settings.audio.muted ? VolumeX : Volume2}
+                  label="Couper le Son (Mute)"
+                  description="Désactive temporairement la sortie audio de tous les émulateurs"
+                  checked={Boolean(settings.audio.muted)}
+                  onChange={(val) => updateAudioSetting('muted', val)}
                 />
               </div>
+            )}
 
-              <div className="p-4 bg-neutral-950 border border-neutral-800 rounded-xl flex items-center justify-between">
-                <div>
-                  <h4 className="font-bold text-white text-xs">Couper le Son (Mute)</h4>
-                  <p className="text-[11px] text-neutral-400 mt-0.5">
-                    Désactive la sortie Web Audio API
-                  </p>
+            {/* ================= ONGLET 4 : SYSTÈME & BIOS ================= */}
+            {activeTab === 'system' && (
+              <div className="space-y-4">
+                <div className="p-4 rounded-2xl bg-neutral-950/80 border border-white/10 space-y-3">
+                  <div>
+                    <h4 className="font-bold text-white text-xs sm:text-[13px]">Mode Matériel Neo Geo (MVS / AES)</h4>
+                    <p className="text-[11px] text-neutral-400 mt-0.5">
+                      Basculez entre la borne d&apos;arcade originale (crédits) et la console de salon (Free Play).
+                    </p>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    {[
+                      { id: 'mvs', title: 'Arcade (MVS)', desc: "Exige l'insertion de Coins / Crédits" },
+                      { id: 'aes', title: 'Console (AES)', desc: 'Mode Free Play & Options SNK' },
+                    ].map((m) => (
+                      <button
+                        key={m.id}
+                        type="button"
+                        onClick={() => updateSystemSetting('biosMode', m.id)}
+                        className={`arcade-focus-ring p-3.5 min-h-[52px] rounded-xl border text-left transition-all ${
+                          settings.system.biosMode === m.id
+                            ? 'u-tab-active'
+                            : 'bg-neutral-900 border-white/10 text-neutral-300 hover:text-white'
+                        }`}
+                      >
+                        <span className="font-bold block text-xs text-white">{m.title}</span>
+                        <span className="text-[11px] text-neutral-400">{m.desc}</span>
+                      </button>
+                    ))}
+                  </div>
                 </div>
-                <button
-                  onClick={() => updateAudioSetting('muted', !settings.audio.muted)}
-                  className={`p-2 rounded-lg border transition-all ${
-                    settings.audio.muted 
-                      ? 'bg-rose-500/20 border-rose-500 text-rose-400' 
-                      : 'bg-neutral-900 border-neutral-800 text-neutral-400'
-                  }`}
-                >
-                  {settings.audio.muted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
-                </button>
-              </div>
-            </div>
-          )}
 
-          {/* ================= ONGLET 4 : SYSTÈME & BIOS ================= */}
-          {activeTab === 'system' && (
-            <div className="space-y-4">
-              {/* Mode Arcade MVS vs Console AES */}
-              <div className="p-4 bg-neutral-950 border border-neutral-800 rounded-xl space-y-2">
-                <h4 className="font-bold text-white text-xs">Mode Matériel du Système Neo Geo</h4>
-                <p className="text-[11px] text-neutral-400">
-                  Comme dans NeoRAGEx, basculez entre la borne d'arcade originale et la console de salon.
-                </p>
-                <div className="grid grid-cols-2 gap-2 pt-1">
-                  {[
-                    { id: 'mvs', title: 'Arcade (MVS)', desc: 'Exige l\'insertion de Coins / Crédits' },
-                    { id: 'aes', title: 'Console (AES)', desc: 'Mode Free Play & Options SNK' }
-                  ].map((mode) => (
-                    <button
-                      key={mode.id}
-                      onClick={() => updateSystemSetting('biosMode', mode.id)}
-                      className={`p-3 rounded-xl border text-left transition-all ${
-                        settings.system.biosMode === mode.id 
-                          ? 'bg-cyan-500/20 border-cyan-500 text-white' 
-                          : 'bg-neutral-900 border-neutral-800 text-neutral-400 hover:text-white'
-                      }`}
-                    >
-                      <span className="font-bold block text-xs">{mode.title}</span>
-                      <span className="text-[10px] text-neutral-500">{mode.desc}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Région */}
-              <div className="p-4 bg-neutral-950 border border-neutral-800 rounded-xl space-y-2">
-                <h4 className="font-bold text-white text-xs">Région du BIOS</h4>
-                <div className="grid grid-cols-3 gap-2 pt-1">
-                  {['europe', 'usa', 'japan'].map((reg) => (
-                    <button
-                      key={reg}
-                      onClick={() => updateSystemSetting('region', reg)}
-                      className={`py-2 px-3 rounded-lg text-xs font-bold uppercase border transition-all ${
-                        settings.system.region === reg 
-                          ? 'bg-cyan-500/20 border-cyan-500 text-cyan-300' 
-                          : 'bg-neutral-900 border-neutral-800 text-neutral-400 hover:text-white'
-                      }`}
-                    >
-                      {reg}
-                    </button>
-                  ))}
+                <div className="p-4 rounded-2xl bg-neutral-950/80 border border-white/10 space-y-2.5">
+                  <h4 className="font-bold text-white text-xs sm:text-[13px]">Région du BIOS</h4>
+                  <div className="grid grid-cols-3 gap-2">
+                    {[
+                      { id: 'europe', label: 'Europe' },
+                      { id: 'usa', label: 'USA' },
+                      { id: 'japan', label: 'Japon' },
+                    ].map((reg) => (
+                      <button
+                        key={reg.id}
+                        type="button"
+                        onClick={() => updateSystemSetting('region', reg.id)}
+                        className={`arcade-focus-ring py-2.5 px-3 min-h-[44px] rounded-xl text-xs font-bold uppercase border transition-all ${
+                          settings.system.region === reg.id
+                            ? 'u-tab-active'
+                            : 'bg-neutral-900 border-white/10 text-neutral-300 hover:text-white'
+                        }`}
+                      >
+                        {reg.label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
+            )}
 
-          {/* ================= ONGLET 5 : FIGHTCADE 2 & CACHE ================= */}
-          {activeTab === 'netplay' && (
-            <div className="space-y-4">
-              <div className="p-4 bg-neutral-950 border border-neutral-800 rounded-xl space-y-3">
-                <h4 className="font-bold text-white text-xs">Profil Joueur Fightcade 2</h4>
-                <div className="flex gap-2">
+            {/* ================= ONGLET 5 : SALON & CACHE ================= */}
+            {activeTab === 'netplay' && (
+              <div className="space-y-4">
+                <div className="p-4 rounded-2xl bg-neutral-950/80 border border-white/10 space-y-2.5">
+                  <label htmlFor="settings-player-name" className="font-bold text-white text-xs sm:text-[13px] block">
+                    Pseudo dans les Salons Fightcade 2
+                  </label>
                   <input
+                    id="settings-player-name"
                     type="text"
                     value={playerName}
                     onChange={(e) => {
@@ -996,108 +1096,114 @@ export function SettingsModal({
                     }}
                     maxLength={24}
                     placeholder="Votre pseudo dans les salons…"
-                    className="flex-1 px-3 py-2 rounded-lg bg-neutral-900 border border-neutral-700 text-xs text-white focus:outline-none focus:border-cyan-500"
+                    className="arcade-focus-ring w-full px-3.5 py-2.5 min-h-[44px] rounded-xl bg-neutral-900 border border-white/15 text-sm sm:text-xs text-white placeholder:text-neutral-400"
                   />
                 </div>
-              </div>
 
-              <div className="p-4 bg-neutral-950 border border-neutral-800 rounded-xl space-y-3">
-                <h4 className="font-bold text-white text-xs">WebRTC Rollback P2P</h4>
-                <div className="flex items-center justify-between">
-                  <span className="text-neutral-300">Input Delay par défaut (0–3 frames)</span>
-                  <div className="flex gap-1.5">
-                    {[0, 1, 2, 3].map((d) => (
-                      <button
-                        key={d}
-                        type="button"
-                        onClick={() => updateNetplaySetting?.('inputDelay', d)}
-                        className={`px-2.5 py-1 rounded-lg font-mono text-xs font-bold border ${
-                          (settings?.netplay?.inputDelay ?? 1) === d
-                            ? 'bg-cyan-500/20 border-cyan-400 text-cyan-300'
-                            : 'bg-neutral-900 border-neutral-800 text-neutral-400'
-                        }`}
-                      >
-                        {d}f
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <label className="flex items-center justify-between pt-1 cursor-pointer">
-                  <span className="text-neutral-300">Afficher le HUD réseau (PING | ROLLBACK | P2P)</span>
-                  <input
-                    type="checkbox"
-                    checked={settings?.netplay?.showHud ?? true}
-                    onChange={(e) => updateNetplaySetting?.('showHud', e.target.checked)}
-                    className="w-4 h-4 accent-cyan-400"
-                  />
-                </label>
-
-                <label className="flex items-center justify-between cursor-pointer">
-                  <span className="text-neutral-300">Son d’alerte Fightcade lors d’un défi</span>
-                  <input
-                    type="checkbox"
-                    checked={settings?.netplay?.challengeSound ?? true}
-                    onChange={(e) => updateNetplaySetting?.('challengeSound', e.target.checked)}
-                    className="w-4 h-4 accent-cyan-400"
-                  />
-                </label>
-              </div>
-
-              <div className="p-4 bg-neutral-950 border border-neutral-800 rounded-xl flex items-center justify-between gap-3">
-                <div className="flex items-center gap-2.5">
-                  <Database className="w-4 h-4 text-emerald-400" />
-                  <div>
-                    <div className="font-bold text-white text-xs">Cache ROMs IndexedDB</div>
-                    <div className="text-[11px] font-mono text-neutral-400">
-                      {cacheInfo.count} jeu(x) · {formatBytes(cacheInfo.totalBytes)}
+                <div className="p-4 rounded-2xl bg-neutral-950/80 border border-white/10 space-y-3">
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <div>
+                      <h4 className="font-bold text-white text-xs sm:text-[13px]">WebRTC Rollback P2P</h4>
+                      <p className="text-[11px] text-neutral-400">Input Delay par défaut (0 à 3 frames)</p>
+                    </div>
+                    <div className="flex gap-1.5">
+                      {[0, 1, 2, 3].map((d) => (
+                        <button
+                          key={d}
+                          type="button"
+                          onClick={() => updateNetplaySetting?.('inputDelay', d)}
+                          className={`arcade-focus-ring px-3 py-2 min-w-[42px] min-h-[40px] rounded-xl font-mono text-xs font-bold border transition-all ${
+                            (settings?.netplay?.inputDelay ?? 1) === d
+                              ? 'u-btn-primary'
+                              : 'bg-neutral-900 border-white/10 text-neutral-300 hover:text-white'
+                          }`}
+                        >
+                          {d}f
+                        </button>
+                      ))}
                     </div>
                   </div>
                 </div>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => getPlatformCacheStats().then(setCacheInfo)}
-                    className="px-2.5 py-1.5 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-xs text-neutral-300"
-                  >
-                    Actualiser
-                  </button>
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      const rows = await listCachedRoms();
-                      for (const r of rows) await removeCachedRom(r.id);
-                      const stats = await getPlatformCacheStats();
-                      setCacheInfo(stats);
-                      onCacheCleared?.();
-                    }}
-                    className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-rose-600/20 hover:bg-rose-600/40 border border-rose-500/40 text-rose-300 text-xs font-bold"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                    <span>Vider</span>
-                  </button>
+
+                <SettingsSwitch
+                  label="Afficher le HUD Réseau (PING | ROLLBACK | P2P)"
+                  description="Affiche la latence et les statistiques Rollback en temps réel pendant les matchs"
+                  checked={settings?.netplay?.showHud ?? true}
+                  onChange={(val) => updateNetplaySetting?.('showHud', val)}
+                />
+
+                <SettingsSwitch
+                  label="Son d'alerte lors d'un défi Fightcade"
+                  description="Joue une notification sonore lorsqu'un joueur vous défie au salon"
+                  checked={settings?.netplay?.challengeSound ?? true}
+                  onChange={(val) => updateNetplaySetting?.('challengeSound', val)}
+                />
+
+                {/* Gestion du cache IndexedDB */}
+                <div className="p-4 rounded-2xl bg-neutral-950/80 border border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-emerald-500/15 border border-emerald-500/35 flex items-center justify-center shrink-0">
+                      <Database className="w-4 h-4 text-emerald-400" aria-hidden="true" />
+                    </div>
+                    <div>
+                      <div className="font-bold text-white text-xs sm:text-[13px]">Cache ROMs IndexedDB</div>
+                      <div className="text-[11px] font-mono text-neutral-300 tabular-nums">
+                        {cacheInfo.count} jeu(x) · {formatBytes(cacheInfo.totalBytes)}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => getPlatformCacheStats().then(setCacheInfo)}
+                      className="arcade-focus-ring flex-1 sm:flex-initial px-3.5 py-2 min-h-[42px] rounded-xl bg-neutral-800 hover:bg-neutral-700 border border-white/10 text-xs font-bold text-neutral-100 transition-colors"
+                    >
+                      Actualiser
+                    </button>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        const rows = await listCachedRoms();
+                        for (const r of rows) await removeCachedRom(r.id);
+                        const stats = await getPlatformCacheStats();
+                        setCacheInfo(stats);
+                        onCacheCleared?.();
+                        setInlineNotice('Cache IndexedDB vidé avec succès.');
+                      }}
+                      className="arcade-focus-ring flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3.5 py-2 min-h-[42px] rounded-xl bg-rose-600/20 hover:bg-rose-600/35 border border-rose-500/45 text-rose-200 text-xs font-bold transition-colors"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" aria-hidden="true" />
+                      <span>Vider</span>
+                    </button>
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
 
-        {/* Footer Actions */}
-        <div className="p-4 border-t border-neutral-800 bg-neutral-950/80 flex items-center justify-between">
+        {/* Footer Actions — Sticky, clair & tactile */}
+        <div className="px-4 sm:px-6 py-3 border-t border-white/10 bg-neutral-950/90 flex items-center justify-between gap-2 shrink-0">
           <button
-            onClick={handleReset}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-neutral-400 hover:text-rose-400 hover:bg-neutral-800 transition-colors text-xs"
+            type="button"
+            onClick={() => {
+              handleReset?.();
+              setInlineNotice("Paramètres d'usine restaurés.");
+            }}
+            className="arcade-focus-ring flex items-center gap-1.5 px-3 py-2 min-h-[44px] rounded-xl text-neutral-300 hover:text-rose-300 hover:bg-rose-950/40 border border-transparent hover:border-rose-500/30 transition-colors text-xs font-semibold"
           >
-            <RotateCcw className="w-3.5 h-3.5" />
-            Paramètres d'Usine
+            <RotateCcw className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+            <span className="hidden sm:inline">Paramètres d&apos;Usine</span>
+            <span className="sm:hidden">Réinitialiser</span>
           </button>
 
           <button
+            type="button"
             onClick={onClose}
-            className="px-5 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-black font-bold text-xs shadow-lg shadow-cyan-500/20 transition-all active:scale-95 flex items-center gap-1.5"
+            className="arcade-focus-ring px-5 py-2.5 min-h-[44px] rounded-xl u-btn-primary font-black text-xs transition-all active:scale-95 flex items-center gap-1.5"
           >
-            <Check className="w-3.5 h-3.5" />
-            ENREGISTRER & FERMER
+            <Check className="w-4 h-4 shrink-0" aria-hidden="true" />
+            <span>Enregistrer &amp; Fermer</span>
           </button>
         </div>
       </div>

@@ -40,7 +40,8 @@ import { PlayerAvatar } from './components/common/PlayerAvatar';
 import { FriendsDrawer } from './components/social/FriendsDrawer';
 import { countryCodeToFlag } from './data/countries';
 import { RollbackP2PEngine } from './services/rollbackP2P';
-import { isJ2meGame, supportsOnlineMultiplayer } from './utils/gameCapabilities';
+import { isJ2meGame, parseMaxPlayers, supportsOnlineMultiplayer } from './utils/gameCapabilities';
+import { getUniverseTheme } from './data/universeThemes';
 import {
   Gamepad2, Disc, Cpu, Coffee, Settings, Joystick, Coins, Layers, Swords, UserCheck, Cloud, Play, X, Plus, Wifi, WifiOff, Database, Users
 } from 'lucide-react';
@@ -438,12 +439,15 @@ export default function App() {
           isHost,
         });
       }
+      const maxP = parseMaxPlayers(gameEntry) || 2;
+      const pIdx = isHost ? 0 : 1;
       await launchEntryWithRom(gameEntry, {
         isNetplay: true,
         isHost,
         isSpectator: false,
-        playerIndex: isHost ? 0 : 1,
-        badgeSuffix: isHost ? 'P1 HOST · NETPLAY 2P' : 'P2 GUEST · NETPLAY 2P',
+        playerIndex: pIdx,
+        maxPlayers: maxP,
+        badgeSuffix: `${isHost ? 'P1 HÔTE' : `P${pIdx + 1} INVITÉ`} · NETPLAY ${maxP}J`,
         preloadedBlob,
         opponentName,
         opponentUid,
@@ -554,7 +558,8 @@ export default function App() {
       isNetplay: true,
       isHost: false,
       isSpectator: true,
-      playerIndex: 2,
+      playerIndex: -1,
+      maxPlayers: parseMaxPlayers(targetEntry) || 2,
       badgeSuffix: `SPECTATEUR LIVE (${targetUser.name || targetUser.displayName}${vsName})`,
       refundCoinOnFail: false,
       opponentName: targetUser.name || targetUser.displayName,
@@ -790,69 +795,89 @@ export default function App() {
   });
 
   const currentModeMeta = SHELL_MODES.find((m) => m.id === platformMode) || SHELL_MODES[0];
+  const universeTheme = getUniverseTheme(platformMode);
   const resolvedSelectedChannel =
     selectedChannelId === GLOBAL_CHANNEL_ID
       ? GLOBAL_CHANNEL
       : activeChannels.find((c) => c.gameId === selectedChannelId) || null;
 
   return (
-    <div className="flex flex-col h-[100dvh] w-screen overflow-hidden bg-neutral-950 font-sans text-neutral-100 pt-safe-pwa">
-      {/* Topbar Unifiée Cyber-Arcade Glass — Compacte, structurée & sans perte d'information */}
-      <header className="arcade-glass border-b border-white/10 shrink-0 z-30 px-2.5 sm:px-4 py-1.5 sm:py-2 space-y-1.5">
-        {/* Ligne 1 : Identité + Statut Système + Actions Desktop */}
+    <div
+      data-universe={platformMode}
+      className="u-shell-bg flex flex-col h-[100dvh] w-screen overflow-hidden font-sans text-neutral-100 pt-safe-pwa"
+    >
+      {/* Topbar Unifiée Thématisée par Console — Lisible, structurée & ergonomique */}
+      <header className="u-header-bg border-b shrink-0 z-30 px-2.5 sm:px-4 py-1.5 sm:py-2 space-y-1.5">
+        {/* Ligne 1 : Identité Console + Statut Système + Actions */}
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2 min-w-0">
             <img
               src="./icons/icon-192.png"
               alt="CSW Arcade"
-              className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl shrink-0 ring-1 ring-cyan-400/35 shadow-md shadow-cyan-500/10"
+              className="w-8 h-8 rounded-xl shrink-0 ring-1 u-accent-border shadow-md"
             />
             <div className="min-w-0">
-              <div className="font-black tracking-wider text-sm sm:text-base text-white leading-tight truncate">
-                CSW<span className="text-cyan-400">.</span>ARCADE
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="font-black tracking-wider text-sm sm:text-base text-white leading-tight whitespace-nowrap shrink-0">
+                  CSW<span className="u-accent-text">.</span>ARCADE
+                </span>
+                <span className="hidden lg:inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md u-badge text-[10px] font-mono font-bold tracking-wide shrink-0">
+                  {universeTheme.symbols ? (
+                    <span className="inline-flex items-center gap-0.5" aria-hidden="true">
+                      {universeTheme.symbols.map((s) => (
+                        <span key={s.label} style={{ color: s.color }} className="text-[11px] leading-none font-black">
+                          {s.glyph}
+                        </span>
+                      ))}
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-0.5" aria-hidden="true">
+                      {universeTheme.jewels.map((hex, i) => (
+                        <span
+                          key={i}
+                          className="w-1.5 h-1.5 rounded-full"
+                          style={{ backgroundColor: hex }}
+                        />
+                      ))}
+                    </span>
+                  )}
+                  <span>{universeTheme.hardwareTag}</span>
+                </span>
               </div>
-              <div className="text-[10px] sm:text-[11px] font-mono text-neutral-300 truncate">
+              <div className="text-[11px] font-mono text-neutral-300 truncate">
                 {currentModeMeta.subtitle}
               </div>
             </div>
           </div>
 
-          {/* Statut système + Paramètres sur Mobile (< md) — Ligne 1 droite */}
+          {/* Actions rapides Mobile (< md) — Cibles tactiles 44×44px sans écraser le titre */}
           <div className="flex md:hidden items-center gap-1.5 shrink-0">
             <span
-              className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg border text-[10px] font-mono font-semibold ${
+              className={`inline-flex items-center justify-center w-9 h-9 rounded-xl border ${
                 isOnline
                   ? 'bg-emerald-950/60 border-emerald-500/40 text-emerald-300'
                   : 'bg-amber-950/60 border-amber-500/40 text-amber-300'
               }`}
-              title={isOnline ? 'Connecté' : 'Hors-ligne'}
+              title={isOnline ? 'En ligne' : 'Hors-ligne'}
+              aria-label={isOnline ? 'Statut : En ligne' : 'Statut : Hors-ligne'}
             >
-              {isOnline ? <Wifi className="w-3 h-3 shrink-0" aria-hidden="true" /> : <WifiOff className="w-3 h-3 shrink-0" aria-hidden="true" />}
-              <span>{isOnline ? 'En ligne' : 'Hors-ligne'}</span>
-            </span>
-
-            <span
-              className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-neutral-900/90 border border-white/10 text-[10px] font-mono text-neutral-200 tabular-nums"
-              title="ROMs en cache IndexedDB"
-            >
-              <Database className="w-3 h-3 text-cyan-400 shrink-0" aria-hidden="true" />
-              <span>{cacheStats.count} · {formatBytes(cacheStats.totalBytes)}</span>
+              {isOnline ? <Wifi className="w-4 h-4 shrink-0" aria-hidden="true" /> : <WifiOff className="w-4 h-4 shrink-0" aria-hidden="true" />}
             </span>
 
             <button
               type="button"
               onClick={() => setIsFriendsOpen(true)}
               aria-label="Amis & Social"
-              title="Amis & Social (style Fortnite)"
-              className="arcade-focus-ring relative flex items-center justify-center w-9 h-9 rounded-xl bg-neutral-900 hover:bg-neutral-800 border border-white/10 text-cyan-300 transition-colors"
+              title="Amis & Social"
+              className="arcade-focus-ring relative flex items-center justify-center w-11 h-11 rounded-xl bg-neutral-900 hover:bg-neutral-800 border border-white/15 u-accent-text transition-colors"
             >
               <Users className="w-4 h-4" aria-hidden="true" />
               {friendsState.incomingRequests.length > 0 ? (
-                <span className="absolute -top-1 -right-1 px-1 rounded-full bg-amber-500 text-black text-[9px] font-black leading-tight">
+                <span className="absolute -top-1 -right-1 px-1.5 py-0.5 rounded-full bg-amber-500 text-black text-[9px] font-black leading-none">
                   {friendsState.incomingRequests.length}
                 </span>
               ) : friendsState.friends.some((f) => f.isOnline) ? (
-                <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-emerald-400" aria-hidden="true" />
+                <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-emerald-400" aria-hidden="true" />
               ) : null}
             </button>
 
@@ -861,7 +886,7 @@ export default function App() {
               onClick={() => setIsSettingsOpen(true)}
               aria-label="Paramètres unifiés"
               title="Paramètres"
-              className="arcade-focus-ring flex items-center justify-center w-9 h-9 rounded-xl bg-neutral-900 hover:bg-neutral-800 border border-white/10 text-neutral-200 transition-colors"
+              className="arcade-focus-ring flex items-center justify-center w-11 h-11 rounded-xl bg-neutral-900 hover:bg-neutral-800 border border-white/15 text-neutral-100 transition-colors"
             >
               <Settings className="w-4 h-4" aria-hidden="true" />
             </button>
@@ -873,10 +898,10 @@ export default function App() {
               type="button"
               onClick={() => setIsAuthOpen(true)}
               title={`Connexion / Stats & Rang (${userProfile?.ratingPoints || 0} RP)`}
-              className={`arcade-focus-ring flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border text-xs font-bold transition-colors ${
+              className={`arcade-focus-ring flex items-center gap-1.5 px-2.5 py-1.5 min-h-[38px] rounded-xl border text-xs font-bold transition-colors ${
                 userProfile?.isAuthenticated
                   ? 'bg-emerald-950/50 border-emerald-500/40 text-emerald-200 hover:bg-emerald-950/80'
-                  : 'bg-cyan-950/40 border-cyan-500/40 text-cyan-200 hover:bg-cyan-950/70'
+                  : 'u-tab-active hover:opacity-95'
               }`}
             >
               <PlayerAvatar
@@ -892,7 +917,7 @@ export default function App() {
                 {userProfile?.rank || 'D'}
               </span>
               <span className="truncate max-w-[110px]">{userProfile?.displayName || 'Joueur'}</span>
-              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-white/10 text-neutral-200">
+              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-white/10 text-neutral-100">
                 {userProfile?.region || 'FR'}
               </span>
             </button>
@@ -901,9 +926,9 @@ export default function App() {
               type="button"
               onClick={() => setIsFriendsOpen(true)}
               title="Amis & Social — Trouver vos amis et jouer ensemble"
-              className="arcade-focus-ring relative flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-neutral-900 hover:bg-neutral-800 border border-cyan-500/35 text-xs font-bold text-cyan-200 transition-colors"
+              className="arcade-focus-ring relative flex items-center gap-1.5 px-2.5 py-1.5 min-h-[38px] rounded-xl bg-neutral-900 hover:bg-neutral-800 border u-accent-border text-xs font-bold text-neutral-100 transition-colors"
             >
-              <Users className="w-3.5 h-3.5 text-cyan-400" aria-hidden="true" />
+              <Users className="w-3.5 h-3.5 u-accent-text" aria-hidden="true" />
               <span>Amis</span>
               <span className="px-1.5 py-0.2 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-[10px] font-mono tabular-nums">
                 {friendsState.friends.filter((f) => f.isOnline).length}
@@ -919,7 +944,7 @@ export default function App() {
               <button
                 type="button"
                 onClick={() => setIsSasPayOpen(true)}
-                className={`arcade-focus-ring flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border text-xs font-mono font-bold tabular-nums transition-colors ${
+                className={`arcade-focus-ring flex items-center gap-1.5 px-2.5 py-1.5 min-h-[38px] rounded-xl border text-xs font-mono font-bold tabular-nums transition-colors ${
                   coins <= 0
                     ? 'bg-rose-950/50 border-rose-500/60 text-rose-200 hover:bg-rose-950/70'
                     : 'bg-amber-950/40 border-amber-500/40 text-amber-200 hover:bg-amber-950/70'
@@ -939,7 +964,7 @@ export default function App() {
                   type="button"
                   onClick={() => addCoins(10)}
                   title="Mode Test : Ajouter +10 Coins gratuitement sans payer"
-                  className="arcade-focus-ring flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-black shadow-lg shadow-emerald-500/20 border border-emerald-400 transition-all active:scale-95"
+                  className="arcade-focus-ring flex items-center gap-1 px-2.5 py-1.5 min-h-[38px] rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-black shadow-lg shadow-emerald-500/20 border border-emerald-400 transition-all active:scale-95"
                 >
                   <Plus className="w-3.5 h-3.5 stroke-[3]" aria-hidden="true" />
                   <span>10 COINS</span>
@@ -947,12 +972,12 @@ export default function App() {
               )}
             </div>
 
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-neutral-900/90 border border-white/10 text-[11px] font-mono text-neutral-300 tabular-nums">
-              <Database className="w-3 h-3 text-cyan-400" aria-hidden="true" />
+            <span className="hidden lg:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-neutral-900/90 border border-white/10 text-[11px] font-mono text-neutral-200 tabular-nums">
+              <Database className="w-3 h-3 u-accent-text" aria-hidden="true" />
               <span>Cache : {cacheStats.count} · {formatBytes(cacheStats.totalBytes)}</span>
             </span>
             <span
-              className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-full border text-[11px] font-mono ${
+              className={`hidden xl:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-full border text-[11px] font-mono ${
                 isOnline
                   ? 'bg-emerald-950/50 border-emerald-700/50 text-emerald-300'
                   : 'bg-amber-950/50 border-amber-700/50 text-amber-300'
@@ -966,108 +991,120 @@ export default function App() {
               onClick={() => setIsSettingsOpen(true)}
               aria-label="Paramètres unifiés"
               title="Paramètres unifiés"
-              className="arcade-focus-ring flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-neutral-900 hover:bg-neutral-800 border border-white/10 text-xs font-semibold text-neutral-200 transition-colors"
+              className="arcade-focus-ring flex items-center justify-center w-10 h-10 rounded-xl bg-neutral-900 hover:bg-neutral-800 border border-white/15 text-neutral-100 transition-colors"
             >
               <Settings className="w-4 h-4" aria-hidden="true" />
             </button>
           </div>
         </div>
 
-        {/* Ligne 2 Mobile (< md) : Barre Joueur & Portefeuille équilibrée sur 1 ligne */}
-        <div className="flex md:hidden items-center justify-between gap-1.5">
+        {/* Ligne 2 Mobile (< md) : Barre Joueur & Portefeuille proportionnée (bouton compte compact) */}
+        <div className="flex md:hidden items-center justify-between gap-2">
           <button
             type="button"
             onClick={() => setIsAuthOpen(true)}
             aria-label="Profil, Connexion, Stats et Rang"
-            className={`arcade-focus-ring flex-1 min-w-0 flex items-center justify-between gap-1.5 px-2.5 py-1.5 min-h-[36px] rounded-xl border text-xs font-bold transition-colors ${
+            className={`arcade-focus-ring min-w-0 max-w-[220px] sm:max-w-[260px] flex items-center gap-2 px-2.5 py-1.5 min-h-[44px] rounded-xl border text-xs font-bold transition-colors ${
               userProfile?.isAuthenticated
-                ? 'bg-emerald-950/45 border-emerald-500/40 text-emerald-200'
-                : 'bg-cyan-950/40 border-cyan-500/40 text-cyan-200'
+                ? 'u-tab-active'
+                : 'bg-neutral-900/90 border-white/15 text-neutral-100'
             }`}
           >
-            <span className="flex items-center gap-1.5 min-w-0">
-              <PlayerAvatar
-                photoURL={userProfile?.photoURL}
-                name={userProfile?.displayName || 'Joueur'}
-                size="xs"
-              />
-              <span
-                className={`px-1 rounded border text-[10px] font-mono font-black shrink-0 ${
-                  getRankTierMeta(userProfile?.rank || 'D').color
-                }`}
-              >
-                {userProfile?.rank || 'D'}
-              </span>
-              <span className="truncate">{userProfile?.displayName || 'Joueur'}</span>
+            <PlayerAvatar
+              photoURL={userProfile?.photoURL}
+              name={userProfile?.displayName || 'Joueur'}
+              size="xs"
+            />
+            <span
+              className={`px-1.5 py-0.5 rounded border text-[10px] font-mono font-black shrink-0 ${
+                getRankTierMeta(userProfile?.rank || 'D').color
+              }`}
+            >
+              {userProfile?.rank || 'D'}
             </span>
-            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-white/10 text-neutral-200 shrink-0">
+            <span className="truncate">{userProfile?.displayName || 'Joueur'}</span>
+            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-black/35 text-neutral-100 shrink-0 ml-auto">
               {userProfile?.region || 'FR'}
             </span>
           </button>
 
-          <button
-            type="button"
-            onClick={() => setIsSasPayOpen(true)}
-            aria-label="Portefeuille Coins et achat SasPay"
-            className={`arcade-focus-ring flex items-center gap-1.5 px-2.5 py-1.5 min-h-[36px] rounded-xl border text-xs font-mono font-bold tabular-nums shrink-0 ${
-              coins <= 0
-                ? 'bg-rose-950/50 border-rose-500/60 text-rose-200'
-                : 'bg-amber-950/40 border-amber-500/40 text-amber-200'
-            }`}
-          >
-            {coins <= 0 && <span className="w-1.5 h-1.5 rounded-full bg-rose-400 animate-ping shrink-0" aria-hidden="true" />}
-            <Coins className="w-3.5 h-3.5 text-amber-400 shrink-0" aria-hidden="true" />
-            <span>{String(coins).padStart(2, '0')}/99</span>
-            <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500 text-black font-black">
-              Acheter
-            </span>
-          </button>
-
-          {ENABLE_DEV_TEST_COINS && (
+          <div className="flex items-center gap-1.5 shrink-0">
             <button
               type="button"
-              onClick={() => addCoins(10)}
-              title="Mode Test : Ajouter +10 Coins gratuitement sans payer"
-              className="arcade-focus-ring flex items-center gap-0.5 px-2.5 py-1.5 min-h-[36px] rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-black shadow-md shadow-emerald-500/20 border border-emerald-400 transition-transform active:scale-95 shrink-0 tabular-nums"
+              onClick={() => setIsSasPayOpen(true)}
+              aria-label="Portefeuille Coins et achat SasPay"
+              className={`arcade-focus-ring flex items-center gap-1.5 px-2.5 py-1.5 min-h-[44px] rounded-xl border text-xs font-mono font-bold tabular-nums shrink-0 ${
+                coins <= 0
+                  ? 'bg-rose-950/50 border-rose-500/60 text-rose-200'
+                  : 'bg-amber-950/40 border-amber-500/40 text-amber-200'
+              }`}
             >
-              <Plus className="w-3.5 h-3.5 stroke-[3]" aria-hidden="true" />
-              <span>10</span>
+              {coins <= 0 && <span className="w-1.5 h-1.5 rounded-full bg-rose-400 animate-ping shrink-0" aria-hidden="true" />}
+              <Coins className="w-3.5 h-3.5 text-amber-400 shrink-0" aria-hidden="true" />
+              <span>{String(coins).padStart(2, '0')}/99</span>
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500 text-black font-black">
+                Acheter
+              </span>
             </button>
-          )}
+
+            {ENABLE_DEV_TEST_COINS && (
+              <button
+                type="button"
+                onClick={() => addCoins(10)}
+                title="Mode Test : Ajouter +10 Coins gratuitement sans payer"
+                className="arcade-focus-ring flex items-center justify-center gap-0.5 px-2.5 min-w-[44px] min-h-[44px] rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-black shadow-md shadow-emerald-500/20 border border-emerald-400 transition-transform active:scale-95 shrink-0 tabular-nums"
+              >
+                <Plus className="w-3.5 h-3.5 stroke-[3]" aria-hidden="true" />
+                <span>10</span>
+              </button>
+            )}
+          </div>
         </div>
 
-        {/* Ligne 3 : Barre d'Univers — Compacte et toujours accessible */}
-        <nav
-          className="flex items-center gap-1.5 overflow-x-auto no-scrollbar snap-x"
-          role="tablist"
-          aria-label="Univers de jeux"
-        >
-          {SHELL_MODES.map((m, idx) => {
-            const Icon = m.icon;
-            const active = selectedChannelId === null && platformMode === m.id;
-            return (
-              <button
-                key={m.id}
-                type="button"
-                role="tab"
-                aria-selected={active}
-                title={`${m.label} (Alt+${idx + 1})`}
-                onClick={() => {
-                  setSelectedChannelId(null);
-                  setPlatformMode(m.id);
-                }}
-                className={`arcade-focus-ring snap-start flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 min-h-[34px] rounded-xl text-xs font-bold transition-all shrink-0 ${
-                  active
-                    ? 'bg-cyan-500/20 text-cyan-200 border border-cyan-400/60 shadow-sm shadow-cyan-500/20'
-                    : 'bg-neutral-900/60 text-neutral-300 hover:text-white hover:bg-neutral-800/80 border border-white/5'
-                }`}
-              >
-                <Icon className="w-3.5 h-3.5 md:w-4 md:h-4 shrink-0" aria-hidden="true" />
-                <span>{m.label}</span>
-              </button>
-            );
-          })}
-        </nav>
+        {/* Ligne 3 : Barre d'Univers — Thématisée avec indicateur de défilement */}
+        <div className="relative">
+          <nav
+            className="flex items-center gap-1.5 overflow-x-auto no-scrollbar snap-x pr-6 md:pr-0"
+            role="tablist"
+            aria-label="Univers de jeux"
+          >
+            {SHELL_MODES.map((m, idx) => {
+              const Icon = m.icon;
+              const active = selectedChannelId === null && platformMode === m.id;
+              const mTheme = getUniverseTheme(m.id);
+              return (
+                <button
+                  key={m.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={active}
+                  title={`${m.label} (Alt+${idx + 1})`}
+                  onClick={() => {
+                    setSelectedChannelId(null);
+                    setPlatformMode(m.id);
+                  }}
+                  className={`arcade-focus-ring snap-start flex items-center gap-1.5 px-3 py-1.5 min-h-[40px] md:min-h-[36px] rounded-xl text-xs font-bold transition-all shrink-0 border ${
+                    active
+                      ? 'u-btn-primary'
+                      : 'bg-neutral-900/75 text-neutral-200 hover:text-white hover:bg-neutral-800/90 border-white/10'
+                  }`}
+                >
+                  <span
+                    className="w-2 h-2 rounded-full shrink-0"
+                    style={{ backgroundColor: active ? mTheme.accentFgHex : mTheme.accentHex }}
+                    aria-hidden="true"
+                  />
+                  <Icon className="w-3.5 h-3.5 md:w-4 md:h-4 shrink-0" aria-hidden="true" />
+                  <span>{m.label}</span>
+                </button>
+              );
+            })}
+          </nav>
+          <div
+            className="pointer-events-none md:hidden absolute right-0 top-0 bottom-0 w-7 bg-gradient-to-l from-neutral-950/90 to-transparent"
+            aria-hidden="true"
+          />
+        </div>
 
         {/* Popover Portefeuille Test partagé Mobile & Desktop */}
         {buyMenuOpen && (
@@ -1122,18 +1159,114 @@ export default function App() {
           onReplaceChannel={handleReplaceFightcadeChannel}
         />
 
-        {onlineCount > 1 && selectedChannelId === null && (
-          <button
-            type="button"
-            onClick={() => setSelectedChannelId(GLOBAL_CHANNEL_ID)}
-            className="arcade-focus-ring fixed bottom-20 md:bottom-6 right-3 sm:right-6 z-40 px-4 py-2.5 min-h-[44px] rounded-full bg-emerald-500 hover:bg-emerald-400 text-black font-black text-xs shadow-2xl shadow-emerald-500/25 flex items-center gap-2 transition-transform active:scale-95 border-2 border-neutral-950"
-            title="Des joueurs sont actuellement connectés au salon. Cliquez pour les rejoindre !"
-          >
-            <span className="w-2.5 h-2.5 rounded-full bg-black animate-ping shrink-0" aria-hidden="true" />
-            <Users className="w-4 h-4 shrink-0" aria-hidden="true" />
-            <span>{onlineCount} Joueurs au Salon · Rejoindre</span>
-          </button>
-        )}
+        {/* Pile d'overlays flottants en bas à droite — visible même en jeu (z-150) pour Drop-In Join */}
+        <div className="fixed bottom-[76px] md:bottom-6 left-3 right-3 md:left-auto md:right-6 z-[150] flex flex-col items-end gap-2.5 pointer-events-none">
+          {incomingChallenge && incomingChallenge.fromUid !== userProfile?.uid && !activeMatchSync && (
+            <div className="pointer-events-auto w-full md:w-80 rounded-2xl bg-neutral-900 border-2 u-accent-border p-4 shadow-2xl space-y-3">
+              <div className="flex items-center gap-2 u-accent-text font-black text-xs uppercase">
+                <Swords className="w-4 h-4 animate-pulse" aria-hidden="true" />
+                <span>Défi Fightcade 2 reçu !</span>
+              </div>
+              <p className="text-xs text-neutral-100">
+                <strong>{incomingChallenge.fromName}</strong> vous défie sur <strong>{incomingChallenge.gameTitle}</strong> (Match offert par l&apos;hôte · 0 Coin requis).
+              </p>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleRespondChallenge(true)}
+                  className="arcade-focus-ring flex-1 py-2.5 min-h-[44px] rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-black"
+                >
+                  Accepter (Offert)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleRespondChallenge(false)}
+                  className="arcade-focus-ring px-3.5 py-2.5 min-h-[44px] rounded-xl bg-neutral-800 hover:bg-rose-950 text-neutral-200 text-xs font-bold"
+                >
+                  Refuser
+                </button>
+              </div>
+            </div>
+          )}
+
+          {remoteActiveSession &&
+            !stageSession &&
+            remoteActiveSession.status === 'playing' &&
+            (remoteActiveSession.updatedAtMs || 0) !== dismissedSessionTs && (
+              <div className="pointer-events-auto w-full md:w-[400px] rounded-2xl bg-neutral-900/95 backdrop-blur-xl border-2 border-emerald-400/70 p-4 shadow-2xl space-y-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-center gap-2 text-emerald-300 font-black text-xs uppercase">
+                    <Cloud className="w-4 h-4 animate-pulse shrink-0" aria-hidden="true" />
+                    <span>Partie active sur votre compte !</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDismissedSessionTs(remoteActiveSession.updatedAtMs || Date.now());
+                      const uid = userProfileRef.current?.uid;
+                      if (uid) {
+                        pushActiveSession(uid, null);
+                      }
+                      setRemoteActiveSession(null);
+                    }}
+                    className="arcade-focus-ring p-1.5 min-w-[36px] min-h-[36px] flex items-center justify-center rounded-lg bg-neutral-800 hover:bg-neutral-700 text-neutral-300 hover:text-white"
+                    aria-label="Fermer la bannière de reprise"
+                    title="Fermer"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-xs text-neutral-100">
+                    Vous jouez actuellement à{' '}
+                    <strong className="text-white">« {remoteActiveSession.title} »</strong> sur{' '}
+                    <strong className="u-accent-text">{remoteActiveSession.deviceName}</strong>.
+                  </p>
+                  <p className="text-[11px] font-mono text-emerald-300">
+                    {remoteActiveSession.hasSavestate
+                      ? 'Sauvegarde instantanée prête · Reprise sans dépenser de Coin'
+                      : 'Salon synchronisé · Reprise immédiate sans dépenser de Coin'}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    disabled={resumingHandoff}
+                    onClick={() => handleResumeRemoteSession(remoteActiveSession)}
+                    className="arcade-focus-ring flex-1 py-2.5 px-3 min-h-[44px] rounded-xl bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-black text-xs font-black flex items-center justify-center gap-1.5 transition-colors"
+                  >
+                    <Play className="w-3.5 h-3.5" aria-hidden="true" />
+                    <span>{resumingHandoff ? 'Synchronisation…' : 'Poursuivre ma partie ici'}</span>
+                  </button>
+                  {remoteActiveSession.inSalon && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedChannelId(remoteActiveSession.gameId);
+                        setDismissedSessionTs(remoteActiveSession.updatedAtMs || Date.now());
+                      }}
+                      className="arcade-focus-ring px-3.5 py-2.5 min-h-[44px] rounded-xl bg-neutral-800 hover:bg-neutral-700 u-accent-text text-xs font-bold shrink-0"
+                    >
+                      Salon
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+
+          {onlineCount > 1 && selectedChannelId === null && (
+            <button
+              type="button"
+              onClick={() => setSelectedChannelId(GLOBAL_CHANNEL_ID)}
+              className="pointer-events-auto arcade-focus-ring px-4 py-2.5 min-h-[44px] rounded-full bg-emerald-500 hover:bg-emerald-400 text-black font-black text-xs shadow-2xl shadow-emerald-500/25 flex items-center gap-2 transition-transform active:scale-95 border-2 border-neutral-950"
+              title="Des joueurs sont actuellement connectés au salon. Cliquez pour les rejoindre !"
+            >
+              <span className="w-2.5 h-2.5 rounded-full bg-black animate-ping shrink-0" aria-hidden="true" />
+              <Users className="w-4 h-4 shrink-0" aria-hidden="true" />
+              <span>{onlineCount} Joueurs au Salon · Rejoindre</span>
+            </button>
+          )}
+        </div>
 
         {resolvedSelectedChannel ? (
           <FightcadeLobbyView
@@ -1276,104 +1409,13 @@ export default function App() {
         </div>
       )}
 
-      {/* Modale Défi Entrant Fightcade 2 (15s) — visible uniquement par l'adversaire invité, jamais par l'expéditeur */}
-      {incomingChallenge && incomingChallenge.fromUid !== userProfile?.uid && !activeMatchSync && (
-        <div className="fixed bottom-20 md:bottom-6 inset-x-3 md:inset-x-auto md:right-6 z-[120] md:w-80 rounded-2xl bg-neutral-900 border-2 border-cyan-400 p-4 shadow-2xl space-y-3">
-          <div className="flex items-center gap-2 text-cyan-300 font-black text-xs uppercase">
-            <Swords className="w-4 h-4 animate-pulse" />
-            <span>Défi Fightcade 2 reçu !</span>
-          </div>
-          <p className="text-xs text-neutral-200">
-            <strong>{incomingChallenge.fromName}</strong> vous défie sur <strong>{incomingChallenge.gameTitle}</strong> (Match offert par l'hôte · 0 Coin requis).
-          </p>
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={() => handleRespondChallenge(true)}
-              className="flex-1 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-black"
-            >
-              Accepter (Offert)
-            </button>
-            <button
-              type="button"
-              onClick={() => handleRespondChallenge(false)}
-              className="px-3 py-2 rounded-xl bg-neutral-800 hover:bg-rose-950 text-neutral-300 text-xs font-bold"
-            >
-              Refuser
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Bannière Synchronisation Compte Multi-Appareils : Poursuivre sa partie directement sur cet appareil */}
-      {remoteActiveSession &&
-        !stageSession &&
-        remoteActiveSession.status === 'playing' &&
-        (remoteActiveSession.updatedAtMs || 0) !== dismissedSessionTs && (
-          <div className="fixed bottom-20 md:bottom-6 left-3 right-3 md:left-auto md:right-6 z-[115] md:w-[400px] rounded-2xl bg-neutral-900/95 backdrop-blur-xl border-2 border-emerald-400/70 p-4 shadow-2xl space-y-3">
-            <div className="flex items-start justify-between gap-2">
-              <div className="flex items-center gap-2 text-emerald-300 font-black text-xs uppercase">
-                <Cloud className="w-4 h-4 animate-pulse shrink-0" />
-                <span>Partie active sur votre compte !</span>
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  setDismissedSessionTs(remoteActiveSession.updatedAtMs || Date.now());
-                  const uid = userProfileRef.current?.uid;
-                  if (uid) {
-                    pushActiveSession(uid, null);
-                  }
-                  setRemoteActiveSession(null);
-                }}
-                className="p-1 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-neutral-400 hover:text-white"
-                title="Fermer"
-              >
-                <X className="w-3.5 h-3.5" />
-              </button>
-            </div>
-            <div className="space-y-1">
-              <p className="text-xs text-neutral-100">
-                Vous jouez actuellement à{' '}
-                <strong className="text-white">« {remoteActiveSession.title} »</strong> sur{' '}
-                <strong className="text-cyan-300">{remoteActiveSession.deviceName}</strong>.
-              </p>
-              <p className="text-[11px] font-mono text-emerald-300/90">
-                {remoteActiveSession.hasSavestate
-                  ? '☁️ Sauvegarde instantanée prête · Reprise sans dépenser de Coin'
-                  : '🟢 Salon synchronisé · Reprise immédiate sans dépenser de Coin'}
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                disabled={resumingHandoff}
-                onClick={() => handleResumeRemoteSession(remoteActiveSession)}
-                className="flex-1 py-2.5 px-3 rounded-xl bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-black text-xs font-black flex items-center justify-center gap-1.5 transition-colors"
-              >
-                <Play className="w-3.5 h-3.5" />
-                <span>{resumingHandoff ? 'Synchronisation…' : 'Poursuivre ma partie ici'}</span>
-              </button>
-              {remoteActiveSession.inSalon && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSelectedChannelId(remoteActiveSession.gameId);
-                    setDismissedSessionTs(remoteActiveSession.updatedAtMs || Date.now());
-                  }}
-                  className="px-3 py-2.5 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-cyan-300 text-xs font-bold shrink-0"
-                >
-                  Salon
-                </button>
-              )}
-            </div>
-          </div>
-        )}
+      {/* Les overlays Défi Entrant & Reprise Multi-Appareils sont regroupés dans la pile flottante ci-dessus */}
 
       {/* Paramètres Unifiés (Contrôles, Vidéo, Audio, BIOS, Fightcade 2 & Cache) */}
       <SettingsModal
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
+        platformMode={platformMode}
         settings={settings}
         updateKeyBinding={updateKeyBinding}
         updateConsoleKeyBinding={updateConsoleKeyBinding}

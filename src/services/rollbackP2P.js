@@ -2,15 +2,42 @@
  * Pilier 3B : Moteur WebRTC DataChannel (UDP-like) + Buffer Circulaire Rollback (8 frames).
  */
 
-const ICE_SERVERS = [
-  { urls: 'stun:stun.l.google.com:19302' },
-  { urls: 'stun:stun1.l.google.com:19302' },
-  { urls: 'stun:stun2.l.google.com:19302' },
-  { urls: 'stun:stun.cloudflare.com:3478' },
-];
+function buildIceServers() {
+  const servers = [
+    { urls: 'stun:stun.l.google.com:19302' },
+    { urls: 'stun:stun1.l.google.com:19302' },
+    { urls: 'stun:stun2.l.google.com:19302' },
+    { urls: 'stun:stun.cloudflare.com:3478' },
+  ];
+  try {
+    const turnUrlsRaw = import.meta?.env?.VITE_TURN_URLS || '';
+    const turnUser = import.meta?.env?.VITE_TURN_USERNAME || '';
+    const turnCred = import.meta?.env?.VITE_TURN_CREDENTIAL || '';
+    if (turnUrlsRaw) {
+      const urls = String(turnUrlsRaw)
+        .split(',')
+        .map((u) => u.trim())
+        .filter(Boolean);
+      if (urls.length > 0) {
+        servers.push({
+          urls,
+          ...(turnUser ? { username: turnUser } : {}),
+          ...(turnCred ? { credential: turnCred } : {}),
+        });
+      }
+    }
+  } catch {
+    /* ignore non-vite env */
+  }
+  return servers;
+}
+
+const ICE_SERVERS = buildIceServers();
 
 const MAX_ROLLBACK_FRAMES = 8;
 const PACKET_BTN_MASK_SYNC = 0xb1;
+const PACKET_PING_BIN = 0xee;
+const PACKET_PONG_BIN = 0xef;
 
 export class RollbackP2PEngine {
   constructor({
@@ -72,6 +99,7 @@ export class RollbackP2PEngine {
     this.onNetplayEvent = null;
     this.frame0FallbackTimer = null;
 
+    this.rttSamples = [];
     this.stats = {
       pingMs: 0,
       rollbackFrames: 0,
@@ -81,7 +109,19 @@ export class RollbackP2PEngine {
       syncStatus: '100%',
       p2pState: 'connecting',
       inputDelay: this.inputDelay,
+      recommendedDelay: this.inputDelay,
     };
+  }
+
+  _recordRttSample(rawRttMs) {
+    const clamped = Math.max(1, Math.min(2500, Math.round(rawRttMs)));
+    this.rttSamples.push(clamped);
+    if (this.rttSamples.length > 5) this.rttSamples.shift();
+    const sorted = [...this.rttSamples].sort((a, b) => a - b);
+    const median = sorted[Math.floor(sorted.length / 2)];
+    this.stats.pingMs = median;
+    this.stats.recommendedDelay = median < 35 ? 0 : median < 85 ? 1 : median < 145 ? 2 : 3;
+    this.emitStats();
   }
 
   addCleanup(fn) {
@@ -134,7 +174,7 @@ export class RollbackP2PEngine {
         this.emitStats();
         this.startPingLoop();
       }
-    }, 1800);
+    }, 4500);
 
     this.pc.oniceconnectionstatechange = () => {
       const s = this.pc?.iceConnectionState || 'closed';
@@ -544,11 +584,8 @@ export class RollbackP2PEngine {
     }
     if (data.syncType === 'PONG' && typeof data.t === 'number') {
       if (this.udpChannel?.readyState !== 'open') {
-        const rawRtt = Math.max(1, Math.min(2500, Math.round((performance.now() - data.t) / 2)));
-        const prev = Number(this.stats.pingMs || 0);
-        this.stats.pingMs = prev > 0 ? Math.round(prev * 0.55 + rawRtt * 0.45) : rawRtt;
         this.stats.p2pState = 'relay-vps';
-        this.emitStats();
+        this._recordRttSample(performance.now() - data.t);
       }
       return;
     }
@@ -617,7 +654,12 @@ export class RollbackP2PEngine {
       if (this.destroyed) return;
       if (this.udpChannel?.readyState === 'open') {
         try {
-          this.udpChannel.send(JSON.stringify({ type: 'PING', t: performance.now() }));
+          // Paquet PING binaire ultra-léger de 9 octets (zéro JSON sur UDP)
+          const pBuf = new ArrayBuffer(9);
+          const pView = new DataView(pBuf);
+          pView.setUint8(0, PACKET_PING_BIN);
+          pView.setFloat64(1, performance.now(), false);
+          this.udpChannel.send(pBuf);
           // Keepalive bitmask pour éviter toute touche bloquée même après perte UDP isolée
           const buf = new ArrayBuffer(7);
           const view = new DataView(buf);
@@ -635,7 +677,7 @@ export class RollbackP2PEngine {
           /* noop */
         }
       }
-    }, 750);
+    }, 1000);
   }
 
   sendButtonEvent(buttonIdx, pressed) {
@@ -728,32 +770,42 @@ export class RollbackP2PEngine {
     let sentOverRtc = false;
 
     if (this.reliableChannel?.readyState === 'open') {
-      try {
-        const rtcTransferId = `${transferId}_rtc`;
-        for (let i = 0; i < total; i++) {
-          const chunk = stateBase64.slice(i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE);
-          this.reliableChannel.send(
-            JSON.stringify({
-              type: 'FRAME0_CHUNK',
-              transferId: rtcTransferId,
-              index: i,
-              total,
-              chunk,
-              syncFrame: cleanSyncFrame,
-            })
-          );
+      sentOverRtc = true;
+      const rtcTransferId = `${transferId}_rtc`;
+      const dc = this.reliableChannel;
+      // Envoi avec contrôle de flux (backpressure < 64 Ko) pour ne jamais saturer le canal UDP
+      (async () => {
+        try {
+          for (let i = 0; i < total; i++) {
+            if (this.destroyed || this.pendingAckTransferId !== transferId || dc.readyState !== 'open') break;
+            let waits = 0;
+            while (dc.bufferedAmount > 65536 && waits < 50) {
+              await new Promise((r) => setTimeout(r, 8));
+              waits++;
+            }
+            const chunk = stateBase64.slice(i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE);
+            dc.send(
+              JSON.stringify({
+                type: 'FRAME0_CHUNK',
+                transferId: rtcTransferId,
+                index: i,
+                total,
+                chunk,
+                syncFrame: cleanSyncFrame,
+              })
+            );
+          }
+        } catch {
+          this.pendingFrame0State = { stateBase64, syncFrame: cleanSyncFrame };
         }
-        sentOverRtc = true;
-      } catch {
-        this.pendingFrame0State = { stateBase64, syncFrame: cleanSyncFrame };
-      }
+      })();
     } else {
       this.pendingFrame0State = { stateBase64, syncFrame: cleanSyncFrame };
     }
 
     const dispatchWsChunks = async () => {
       if (!this.onRelayButtonFallback || this.destroyed) return;
-      const WS_CHUNK = 49152;
+      const WS_CHUNK = 16384; // 16 Ko cadencés pour laisser passer les touches & pings sans latence
       const wsTotal = Math.ceil(stateBase64.length / WS_CHUNK);
       const wsTransferId = `${transferId}_ws`;
       try {
@@ -769,7 +821,7 @@ export class RollbackP2PEngine {
             syncFrame: cleanSyncFrame,
           });
           if (i + 1 < wsTotal) {
-            await new Promise((r) => setTimeout(r, 2));
+            await new Promise((r) => setTimeout(r, 16));
           }
         }
       } catch {
@@ -777,14 +829,14 @@ export class RollbackP2PEngine {
       }
     };
 
-    // Si WebRTC fiable est ouvert, basculer sur le relais WS uniquement si l'ACK tarde (> 650ms).
+    // Si WebRTC fiable est ouvert, basculer sur le relais WS uniquement si l'ACK tarde (> 2500ms).
     if (!sentOverRtc) {
       dispatchWsChunks();
     } else if (this.onRelayButtonFallback) {
       this.frame0FallbackTimer = setTimeout(() => {
         this.frame0FallbackTimer = null;
         dispatchWsChunks();
-      }, 650);
+      }, 2500);
     }
   }
 
@@ -804,13 +856,35 @@ export class RollbackP2PEngine {
     const view = new DataView(buffer);
     const magic = view.getUint8(0);
 
+    // Paquets binaires PING/PONG 9 octets (zéro surcharge JSON sur UDP)
+    if (buffer.byteLength === 9 && magic === PACKET_PING_BIN) {
+      const ts = view.getFloat64(1, false);
+      if (this.udpChannel?.readyState === 'open') {
+        try {
+          const pongBuf = new ArrayBuffer(9);
+          const pView = new DataView(pongBuf);
+          pView.setUint8(0, PACKET_PONG_BIN);
+          pView.setFloat64(1, ts, false);
+          this.udpChannel.send(pongBuf);
+        } catch {}
+      }
+      return;
+    }
+    if (buffer.byteLength === 9 && magic === PACKET_PONG_BIN) {
+      const ts = view.getFloat64(1, false);
+      this.stats.p2pState = 'connected';
+      this._recordRttSample(performance.now() - ts);
+      return;
+    }
+
     // Paquets binaires GGPO Fightcade :
-    // 0x5A = Input Frame + Redondance N-3 (15 octets)
+    // 0x5A = Input Frame + Redondance N-3 (15 octets, 2J)
+    // 0x5D = Input Frame Multi-Joueurs 4J+ avec octet playerIndex (16 octets)
     // 0x5B = Frame-0 / Sync ACK (5 octets)
     // 0x5C = Frame-0 / Simultaneous GO (5 octets)
     // 0xCB = Checksum RAM 68000 (9 octets)
     // 0xCC = Demande d'Auto-Resync sur divergence checksum (5 octets)
-    if (magic === 0x5a || magic === 0x5b || magic === 0x5c || magic === 0xcb || magic === 0xcc) {
+    if (magic === 0x5a || magic === 0x5d || magic === 0x5b || magic === 0x5c || magic === 0xcb || magic === 0xcc) {
       if (magic === 0x5b && buffer.byteLength >= 5) {
         const ackFrame = view.getUint32(1, false);
         if (this.frame0FallbackTimer) {

@@ -261,7 +261,7 @@
             const diff = mask ^ prevNetplayGamepadMask;
             if (diff !== 0) {
               prevNetplayGamepadMask = mask;
-              const myPort = netplayPlayerIndex === 1 ? 1 : 0;
+              const myPort = netplayPlayerIndex >= 0 && netplayPlayerIndex <= 3 ? netplayPlayerIndex : 0;
               const ggpo = window.__cswGgpoEngine;
               for (let i = 0; i < 14; i++) {
                 if ((diff >> i) & 1) {
@@ -344,7 +344,7 @@
         for (const k of [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 16, 17, 18, 19, 20, 21, 22, 23]) {
           emptyPort[k] = { value: 0, value2: '' };
         }
-        return { 0: { ...emptyPort }, 1: { ...emptyPort }, 2: {}, 3: {} };
+        return { 0: { ...emptyPort }, 1: { ...emptyPort }, 2: { ...emptyPort }, 3: { ...emptyPort } };
       }
 
       return {
@@ -1648,8 +1648,8 @@
         this.localInputs[targetIdx] = this.localLiveMask;
         this.localFrameNums[targetIdx] = targetFrame;
 
-        // 3. Envoyer le paquet binaire 0x5A dès qu'une touche change ou toutes les 6 frames (keepalive)
-        if (this.localLiveMask !== this.lastSentMask || frame % 6 === 0) {
+        // 3. Envoyer le paquet binaire 0x5A dès qu'une touche change ou toutes les 3 frames (50ms, pacing fluide)
+        if (this.localLiveMask !== this.lastSentMask || frame % 3 === 0) {
           this.lastSentMask = this.localLiveMask;
           this.send0x5APacket(targetFrame);
         }
@@ -2852,6 +2852,11 @@
 
     function startRamTelemetry(gameTitle, core) {
       if (cswRamTelemetry.timer) clearInterval(cswRamTelemetry.timer);
+      // Suspendre le scan RAM (jusqu'à 6 Mo) pendant les matchs Netplay pour éliminer les micro-freezes et le jitter ping
+      if (isNetplaySession) {
+        cswRamTelemetry.timer = null;
+        return;
+      }
       const lowerCore = String(core || '').toLowerCase();
       const lowerTitle = String(gameTitle || '').toLowerCase();
       cswRamTelemetry.core = lowerCore;
@@ -2898,6 +2903,39 @@
 
       if (msg.type === 'STOP_NETPLAY_MATCH') {
         window.__cswGgpoEngine?.stop?.();
+        return;
+      }
+
+      // Bascule transparente en Solo (ou continue sans le pair parti) sans jamais fermer ni réinitialiser le jeu
+      if (msg.type === 'CONVERT_TO_SOLO') {
+        try {
+          const ggpo = window.__cswGgpoEngine;
+          if (ggpo && typeof ggpo.uninstallHook === 'function') {
+            ggpo.uninstallHook();
+          } else if (ggpo) {
+            ggpo.active = false;
+            ggpo.stopped = false;
+          }
+          isNetplaySession = false;
+          netplayPlayerIndex = 0;
+          window.EJS_emulator?.play?.();
+          startRamTelemetry(window.EJS_gameName || '', currentCoreName);
+          notifyParent('STAGE_STATUS', { status: 'playing', message: 'Partie poursuivie en Solo.' });
+        } catch {}
+        return;
+      }
+
+      // Transition à chaud Solo -> Netplay lors d'un Drop-In Join (J2/J3/J4 rejoint la partie en cours)
+      if (msg.type === 'ENABLE_LIVE_NETPLAY') {
+        try {
+          isNetplaySession = true;
+          netplayPlayerIndex = Number(msg.playerIndex ?? 0);
+          if (cswRamTelemetry.timer) {
+            clearInterval(cswRamTelemetry.timer);
+            cswRamTelemetry.timer = null;
+          }
+          window.__cswGgpoEngine?.start?.();
+        } catch {}
         return;
       }
 
@@ -3113,7 +3151,7 @@
       }
 
       if (msg.type === 'PRESS_BUTTON') {
-        if (isNetplaySession && netplayPlayerIndex === 2) return;
+        if (isNetplaySession && netplayPlayerIndex < 0) return;
         const idx = msg.button === 'coin' ? 2 : 3;
         try { window.focus(); } catch {}
         const ggpo = window.__cswGgpoEngine;
@@ -3121,7 +3159,7 @@
           ggpo.pulseLocalButton(idx, 5);
           return;
         }
-        const myPort = netplayPlayerIndex === 1 ? 1 : 0;
+        const myPort = netplayPlayerIndex >= 0 && netplayPlayerIndex <= 3 ? netplayPlayerIndex : 0;
         pulseEmuButton(myPort, idx, 100);
         if (isNetplaySession) {
           notifyParent('NETPLAY_LOCAL_BTN', { buttonIdx: idx, pressed: true });
@@ -3289,6 +3327,20 @@
           window.EJS_startOnLoaded = true;
           window.EJS_color = msg.accent || '#3b82f6';
           if (ctrlCfg) window.EJS_defaultControls = ctrlCfg;
+          // Activation automatique des Multitaps pour les jeux 3-4+ joueurs (PS1, Sega 4-Way Play, SNES)
+          const maxPlayers = Math.max(2, Number(msg.maxPlayers || 2));
+          if (maxPlayers >= 3) {
+            const normCore = String(window.EJS_core || '').toLowerCase();
+            const mtOpts = { ...(window.EJS_defaultOptions || {}) };
+            if (normCore === 'psx' || normCore === 'pcsx_rearmed') {
+              mtOpts['pcsx_rearmed_multitap1'] = 'enabled';
+            } else if (normCore === 'segamd' || normCore === 'genesis_plus_gx') {
+              mtOpts['genesis_plus_gx_port_1_type'] = '4-way play';
+            } else if (normCore === 'snes' || normCore === 'snes9x') {
+              mtOpts['snes9x_multitap'] = 'enabled';
+            }
+            window.EJS_defaultOptions = mtOpts;
+          }
           const effectiveMuted = msg.muted ?? hw.audio?.muted ?? false;
           const effectiveVol = typeof msg.volume === 'number' ? msg.volume : (hw.audio?.volume ?? 80);
           window.__cswDesiredAudio = { muted: Boolean(effectiveMuted), vol: Math.max(0, Math.min(1, effectiveVol / 100)) };

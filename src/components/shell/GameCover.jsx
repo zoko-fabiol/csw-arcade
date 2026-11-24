@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
+import { getUniverseTheme } from '../../data/universeThemes';
 
 const FAILED_COVER_URLS = new Set();
 const RESOLVED_COVER_CACHE = new Map();
@@ -64,6 +65,16 @@ function resolveCoverCandidates({ title, platformLabel, filename, imageUrl }) {
   return candidates;
 }
 
+function detectCoverUniverse(platformLabel = '', filename = '') {
+  const s = `${platformLabel} ${filename}`.toLowerCase();
+  if (/java|j2me|gameloft|\.jar$/.test(s)) return 'java';
+  if (/playstation|\bps1\b|\bpsx\b|pcsx|\bpsp\b/.test(s)) return 'playstation';
+  if (/nintendo|\bnes\b|snes|famicom|game\s*boy|\bgb\b|\bgbc\b|\bgba\b|\bn64\b|\bnds\b/.test(s)) return 'nintendo';
+  if (/sega|mega\s*drive|genesis|master\s*system|game\s*gear|saturn/.test(s)) return 'sega';
+  if (/neo\s*geo|mame|fbneo|arcade|cps/.test(s)) return 'arcade';
+  return 'all';
+}
+
 export function GameCover({ title, platformLabel, filename, imageUrl, compact = false }) {
   const coverKey = `${platformLabel || ''}|${filename || ''}|${title || ''}|${imageUrl || ''}`;
   const candidates = useMemo(
@@ -76,43 +87,56 @@ export function GameCover({ title, platformLabel, filename, imageUrl, compact = 
 
   useEffect(() => {
     setIdx(0);
-    setLoaded(Boolean(RESOLVED_COVER_CACHE.get(coverKey) && RESOLVED_COVER_CACHE.get(coverKey) !== 'none'));
+    setLoaded(false);
   }, [coverKey]);
 
   const initials = useMemo(() => {
-    const parts = String(title || '?').split(/\s+/).filter(Boolean).slice(0, 2);
+    const clean = String(title || '?').replace(/[^a-zA-Z0-9\s]/g, ' ').trim();
+    const parts = clean.split(/\s+/).filter(Boolean).slice(0, 2);
     return parts.map((w) => w[0]?.toUpperCase() || '').join('') || 'CSW';
   }, [title]);
 
-  const isJ2me = /java|j2me|gameloft/i.test(String(platformLabel || '')) || /\.jar$/i.test(String(filename || ''));
+  const coverUniverse = useMemo(
+    () => detectCoverUniverse(platformLabel, filename),
+    [platformLabel, filename]
+  );
+  const theme = getUniverseTheme(coverUniverse);
+  const isJ2me = coverUniverse === 'java';
   const currentSrc = idx < candidates.length ? candidates[idx] : null;
 
   return (
     <div
-      className={`relative overflow-hidden rounded-lg border ${
-        isJ2me
-          ? 'border-amber-500/30 bg-gradient-to-br from-amber-950/60 via-neutral-900 to-neutral-950'
-          : 'border-white/10 bg-gradient-to-br from-cyan-950/40 via-neutral-900 to-neutral-950'
-      } flex items-center justify-center shrink-0 ${
+      className={`relative overflow-hidden rounded-lg border ${theme.coverBorder} bg-gradient-to-br ${theme.coverGradient} flex items-center justify-center shrink-0 ${
         compact ? 'w-24 aspect-[4/3]' : 'w-full aspect-[16/10]'
       }`}
     >
       {!loaded && (
-        <div className="flex flex-col items-center justify-center gap-1 p-2 text-center select-none">
-          {isJ2me && !compact && (
-            <span className="px-1.5 py-0.5 rounded bg-amber-500/20 border border-amber-500/40 text-[9px] font-bold uppercase tracking-wider text-amber-300">
-              📱 GAMELOFT · J2ME
-            </span>
+        <div className="flex flex-col items-center justify-center gap-1.5 p-2 text-center select-none w-full">
+          {!compact && (
+            <div className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-black/45 border border-white/15 text-[9px] font-mono font-bold uppercase tracking-wider text-neutral-200">
+              {theme.symbols ? (
+                <span className="inline-flex items-center gap-0.5" aria-hidden="true">
+                  {theme.symbols.map((s) => (
+                    <span key={s.label} style={{ color: s.color }}>{s.glyph}</span>
+                  ))}
+                </span>
+              ) : (
+                <span
+                  className="w-1.5 h-1.5 rounded-full"
+                  style={{ backgroundColor: theme.accentHex }}
+                  aria-hidden="true"
+                />
+              )}
+              <span>{isJ2me ? 'GAMELOFT · J2ME' : theme.badgeLabel}</span>
+            </div>
           )}
           <span
-            className={`font-black tracking-wider ${
-              isJ2me ? 'text-amber-400' : 'text-cyan-400'
-            } ${compact ? 'text-sm' : 'text-xl'}`}
+            className={`font-black tracking-wider ${theme.coverText} ${compact ? 'text-sm' : 'text-2xl'}`}
           >
             {initials}
           </span>
           {platformLabel && (
-            <span className="font-mono text-[9px] uppercase tracking-wider text-neutral-400 truncate max-w-full">
+            <span className="font-mono text-[10px] uppercase tracking-wider text-neutral-300 truncate max-w-[90%]">
               {platformLabel}
             </span>
           )}
@@ -124,9 +148,13 @@ export function GameCover({ title, platformLabel, filename, imageUrl, compact = 
           alt={title ? `Jaquette ${title}` : 'Jaquette du jeu'}
           loading="lazy"
           decoding="async"
-          onLoad={() => {
-            if (currentSrc) RESOLVED_COVER_CACHE.set(coverKey, currentSrc);
-            setLoaded(true);
+          onLoad={(e) => {
+            if (e.currentTarget.naturalWidth > 0 && e.currentTarget.naturalHeight > 0) {
+              if (currentSrc) RESOLVED_COVER_CACHE.set(coverKey, currentSrc);
+              setLoaded(true);
+            } else {
+              setIdx((prev) => prev + 1);
+            }
           }}
           onError={() => {
             if (currentSrc) {
@@ -138,10 +166,11 @@ export function GameCover({ title, platformLabel, filename, imageUrl, compact = 
               if (RESOLVED_COVER_CACHE.size > 1500) RESOLVED_COVER_CACHE.clear();
               RESOLVED_COVER_CACHE.set(coverKey, 'none');
             }
+            setLoaded(false);
             setIdx(nextIdx);
           }}
-          className={`absolute inset-0 w-full h-full object-contain bg-black/70 transition-opacity duration-200 ${
-            loaded ? 'opacity-100' : 'opacity-0'
+          className={`absolute inset-0 w-full h-full object-contain bg-black/75 transition-opacity duration-200 ${
+            loaded ? 'opacity-100' : 'opacity-0 pointer-events-none'
           }`}
         />
       )}

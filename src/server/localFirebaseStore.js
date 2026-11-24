@@ -32,6 +32,12 @@ export function generateFirestoreId() {
   return out;
 }
 
+const FORBIDDEN_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+
+function isSafeKey(key) {
+  return typeof key === 'string' && key.length > 0 && !FORBIDDEN_KEYS.has(key);
+}
+
 function isPlainObject(val) {
   return Boolean(val) && typeof val === 'object' && !Array.isArray(val) && !val.__cswTsMs;
 }
@@ -53,7 +59,7 @@ export function resolveSentinels(value, nowMs = Date.now()) {
     }
     const next = {};
     for (const [k, v] of Object.entries(value)) {
-      if (v === undefined) continue;
+      if (v === undefined || !isSafeKey(k)) continue;
       next[k] = resolveSentinels(v, nowMs);
     }
     return next;
@@ -65,6 +71,7 @@ function deepMergeObjects(target, source) {
   const base = isPlainObject(target) ? { ...target } : {};
   if (!isPlainObject(source)) return base;
   for (const [k, v] of Object.entries(source)) {
+    if (!isSafeKey(k)) continue;
     if (v && typeof v === 'object' && v.__cswDeleteField === true) {
       delete base[k];
       continue;
@@ -87,6 +94,7 @@ function applyDottedPatch(target, patch) {
   for (const [rawKey, val] of Object.entries(patch || {})) {
     if (!rawKey) continue;
     const parts = rawKey.split('.');
+    if (parts.some((p) => !isSafeKey(p))) continue;
     if (parts.length === 1) {
       if (val && typeof val === 'object' && val.__cswDeleteField === true) {
         delete out[rawKey];
@@ -120,7 +128,8 @@ function readFieldValue(docObj, fieldPath) {
   const parts = String(fieldPath).split('.');
   let cur = docObj;
   for (const seg of parts) {
-    if (cur === null || cur === undefined || typeof cur !== 'object') return undefined;
+    if (!isSafeKey(seg) || cur === null || cur === undefined || typeof cur !== 'object') return undefined;
+    if (!Object.prototype.hasOwnProperty.call(cur, seg)) return undefined;
     cur = cur[seg];
   }
   return cur;

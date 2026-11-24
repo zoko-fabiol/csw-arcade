@@ -200,13 +200,13 @@ export function FightcadeLobbyView({
   };
 
   return (
-    <div className="flex-1 flex flex-col min-h-0 bg-neutral-950 text-neutral-100 pb-16 md:pb-0">
-      {/* En-tête du salon Fightcade 2 — Complet sans perte d'information sur tous écrans */}
-      <div className="flex flex-col gap-2 px-3 md:px-4 py-2.5 md:py-3 bg-neutral-900/80 backdrop-blur-md border-b border-white/10 shrink-0">
-        <div className="flex flex-wrap items-center justify-between gap-2 md:gap-3">
-          <div className="flex items-center gap-2.5 min-w-0 flex-1">
+    <div className="flex-1 min-w-0 w-full max-w-full flex flex-col min-h-0 overflow-x-hidden bg-transparent text-neutral-100 pb-16 md:pb-0">
+      {/* En-tête du salon Fightcade 2 — Zéro débordement sur mobile/tablette, thématisé par console */}
+      <div className="u-banner w-full min-w-0 flex flex-col gap-2.5 px-3 md:px-4 py-2.5 md:py-3 backdrop-blur-md border-b shrink-0 overflow-hidden">
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-2.5">
+          <div className="flex items-center gap-3 min-w-0 flex-1">
             {isGlobal ? (
-              <div className="w-10 h-10 md:w-12 md:h-12 rounded-2xl bg-emerald-500/15 border border-emerald-500/40 flex items-center justify-center text-emerald-300 shrink-0">
+              <div className="w-11 h-11 md:w-12 md:h-12 rounded-2xl bg-emerald-500/15 border border-emerald-500/40 flex items-center justify-center text-emerald-300 shrink-0">
                 <Globe className="w-5 h-5 md:w-6 md:h-6" aria-hidden="true" />
               </div>
             ) : (
@@ -219,34 +219,36 @@ export function FightcadeLobbyView({
                 />
               </div>
             )}
-            <div className="min-w-0 flex-1">
+            <div className="min-w-0 flex-1 space-y-1">
+              <h2 className="text-sm sm:text-base font-black text-white leading-tight line-clamp-2">
+                {channel.title}
+              </h2>
               <div className="flex items-center gap-1.5 flex-wrap">
-                <h2 className="text-sm md:text-base font-black text-white truncate">{channel.title}</h2>
                 <span
-                  className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold border ${
+                  className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold border whitespace-nowrap ${
                     isGlobal
                       ? 'bg-emerald-950 text-emerald-300 border-emerald-700/60'
-                      : 'bg-cyan-950 text-cyan-300 border-cyan-700/60'
+                      : 'u-badge'
                   }`}
                 >
                   {channel.platformLabel}
                 </span>
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-950/60 text-emerald-300 border border-emerald-500/40 tabular-nums">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" aria-hidden="true" />
+                <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-950/70 text-emerald-300 border border-emerald-500/40 tabular-nums whitespace-nowrap">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" aria-hidden="true" />
                   <span>{users.length} en ligne</span>
                 </span>
               </div>
             </div>
           </div>
 
-          <div className="flex items-center gap-1.5 flex-wrap shrink-0">
+          <div className="flex items-center gap-2 flex-wrap shrink-0">
             <button
               type="button"
               onClick={handleAnnounceActiveGames}
               title="Publier dans le chat que vous êtes au salon et prêt à jouer sur vos jeux sélectionnés"
-              className="arcade-focus-ring flex items-center gap-1.5 px-2.5 sm:px-3 py-2 min-h-[38px] rounded-xl bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-500/40 text-cyan-200 text-xs font-bold transition-colors"
+              className="arcade-focus-ring flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3 py-2 min-h-[44px] lg:min-h-[38px] rounded-xl u-tab-active text-xs font-bold transition-colors whitespace-nowrap"
             >
-              <Megaphone className="w-3.5 h-3.5 text-cyan-400 shrink-0" aria-hidden="true" />
+              <Megaphone className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
               <span className="sm:hidden">Annoncer</span>
               <span className="hidden sm:inline">Annoncer mes jeux actifs</span>
             </button>
@@ -255,7 +257,7 @@ export function FightcadeLobbyView({
               <button
                 type="button"
                 onClick={() => onTestLocal(channel.entry)}
-                className="arcade-focus-ring flex items-center gap-1.5 px-3 py-2 min-h-[38px] rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-bold transition-colors"
+                className="arcade-focus-ring flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3.5 py-2 min-h-[44px] lg:min-h-[38px] rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-black transition-colors whitespace-nowrap"
               >
                 <Play className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
                 <span className="sm:hidden">Jouer</span>
@@ -268,7 +270,7 @@ export function FightcadeLobbyView({
                 type="button"
                 onClick={() => onLeaveChannel(channel.gameId)}
                 title="Quitter ce salon"
-                className="arcade-focus-ring flex items-center gap-1 px-2.5 py-2 min-h-[38px] rounded-xl bg-neutral-800 hover:bg-rose-950 border border-white/10 text-neutral-200 hover:text-rose-200 text-xs font-bold transition-colors"
+                className="arcade-focus-ring flex items-center justify-center gap-1.5 px-3 py-2 min-h-[44px] lg:min-h-[38px] rounded-xl bg-neutral-900 hover:bg-rose-950 border border-white/15 text-neutral-100 hover:text-rose-200 text-xs font-bold transition-colors whitespace-nowrap"
               >
                 <LogOut className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
                 <span>Quitter</span>
@@ -277,41 +279,47 @@ export function FightcadeLobbyView({
           </div>
         </div>
 
-        {/* Barre indiquant les jeux sélectionnés où vous êtes actif — Visible sur tous écrans */}
-        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar text-[11px] pb-0.5">
-          <span className="font-mono text-neutral-300 shrink-0">Vos jeux actifs :</span>
-          {activeChannels.length === 0 ? (
-            <span className="text-neutral-400 font-mono truncate">
-              Aucun jeu sélectionné (lancez un jeu ou cliquez sur Salon dans le catalogue)
-            </span>
-          ) : (
-            activeChannels.map((ch) => (
-              <button
-                key={ch.gameId}
-                type="button"
-                onClick={() => onSelectChannel?.(ch.gameId)}
-                className={`arcade-focus-ring inline-flex items-center gap-1 px-2.5 py-1 rounded-lg font-bold text-[10px] border shrink-0 transition-colors ${
-                  ch.gameId === channel.gameId
-                    ? 'bg-cyan-500 text-black border-cyan-400'
-                    : 'bg-neutral-800 hover:bg-neutral-700 text-cyan-200 border-cyan-500/30'
-                }`}
-              >
-                <Gamepad2 className="w-3 h-3 shrink-0" aria-hidden="true" />
-                <span>{ch.title}</span>
-              </button>
-            ))
-          )}
+        {/* Barre indiquant les jeux sélectionnés où vous êtes actif — Scroll fluide dans la largeur exacte */}
+        <div className="relative w-full min-w-0 overflow-hidden">
+          <div className="flex items-center gap-1.5 w-full overflow-x-auto no-scrollbar text-[11px] pb-0.5 pr-7">
+            <span className="font-mono text-neutral-300 shrink-0">Vos jeux actifs :</span>
+            {activeChannels.length === 0 ? (
+              <span className="text-neutral-300 font-mono truncate">
+                Aucun jeu sélectionné (lancez un jeu ou cliquez sur Salon dans le catalogue)
+              </span>
+            ) : (
+              activeChannels.map((ch) => (
+                <button
+                  key={ch.gameId}
+                  type="button"
+                  onClick={() => onSelectChannel?.(ch.gameId)}
+                  className={`arcade-focus-ring inline-flex items-center gap-1.5 px-2.5 py-1.5 min-h-[34px] rounded-lg font-bold text-[11px] border shrink-0 transition-colors ${
+                    ch.gameId === channel.gameId
+                      ? 'u-btn-primary'
+                      : 'bg-neutral-900/90 hover:bg-neutral-800 text-neutral-100 border-white/15'
+                  }`}
+                >
+                  <Gamepad2 className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+                  <span className="max-w-[200px] truncate">{ch.title}</span>
+                </button>
+              ))
+            )}
+          </div>
+          <div
+            className="pointer-events-none absolute right-0 top-0 bottom-0 w-7 bg-gradient-to-l from-neutral-950/90 to-transparent"
+            aria-hidden="true"
+          />
         </div>
       </div>
 
-      {/* Onglets Mobile (< md) : bascule plein écran entre Chat / Joueurs / Records sans icônes emoji */}
-      <div className="md:hidden grid grid-cols-3 border-b border-white/10 bg-neutral-900/60 text-xs font-bold shrink-0">
+      {/* Onglets Mobile & Tablette (< lg) : bascule plein écran entre Chat / Joueurs / Records */}
+      <div className="lg:hidden w-full min-w-0 grid grid-cols-3 border-b border-white/10 bg-neutral-900/60 text-xs font-bold shrink-0">
         <button
           type="button"
           onClick={() => setMobilePanel('chat')}
           className={`arcade-focus-ring flex items-center justify-center gap-1.5 py-2.5 min-h-[44px] border-b-2 transition-colors ${
             mobilePanel === 'chat'
-              ? 'border-cyan-400 text-cyan-300 bg-cyan-950/25'
+              ? 'u-accent-border u-accent-text bg-white/5'
               : 'border-transparent text-neutral-300'
           }`}
         >
@@ -362,12 +370,12 @@ export function FightcadeLobbyView({
       </div>
 
       {/* Corps : Chat Communautaire en direct + Liste des joueurs et leurs jeux actifs */}
-      <div className="flex-1 grid grid-cols-1 md:grid-cols-3 min-h-0 overflow-hidden">
+      <div className="flex-1 w-full min-w-0 grid grid-cols-1 lg:grid-cols-3 min-h-0 overflow-hidden">
         {/* Chat Communautaire du salon */}
         <div
           className={`${
-            mobilePanel === 'chat' ? 'flex' : 'hidden md:flex'
-          } md:col-span-2 flex-col min-h-0 md:border-r border-white/10`}
+            mobilePanel === 'chat' ? 'flex' : 'hidden lg:flex'
+          } lg:col-span-2 min-w-0 flex-col min-h-0 lg:border-r border-white/10`}
         >
           <div className="flex flex-wrap px-3 md:px-4 py-1.5 md:py-2 bg-neutral-900/40 border-b border-white/10 items-center justify-between gap-2 text-[10px] md:text-[11px] font-mono uppercase tracking-wider text-neutral-300">
             <span className="truncate">Chat — #{channel.gameId}</span>
@@ -509,19 +517,22 @@ export function FightcadeLobbyView({
             )}
           </div>
 
-          <form onSubmit={handleSendChat} className="p-2.5 sm:p-3 border-t border-neutral-800 bg-neutral-900/50 flex gap-2">
+          <form onSubmit={handleSendChat} className="p-2.5 sm:p-3 border-t border-white/10 bg-neutral-900/60 flex gap-2">
             <input
               type="text"
               value={chatInput}
               onChange={(e) => setChatInput(e.target.value)}
               placeholder={`Message #${channel.title}…`}
-              className="flex-1 px-3 py-2 rounded-xl bg-neutral-950 border border-neutral-800 text-base sm:text-xs text-white placeholder:text-neutral-500 focus:outline-none focus:border-cyan-500"
+              aria-label={`Message dans ${channel.title}`}
+              className="arcade-focus-ring flex-1 px-3 py-2 min-h-[44px] rounded-xl bg-neutral-950 border border-white/15 text-base sm:text-xs text-white placeholder:text-neutral-400"
             />
             <button
               type="submit"
-              className="px-3.5 sm:px-4 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-black text-xs font-bold flex items-center gap-1.5 shrink-0"
+              aria-label="Envoyer le message"
+              title="Envoyer le message"
+              className="arcade-focus-ring px-4 py-2 min-w-[44px] min-h-[44px] rounded-xl u-btn-primary text-xs font-black flex items-center justify-center gap-1.5 shrink-0"
             >
-              <Send className="w-3.5 h-3.5" />
+              <Send className="w-4 h-4" aria-hidden="true" />
               <span className="hidden sm:inline">Envoyer</span>
             </button>
           </form>
@@ -530,18 +541,18 @@ export function FightcadeLobbyView({
         {/* Colonne Droite : Joueurs au salon + Classement Meilleurs Scores du jeu */}
         <div
           className={`${
-            mobilePanel !== 'chat' ? 'flex' : 'hidden md:flex'
-          } flex-col min-h-0 bg-neutral-900/20`}
+            mobilePanel !== 'chat' ? 'flex' : 'hidden lg:flex'
+          } min-w-0 flex-col min-h-0 bg-neutral-900/20`}
         >
-          <div className="hidden md:flex px-3 py-2 bg-neutral-900/40 border-b border-neutral-800 items-center justify-between gap-2 text-[11px] font-mono uppercase tracking-wider text-neutral-400">
+          <div className="hidden lg:flex px-3 py-2 bg-neutral-900/40 border-b border-white/10 items-center justify-between gap-2 text-[11px] font-mono uppercase tracking-wider text-neutral-300">
             <div className="flex items-center gap-1.5">
               <button
                 type="button"
                 onClick={() => setRightTab('users')}
-                className={`px-2 py-1 rounded-lg font-bold transition-colors ${
+                className={`arcade-focus-ring px-2.5 py-1.5 rounded-lg font-bold transition-colors border ${
                   rightTab === 'users'
-                    ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40'
-                    : 'text-neutral-400 hover:text-white'
+                    ? 'u-tab-active'
+                    : 'border-transparent text-neutral-300 hover:text-white'
                 }`}
               >
                 Joueurs ({users.length})
@@ -612,7 +623,7 @@ export function FightcadeLobbyView({
                         <div className="text-xs font-mono font-black text-amber-300">
                           {(row.bestScore || 0).toLocaleString('fr-FR')}
                         </div>
-                        <div className="text-[9px] font-mono text-neutral-500">POINTS</div>
+                        <div className="text-[9px] font-mono text-neutral-300">POINTS</div>
                       </div>
                     </div>
                   );
@@ -673,28 +684,28 @@ export function FightcadeLobbyView({
                             >
                               {u.name} {isMe && '(Vous)'}
                             </button>
-                            <span className="text-[10px] font-mono px-1 rounded bg-neutral-800 text-neutral-300">
-                              {countryCodeToFlag(u.region)} {u.region || 'FR'}
+                            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-white/10 text-neutral-200 border border-white/10 shrink-0">
+                              {String(u.region || 'FR').toUpperCase()}
                             </span>
                           </div>
 
                           {/* Statut précis du joueur */}
-                          <div className="flex items-center gap-2 mt-1 text-[10px] font-mono text-neutral-300">
+                          <div className="flex items-center gap-2 mt-1 text-[10px] font-mono text-neutral-300 flex-wrap">
                             <PingBars ping={u.ping || 22} />
                             <span>{u.ping || 22}ms</span>
                             <span>·</span>
                             {isNetplayMatch ? (
                               <span className="text-amber-300 font-bold">
-                                ⚔️ En match P2P {u.currentGame?.title ? `sur ${u.currentGame.title}` : ''}
+                                En match P2P {u.currentGame?.title ? `sur ${u.currentGame.title}` : ''}
                               </span>
                             ) : isInGameAvailable ? (
                               <span className="text-emerald-300 font-bold">
-                                🎮 En jeu &amp; Au salon ({u.currentGame?.title || 'Training'})
+                                En jeu &amp; Au salon ({u.currentGame?.title || 'Training'})
                               </span>
                             ) : isAfk ? (
-                              <span className="text-neutral-500">⚪ AFK</span>
+                              <span className="text-neutral-300">AFK</span>
                             ) : (
-                              <span className="text-emerald-400">🟢 Au salon · Prêt à jouer</span>
+                              <span className="text-emerald-300">Au salon · Prêt à jouer</span>
                             )}
                           </div>
                         </div>
@@ -738,28 +749,60 @@ export function FightcadeLobbyView({
                         )}
 
                         {isNetplayMatch ? (
-                          <button
-                            type="button"
-                            onClick={() => onSpectateMatch?.(channel, u)}
-                            className="px-2.5 py-1.5 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-neutral-200 text-[11px] font-bold flex items-center gap-1 shrink-0"
-                          >
-                            <Eye className="w-3.5 h-3.5" />
-                            <span>Regarder</span>
-                          </button>
+                          <div className="flex items-center gap-1 shrink-0">
+                            {canChallengeUser && (
+                              <button
+                                type="button"
+                                disabled={pendingChallengeId === u.uid}
+                                onClick={() => handleChallenge(u, challengeCandidate)}
+                                title="Rejoindre cette partie en cours en tant que joueur supplémentaire (Drop-In)"
+                                className="arcade-focus-ring px-2.5 py-1.5 min-h-[36px] rounded-lg bg-emerald-500 hover:bg-emerald-400 text-black text-[11px] font-black flex items-center gap-1 shrink-0"
+                              >
+                                <Gamepad2 className="w-3.5 h-3.5" aria-hidden="true" />
+                                <span>{pendingChallengeId === u.uid ? 'Envoi…' : 'Rejoindre'}</span>
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => onSpectateMatch?.(channel, u)}
+                              className="arcade-focus-ring px-2.5 py-1.5 min-h-[36px] rounded-lg bg-neutral-800 hover:bg-neutral-700 border border-white/10 text-neutral-100 text-[11px] font-bold flex items-center gap-1 shrink-0"
+                            >
+                              <Eye className="w-3.5 h-3.5" aria-hidden="true" />
+                              <span>Regarder</span>
+                            </button>
+                          </div>
                         ) : (
                           <button
                             type="button"
                             disabled={pendingChallengeId === u.uid || !canChallengeUser}
                             onClick={() => handleChallenge(u, challengeCandidate)}
                             title={
-                              canChallengeUser
+                              isInGameAvailable
+                                ? `Rejoindre ${u.name} dans sa partie en cours en tant que Joueur 2 (Drop-In)`
+                                : canChallengeUser
                                 ? "Lancer le défi (2 Coins débités chez vous pour financer les deux slots · Gratuit pour l'invité)"
                                 : 'Sélectionnez ou rejoignez un jeu multijoueur pour défier ce joueur'
                             }
-                            className="px-2.5 py-1.5 rounded-lg bg-cyan-500 hover:bg-cyan-400 disabled:opacity-40 disabled:cursor-not-allowed text-black text-[11px] font-bold flex items-center gap-1 shrink-0"
+                            className={`arcade-focus-ring px-2.5 py-1.5 min-h-[36px] rounded-lg disabled:opacity-40 disabled:cursor-not-allowed text-[11px] font-black flex items-center gap-1 shrink-0 ${
+                              isInGameAvailable
+                                ? 'bg-emerald-500 hover:bg-emerald-400 text-black'
+                                : 'u-btn-primary'
+                            }`}
                           >
-                            <Swords className="w-3.5 h-3.5" />
-                            <span>{pendingChallengeId === u.uid ? 'Envoi…' : canChallengeUser ? 'Défier' : 'Aucun jeu'}</span>
+                            {isInGameAvailable ? (
+                              <Gamepad2 className="w-3.5 h-3.5" aria-hidden="true" />
+                            ) : (
+                              <Swords className="w-3.5 h-3.5" aria-hidden="true" />
+                            )}
+                            <span>
+                              {pendingChallengeId === u.uid
+                                ? 'Envoi…'
+                                : isInGameAvailable && canChallengeUser
+                                ? 'Rejoindre (J2)'
+                                : canChallengeUser
+                                ? 'Défier'
+                                : 'Aucun jeu'}
+                            </span>
                           </button>
                         )}
                       </div>
@@ -778,7 +821,7 @@ export function FightcadeLobbyView({
                       Actif sur :
                     </span>
                     {userActiveGames.length === 0 ? (
-                      <span className="text-[10px] font-mono text-neutral-500">
+                      <span className="text-[10px] font-mono text-neutral-400">
                         {isGlobal ? 'Lobby Global' : channel.title}
                       </span>
                     ) : (

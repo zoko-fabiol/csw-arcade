@@ -3579,7 +3579,7 @@
       "core": "mame2003_plus",
       "year": null,
       "genre": "Arcade MAME 32/16-bit",
-      "players": "1–4J",
+      "players": "1–3J",
       "estimatedSize": "10.6 Mo",
       "filename": "avsp.zip",
       "urls": [
@@ -3663,7 +3663,7 @@
       "core": "mame2003_plus",
       "year": null,
       "genre": "Arcade MAME 32/16-bit",
-      "players": "1–2J",
+      "players": "1–3J",
       "estimatedSize": "4.1 Mo",
       "filename": "btoads.zip",
       "urls": [
@@ -3726,7 +3726,7 @@
       "core": "mame2003_plus",
       "year": null,
       "genre": "Arcade MAME 32/16-bit",
-      "players": "1–2J",
+      "players": "1–4J",
       "estimatedSize": "2.4 Mo",
       "filename": "captcomm.zip",
       "urls": [
@@ -3978,7 +3978,7 @@
       "core": "mame2003_plus",
       "year": null,
       "genre": "Arcade MAME 32/16-bit",
-      "players": "1–2J",
+      "players": "1–3J",
       "estimatedSize": "3.9 Mo",
       "filename": "dino.zip",
       "urls": [
@@ -4499,7 +4499,7 @@
       "core": "mame2003_plus",
       "year": null,
       "genre": "Arcade MAME 32/16-bit",
-      "players": "1–2J",
+      "players": "1–3J",
       "estimatedSize": "2.2 Mo",
       "filename": "knights.zip",
       "urls": [
@@ -4520,7 +4520,7 @@
       "core": "mame2003_plus",
       "year": null,
       "genre": "Arcade MAME 32/16-bit",
-      "players": "1–2J",
+      "players": "1–3J",
       "estimatedSize": "2.3 Mo",
       "filename": "kod.zip",
       "urls": [
@@ -4980,7 +4980,7 @@
       "core": "mame2003_plus",
       "year": null,
       "genre": "Arcade MAME 32/16-bit",
-      "players": "1–4J",
+      "players": "1–3J",
       "estimatedSize": "251 Ko",
       "filename": "rampage.zip",
       "urls": [
@@ -5816,7 +5816,7 @@
       "core": "mame2003_plus",
       "year": null,
       "genre": "Arcade MAME 32/16-bit",
-      "players": "1–2J",
+      "players": "1–4J",
       "estimatedSize": "2.7 Mo",
       "filename": "vendetta.zip",
       "urls": [

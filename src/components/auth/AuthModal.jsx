@@ -263,10 +263,15 @@ export function AuthModal({ isOpen, onClose, userProfile, activeChannels = [] })
   };
 
   return (
-    <div className="fixed inset-0 z-[130] flex items-end sm:items-center justify-center bg-black/80 backdrop-blur-md p-0 sm:p-4">
-      <div className="w-full sm:max-w-xl max-h-[94dvh] flex flex-col rounded-t-2xl sm:rounded-2xl bg-neutral-900 border-t sm:border border-cyan-500/40 shadow-2xl overflow-hidden text-neutral-100 pb-safe">
-        {/* En-tête */}
-        <div className="flex items-center justify-between px-5 py-4 bg-gradient-to-r from-cyan-950/60 via-neutral-900 to-neutral-900 border-b border-neutral-800 shrink-0">
+    <div
+      className="fixed inset-0 z-[130] flex items-end sm:items-center justify-center bg-black/80 backdrop-blur-md p-0 sm:p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Compte, Stats et Rang"
+    >
+      <div className="w-full sm:max-w-xl max-h-[94dvh] flex flex-col rounded-t-3xl sm:rounded-3xl bg-neutral-900 border-t sm:border u-accent-border shadow-2xl overflow-hidden text-neutral-100 pb-safe">
+        {/* En-tête thématisé par la console active */}
+        <div className="u-banner flex items-center justify-between px-4 sm:px-5 py-4 border-b shrink-0 gap-3">
           <div className="flex items-center gap-3 min-w-0">
             <PlayerAvatar
               photoURL={userProfile?.photoURL}
@@ -275,88 +280,91 @@ export function AuthModal({ isOpen, onClose, userProfile, activeChannels = [] })
             />
             <div className="min-w-0">
               <div className="flex items-center gap-2">
-                <h2 className="text-sm font-black tracking-wide text-white uppercase truncate">
-                  Compte, Stats &amp; Rang CSW-Arcade
+                <h2 className="text-sm sm:text-base font-black tracking-tight text-white truncate">
+                  Compte &amp; Rang
                 </h2>
                 <span
-                  className={`px-1.5 py-0.5 rounded border text-[10px] font-mono font-black shrink-0 ${rankMeta.color}`}
+                  className={`px-1.5 py-0.5 rounded-md border text-[10px] font-mono font-black shrink-0 ${rankMeta.color}`}
                   title={`Rang évalué automatiquement : ${rankMeta.id} (${rankMeta.label})`}
                 >
-                  {rankMeta.id}
+                  Rang {rankMeta.id}
                 </span>
               </div>
-              <p className="text-[11px] font-mono text-neutral-400 truncate">
-                {countryMeta.flag} {friendTag} · {rankMeta.label} · {userProfile?.ratingPoints || 0} RP
+              <p className="text-[11px] font-mono text-neutral-300 truncate mt-0.5">
+                {friendTag} · {rankMeta.label} · {userProfile?.ratingPoints || 0} RP
               </p>
             </div>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="p-1.5 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-neutral-400 hover:text-white"
+            aria-label="Fermer le compte"
+            className="arcade-focus-ring p-2 min-w-[44px] min-h-[44px] rounded-xl bg-white/5 hover:bg-white/15 border border-white/10 text-neutral-200 hover:text-white flex items-center justify-center shrink-0 transition-colors"
           >
-            <X className="w-4 h-4" />
+            <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Navigation Onglets : masquer Sign-In & Login lorsque l'utilisateur est déjà connecté */}
-        <div
-          className={`grid ${
-            isLoggedIn ? 'grid-cols-2' : 'grid-cols-4'
-          } border-b border-neutral-800 bg-neutral-950/60 text-xs font-bold shrink-0`}
-        >
-          {!isLoggedIn && (
-            <>
-              <button
-                type="button"
-                onClick={() => { setTab('register'); setError(''); setSuccessMsg(''); }}
-                className={`py-2.5 flex items-center justify-center gap-1.5 border-b-2 transition-colors ${
-                  activeTab === 'register'
-                    ? 'border-cyan-400 text-cyan-300 bg-cyan-950/25'
-                    : 'border-transparent text-neutral-400 hover:text-neutral-200'
-                }`}
-              >
-                <UserPlus className="w-3.5 h-3.5" />
-                <span>Sign-In / Créer</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => { setTab('login'); setError(''); setSuccessMsg(''); }}
-                className={`py-2.5 flex items-center justify-center gap-1.5 border-b-2 transition-colors ${
-                  activeTab === 'login'
-                    ? 'border-cyan-400 text-cyan-300 bg-cyan-950/25'
-                    : 'border-transparent text-neutral-400 hover:text-neutral-200'
-                }`}
-              >
-                <LogIn className="w-3.5 h-3.5" />
-                <span>Login</span>
-              </button>
-            </>
-          )}
-          <button
-            type="button"
-            onClick={() => { setTab('stats'); setError(''); setSuccessMsg(''); }}
-            className={`py-2.5 flex items-center justify-center gap-1.5 border-b-2 transition-colors ${
-              activeTab === 'stats'
-                ? 'border-amber-400 text-amber-300 bg-amber-950/25'
-                : 'border-transparent text-neutral-400 hover:text-neutral-200'
-            }`}
+        {/* Navigation Onglets — Pilules segmentées thématisées */}
+        <div className="p-2.5 border-b border-white/10 bg-neutral-950/80 shrink-0">
+          <div
+            className={`${
+              isLoggedIn ? 'grid grid-cols-2' : 'flex overflow-x-auto no-scrollbar sm:grid sm:grid-cols-4'
+            } gap-1.5 p-1 rounded-2xl bg-neutral-900 border border-white/10 text-xs font-bold`}
           >
-            <BarChart3 className="w-3.5 h-3.5" />
-            <span>Stats &amp; Rang</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => { setTab('profile'); setError(''); setSuccessMsg(''); }}
-            className={`py-2.5 flex items-center justify-center gap-1.5 border-b-2 transition-colors ${
-              activeTab === 'profile'
-                ? 'border-cyan-400 text-cyan-300 bg-cyan-950/25'
-                : 'border-transparent text-neutral-400 hover:text-neutral-200'
-            }`}
-          >
-            <User className="w-3.5 h-3.5" />
-            <span>Profil</span>
-          </button>
+            {!isLoggedIn && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => { setTab('register'); setError(''); setSuccessMsg(''); }}
+                  className={`arcade-focus-ring py-2 px-3 min-h-[40px] rounded-xl flex items-center justify-center gap-1.5 transition-all shrink-0 ${
+                    activeTab === 'register'
+                      ? 'u-btn-primary'
+                      : 'text-neutral-300 hover:text-white hover:bg-white/5'
+                  }`}
+                >
+                  <UserPlus className="w-3.5 h-3.5" />
+                  <span>Créer</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setTab('login'); setError(''); setSuccessMsg(''); }}
+                  className={`arcade-focus-ring py-2 px-3 min-h-[40px] rounded-xl flex items-center justify-center gap-1.5 transition-all shrink-0 ${
+                    activeTab === 'login'
+                      ? 'u-btn-primary'
+                      : 'text-neutral-300 hover:text-white hover:bg-white/5'
+                  }`}
+                >
+                  <LogIn className="w-3.5 h-3.5" />
+                  <span>Connexion</span>
+                </button>
+              </>
+            )}
+            <button
+              type="button"
+              onClick={() => { setTab('stats'); setError(''); setSuccessMsg(''); }}
+              className={`arcade-focus-ring py-2 px-3 min-h-[40px] rounded-xl flex items-center justify-center gap-1.5 transition-all shrink-0 ${
+                activeTab === 'stats'
+                  ? 'u-btn-primary'
+                  : 'text-neutral-300 hover:text-white hover:bg-white/5'
+              }`}
+            >
+              <BarChart3 className="w-3.5 h-3.5" />
+              <span>Stats &amp; Rang</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => { setTab('profile'); setError(''); setSuccessMsg(''); }}
+              className={`arcade-focus-ring py-2 px-3 min-h-[40px] rounded-xl flex items-center justify-center gap-1.5 transition-all shrink-0 ${
+                activeTab === 'profile'
+                  ? 'u-btn-primary'
+                  : 'text-neutral-300 hover:text-white hover:bg-white/5'
+              }`}
+            >
+              <User className="w-3.5 h-3.5" />
+              <span>Profil</span>
+            </button>
+          </div>
         </div>
 
         <div className="p-5 space-y-4 overflow-y-auto flex-1">
@@ -389,7 +397,7 @@ export function AuthModal({ isOpen, onClose, userProfile, activeChannels = [] })
                     value={lastName}
                     onChange={(e) => setLastName(e.target.value)}
                     placeholder="Ex: Dupont"
-                    className="w-full px-3 py-2 rounded-xl bg-neutral-950 border border-neutral-800 text-base sm:text-xs text-white focus:outline-none focus:border-cyan-400"
+                    className="w-full px-3 py-2 rounded-xl bg-neutral-950 border border-neutral-800 text-base sm:text-xs text-white focus:outline-none arcade-focus-ring"
                   />
                 </div>
                 <div>
@@ -403,7 +411,7 @@ export function AuthModal({ isOpen, onClose, userProfile, activeChannels = [] })
                     value={firstName}
                     onChange={(e) => setFirstName(e.target.value)}
                     placeholder="Ex: Lucas"
-                    className="w-full px-3 py-2 rounded-xl bg-neutral-950 border border-neutral-800 text-base sm:text-xs text-white focus:outline-none focus:border-cyan-400"
+                    className="w-full px-3 py-2 rounded-xl bg-neutral-950 border border-neutral-800 text-base sm:text-xs text-white focus:outline-none arcade-focus-ring"
                   />
                 </div>
               </div>
@@ -419,16 +427,16 @@ export function AuthModal({ isOpen, onClose, userProfile, activeChannels = [] })
                   value={displayName}
                   onChange={(e) => setDisplayName(e.target.value)}
                   placeholder="Ex: Ryu_FR99"
-                  className="w-full px-3 py-2 rounded-xl bg-neutral-950 border border-neutral-800 text-base sm:text-xs text-white focus:outline-none focus:border-cyan-400"
+                  className="w-full px-3 py-2 rounded-xl bg-neutral-950 border border-neutral-800 text-base sm:text-xs text-white focus:outline-none arcade-focus-ring"
                 />
               </div>
 
               <div>
                 <label className="block text-[11px] font-mono uppercase text-neutral-400 mb-1 flex items-center justify-between">
                   <span className="flex items-center gap-1">
-                    <Globe className="w-3 h-3 text-cyan-400" /> Pays ({ALL_COUNTRIES.length} pays) *
+                    <Globe className="w-3 h-3 u-accent-text" /> Pays ({ALL_COUNTRIES.length} pays) *
                   </span>
-                  <span className="text-[10px] text-cyan-300">
+                  <span className="text-[10px] u-accent-text">
                     {getCountryByCode(region).flag} {getCountryByCode(region).name}
                   </span>
                 </label>
@@ -437,13 +445,13 @@ export function AuthModal({ isOpen, onClose, userProfile, activeChannels = [] })
                   value={countrySearch}
                   onChange={(e) => setCountrySearch(e.target.value)}
                   placeholder="Filtrer un pays (ex: France, Sénégal, Maroc, Japon, Brésil…)"
-                  className="w-full px-3 py-1.5 mb-1.5 rounded-lg bg-neutral-950 border border-neutral-800 text-base sm:text-xs text-white placeholder:text-neutral-500 focus:outline-none focus:border-cyan-400"
+                  className="w-full px-3 py-1.5 mb-1.5 rounded-lg bg-neutral-950 border border-neutral-800 text-base sm:text-xs text-white placeholder:text-neutral-400 focus:outline-none arcade-focus-ring"
                 />
                 <select
                   required
                   value={region}
                   onChange={(e) => setRegion(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl bg-neutral-950 border border-neutral-800 text-base sm:text-xs text-white focus:outline-none focus:border-cyan-400"
+                  className="w-full px-3 py-2 rounded-xl bg-neutral-950 border border-neutral-800 text-base sm:text-xs text-white focus:outline-none arcade-focus-ring"
                 >
                   {filteredCountries.map((c) => (
                     <option key={c.code} value={c.code}>
@@ -463,7 +471,7 @@ export function AuthModal({ isOpen, onClose, userProfile, activeChannels = [] })
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="joueur@csw-arcade.com"
-                  className="w-full px-3 py-2 rounded-xl bg-neutral-950 border border-neutral-800 text-base sm:text-xs text-white focus:outline-none focus:border-cyan-400"
+                  className="w-full px-3 py-2 rounded-xl bg-neutral-950 border border-neutral-800 text-base sm:text-xs text-white focus:outline-none arcade-focus-ring"
                 />
               </div>
 
@@ -478,7 +486,7 @@ export function AuthModal({ isOpen, onClose, userProfile, activeChannels = [] })
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
-                  className="w-full px-3 py-2 rounded-xl bg-neutral-950 border border-neutral-800 text-base sm:text-xs text-white focus:outline-none focus:border-cyan-400"
+                  className="w-full px-3 py-2 rounded-xl bg-neutral-950 border border-neutral-800 text-base sm:text-xs text-white focus:outline-none arcade-focus-ring"
                 />
               </div>
 
@@ -512,7 +520,7 @@ export function AuthModal({ isOpen, onClose, userProfile, activeChannels = [] })
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="joueur@csw-arcade.com"
-                  className="w-full px-3 py-2 rounded-xl bg-neutral-950 border border-neutral-800 text-base sm:text-xs text-white focus:outline-none focus:border-cyan-400"
+                  className="w-full px-3 py-2 rounded-xl bg-neutral-950 border border-neutral-800 text-base sm:text-xs text-white focus:outline-none arcade-focus-ring"
                 />
               </div>
 
@@ -526,21 +534,21 @@ export function AuthModal({ isOpen, onClose, userProfile, activeChannels = [] })
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
-                  className="w-full px-3 py-2 rounded-xl bg-neutral-950 border border-neutral-800 text-base sm:text-xs text-white focus:outline-none focus:border-cyan-400"
+                  className="w-full px-3 py-2 rounded-xl bg-neutral-950 border border-neutral-800 text-base sm:text-xs text-white focus:outline-none arcade-focus-ring"
                 />
               </div>
 
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full py-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 disabled:opacity-50 text-black font-black text-xs transition-colors"
+                className="w-full py-2.5 rounded-xl u-btn-primary disabled:opacity-50 font-black text-xs transition-colors"
               >
                 {loading ? 'Connexion en cours…' : 'Se connecter (Login)'}
               </button>
 
               <div className="relative flex py-1 items-center">
                 <div className="flex-grow border-t border-neutral-800" />
-                <span className="shrink mx-3 text-[10px] font-mono uppercase text-neutral-500">OU</span>
+                <span className="shrink mx-3 text-[10px] font-mono uppercase text-neutral-400">OU</span>
                 <div className="flex-grow border-t border-neutral-800" />
               </div>
 
@@ -587,7 +595,7 @@ export function AuthModal({ isOpen, onClose, userProfile, activeChannels = [] })
                     </div>
                   </div>
                   <div className="text-right">
-                    <div className="text-lg font-mono font-black text-cyan-300">
+                    <div className="text-lg font-mono font-black u-accent-text">
                       {userProfile?.ratingPoints || 0} <span className="text-xs">RP</span>
                     </div>
                     <div className="text-[10px] font-mono text-neutral-400">
@@ -625,7 +633,7 @@ export function AuthModal({ isOpen, onClose, userProfile, activeChannels = [] })
                   </div>
                   <div className="p-2 rounded-lg bg-neutral-900 border border-neutral-800 text-center">
                     <div className="text-[10px] font-mono text-neutral-400">JEUX JOUÉS</div>
-                    <div className="text-xs font-mono font-black text-cyan-300">
+                    <div className="text-xs font-mono font-black u-accent-text">
                       {userProfile?.gamesCount || 0}
                     </div>
                   </div>
@@ -651,7 +659,7 @@ export function AuthModal({ isOpen, onClose, userProfile, activeChannels = [] })
                     <button
                       type="button"
                       onClick={handleRefreshStats}
-                      className="flex items-center gap-1 px-2 py-0.5 rounded bg-neutral-800 hover:bg-neutral-700 text-[10px] font-mono text-cyan-300 transition-colors"
+                      className="flex items-center gap-1 px-2 py-0.5 rounded bg-neutral-800 hover:bg-neutral-700 text-[10px] font-mono u-accent-text transition-colors"
                     >
                       <RefreshCw className={`w-3 h-3 ${syncingStats ? 'animate-spin' : ''}`} />
                       <span>Actualiser</span>
@@ -684,7 +692,7 @@ export function AuthModal({ isOpen, onClose, userProfile, activeChannels = [] })
                               <span className="text-xs font-bold text-white truncate">{st.gameTitle}</span>
                             </div>
                             <div className="flex flex-wrap items-center gap-1.5 text-[10px] font-mono text-neutral-400 mt-1">
-                              <span className="px-1.5 py-0.5 rounded bg-neutral-900 border border-neutral-800 text-cyan-300">
+                              <span className="px-1.5 py-0.5 rounded bg-neutral-900 border border-neutral-800 u-accent-text">
                                 {st.platformLabel || 'Arcade'}
                               </span>
                               <span>{st.gamesPlayed || 1} partie(s)</span>
@@ -699,7 +707,7 @@ export function AuthModal({ isOpen, onClose, userProfile, activeChannels = [] })
                                   🏆 {Number(st.bestScore).toLocaleString('fr-FR')} pts
                                 </div>
                                 {Number(st.lastScore || 0) > 0 && (
-                                  <div className="text-[10px] font-mono text-neutral-500">
+                                  <div className="text-[10px] font-mono text-neutral-400">
                                     Dernier : {Number(st.lastScore).toLocaleString('fr-FR')}
                                   </div>
                                 )}
@@ -709,7 +717,7 @@ export function AuthModal({ isOpen, onClose, userProfile, activeChannels = [] })
                                 <div className="text-[11px] font-mono font-bold text-neutral-300">
                                   Session suivie
                                 </div>
-                                <div className="text-[10px] font-mono text-neutral-500">
+                                <div className="text-[10px] font-mono text-neutral-400">
                                   En attente score RAM
                                 </div>
                               </>
@@ -778,7 +786,7 @@ export function AuthModal({ isOpen, onClose, userProfile, activeChannels = [] })
                         onClick={() => photoInputRef.current?.click()}
                         aria-label="Changer la photo de profil"
                         title="Importer une photo de profil"
-                        className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-cyan-500 hover:bg-cyan-400 disabled:opacity-50 text-black border-2 border-neutral-950 flex items-center justify-center shadow-lg transition-colors cursor-pointer"
+                        className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full u-btn-primary disabled:opacity-50 border-2 border-neutral-950 flex items-center justify-center shadow-lg transition-colors cursor-pointer"
                       >
                         <Camera aria-hidden="true" className="w-3.5 h-3.5" />
                       </button>
@@ -812,7 +820,7 @@ export function AuthModal({ isOpen, onClose, userProfile, activeChannels = [] })
                           type="button"
                           onClick={handleCopyFriendTag}
                           title="Copier mon Tag Ami pour le partager à mes amis"
-                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-neutral-900 hover:bg-neutral-800 border border-neutral-700 text-[10px] font-mono text-cyan-300 transition-colors cursor-pointer"
+                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-neutral-900 hover:bg-neutral-800 border border-neutral-700 text-[10px] font-mono u-accent-text transition-colors cursor-pointer"
                         >
                           <span>Tag : {friendTag}</span>
                           <Copy aria-hidden="true" className="w-2.5 h-2.5" />
@@ -850,7 +858,7 @@ export function AuthModal({ isOpen, onClose, userProfile, activeChannels = [] })
                           <form onSubmit={(e) => handleSaveProfileField(e, field.key)} className="space-y-1.5">
                             <label
                               htmlFor={`profile-field-${field.key}`}
-                              className="block text-[10px] font-mono uppercase tracking-wider text-cyan-300"
+                              className="block text-[10px] font-mono uppercase tracking-wider u-accent-text"
                             >
                               {field.label}
                             </label>
@@ -870,14 +878,14 @@ export function AuthModal({ isOpen, onClose, userProfile, activeChannels = [] })
                                     cancelEditField();
                                   }
                                 }}
-                                className="flex-1 min-w-0 px-3 py-1.5 rounded-lg bg-neutral-900 border border-cyan-500/60 text-base sm:text-xs text-white focus:outline-none focus:border-cyan-400"
+                                className="flex-1 min-w-0 px-3 py-1.5 rounded-lg bg-neutral-900 border u-accent-border text-base sm:text-xs text-white focus:outline-none arcade-focus-ring"
                               />
                               <button
                                 type="submit"
                                 disabled={loading}
                                 aria-label={`Enregistrer ${field.label}`}
                                 title="Enregistrer"
-                                className="w-8 h-8 rounded-lg bg-cyan-500 hover:bg-cyan-400 disabled:opacity-50 text-black flex items-center justify-center shrink-0 transition-colors cursor-pointer"
+                                className="w-8 h-8 rounded-lg u-btn-primary disabled:opacity-50 flex items-center justify-center shrink-0 transition-colors cursor-pointer"
                               >
                                 <Check aria-hidden="true" className="w-4 h-4" />
                               </button>
@@ -901,7 +909,7 @@ export function AuthModal({ isOpen, onClose, userProfile, activeChannels = [] })
                               </div>
                               <div
                                 className={`text-xs mt-0.5 truncate ${
-                                  hasValue ? 'font-semibold text-white' : 'text-neutral-500 italic'
+                                  hasValue ? 'font-semibold text-white' : 'text-neutral-400 italic'
                                 }`}
                               >
                                 {hasValue ? field.savedValue : field.emptyText}
@@ -912,7 +920,7 @@ export function AuthModal({ isOpen, onClose, userProfile, activeChannels = [] })
                               onClick={() => startEditField(field.key)}
                               aria-label={`Modifier ${field.label}`}
                               title={`Modifier ${field.label}`}
-                              className="w-8 h-8 rounded-lg text-neutral-400 hover:text-cyan-300 hover:bg-neutral-800/80 border border-transparent hover:border-neutral-700 flex items-center justify-center shrink-0 transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400"
+                              className="w-8 h-8 rounded-lg text-neutral-400 hover:u-accent-text hover:bg-neutral-800/80 border border-transparent hover:border-neutral-700 flex items-center justify-center shrink-0 transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400"
                             >
                               <Pencil aria-hidden="true" className="w-3.5 h-3.5" />
                             </button>
@@ -928,7 +936,7 @@ export function AuthModal({ isOpen, onClose, userProfile, activeChannels = [] })
                       <form onSubmit={(e) => handleSaveProfileField(e, 'region')} className="space-y-1.5">
                         <label
                           htmlFor="profile-field-region"
-                          className="block text-[10px] font-mono uppercase tracking-wider text-cyan-300 flex items-center gap-1"
+                          className="block text-[10px] font-mono uppercase tracking-wider u-accent-text flex items-center gap-1"
                         >
                           <Globe aria-hidden="true" className="w-3 h-3" /> Pays ({ALL_COUNTRIES.length} pays)
                         </label>
@@ -943,7 +951,7 @@ export function AuthModal({ isOpen, onClose, userProfile, activeChannels = [] })
                             }
                           }}
                           placeholder="Rechercher un pays…"
-                          className="w-full px-3 py-1.5 rounded-lg bg-neutral-900 border border-neutral-800 text-base sm:text-xs text-white placeholder:text-neutral-500 focus:outline-none focus:border-cyan-400"
+                          className="w-full px-3 py-1.5 rounded-lg bg-neutral-900 border border-neutral-800 text-base sm:text-xs text-white placeholder:text-neutral-400 focus:outline-none arcade-focus-ring"
                         />
                         <div className="flex items-center gap-1.5">
                           <select
@@ -957,7 +965,7 @@ export function AuthModal({ isOpen, onClose, userProfile, activeChannels = [] })
                                 cancelEditField();
                               }
                             }}
-                            className="flex-1 min-w-0 px-3 py-1.5 rounded-lg bg-neutral-900 border border-cyan-500/60 text-base sm:text-xs text-white focus:outline-none focus:border-cyan-400"
+                            className="flex-1 min-w-0 px-3 py-1.5 rounded-lg bg-neutral-900 border u-accent-border text-base sm:text-xs text-white focus:outline-none arcade-focus-ring"
                           >
                             {filteredCountries.map((c) => (
                               <option key={c.code} value={c.code}>
@@ -970,7 +978,7 @@ export function AuthModal({ isOpen, onClose, userProfile, activeChannels = [] })
                             disabled={loading}
                             aria-label="Enregistrer le pays"
                             title="Enregistrer"
-                            className="w-8 h-8 rounded-lg bg-cyan-500 hover:bg-cyan-400 disabled:opacity-50 text-black flex items-center justify-center shrink-0 transition-colors cursor-pointer"
+                            className="w-8 h-8 rounded-lg u-btn-primary disabled:opacity-50 flex items-center justify-center shrink-0 transition-colors cursor-pointer"
                           >
                             <Check aria-hidden="true" className="w-4 h-4" />
                           </button>
@@ -993,7 +1001,7 @@ export function AuthModal({ isOpen, onClose, userProfile, activeChannels = [] })
                             <Globe aria-hidden="true" className="w-3 h-3" /> Pays
                           </div>
                           <div className="text-xs font-semibold text-white mt-0.5 truncate">
-                            {countryMeta.flag} {countryMeta.name} ({countryMeta.code})
+                            {countryMeta.name} ({countryMeta.code})
                           </div>
                         </div>
                         <button
@@ -1001,9 +1009,9 @@ export function AuthModal({ isOpen, onClose, userProfile, activeChannels = [] })
                           onClick={() => startEditField('region')}
                           aria-label="Modifier le pays"
                           title="Modifier le pays"
-                          className="w-8 h-8 rounded-lg text-neutral-400 hover:text-cyan-300 hover:bg-neutral-800/80 border border-transparent hover:border-neutral-700 flex items-center justify-center shrink-0 transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400"
+                          className="arcade-focus-ring w-10 h-10 rounded-xl text-neutral-300 hover:u-accent-text hover:bg-white/10 border border-transparent hover:border-white/15 flex items-center justify-center shrink-0 transition-colors cursor-pointer"
                         >
-                          <Pencil aria-hidden="true" className="w-3.5 h-3.5" />
+                          <Pencil aria-hidden="true" className="w-4 h-4" />
                         </button>
                       </div>
                     )}
@@ -1011,22 +1019,22 @@ export function AuthModal({ isOpen, onClose, userProfile, activeChannels = [] })
                 </div>
 
                 {/* Jeux / Salons où le joueur est actuellement actif */}
-                <div className="p-3 rounded-xl bg-neutral-950/80 border border-neutral-800">
-                  <div className="text-[10px] font-mono uppercase text-neutral-400 mb-1.5">
+                <div className="p-3.5 rounded-2xl bg-neutral-950/80 border border-white/10">
+                  <div className="text-[10px] font-mono uppercase text-neutral-300 mb-2">
                     Salons &amp; Jeux sélectionnés où vous êtes actif ({activeChannels.length}/3) :
                   </div>
                   {activeChannels.length === 0 ? (
-                    <p className="text-[11px] text-neutral-500">
-                      Lancez un jeu ou cliquez sur l’icône ⚔️ d’une carte pour apparaître actif dans son salon.
+                    <p className="text-xs text-neutral-400">
+                      Lancez un jeu ou cliquez sur Salon dans le catalogue pour apparaître actif.
                     </p>
                   ) : (
                     <div className="flex flex-wrap gap-1.5">
                       {activeChannels.map((ch) => (
                         <span
                           key={ch.gameId}
-                          className="px-2 py-0.5 rounded-md bg-cyan-950/70 border border-cyan-500/40 text-cyan-200 text-[11px] font-bold"
+                          className="px-2.5 py-1 rounded-lg u-badge text-[11px] font-bold"
                         >
-                          🟢 {ch.title}
+                          {ch.title}
                         </span>
                       ))}
                     </div>
@@ -1038,9 +1046,9 @@ export function AuthModal({ isOpen, onClose, userProfile, activeChannels = [] })
                     <button
                       type="button"
                       onClick={handleLogout}
-                      className="px-3.5 py-2 rounded-xl bg-neutral-800 hover:bg-rose-950 text-neutral-300 hover:text-rose-200 text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
+                      className="arcade-focus-ring px-4 py-2.5 min-h-[44px] rounded-xl bg-neutral-800 hover:bg-rose-950 border border-white/10 hover:border-rose-500/40 text-neutral-200 hover:text-rose-200 text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
                     >
-                      <LogOut aria-hidden="true" className="w-3.5 h-3.5" />
+                      <LogOut aria-hidden="true" className="w-4 h-4" />
                       <span>Déconnexion</span>
                     </button>
                   </div>

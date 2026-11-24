@@ -53,6 +53,15 @@ export function FriendsDrawer({
   const friends = friendsState?.friends || [];
   const incomingRequests = friendsState?.incomingRequests || [];
   const outgoingRequests = friendsState?.outgoingRequests || [];
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const onKeyDown = (e) => {
+      if (e.key === 'Escape') onClose?.();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [isOpen, onClose]);
   const onlineFriends = friends.filter((f) => f.isOnline);
   const offlineFriends = friends.filter((f) => !f.isOnline);
   const myTag =
@@ -187,8 +196,8 @@ export function FriendsDrawer({
         key={friend.uid}
         className={`p-3 rounded-xl border transition-colors space-y-2 ${
           friend.isOnline
-            ? 'bg-neutral-950/90 border-neutral-800 hover:border-cyan-500/35'
-            : 'bg-neutral-950/40 border-neutral-800/70 opacity-75'
+            ? 'bg-neutral-950/90 border-white/15 hover:u-accent-border'
+            : 'bg-neutral-950/70 border-white/10'
         }`}
       >
         <div className="flex items-center justify-between gap-2.5">
@@ -205,9 +214,9 @@ export function FriendsDrawer({
                   {rankMeta.id}
                 </span>
                 <span className="text-xs font-bold text-white truncate">{friend.displayName}</span>
-                <span className="text-[10px] font-mono text-neutral-500">#{friend.friendCode}</span>
-                <span className="text-[10px] font-mono text-neutral-400">
-                  {countryCodeToFlag(friend.region)}
+                <span className="text-[10px] font-mono text-neutral-300">#{friend.friendCode}</span>
+                <span className="text-[10px] font-mono px-1 rounded bg-white/10 text-neutral-200">
+                  {String(friend.region || 'FR').toUpperCase()}
                 </span>
               </div>
               <div className="text-[11px] font-mono text-neutral-300 truncate mt-0.5">
@@ -216,34 +225,57 @@ export function FriendsDrawer({
             </div>
           </div>
 
-          <div className="flex items-center gap-1 shrink-0">
+          <div className="flex items-center gap-1.5 shrink-0">
             {friend.isOnline && isPlayingMatch && (
-              <button
-                type="button"
-                onClick={() => onSpectateFriend?.(friend)}
-                title="Regarder la partie en direct"
-                className="px-2.5 py-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-200 text-[11px] font-bold flex items-center gap-1 cursor-pointer"
-              >
-                <Eye aria-hidden="true" className="w-3.5 h-3.5" />
-                <span>Regarder</span>
-              </button>
+              <>
+                {gameTarget && (
+                  <button
+                    type="button"
+                    onClick={() => onChallengeFriend?.(friend, gameTarget)}
+                    title={`Rejoindre la partie en cours de ${friend.displayName} (Drop-In)`}
+                    className="arcade-focus-ring px-2.5 py-1.5 min-h-[36px] rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black text-[11px] font-black flex items-center gap-1 cursor-pointer"
+                  >
+                    <Swords aria-hidden="true" className="w-3.5 h-3.5" />
+                    <span>Rejoindre</span>
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => onSpectateFriend?.(friend)}
+                  title="Regarder la partie en direct"
+                  className="arcade-focus-ring px-2.5 py-1.5 min-h-[36px] rounded-xl bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-200 text-[11px] font-bold flex items-center gap-1 cursor-pointer"
+                >
+                  <Eye aria-hidden="true" className="w-3.5 h-3.5" />
+                  <span>Regarder</span>
+                </button>
+              </>
             )}
             {friend.isOnline && !isPlayingMatch && gameTarget && (
               <>
                 <button
                   type="button"
                   onClick={() => onChallengeFriend?.(friend, gameTarget)}
-                  title={`Défier ${friend.displayName} sur ${gameTarget.title}`}
-                  className="px-2.5 py-1.5 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-black text-[11px] font-black flex items-center gap-1 cursor-pointer"
+                  title={
+                    friend.status === 'in_game_available' || friend.currentGame
+                      ? `Rejoindre ${friend.displayName} sur ${gameTarget.title} en tant que J2 (Drop-In)`
+                      : `Défier ${friend.displayName} sur ${gameTarget.title}`
+                  }
+                  className={`arcade-focus-ring px-2.5 py-1.5 min-h-[36px] rounded-xl text-[11px] font-black flex items-center gap-1 cursor-pointer ${
+                    friend.status === 'in_game_available' || friend.currentGame
+                      ? 'bg-emerald-500 hover:bg-emerald-400 text-black'
+                      : 'u-btn-primary'
+                  }`}
                 >
                   <Swords aria-hidden="true" className="w-3.5 h-3.5" />
-                  <span>Défier</span>
+                  <span>
+                    {friend.status === 'in_game_available' || friend.currentGame ? 'Rejoindre (J2)' : 'Défier'}
+                  </span>
                 </button>
                 <button
                   type="button"
                   onClick={() => onJoinFriendGameChannel?.(gameTarget)}
                   title={`Rejoindre le salon ${gameTarget.title}`}
-                  className="p-1.5 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-cyan-300 cursor-pointer"
+                  className="arcade-focus-ring p-2 min-w-[36px] min-h-[36px] rounded-xl bg-neutral-800 hover:bg-neutral-700 u-accent-text flex items-center justify-center cursor-pointer"
                 >
                   <MessageSquare aria-hidden="true" className="w-3.5 h-3.5" />
                 </button>
@@ -273,7 +305,7 @@ export function FriendsDrawer({
                 onClick={() => setConfirmRemoveUid(friend.uid)}
                 aria-label={`Retirer ${friend.displayName} de mes amis`}
                 title="Retirer de mes amis"
-                className="p-1.5 rounded-lg text-neutral-500 hover:text-rose-300 hover:bg-rose-950/40 transition-colors cursor-pointer"
+                className="p-1.5 rounded-lg text-neutral-400 hover:text-rose-300 hover:bg-rose-950/40 transition-colors cursor-pointer"
               >
                 <UserMinus aria-hidden="true" className="w-3.5 h-3.5" />
               </button>
@@ -285,7 +317,12 @@ export function FriendsDrawer({
   };
 
   return (
-    <div className="fixed inset-0 z-[115] flex justify-end bg-black/75 backdrop-blur-sm">
+    <div
+      className="fixed inset-0 z-[115] flex justify-end bg-black/75 backdrop-blur-md"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Amis & Social"
+    >
       <div
         className="flex-1"
         onClick={onClose}
@@ -293,11 +330,11 @@ export function FriendsDrawer({
       />
       <aside
         aria-label="Système d'amitié CSW-Arcade"
-        className="w-full max-w-md h-full bg-neutral-900 border-l border-cyan-500/35 shadow-2xl flex flex-col text-neutral-100"
+        className="w-full max-w-md h-full bg-neutral-900 border-l u-accent-border sm:rounded-l-3xl shadow-2xl flex flex-col text-neutral-100 overflow-hidden"
       >
-        {/* En-tête Social style Fortnite */}
-        <div className="px-4 py-3.5 bg-gradient-to-r from-cyan-950/60 via-neutral-900 to-neutral-900 border-b border-neutral-800 flex items-center justify-between gap-3 shrink-0">
-          <div className="flex items-center gap-2.5 min-w-0">
+        {/* En-tête Social — Thématisé selon la console active */}
+        <div className="u-banner px-4 py-4 border-b flex items-center justify-between gap-3 shrink-0">
+          <div className="flex items-center gap-3 min-w-0">
             <PlayerAvatar
               photoURL={userProfile?.photoURL}
               name={userProfile?.displayName || userProfile?.name || 'Joueur'}
@@ -306,8 +343,8 @@ export function FriendsDrawer({
             />
             <div className="min-w-0">
               <div className="flex items-center gap-1.5">
-                <Users aria-hidden="true" className="w-4 h-4 text-cyan-400 shrink-0" />
-                <h2 className="text-sm font-black uppercase tracking-wide text-white truncate">
+                <Users aria-hidden="true" className="w-4 h-4 u-accent-text shrink-0" />
+                <h2 className="text-sm sm:text-base font-black tracking-tight text-white truncate">
                   Amis &amp; Social
                 </h2>
               </div>
@@ -315,11 +352,11 @@ export function FriendsDrawer({
                 type="button"
                 onClick={handleCopyTag}
                 title="Copier votre Tag Ami pour l'envoyer à vos amis"
-                className="inline-flex items-center gap-1 text-[11px] font-mono text-cyan-300 hover:text-cyan-200 cursor-pointer"
+                className="arcade-focus-ring mt-0.5 inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md u-badge text-[11px] font-mono cursor-pointer transition-opacity hover:opacity-90"
               >
-                <span>Mon Tag : {myTag}</span>
+                <span>{myTag}</span>
                 <Copy aria-hidden="true" className="w-3 h-3" />
-                {copiedTag && <span className="text-emerald-300 font-bold ml-1">Copié !</span>}
+                {copiedTag && <span className="text-emerald-300 font-bold ml-0.5">Copié !</span>}
               </button>
             </div>
           </div>
@@ -328,71 +365,73 @@ export function FriendsDrawer({
             type="button"
             onClick={onClose}
             aria-label="Fermer le panneau Amis"
-            className="p-2 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-neutral-300 hover:text-white cursor-pointer"
+            className="arcade-focus-ring p-2 min-w-[44px] min-h-[44px] rounded-xl bg-white/5 hover:bg-white/15 border border-white/10 text-neutral-200 hover:text-white flex items-center justify-center cursor-pointer transition-colors shrink-0"
           >
-            <X aria-hidden="true" className="w-4 h-4" />
+            <X aria-hidden="true" className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Onglets */}
-        <div className="grid grid-cols-3 border-b border-neutral-800 bg-neutral-950/60 text-xs font-bold shrink-0">
-          <button
-            type="button"
-            onClick={() => setTab('friends')}
-            className={`py-2.5 flex items-center justify-center gap-1.5 border-b-2 transition-colors cursor-pointer ${
-              tab === 'friends'
-                ? 'border-cyan-400 text-cyan-300 bg-cyan-950/20'
-                : 'border-transparent text-neutral-400 hover:text-neutral-200'
-            }`}
-          >
-            <span>Amis</span>
-            <span className="px-1.5 py-0.2 rounded-full bg-neutral-800 text-[10px] font-mono">
-              {onlineFriends.length}/{friends.length}
-            </span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setTab('requests')}
-            className={`py-2.5 flex items-center justify-center gap-1.5 border-b-2 transition-colors cursor-pointer ${
-              tab === 'requests'
-                ? 'border-amber-400 text-amber-300 bg-amber-950/20'
-                : 'border-transparent text-neutral-400 hover:text-neutral-200'
-            }`}
-          >
-            <span>Demandes</span>
-            {incomingRequests.length + outgoingRequests.length > 0 && (
-              <span
-                className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono font-black ${
-                  incomingRequests.length > 0
-                    ? 'bg-amber-500 text-black'
-                    : 'bg-neutral-800 text-neutral-300'
-                }`}
-              >
-                {incomingRequests.length + outgoingRequests.length}
+        {/* Onglets — Style pilules segmentées thématisées */}
+        <div className="p-2.5 border-b border-white/10 bg-neutral-950/80 shrink-0">
+          <div className="grid grid-cols-3 gap-1.5 p-1 rounded-2xl bg-neutral-900 border border-white/10 text-xs font-bold">
+            <button
+              type="button"
+              onClick={() => setTab('friends')}
+              className={`arcade-focus-ring py-2 min-h-[40px] rounded-xl flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                tab === 'friends'
+                  ? 'u-btn-primary'
+                  : 'text-neutral-300 hover:text-white hover:bg-white/5'
+              }`}
+            >
+              <span>Amis</span>
+              <span className="px-1.5 py-0.5 rounded-full bg-black/30 text-[10px] font-mono tabular-nums">
+                {onlineFriends.length}/{friends.length}
               </span>
-            )}
-          </button>
+            </button>
 
-          <button
-            type="button"
-            onClick={() => setTab('find')}
-            className={`py-2.5 flex items-center justify-center gap-1.5 border-b-2 transition-colors cursor-pointer ${
-              tab === 'find'
-                ? 'border-emerald-400 text-emerald-300 bg-emerald-950/20'
-                : 'border-transparent text-neutral-400 hover:text-neutral-200'
-            }`}
-          >
-            <UserPlus aria-hidden="true" className="w-3.5 h-3.5" />
-            <span>Ajouter</span>
-          </button>
+            <button
+              type="button"
+              onClick={() => setTab('requests')}
+              className={`arcade-focus-ring py-2 min-h-[40px] rounded-xl flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                tab === 'requests'
+                  ? 'u-btn-primary'
+                  : 'text-neutral-300 hover:text-white hover:bg-white/5'
+              }`}
+            >
+              <span>Demandes</span>
+              {incomingRequests.length + outgoingRequests.length > 0 && (
+                <span
+                  className={`px-1.5 py-0.5 rounded-full text-[10px] font-mono font-black ${
+                    incomingRequests.length > 0
+                      ? 'bg-amber-500 text-black'
+                      : 'bg-black/30 text-neutral-200'
+                  }`}
+                >
+                  {incomingRequests.length + outgoingRequests.length}
+                </span>
+              )}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setTab('find')}
+              className={`arcade-focus-ring py-2 min-h-[40px] rounded-xl flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                tab === 'find'
+                  ? 'u-btn-primary'
+                  : 'text-neutral-300 hover:text-white hover:bg-white/5'
+              }`}
+            >
+              <UserPlus aria-hidden="true" className="w-3.5 h-3.5" />
+              <span>Ajouter</span>
+            </button>
+          </div>
         </div>
 
         {/* Barre de recherche contextuelle */}
         {(tab === 'friends' || tab === 'find') && (
-          <div className="p-3 border-b border-neutral-800 bg-neutral-950/40 shrink-0">
+          <div className="px-3.5 py-2.5 border-b border-white/10 bg-neutral-950/50 shrink-0">
             <div className="relative">
-              <Search aria-hidden="true" className="w-4 h-4 text-neutral-500 absolute left-3 top-1/2 -translate-y-1/2" />
+              <Search aria-hidden="true" className="w-4 h-4 text-neutral-300 absolute left-3.5 top-1/2 -translate-y-1/2" />
               <input
                 type="text"
                 value={searchQuery}
@@ -402,16 +441,16 @@ export function FriendsDrawer({
                     ? 'Pseudo, Tag (#XXXX), Nom ou Email…'
                     : 'Filtrer mes amis…'
                 }
-                className="w-full pl-9 pr-8 py-2 rounded-xl bg-neutral-950 border border-neutral-800 text-base sm:text-xs text-white placeholder:text-neutral-500 focus:outline-none focus:border-cyan-400"
+                className="arcade-focus-ring w-full pl-10 pr-9 py-2.5 min-h-[44px] rounded-xl bg-neutral-950 border border-white/15 text-sm sm:text-xs text-white placeholder:text-neutral-400"
               />
               {searchQuery && (
                 <button
                   type="button"
                   onClick={() => setSearchQuery('')}
                   aria-label="Effacer la recherche"
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-white cursor-pointer"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-300 hover:text-white cursor-pointer"
                 >
-                  <X aria-hidden="true" className="w-3.5 h-3.5" />
+                  <X aria-hidden="true" className="w-4 h-4" />
                 </button>
               )}
             </div>
@@ -439,20 +478,22 @@ export function FriendsDrawer({
           {tab === 'friends' && (
             <>
               {friends.length === 0 ? (
-                <div className="p-6 rounded-xl bg-neutral-950 border border-neutral-800 text-center space-y-3">
-                  <Sparkles aria-hidden="true" className="w-7 h-7 text-cyan-400 mx-auto" />
+                <div className="p-6 rounded-2xl u-card border text-center space-y-3.5">
+                  <div className="w-12 h-12 rounded-2xl u-badge flex items-center justify-center mx-auto">
+                    <Sparkles aria-hidden="true" className="w-6 h-6" />
+                  </div>
                   <div className="space-y-1">
-                    <p className="text-xs font-bold text-white">Aucun ami pour le moment</p>
-                    <p className="text-[11px] text-neutral-400">
-                      Partagez votre Tag <span className="font-mono text-cyan-300">{myTag}</span> ou recherchez un ami pour voir son jeu en cours et le défier en 1 clic !
+                    <p className="text-sm font-bold text-white">Aucun ami pour le moment</p>
+                    <p className="text-xs text-neutral-300 leading-relaxed">
+                      Partagez votre Tag <span className="font-mono u-accent-text font-bold">{myTag}</span> ou recherchez un ami pour voir son jeu en cours et le défier en 1 clic !
                     </p>
                   </div>
                   <button
                     type="button"
                     onClick={() => setTab('find')}
-                    className="px-4 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-black text-xs font-black inline-flex items-center gap-1.5 cursor-pointer"
+                    className="arcade-focus-ring px-5 py-2.5 min-h-[44px] rounded-xl u-btn-primary text-xs font-black inline-flex items-center gap-1.5 cursor-pointer"
                   >
-                    <UserPlus aria-hidden="true" className="w-3.5 h-3.5" />
+                    <UserPlus aria-hidden="true" className="w-4 h-4" />
                     <span>Trouver des amis</span>
                   </button>
                 </div>
@@ -469,7 +510,7 @@ export function FriendsDrawer({
 
                   {visibleOffline.length > 0 && (
                     <div className="space-y-2">
-                      <div className="text-[10px] font-mono uppercase tracking-wider text-neutral-500 px-1">
+                      <div className="text-[10px] font-mono uppercase tracking-wider text-neutral-400 px-1">
                         Hors-ligne ({visibleOffline.length})
                       </div>
                       {visibleOffline.map(renderFriendRow)}
@@ -477,7 +518,7 @@ export function FriendsDrawer({
                   )}
 
                   {visibleOnline.length === 0 && visibleOffline.length === 0 && (
-                    <p className="text-center text-xs text-neutral-500 py-6">
+                    <p className="text-center text-xs text-neutral-400 py-6">
                       Aucun ami ne correspond à « {searchQuery} ».
                     </p>
                   )}
@@ -493,7 +534,7 @@ export function FriendsDrawer({
                   Demandes reçues ({incomingRequests.length})
                 </div>
                 {incomingRequests.length === 0 ? (
-                  <p className="text-xs text-neutral-500 px-1">Aucune demande reçue en attente.</p>
+                  <p className="text-xs text-neutral-400 px-1">Aucune demande reçue en attente.</p>
                 ) : (
                   incomingRequests.map((req) => {
                     const u = req.fromUser || {};
@@ -549,7 +590,7 @@ export function FriendsDrawer({
                   Demandes envoyées ({outgoingRequests.length})
                 </div>
                 {outgoingRequests.length === 0 ? (
-                  <p className="text-xs text-neutral-500 px-1">Aucune demande envoyée en attente.</p>
+                  <p className="text-xs text-neutral-400 px-1">Aucune demande envoyée en attente.</p>
                 ) : (
                   outgoingRequests.map((req) => {
                     const u = req.toUser || {};
@@ -585,14 +626,14 @@ export function FriendsDrawer({
 
           {tab === 'find' && (
             <div className="space-y-2.5">
-              <div className="text-[10px] font-mono uppercase tracking-wider text-neutral-400 px-1 flex items-center justify-between">
+              <div className="text-[11px] font-mono uppercase tracking-wider text-neutral-300 px-1 flex items-center justify-between">
                 <span>{searchQuery.trim() ? 'Résultats de recherche' : 'Joueurs actifs & communauté'}</span>
-                {searching && <span className="text-cyan-400">Recherche…</span>}
+                {searching && <span className="u-accent-text">Recherche…</span>}
               </div>
 
               {!searching && searchResults.length === 0 ? (
-                <div className="p-5 rounded-xl bg-neutral-950 border border-neutral-800 text-center text-xs text-neutral-400">
-                  Aucun joueur trouvé. Demandez à votre ami son Tag (<span className="font-mono text-cyan-300">Pseudo#XXXX</span>) ou son pseudo exact !
+                <div className="p-6 rounded-2xl u-card border text-center text-xs text-neutral-300 leading-relaxed">
+                  Aucun joueur trouvé. Demandez à votre ami son Tag (<span className="font-mono u-accent-text font-bold">Pseudo#XXXX</span>) ou son pseudo exact !
                 </div>
               ) : (
                 searchResults.map((u) => {
@@ -615,7 +656,7 @@ export function FriendsDrawer({
                               {rMeta.id}
                             </span>
                             <span className="text-xs font-bold text-white truncate">{u.displayName}</span>
-                            <span className="text-[10px] font-mono text-neutral-500">#{u.friendCode}</span>
+                            <span className="text-[10px] font-mono text-neutral-400">#{u.friendCode}</span>
                           </div>
                           <div className="text-[10px] font-mono text-neutral-400 truncate">
                             {countryCodeToFlag(u.region)} · {u.isOnline ? 'En ligne' : 'Hors-ligne'}
@@ -646,7 +687,7 @@ export function FriendsDrawer({
                             type="button"
                             disabled={busyUid === u.uid}
                             onClick={() => handleAddFriend(u)}
-                            className="px-2.5 py-1.5 rounded-lg bg-cyan-500 hover:bg-cyan-400 disabled:opacity-50 text-black text-[11px] font-black inline-flex items-center gap-1 cursor-pointer"
+                            className="arcade-focus-ring px-3 py-2 min-h-[38px] rounded-xl u-btn-primary disabled:opacity-50 text-[11px] font-black inline-flex items-center gap-1 cursor-pointer"
                           >
                             <UserPlus aria-hidden="true" className="w-3.5 h-3.5" />
                             <span>Ajouter</span>

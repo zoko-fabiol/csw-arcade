@@ -19,11 +19,118 @@
 }
 
 /* Safe Areas pour encoches (Notch / Dynamic Island / Barre de navigation Android) */
-:root {
+:root,
+[data-universe="all"] {
   --sat: env(safe-area-inset-top, 0px);
   --sab: env(safe-area-inset-bottom, 0px);
   --sal: env(safe-area-inset-left, 0px);
   --sar: env(safe-area-inset-right, 0px);
+
+  /* Univers par défaut : Cyber-Arcade Prism */
+  --u-bg: #090b10;
+  --u-surface: #111622;
+  --u-surface-2: #171e2e;
+  --u-header-tint: rgba(12, 18, 30, 0.94);
+  --u-accent: #22d3ee;
+  --u-accent-hover: #67e8f9;
+  --u-accent-fg: #041014;
+  --u-accent-text: #67e8f9;
+  --u-accent-soft: rgba(34, 211, 238, 0.14);
+  --u-accent-border: rgba(34, 211, 238, 0.42);
+  --u-accent-glow: rgba(34, 211, 238, 0.22);
+  --u-banner-bg: radial-gradient(circle at 12% 0%, rgba(34, 211, 238, 0.16), transparent 55%), linear-gradient(135deg, rgba(17, 22, 34, 0.96), rgba(9, 11, 16, 0.98));
+  --u-pattern: radial-gradient(rgba(34, 211, 238, 0.055) 1px, transparent 1px);
+  --u-pattern-size: 22px 22px;
+}
+
+/* Univers Arcade / Neo Geo MVS Gold */
+[data-universe="arcade"] {
+  --u-bg: #0b0a08;
+  --u-surface: #17140e;
+  --u-surface-2: #211c13;
+  --u-header-tint: rgba(23, 19, 12, 0.95);
+  --u-accent: #fbbf24;
+  --u-accent-hover: #fcd34d;
+  --u-accent-fg: #140d02;
+  --u-accent-text: #fcd34d;
+  --u-accent-soft: rgba(251, 191, 36, 0.14);
+  --u-accent-border: rgba(251, 191, 36, 0.45);
+  --u-accent-glow: rgba(251, 191, 36, 0.24);
+  --u-banner-bg: radial-gradient(circle at 12% 0%, rgba(251, 191, 36, 0.2), transparent 55%), linear-gradient(135deg, rgba(28, 22, 12, 0.96), rgba(11, 10, 8, 0.98));
+  --u-pattern: repeating-linear-gradient(0deg, rgba(251, 191, 36, 0.03) 0px, rgba(251, 191, 36, 0.03) 1px, transparent 1px, transparent 4px);
+  --u-pattern-size: 100% 4px;
+}
+
+/* Univers PlayStation Cobalt & Titanium */
+[data-universe="playstation"] {
+  --u-bg: #070a14;
+  --u-surface: #101629;
+  --u-surface-2: #17203b;
+  --u-header-tint: rgba(13, 19, 38, 0.95);
+  --u-accent: #60a5fa;
+  --u-accent-hover: #93c5fd;
+  --u-accent-fg: #050d1f;
+  --u-accent-text: #93c5fd;
+  --u-accent-soft: rgba(96, 165, 250, 0.16);
+  --u-accent-border: rgba(96, 165, 250, 0.46);
+  --u-accent-glow: rgba(59, 130, 246, 0.26);
+  --u-banner-bg: radial-gradient(circle at 12% 0%, rgba(59, 130, 246, 0.24), transparent 55%), linear-gradient(135deg, rgba(16, 23, 44, 0.96), rgba(7, 10, 20, 0.98));
+  --u-pattern: radial-gradient(rgba(96, 165, 250, 0.06) 1px, transparent 1px);
+  --u-pattern-size: 20px 20px;
+}
+
+/* Univers Nintendo Famicom / SNES Crimson */
+[data-universe="nintendo"] {
+  --u-bg: #10080a;
+  --u-surface: #1c1013;
+  --u-surface-2: #27161a;
+  --u-header-tint: rgba(28, 14, 18, 0.95);
+  --u-accent: #dc2626;
+  --u-accent-hover: #ef4444;
+  --u-accent-fg: #ffffff;
+  --u-accent-text: #fca5a5;
+  --u-accent-soft: rgba(220, 38, 38, 0.18);
+  --u-accent-border: rgba(248, 113, 113, 0.45);
+  --u-accent-glow: rgba(220, 38, 38, 0.26);
+  --u-banner-bg: radial-gradient(circle at 12% 0%, rgba(220, 38, 38, 0.24), transparent 55%), linear-gradient(135deg, rgba(34, 15, 19, 0.96), rgba(16, 8, 10, 0.98));
+  --u-pattern: radial-gradient(rgba(248, 113, 113, 0.055) 1px, transparent 1px);
+  --u-pattern-size: 18px 18px;
+}
+
+/* Univers Sega Mega Drive 16-Bit Electric Blue */
+[data-universe="sega"] {
+  --u-bg: #060b12;
+  --u-surface: #0e1726;
+  --u-surface-2: #142238;
+  --u-header-tint: rgba(11, 20, 34, 0.95);
+  --u-accent: #38bdf8;
+  --u-accent-hover: #7dd3fc;
+  --u-accent-fg: #04111c;
+  --u-accent-text: #7dd3fc;
+  --u-accent-soft: rgba(56, 189, 248, 0.16);
+  --u-accent-border: rgba(56, 189, 248, 0.46);
+  --u-accent-glow: rgba(14, 165, 233, 0.25);
+  --u-banner-bg: radial-gradient(circle at 12% 0%, rgba(14, 165, 233, 0.24), transparent 55%), linear-gradient(135deg, rgba(13, 25, 43, 0.96), rgba(6, 11, 18, 0.98));
+  --u-pattern: repeating-linear-gradient(-45deg, rgba(56, 189, 248, 0.03) 0px, rgba(56, 189, 248, 0.03) 2px, transparent 2px, transparent 14px);
+  --u-pattern-size: 20px 20px;
+}
+
+/* Univers Mobile / Java J2ME Amber LCD */
+[data-universe="java"] {
+  --u-bg: #0b0a06;
+  --u-surface: #18150c;
+  --u-surface-2: #241f11;
+  --u-header-tint: rgba(24, 20, 10, 0.95);
+  --u-accent: #f59e0b;
+  --u-accent-hover: #fbbf24;
+  --u-accent-fg: #120b02;
+  --u-accent-text: #fcd34d;
+  --u-accent-soft: rgba(245, 158, 11, 0.16);
+  --u-accent-border: rgba(245, 158, 11, 0.46);
+  --u-accent-glow: rgba(245, 158, 11, 0.24);
+  --u-banner-bg: radial-gradient(circle at 12% 0%, rgba(245, 158, 11, 0.22), transparent 55%), linear-gradient(135deg, rgba(30, 24, 11, 0.96), rgba(11, 10, 6, 0.98));
+  --u-pattern: radial-gradient(rgba(251, 191, 36, 0.06) 1px, transparent 1px);
+  --u-pattern-size: 10px 10px;
 }
 
 .pt-safe { padding-top: env(safe-area-inset-top, 0px); }
@@ -89,19 +196,90 @@ html.is-pwa-standalone .pt-safe-pwa {
   box-shadow: 0 0 15px rgba(255, 0, 60, 0.3), inset 0 0 15px rgba(255, 0, 60, 0.15);
 }
 
+/* Surfaces & Composants Thématisés par Univers Console (WCAG AA+) */
+.u-shell-bg {
+  background-color: var(--u-bg);
+  background-image: var(--u-pattern);
+  background-size: var(--u-pattern-size);
+  transition: background-color 220ms ease;
+}
+
+.u-header-bg {
+  background: var(--u-header-tint);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border-bottom-color: var(--u-accent-border);
+}
+
+.u-banner {
+  background: var(--u-banner-bg);
+  border-color: var(--u-accent-border);
+}
+
+.u-surface {
+  background-color: var(--u-surface);
+}
+
+.u-btn-primary {
+  background-color: var(--u-accent);
+  color: var(--u-accent-fg);
+  border: 1px solid var(--u-accent-border);
+  box-shadow: 0 2px 12px var(--u-accent-glow);
+  transition: background-color 150ms ease, transform 120ms ease, box-shadow 150ms ease;
+}
+
+.u-btn-primary:hover:not(:disabled) {
+  background-color: var(--u-accent-hover);
+  box-shadow: 0 4px 18px var(--u-accent-glow);
+}
+
+.u-tab-active {
+  background-color: var(--u-accent-soft);
+  color: var(--u-accent-text);
+  border-color: var(--u-accent-border);
+  box-shadow: inset 0 0 0 1px var(--u-accent-border);
+}
+
+.u-badge {
+  background-color: var(--u-accent-soft);
+  color: var(--u-accent-text);
+  border: 1px solid var(--u-accent-border);
+}
+
+.u-accent-text {
+  color: var(--u-accent-text);
+}
+
+.u-accent-border {
+  border-color: var(--u-accent-border);
+}
+
+.u-card {
+  background-color: var(--u-surface);
+  border-color: rgba(255, 255, 255, 0.09);
+  transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+}
+
+.u-card:hover,
+.u-card:focus-within {
+  border-color: var(--u-accent-border);
+  box-shadow: 0 6px 24px -8px var(--u-accent-glow);
+}
+
 /* Surfaces Cyber-Arcade Glass (UI/UX Pro Max) */
 .arcade-glass {
-  background: rgba(15, 16, 22, 0.84);
+  background: var(--u-header-tint);
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
 }
 
 .arcade-surface-elevated {
-  background: linear-gradient(180deg, rgba(24, 26, 36, 0.92) 0%, rgba(14, 15, 21, 0.96) 100%);
+  background: linear-gradient(180deg, rgba(24, 26, 36, 0.94) 0%, rgba(14, 15, 21, 0.98) 100%);
 }
 
 .arcade-focus-ring {
-  @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-950;
+  @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-950;
+  --tw-ring-color: var(--u-accent);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -124,10 +302,10 @@ html.is-pwa-standalone .pt-safe-pwa {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #252530;
+  background: #2e3242;
   border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #00f0ff;
+  background: var(--u-accent);
 }

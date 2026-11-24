@@ -12,9 +12,52 @@ try {
   dns.setDefaultResultOrder('ipv4first');
 } catch {}
 
+const ALLOWED_ROM_HOST_SUFFIXES = [
+  'archive.org',
+  'myrient.erista.me',
+  'cdn.emulatorjs.org',
+  'raw.githubusercontent.com',
+  'github.com',
+  'objects.githubusercontent.com',
+  'release-assets.githubusercontent.com',
+  'jsdelivr.net',
+  'v8.js-dos.com',
+];
+
+function isPrivateOrLoopbackHost(hostname) {
+  const host = String(hostname || '').toLowerCase().replace(/^\[|\]$/g, '');
+  if (!host) return true;
+  if (
+    host === 'localhost' ||
+    host === '0.0.0.0' ||
+    host === '::1' ||
+    host.endsWith('.local') ||
+    host.endsWith('.internal') ||
+    /^(10\.|127\.|169\.254\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(host) ||
+    /^(fc|fd|fe80:)/i.test(host)
+  ) {
+    return true;
+  }
+  return false;
+}
+
+export function isAllowedRomProxyUrl(rawUrl) {
+  try {
+    const parsed = new URL(rawUrl);
+    if (parsed.protocol !== 'https:') return false;
+    const host = parsed.hostname.toLowerCase();
+    if (isPrivateOrLoopbackHost(host)) return false;
+    return ALLOWED_ROM_HOST_SUFFIXES.some(
+      (suffix) => host === suffix || host.endsWith(`.${suffix}`)
+    );
+  } catch {
+    return false;
+  }
+}
+
 export function openRemoteStreamIpv4(
   targetUrl,
-  { method = 'GET', timeoutMs = 25000, maxRedirects = 5, headers = {} } = {}
+  { method = 'GET', timeoutMs = 25000, maxRedirects = 5, headers = {}, enforceAllowlist = false } = {}
 ) {
   return new Promise((resolve, reject) => {
     let settled = false;
@@ -36,6 +79,14 @@ export function openRemoteStreamIpv4(
         if (!settled) {
           settled = true;
           reject(err);
+        }
+        return;
+      }
+      if (isPrivateOrLoopbackHost(parsed.hostname) || (enforceAllowlist && !isAllowedRomProxyUrl(parsed.toString()))) {
+        clearTimeout(timer);
+        if (!settled) {
+          settled = true;
+          reject(new Error('Origine distante non autorisée'));
         }
         return;
       }
@@ -324,12 +375,17 @@ export async function handleRomProxyRequest(req, res, { romsDir, romNameMap = {}
     const url = new URL(req.url, 'http://localhost:3003');
     const customUrl = url.searchParams.get('url');
 
-    if (customUrl && /^https?:\/\//i.test(customUrl)) {
+    if (customUrl) {
+      if (!isAllowedRomProxyUrl(customUrl)) {
+        res.writeHead(403, { 'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json' });
+        return res.end(JSON.stringify({ error: 'Origine ROM non autorisée' }));
+      }
       let upstreamRes;
       try {
         upstreamRes = await openRemoteStreamIpv4(customUrl, {
           method: req.method === 'HEAD' ? 'HEAD' : 'GET',
           timeoutMs: 25000,
+          enforceAllowlist: true,
         });
       } catch {
         res.writeHead(404, { 'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json' });
@@ -830,7 +886,6 @@ export function setupNetplayHub(server) {
       friendTag,
       firstName: String(raw.firstName || ''),
       lastName: String(raw.lastName || ''),
-      email: raw.email ? String(raw.email) : null,
       region: String(raw.region || 'FR').toUpperCase().slice(0, 2),
       rank: String(raw.rank || 'D'),
       ratingPoints: Number(raw.ratingPoints || 0),
@@ -1723,22 +1778,42 @@ export function setupNetplayHub(server) {
             res.statusCode = 200;
             return res.end(JSON.stringify({ ok: true, docs }));
           }
+          const isProtectedWalletPath = (rawPath) => {
+            const norm = String(rawPath || '').replace(/^\/+/, '');
+            return norm === 'wallets' || norm.startsWith('wallets/');
+          };
           if (op === 'setDoc') {
+            if (isProtectedWalletPath(body.path)) {
+              res.statusCode = 403;
+              return res.end(JSON.stringify({ ok: false, error: 'Modification directe du portefeuille interdite' }));
+            }
             const ev = localFirebase.setDoc(body.path, body.data, { merge: Boolean(body.merge) });
             res.statusCode = 200;
             return res.end(JSON.stringify({ ok: true, ...ev }));
           }
           if (op === 'updateDoc') {
+            if (isProtectedWalletPath(body.path)) {
+              res.statusCode = 403;
+              return res.end(JSON.stringify({ ok: false, error: 'Modification directe du portefeuille interdite' }));
+            }
             const ev = localFirebase.updateDoc(body.path, body.patch || body.data);
             res.statusCode = 200;
             return res.end(JSON.stringify({ ok: true, ...ev }));
           }
           if (op === 'addDoc') {
+            if (isProtectedWalletPath(body.path)) {
+              res.statusCode = 403;
+              return res.end(JSON.stringify({ ok: false, error: 'Modification directe du portefeuille interdite' }));
+            }
             const ev = localFirebase.addDoc(body.path, body.data);
             res.statusCode = 200;
             return res.end(JSON.stringify({ ok: true, ...ev }));
           }
           if (op === 'deleteDoc') {
+            if (isProtectedWalletPath(body.path)) {
+              res.statusCode = 403;
+              return res.end(JSON.stringify({ ok: false, error: 'Suppression directe du portefeuille interdite' }));
+            }
             const ev = localFirebase.deleteDoc(body.path);
             res.statusCode = 200;
             return res.end(JSON.stringify({ ok: true, ...ev }));
@@ -1781,7 +1856,56 @@ export function setupNetplayHub(server) {
   // ============================================================================
   // PASSERELLE DE PAIEMENT SASPAY (Clé secrète côté serveur uniquement)
   // ============================================================================
+  const saspayTxPath = path.join(socialDir, 'saspay-tx.json');
   const saspayTransactions = new Map(); // paymentId -> { paymentId, uid, coins, amount, currency, status, credited, createdAtMs }
+
+  try {
+    if (fs.existsSync(saspayTxPath)) {
+      const parsedTx = JSON.parse(fs.readFileSync(saspayTxPath, 'utf8'));
+      if (parsedTx && typeof parsedTx === 'object') {
+        for (const [k, v] of Object.entries(parsedTx)) {
+          if (k && v && typeof v === 'object') saspayTransactions.set(k, v);
+        }
+      }
+    }
+  } catch {}
+
+  function persistSasPayTransactions() {
+    try {
+      if (!fs.existsSync(socialDir)) fs.mkdirSync(socialDir, { recursive: true });
+      const obj = {};
+      for (const [k, v] of saspayTransactions.entries()) obj[k] = v;
+      fs.writeFileSync(saspayTxPath, JSON.stringify(obj, null, 2), { encoding: 'utf8', mode: 0o600 });
+    } catch {}
+  }
+
+  function readLimitedJsonBody(req, maxBytes = 64 * 1024) {
+    return new Promise((resolve, reject) => {
+      const chunks = [];
+      let total = 0;
+      let rejected = false;
+      req.on('data', (c) => {
+        if (rejected) return;
+        total += c.length;
+        if (total > maxBytes) {
+          rejected = true;
+          reject(Object.assign(new Error('Payload trop volumineux'), { statusCode: 413 }));
+          return;
+        }
+        chunks.push(c);
+      });
+      req.on('end', () => {
+        if (rejected) return;
+        try {
+          const raw = Buffer.concat(chunks).toString('utf8');
+          resolve(raw ? JSON.parse(raw) : {});
+        } catch {
+          reject(Object.assign(new Error('JSON invalide'), { statusCode: 400 }));
+        }
+      });
+      req.on('error', reject);
+    });
+  }
 
   function creditSyncedWalletCoins(uid, coinsToAdd) {
     if (!uid || !coinsToAdd) return 0;
@@ -1863,37 +1987,7 @@ export function setupNetplayHub(server) {
     return res.end(JSON.stringify({ ok: true, data: [] }));
   });
 
-  server.middlewares.use('/api/saspay/sync-env', (req, res) => {
-    res.setHeader('Content-Type', 'application/json');
-    if (req.method !== 'POST') {
-      res.statusCode = 405;
-      return res.end(JSON.stringify({ ok: false }));
-    }
-    const secret = req.headers['x-deploy-secret'];
-    if (secret !== 'csw_arcade_deploy_secure_key_2026') {
-      res.statusCode = 403;
-      return res.end(JSON.stringify({ ok: false, error: 'Forbidden' }));
-    }
-    const chunks = [];
-    req.on('data', (c) => chunks.push(c));
-    req.on('end', () => {
-      try {
-        const body = JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}');
-        if (typeof body.envContent === 'string' && body.envContent.includes('SASPAY_')) {
-          const targetPath = fs.existsSync('/opt/csw-arcade')
-            ? '/opt/csw-arcade/.env'
-            : path.resolve(process.cwd(), '.env');
-          fs.writeFileSync(targetPath, body.envContent, { encoding: 'utf8', mode: 0o600 });
-          return res.end(JSON.stringify({ ok: true, path: targetPath }));
-        }
-        res.statusCode = 400;
-        return res.end(JSON.stringify({ ok: false, error: 'Contenu .env invalide' }));
-      } catch (e) {
-        res.statusCode = 500;
-        return res.end(JSON.stringify({ ok: false, error: e?.message }));
-      }
-    });
-  });
+  // Endpoint /api/saspay/sync-env supprimé pour sécurité (configuration .env uniquement via SSH / variables serveur)
 
   server.middlewares.use('/api/saspay/countries', async (req, res) => {
     res.setHeader('Content-Type', 'application/json');
@@ -2036,6 +2130,7 @@ export function setupNetplayHub(server) {
           credited: paidNow,
           createdAtMs: Date.now(),
         });
+        persistSasPayTransactions();
 
         res.statusCode = 200;
         return res.end(
@@ -2091,9 +2186,9 @@ export function setupNetplayHub(server) {
       let coinsAdded = 0;
 
       if (paid) {
-        const targetUid = tx?.uid || uidParam || apiData?.metadata?.uid;
-        coinsAdded = tx?.coins || Number(apiData?.metadata?.coins || 10);
-        if (targetUid && !tx?.credited) {
+        const targetUid = tx?.uid || apiData?.metadata?.uid || apiData?.data?.metadata?.uid || null;
+        coinsAdded = tx?.coins || Number(apiData?.metadata?.coins || apiData?.data?.metadata?.coins || 0);
+        if (targetUid && coinsAdded > 0 && !tx?.credited) {
           newCoins = creditSyncedWalletCoins(targetUid, coinsAdded);
         }
         saspayTransactions.set(paymentId, {
@@ -2101,6 +2196,7 @@ export function setupNetplayHub(server) {
           status: String(status),
           credited: true,
         });
+        persistSasPayTransactions();
       }
 
       res.statusCode = 200;
@@ -2111,32 +2207,46 @@ export function setupNetplayHub(server) {
     }
   });
 
-  server.middlewares.use('/api/saspay/webhook', (req, res) => {
+  server.middlewares.use('/api/saspay/webhook', async (req, res) => {
     res.setHeader('Content-Type', 'application/json');
     if (req.method !== 'POST') {
       res.statusCode = 405;
       return res.end(JSON.stringify({ ok: false }));
     }
-    const chunks = [];
-    req.on('data', (c) => chunks.push(c));
-    req.on('end', () => {
-      try {
-        const event = JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}');
-        const data = event?.data || event;
-        const paymentId = String(data?.id || data?.payment_id || data?.reference || '');
-        const status = data?.status || event?.event || '';
-        if (paymentId && isSasPayPaidStatus(status)) {
-          const tx = saspayTransactions.get(paymentId);
-          if (tx && !tx.credited) {
+    try {
+      const event = await readLimitedJsonBody(req, 64 * 1024);
+      const data = event?.data || event;
+      const paymentId = String(data?.id || data?.payment_id || data?.reference || '').trim();
+      const claimedStatus = data?.status || event?.event || '';
+      const secretKey = loadEnvValue('SASPAY_SECRET_KEY');
+      const baseUrl = loadEnvValue('SASPAY_BASE_URL', 'https://api.saspay.me/api/v1');
+
+      // Toujours re-vérifier le paiement côté serveur auprès de SasPay avant tout crédit
+      if (paymentId && isSasPayPaidStatus(claimedStatus) && secretKey) {
+        const tx = saspayTransactions.get(paymentId);
+        if (tx && !tx.credited) {
+          const verifyRes = await fetch(`${baseUrl}/payments/${encodeURIComponent(paymentId)}/verify/`, {
+            headers: {
+              Authorization: `Bearer ${secretKey}`,
+              Accept: 'application/json',
+            },
+          });
+          const verifyData = await verifyRes.json().catch(() => ({}));
+          const verifiedStatus = verifyData?.status || verifyData?.data?.status || '';
+          if (verifyRes.ok && isSasPayPaidStatus(verifiedStatus)) {
             creditSyncedWalletCoins(tx.uid, tx.coins);
             tx.credited = true;
-            tx.status = String(status);
+            tx.status = String(verifiedStatus);
+            persistSasPayTransactions();
           }
         }
-      } catch {}
+      }
       res.statusCode = 200;
-      res.end(JSON.stringify({ received: true }));
-    });
+      return res.end(JSON.stringify({ received: true }));
+    } catch (err) {
+      res.statusCode = err?.statusCode || 400;
+      return res.end(JSON.stringify({ received: false }));
+    }
   });
 
   function broadcastRoomUpdate(room) {
@@ -2188,13 +2298,31 @@ export function setupNetplayHub(server) {
       ws.spectatingMatchKey = null;
     }
 
-    // Si ce joueur ferme brutalement son onglet/app en plein match Netplay, arrêter net la partie chez son adversaire et les spectateurs
+    // Fenêtre de grâce anti-éjection de 15s : prévenir l'adversaire de la reconnexion sans couper son jeu
     const partnerUid = ws.activeMatchPartnerUid;
     if (partnerUid && wasLastUserSocket) {
       const disconnectedUid = ws.uid;
       const disconnectedName = ws.userName || 'Adversaire';
+      const initialPartnerSockets = connectedUsers.get(partnerUid);
+      if (initialPartnerSockets) {
+        const reconnectingPayload = JSON.stringify({
+          type: 'REMOTE_BTN_RELAY',
+          syncType: 'NETPLAY_EVENT',
+          eventData: {
+            event: 'PEER_RECONNECTING',
+            senderName: disconnectedName,
+            graceMs: 15000,
+            eventId: `srv_reconn_${Date.now()}_${disconnectedUid}`,
+          },
+        });
+        for (const s of initialPartnerSockets) {
+          if (s.readyState === WebSocket.OPEN) {
+            try { s.send(reconnectingPayload); } catch {}
+          }
+        }
+      }
       setTimeout(() => {
-        // Ne notifier que si l'utilisateur ne s'est pas reconnecté entre-temps (< 1.2s)
+        // Ne notifier le départ définitif que si le joueur n'est pas revenu après 15 secondes
         if (disconnectedUid && !connectedUsers.has(disconnectedUid)) {
           endSpectateMatch(disconnectedUid, 'disconnect', disconnectedName);
           const partnerSockets = connectedUsers.get(partnerUid);
@@ -2217,7 +2345,7 @@ export function setupNetplayHub(server) {
             }
           }
         }
-      }, 1200);
+      }, 15000);
     }
     ws.activeMatchPartnerUid = null;
 

@@ -146,18 +146,23 @@ export function SasPayModal({ isOpen, onClose, onOpenAuth, userProfile, currentC
   };
 
   return (
-    <div className="fixed inset-0 z-[135] flex items-end sm:items-center justify-center bg-black/80 backdrop-blur-md p-0 sm:p-4">
-      <div className="w-full sm:max-w-lg max-h-[94dvh] flex flex-col rounded-t-2xl sm:rounded-2xl bg-neutral-900 border-t sm:border border-amber-500/40 shadow-2xl overflow-hidden text-neutral-100 pb-safe">
-        <div className="flex items-center justify-between px-5 py-4 bg-gradient-to-r from-amber-950/60 via-neutral-900 to-neutral-900 border-b border-neutral-800 shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400">
+    <div
+      className="fixed inset-0 z-[135] flex items-end sm:items-center justify-center bg-black/80 backdrop-blur-md p-0 sm:p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Boutique Crédits SasPay"
+    >
+      <div className="w-full sm:max-w-lg max-h-[94dvh] flex flex-col rounded-t-3xl sm:rounded-3xl bg-neutral-900 border-t sm:border u-accent-border shadow-2xl overflow-hidden text-neutral-100 pb-safe">
+        <div className="u-banner flex items-center justify-between px-4 sm:px-5 py-4 border-b shrink-0 gap-3">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-10 h-10 rounded-2xl u-badge flex items-center justify-center shrink-0">
               <Coins className="w-5 h-5" />
             </div>
-            <div>
-              <h2 className="text-sm font-black tracking-wide text-white uppercase">
+            <div className="min-w-0">
+              <h2 className="text-sm sm:text-base font-black tracking-tight text-white truncate">
                 Boutique Crédits · SasPay
               </h2>
-              <p className="text-[11px] font-mono text-neutral-400">
+              <p className="text-[11px] font-mono text-neutral-300">
                 Solde actuel : <strong className="text-amber-300">{String(currentCoins).padStart(2, '0')}/99</strong> Coins
               </p>
             </div>
@@ -165,20 +170,21 @@ export function SasPayModal({ isOpen, onClose, onOpenAuth, userProfile, currentC
           <button
             type="button"
             onClick={onClose}
-            className="p-1.5 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-neutral-400 hover:text-white"
+            aria-label="Fermer la boutique"
+            className="arcade-focus-ring p-2 min-w-[44px] min-h-[44px] rounded-xl bg-white/5 hover:bg-white/15 border border-white/10 text-neutral-200 hover:text-white flex items-center justify-center shrink-0 transition-colors"
           >
-            <X className="w-4 h-4" />
+            <X className="w-5 h-5" />
           </button>
         </div>
 
         {!userProfile?.isAuthenticated ? (
           <div className="p-6 text-center space-y-4">
-            <div className="w-12 h-12 rounded-2xl bg-cyan-500/15 border border-cyan-500/40 flex items-center justify-center text-cyan-400 mx-auto">
+            <div className="w-12 h-12 rounded-2xl u-badge flex items-center justify-center mx-auto">
               <LogIn className="w-6 h-6" />
             </div>
             <div className="space-y-1.5">
               <h3 className="text-sm font-black text-white uppercase">Connexion requise pour payer</h3>
-              <p className="text-xs text-neutral-400 leading-relaxed">
+              <p className="text-xs text-neutral-300 leading-relaxed">
                 Connectez-vous ou créez votre compte CSW-Arcade avant d’acheter des crédits. Vos informations (Nom, Prénom, Email, Pays) seront remplies automatiquement et vos Coins seront synchronisés sur tous vos appareils.
               </p>
             </div>
@@ -188,24 +194,24 @@ export function SasPayModal({ isOpen, onClose, onOpenAuth, userProfile, currentC
                 onClose?.();
                 onOpenAuth?.();
               }}
-              className="w-full py-3 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-black font-black text-xs uppercase tracking-wide flex items-center justify-center gap-2 transition-colors"
+              className="arcade-focus-ring w-full py-3 min-h-[44px] rounded-xl u-btn-primary font-black text-xs uppercase tracking-wide flex items-center justify-center gap-2 transition-colors"
             >
               <LogIn className="w-4 h-4" />
               <span>Se connecter / Créer un compte</span>
             </button>
           </div>
         ) : (
-        <form onSubmit={handleStartPayment} className="p-5 space-y-4 overflow-y-auto flex-1">
+        <form onSubmit={handleStartPayment} className="p-4 sm:p-5 space-y-4 overflow-y-auto flex-1">
           {/* Infos client pré-remplies automatiquement depuis le compte connecté */}
-          <div className="px-3 py-2 rounded-xl bg-neutral-950 border border-emerald-500/30 flex items-center justify-between gap-2 text-[11px]">
-            <div className="truncate text-neutral-300">
+          <div className="px-3.5 py-2.5 rounded-xl bg-neutral-950/90 border border-white/15 flex items-center justify-between gap-2 text-xs">
+            <div className="truncate text-neutral-200">
               <span className="text-emerald-400 font-bold">Compte connecté :</span>{' '}
               {userProfile?.firstName || userProfile?.lastName
                 ? `${userProfile.firstName || ''} ${userProfile.lastName || ''}`.trim()
                 : userProfile?.displayName}{' '}
               · <span className="text-neutral-400">{userProfile?.email}</span>
             </div>
-            <span className="px-1.5 py-0.5 rounded bg-neutral-800 text-cyan-300 font-mono text-[10px] shrink-0">
+            <span className="px-2 py-0.5 rounded-md u-badge font-mono text-[10px] font-bold shrink-0">
               {country}
             </span>
           </div>
@@ -225,17 +231,17 @@ export function SasPayModal({ isOpen, onClose, onOpenAuth, userProfile, currentC
 
           {/* Paiement en attente de confirmation */}
           {pendingTx && (
-            <div className="p-3.5 rounded-xl bg-cyan-950/35 border border-cyan-500/40 space-y-2.5">
-              <div className="flex items-center justify-between text-xs">
-                <span className="font-bold text-cyan-300">Paiement en attente ({pendingTx.coins} Coins)</span>
-                <span className="font-mono text-[10px] text-neutral-400">#{pendingTx.paymentId}</span>
+            <div className="p-3.5 rounded-2xl u-tab-active border space-y-2.5">
+              <div className="flex items-center justify-between gap-2 text-xs">
+                <span className="font-bold">Paiement en attente ({pendingTx.coins} Coins)</span>
+                <span className="font-mono text-[10px] text-neutral-300 truncate max-w-[160px]">#{pendingTx.paymentId}</span>
               </div>
               <div className="flex flex-wrap gap-2">
                 <button
                   type="button"
                   disabled={verifying}
                   onClick={() => handleVerifyPending(pendingTx)}
-                  className="flex-1 py-2 px-3 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-black flex items-center justify-center gap-1.5"
+                  className="arcade-focus-ring flex-1 py-2.5 px-3 min-h-[42px] rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-black flex items-center justify-center gap-1.5"
                 >
                   <RefreshCw className={`w-3.5 h-3.5 ${verifying ? 'animate-spin' : ''}`} />
                   <span>{verifying ? 'Vérification…' : 'Vérifier mon paiement'}</span>
@@ -245,7 +251,7 @@ export function SasPayModal({ isOpen, onClose, onOpenAuth, userProfile, currentC
                     href={pendingTx.checkoutUrl}
                     target="_blank"
                     rel="noreferrer"
-                    className="py-2 px-3 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-cyan-300 text-xs font-bold flex items-center gap-1"
+                    className="arcade-focus-ring py-2.5 px-3 min-h-[42px] rounded-xl bg-neutral-900 hover:bg-neutral-800 border border-white/15 u-accent-text text-xs font-bold flex items-center gap-1"
                   >
                     <ExternalLink className="w-3.5 h-3.5" />
                     <span>Rouvrir</span>
@@ -257,7 +263,7 @@ export function SasPayModal({ isOpen, onClose, onOpenAuth, userProfile, currentC
 
           {/* Choix du Pack de Coins */}
           <div className="space-y-2">
-            <div className="text-[11px] font-mono uppercase text-neutral-400">
+            <div className="text-[11px] font-mono uppercase text-neutral-300 font-semibold">
               1. Choisissez votre pack de Crédits
             </div>
             <div className="grid grid-cols-2 gap-2.5">
@@ -268,20 +274,20 @@ export function SasPayModal({ isOpen, onClose, onOpenAuth, userProfile, currentC
                     key={pack.id}
                     type="button"
                     onClick={() => setSelectedPackId(pack.id)}
-                    className={`p-3 rounded-xl border text-left transition-all relative ${
+                    className={`arcade-focus-ring p-3.5 rounded-2xl border text-left transition-all relative ${
                       active
-                        ? 'bg-amber-500/15 border-amber-400 shadow-lg'
-                        : 'bg-neutral-950 border-neutral-800 hover:border-neutral-700'
+                        ? 'u-tab-active shadow-lg'
+                        : 'bg-neutral-950/85 border-white/10 hover:border-white/25'
                     }`}
                   >
                     {pack.popular && (
-                      <span className="absolute -top-2 right-2 px-1.5 py-0.5 rounded bg-amber-500 text-black text-[9px] font-black uppercase">
+                      <span className="absolute -top-2.5 right-2.5 px-2 py-0.5 rounded-md bg-amber-500 text-black text-[9px] font-black uppercase shadow">
                         Meilleure Offre
                       </span>
                     )}
                     <div className="text-sm font-black text-white">{pack.coins} Coins</div>
-                    <div className="text-[10px] text-neutral-400">{pack.label}</div>
-                    <div className="text-xs font-mono font-black text-amber-300 mt-1">
+                    <div className="text-[11px] text-neutral-300">{pack.label}</div>
+                    <div className="text-xs font-mono font-black text-amber-300 mt-1.5">
                       {pack.amount.toLocaleString('fr-FR')} {pack.currency}{' '}
                       <span className="text-[10px] text-neutral-400 font-normal">({pack.eurApprox})</span>
                     </div>
@@ -293,33 +299,33 @@ export function SasPayModal({ isOpen, onClose, onOpenAuth, userProfile, currentC
 
           {/* Choix du mode SasPay */}
           <div className="space-y-2">
-            <div className="text-[11px] font-mono uppercase text-neutral-400">
+            <div className="text-[11px] font-mono uppercase text-neutral-300 font-semibold">
               2. Mode de paiement SasPay
             </div>
             <div className="grid grid-cols-2 gap-2">
               <button
                 type="button"
                 onClick={() => setPayMode('checkout')}
-                className={`p-2.5 rounded-xl border text-xs font-bold flex items-center justify-center gap-2 ${
+                className={`arcade-focus-ring p-2.5 min-h-[44px] rounded-xl border text-xs font-bold flex items-center justify-center gap-2 transition-all ${
                   payMode === 'checkout'
-                    ? 'bg-cyan-500/20 border-cyan-400 text-cyan-200'
-                    : 'bg-neutral-950 border-neutral-800 text-neutral-400'
+                    ? 'u-tab-active'
+                    : 'bg-neutral-950/85 border-white/10 text-neutral-300 hover:text-white'
                 }`}
               >
-                <CreditCard className="w-4 h-4" />
-                <span>Page SasPay (Carte / MM)</span>
+                <CreditCard className="w-4 h-4 shrink-0" />
+                <span>Page SasPay</span>
               </button>
               <button
                 type="button"
                 onClick={() => setPayMode('softpay')}
-                className={`p-2.5 rounded-xl border text-xs font-bold flex items-center justify-center gap-2 ${
+                className={`arcade-focus-ring p-2.5 min-h-[44px] rounded-xl border text-xs font-bold flex items-center justify-center gap-2 transition-all ${
                   payMode === 'softpay'
-                    ? 'bg-cyan-500/20 border-cyan-400 text-cyan-200'
-                    : 'bg-neutral-950 border-neutral-800 text-neutral-400'
+                    ? 'u-tab-active'
+                    : 'bg-neutral-950/85 border-white/10 text-neutral-300 hover:text-white'
                 }`}
               >
-                <Smartphone className="w-4 h-4" />
-                <span>Mobile Money Direct</span>
+                <Smartphone className="w-4 h-4 shrink-0" />
+                <span>Mobile Money</span>
               </button>
             </div>
           </div>

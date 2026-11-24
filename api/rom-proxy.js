@@ -2,6 +2,39 @@ export const config = {
   runtime: 'edge', // Edge Runtime pour streaming illimité sans limite de payload de 4.5 Mo
 };
 
+const ALLOWED_ROM_HOST_SUFFIXES = [
+  'archive.org',
+  'myrient.erista.me',
+  'cdn.emulatorjs.org',
+  'raw.githubusercontent.com',
+  'github.com',
+  'objects.githubusercontent.com',
+  'release-assets.githubusercontent.com',
+  'ia600000.us.archive.org',
+];
+
+function isAllowedRomUrl(rawUrl) {
+  try {
+    const parsed = new URL(rawUrl);
+    if (parsed.protocol !== 'https:') return false;
+    const host = parsed.hostname.toLowerCase();
+    if (
+      host === 'localhost' ||
+      host === '127.0.0.1' ||
+      host === '::1' ||
+      host.endsWith('.local') ||
+      /^(10\.|127\.|169\.254\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(host)
+    ) {
+      return false;
+    }
+    return ALLOWED_ROM_HOST_SUFFIXES.some(
+      (suffix) => host === suffix || host.endsWith(`.${suffix}`)
+    );
+  } catch {
+    return false;
+  }
+}
+
 export default async function handler(request) {
   // Gestion du preflight CORS OPTIONS
   if (request.method === 'OPTIONS') {
@@ -30,13 +63,24 @@ export default async function handler(request) {
     });
   }
 
+  if (customUrl && !isAllowedRomUrl(customUrl)) {
+    return new Response(JSON.stringify({ error: 'Origine ROM non autorisée' }), {
+      status: 403,
+      headers: {
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*'
+      }
+    });
+  }
+
   // Liste ordonnée de miroirs Archive.org haute disponibilité
   const candidateUrls = [];
   if (customUrl) {
     candidateUrls.push(customUrl);
   }
   if (file) {
-    const cleanZip = file.toLowerCase().endsWith('.zip') ? file.toLowerCase() : file.toLowerCase() + '.zip';
+    const safeFile = file.split(/[\\/]/).pop().replace(/[^a-zA-Z0-9._-]/g, '');
+    const cleanZip = safeFile.toLowerCase().endsWith('.zip') ? safeFile.toLowerCase() : safeFile.toLowerCase() + '.zip';
     candidateUrls.push(
       `https://archive.org/cors/neo-geo-mvs-romset/${cleanZip}`,
       `https://archive.org/download/neo-geo-mvs-romset/${cleanZip}`,

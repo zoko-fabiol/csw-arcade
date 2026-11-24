@@ -33,12 +33,12 @@ export function FightcadeChannelsDock({
           title="Catalogue des jeux (Game Mode)"
           className={`arcade-focus-ring w-12 h-12 rounded-2xl flex flex-col items-center justify-center gap-0.5 transition-all border ${
             selectedChannelId === null
-              ? 'bg-cyan-500/20 border-cyan-400 text-cyan-200 shadow-lg shadow-cyan-500/20'
-              : 'bg-neutral-900/80 border-white/10 text-neutral-300 hover:text-white hover:border-white/25'
+              ? 'u-btn-primary'
+              : 'bg-neutral-900/80 border-white/15 text-neutral-200 hover:text-white hover:border-white/30'
           }`}
         >
           <Gamepad2 className="w-5 h-5" aria-hidden="true" />
-          <span className="text-[9px] font-bold">JEUX</span>
+          <span className="text-[9px] font-black">JEUX</span>
         </button>
 
         {/* Bouton Salon Communautaire Global Fightcade 2 */}
@@ -49,7 +49,7 @@ export function FightcadeChannelsDock({
           className={`arcade-focus-ring relative w-12 h-12 rounded-2xl flex flex-col items-center justify-center gap-0.5 transition-all border ${
             isGlobalSelected
               ? 'bg-emerald-500/20 border-emerald-400 text-emerald-200 shadow-lg shadow-emerald-500/20'
-              : 'bg-neutral-900/80 border-white/10 text-neutral-300 hover:text-emerald-300 hover:border-emerald-500/40'
+              : 'bg-neutral-900/80 border-white/15 text-neutral-200 hover:text-emerald-300 hover:border-emerald-500/40'
           }`}
         >
           <Globe className="w-5 h-5" aria-hidden="true" />
@@ -59,33 +59,40 @@ export function FightcadeChannelsDock({
           </span>
         </button>
 
-        <div className="w-8 h-px bg-neutral-800" />
+        <div className="w-8 h-px bg-white/15" />
 
-        <div className="text-[9px] font-mono text-neutral-500 uppercase" title="Vos jeux sélectionnés (actifs aux salons)">
+        <div className="text-[9px] font-mono font-semibold text-neutral-300 uppercase" title="Vos jeux sélectionnés (actifs aux salons)">
           ACTIFS {activeChannels.length}/3
         </div>
 
         <div className="flex-1 flex flex-col gap-2.5 w-full items-center overflow-y-auto px-1">
           {activeChannels.map((ch) => {
             const active = selectedChannelId === ch.gameId;
+            const initials = String(ch.title || 'J')
+              .replace(/[^a-zA-Z0-9\s]/g, ' ')
+              .trim()
+              .split(/\s+/)
+              .filter(Boolean)
+              .slice(0, 2)
+              .map((w) => w[0]?.toUpperCase() || '')
+              .join('') || 'FC';
             return (
               <div key={ch.gameId} className="relative group">
                 <button
                   type="button"
                   onClick={() => onSelectChannel(ch.gameId)}
                   title={`Salon actif : ${ch.title} (${ch.platformLabel})`}
-                  className={`w-12 h-12 rounded-xl overflow-hidden border-2 transition-all flex items-center justify-center bg-neutral-900 ${
+                  aria-label={`Ouvrir le salon ${ch.title}`}
+                  className={`arcade-focus-ring w-12 h-12 rounded-xl overflow-hidden border-2 transition-all flex flex-col items-center justify-center px-1 ${
                     active
-                      ? 'border-cyan-400 shadow-lg shadow-cyan-500/30 scale-105'
-                      : 'border-neutral-800 hover:border-neutral-600'
+                      ? 'u-tab-active scale-105'
+                      : 'bg-neutral-900/90 border-white/15 text-neutral-100 hover:border-white/35'
                   }`}
                 >
-                  <GameCover
-                    title={ch.title}
-                    platformLabel={ch.platformLabel}
-                    filename={ch.filename}
-                    compact
-                  />
+                  <span className="text-xs font-black tracking-tight leading-none u-accent-text">{initials}</span>
+                  <span className="text-[8px] font-mono text-neutral-300 truncate max-w-full mt-0.5 leading-none">
+                    {ch.platformLabel ? ch.platformLabel.split(' ')[0] : 'SALON'}
+                  </span>
                 </button>
                 <span
                   className="absolute -bottom-0.5 -left-0.5 w-2.5 h-2.5 rounded-full bg-emerald-400 border border-neutral-950"
@@ -97,25 +104,26 @@ export function FightcadeChannelsDock({
                     e.stopPropagation();
                     onLeaveChannel(ch.gameId);
                   }}
+                  aria-label={`Quitter le salon ${ch.title}`}
                   title="Quitter ce salon"
-                  className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-neutral-900 border border-neutral-700 text-neutral-300 hover:bg-rose-600 hover:text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                  className="arcade-focus-ring absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-neutral-900 border border-white/25 text-neutral-200 hover:bg-rose-600 hover:text-white flex items-center justify-center opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity"
                 >
-                  <X className="w-3 h-3" />
+                  <X className="w-3 h-3" aria-hidden="true" />
                 </button>
               </div>
             );
           })}
         </div>
 
-        <div className="text-[9px] font-mono text-neutral-600 flex flex-col items-center gap-0.5">
-          <MessageSquare className="w-3.5 h-3.5" />
+        <div className="text-[10px] font-mono text-neutral-400 flex flex-col items-center gap-0.5">
+          <MessageSquare className="w-3.5 h-3.5" aria-hidden="true" />
           <span>FC2</span>
         </div>
       </nav>
 
       {/* BOTTOM NAVIGATION BAR — MOBILE (< md) */}
       <nav
-        className="md:hidden fixed bottom-0 inset-x-0 z-30 arcade-glass border-t border-white/10 pb-safe"
+        className="md:hidden fixed bottom-0 inset-x-0 z-30 arcade-glass border-t border-white/15 pb-safe"
         aria-label="Navigation mobile"
       >
         <div className="grid grid-cols-4 h-16 px-1.5 gap-1">
@@ -126,7 +134,7 @@ export function FightcadeChannelsDock({
               onSelectLibrary();
             }}
             className={`arcade-focus-ring flex flex-col items-center justify-center gap-1 min-h-[44px] rounded-xl transition-colors ${
-              selectedChannelId === null ? 'text-cyan-300 bg-cyan-500/10' : 'text-neutral-300'
+              selectedChannelId === null ? 'u-tab-active' : 'text-neutral-200'
             }`}
           >
             <Gamepad2 className="w-5 h-5" aria-hidden="true" />

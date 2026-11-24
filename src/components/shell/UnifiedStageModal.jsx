@@ -78,7 +78,8 @@ export function UnifiedStageModal({
   const [remoteEmuReady, setRemoteEmuReady] = useState(false);
   const [netplaySyncReady, setNetplaySyncReady] = useState(() => !session?.isNetplay);
   const [spectatorsCount, setSpectatorsCount] = useState(0);
-  const isSpectator = Boolean(session?.isSpectator || session?.playerIndex === 2);
+  const [continuedSolo, setContinuedSolo] = useState(false);
+  const isSpectator = Boolean(session?.isSpectator || session?.playerIndex === -1);
 
   useEffect(() => {
     if (!session) return;
@@ -316,6 +317,7 @@ export function UnifiedStageModal({
                 gameUrl: session.gameUrl || '',
                 isNetplay: Boolean(session.isNetplay),
                 playerIndex: session.playerIndex ?? 0,
+                maxPlayers: session.maxPlayers ?? 2,
                 accent: session.accent || '#00f0ff',
                 filter,
                 ratio,
@@ -611,9 +613,14 @@ export function UnifiedStageModal({
     p2pEngine.onNetplayEvent = (ev) => {
       if (!ev || !ev.event) return;
       const peerName = ev.senderName || session?.opponentName || 'Votre adversaire';
+      if (ev.event === 'PEER_RECONNECTING') {
+        showRamToast('record', `Reconnexion de ${peerName} en cours (15s)…`);
+        return;
+      }
       if (ev.event === 'MATCH_LEAVE') {
+        // Ne jamais détruire ni éjecter le joueur restant : mettre simplement en pause douce et lui proposer Continuer ou Quitter
         try {
-          iframeRef.current?.contentWindow?.postMessage({ type: 'STOP_NETPLAY_MATCH' }, window.location.origin);
+          iframeRef.current?.contentWindow?.postMessage({ type: 'PAUSE_EMU' }, window.location.origin);
         } catch {}
         setPauseMenuOpen(false);
         setQuickMenuOpen(false);
@@ -1300,16 +1307,21 @@ export function UnifiedStageModal({
           </div>
         )}
 
-        {/* MODALE ARRÊT AUTOMATIQUE DU MATCH QUAND UN JOUEUR QUITTE LA PARTIE */}
+        {/* MODALE CHOIX QUAND UN JOUEUR QUITTE LA PARTIE : CONTINUER OU QUITTER */}
         {opponentLeftModal && (
-          <div className="absolute inset-0 z-[70] bg-black/88 backdrop-blur-md flex items-center justify-center p-4">
-            <div className="max-w-md w-full rounded-2xl bg-neutral-900 border-2 border-rose-500/70 p-6 text-center space-y-4 shadow-2xl">
-              <div className="w-14 h-14 rounded-full bg-rose-500/20 border-2 border-rose-400 flex items-center justify-center mx-auto">
-                <Trophy className="w-7 h-7 text-amber-400" />
+          <div
+            className="absolute inset-0 z-[70] bg-black/85 backdrop-blur-md flex items-center justify-center p-4"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Un joueur a quitté la partie"
+          >
+            <div className="max-w-md w-full rounded-3xl bg-neutral-900 border-2 u-accent-border p-6 text-center space-y-4 shadow-2xl">
+              <div className="w-14 h-14 rounded-2xl u-badge flex items-center justify-center mx-auto">
+                <Trophy className="w-7 h-7" />
               </div>
               <div className="space-y-1.5">
                 <span className="inline-block px-2.5 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-400/50 text-emerald-300 text-[10px] font-mono font-black uppercase">
-                  {isSpectator ? '📡 Diffusion terminée · Match arrêté' : '🏆 Victoire par Forfait · Partie Arrêtée'}
+                  {isSpectator ? 'Diffusion terminée' : 'Départ d’un joueur · Partie en pause'}
                 </span>
                 <h3 className="text-lg font-black text-white">
                   {isSpectator
@@ -1317,30 +1329,40 @@ export function UnifiedStageModal({
                     : `${opponentLeftModal.name} a quitté la partie`}
                 </h3>
                 <p className="text-xs text-neutral-300 leading-relaxed">
-                  {opponentLeftModal.customMessage ||
-                    'Le match multijoueur a été arrêté automatiquement car votre adversaire a quitté la session.'}
+                  {isSpectator
+                    ? opponentLeftModal.customMessage || 'La diffusion du match en direct est terminée.'
+                    : 'Votre progression est intacte. Voulez-vous continuer la partie maintenant (0 Coin) ou quitter vers le salon ?'}
                 </p>
               </div>
               <div className="flex flex-col sm:flex-row gap-2 pt-2">
+                {!isSpectator && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setOpponentLeftModal(null);
+                      setContinuedSolo(true);
+                      try {
+                        p2pEngine?.destroy?.();
+                        iframeRef.current?.contentWindow?.postMessage({ type: 'CONVERT_TO_SOLO' }, window.location.origin);
+                        iframeRef.current?.contentWindow?.postMessage({ type: 'RESUME_EMU' }, window.location.origin);
+                        iframeRef.current?.focus();
+                      } catch {}
+                      showRamToast('record', 'Partie poursuivie sans interruption (0 Coin) !');
+                    }}
+                    className="arcade-focus-ring flex-1 py-3 px-4 min-h-[44px] rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-black transition-colors"
+                  >
+                    Continuer la partie
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={() => {
                     setOpponentLeftModal(null);
                     onOpenSalon?.();
                   }}
-                  className="flex-1 py-2.5 px-4 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-black text-xs font-black transition-colors"
+                  className={`arcade-focus-ring ${isSpectator ? 'flex-1 u-btn-primary' : 'py-3 px-4 bg-neutral-800 hover:bg-rose-950 border border-white/15 text-neutral-200 hover:text-rose-200'} py-3 px-4 min-h-[44px] rounded-xl text-xs font-bold transition-colors`}
                 >
-                  Retourner au Salon Fightcade
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setOpponentLeftModal(null);
-                    handleCloseStage();
-                  }}
-                  className="py-2.5 px-4 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-neutral-200 text-xs font-bold transition-colors"
-                >
-                  Fermer la session
+                  {isSpectator ? 'Retourner au Salon' : 'Quitter vers le salon'}
                 </button>
               </div>
             </div>
@@ -1634,7 +1656,7 @@ export function UnifiedStageModal({
                 </div>
 
                 {gameLeaderboard.length === 0 ? (
-                  <div className="p-4 rounded-xl bg-neutral-900/70 border border-neutral-800 text-center text-xs text-neutral-500">
+                  <div className="p-4 rounded-xl bg-neutral-900/70 border border-neutral-800 text-center text-xs text-neutral-400">
                     Soyez le premier à établir un record sur « {session.title} » !
                   </div>
                 ) : (
@@ -1876,7 +1898,7 @@ export function UnifiedStageModal({
                                   className="w-full h-full object-cover"
                                 />
                               ) : (
-                                <span className="text-[11px] font-mono text-neutral-600">
+                                <span className="text-[11px] font-mono text-neutral-400">
                                   {existing ? 'Sauvegarde prête' : 'Emplacement vide'}
                                 </span>
                               )}
@@ -2039,7 +2061,7 @@ export function UnifiedStageModal({
                       >
                         <div className="min-w-0">
                           <div className="text-xs font-bold text-white">Slot {slotNum}</div>
-                          <div className="text-[10px] font-mono text-neutral-500 truncate">
+                          <div className="text-[10px] font-mono text-neutral-400 truncate">
                             {existing
                               ? `Sauvé à ${new Date(existing.savedAtMs).toLocaleTimeString('fr-FR', {
                                   hour: '2-digit',
@@ -2160,6 +2182,7 @@ export function UnifiedStageModal({
         <MobilePlatformController
           kind={session.kind}
           core={session.core}
+          settings={settings}
           onEmuButton={(buttonIdx, pressed) => {
             iframeRef.current?.contentWindow?.postMessage(
               { type: 'VIRTUAL_PAD_BTN', buttonIdx, pressed },
