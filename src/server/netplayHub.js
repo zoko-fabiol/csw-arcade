@@ -2249,7 +2249,7 @@ export function setupNetplayHub(server) {
           return;
         }
 
-        // Relais Audio VPS (Opus / WebM chunks) pour garantir 100 % de fonctionnement derrière NAT/4G
+        // Relais Audio VPS (G.711 µ-law 12 kHz Web Audio / Opus) pour garantir 100 % de fonctionnement à distance (4G/NAT/VPN)
         if (msg.type === 'voice_audio') {
           if (!prof.roomId || prof.muted || !msg.chunk) return;
           const room = voiceRooms.get(prof.roomId);
@@ -2260,7 +2260,8 @@ export function setupNetplayHub(server) {
             fromName: prof.name,
             roomId: prof.roomId,
             channel: prof.channel || 'party',
-            mimeType: String(msg.mimeType || 'audio/webm;codecs=opus'),
+            codec: String(msg.codec || 'ulaw12k'),
+            sampleRate: Number(msg.sampleRate || 12000),
             chunk: msg.chunk,
             ts: Date.now(),
           };
