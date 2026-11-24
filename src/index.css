@@ -529,24 +529,21 @@ html[data-theme="light"] .u-card:focus-within {
    Garantit zéro texte invisible, zéro fond sombre résiduel, zéro régression
    ============================================================================ */
 
-/* 1. Surfaces neutres sombres -> surfaces claires hiérarchisées */
+/* 1. Surfaces neutres sombres -> surfaces claires hiérarchisées (100 % des opacités couvertes) */
 html[data-theme="light"] :where(
-  .bg-neutral-950, .bg-neutral-950\/95, .bg-neutral-950\/90, .bg-neutral-950\/85, .bg-neutral-950\/80, .bg-neutral-950\/75, .bg-neutral-950\/70, .bg-neutral-950\/60, .bg-neutral-950\/50, .bg-neutral-950\/40,
-  .bg-slate-950, .bg-slate-950\/90, .bg-slate-950\/80, .bg-zinc-950, .bg-zinc-950\/90
+  [class*="bg-neutral-950"], [class*="bg-slate-950"], [class*="bg-zinc-950"]
 ):not(.keep-dark):not(.keep-dark *) {
   background-color: #f1f5f9 !important;
 }
 
 html[data-theme="light"] :where(
-  .bg-neutral-900, .bg-neutral-900\/95, .bg-neutral-900\/90, .bg-neutral-900\/85, .bg-neutral-900\/80, .bg-neutral-900\/75, .bg-neutral-900\/70, .bg-neutral-900\/60, .bg-neutral-900\/50, .bg-neutral-900\/40,
-  .bg-slate-900, .bg-slate-900\/90, .bg-slate-900\/80, .bg-zinc-900, .bg-zinc-900\/90
+  [class*="bg-neutral-900"], [class*="bg-slate-900"], [class*="bg-zinc-900"]
 ):not(.keep-dark):not(.keep-dark *) {
   background-color: #ffffff !important;
 }
 
 html[data-theme="light"] :where(
-  .bg-neutral-800, .bg-neutral-800\/95, .bg-neutral-800\/90, .bg-neutral-800\/85, .bg-neutral-800\/80, .bg-neutral-800\/70, .bg-neutral-800\/60, .bg-neutral-800\/50,
-  .bg-slate-800, .bg-zinc-800
+  [class*="bg-neutral-800"], [class*="bg-slate-800"], [class*="bg-zinc-800"]
 ):not(.keep-dark):not(.keep-dark *) {
   background-color: #e2e8f0 !important;
 }
@@ -599,20 +596,20 @@ html[data-theme="light"] :where(.divide-white\/5, .divide-white\/10, .divide-neu
   border-color: rgba(15, 23, 42, 0.1) !important;
 }
 
-/* 3. Textes neutres clairs -> ardoise foncée à fort contraste */
-html[data-theme="light"] :where(.text-neutral-100, .text-slate-100, .text-zinc-100, .text-gray-100):not(.keep-dark):not(.keep-dark *):not(.keep-white) {
+/* 3. Textes neutres clairs -> ardoise foncée à fort contraste (y compris variantes avec opacité /90, /80, etc.) */
+html[data-theme="light"] :where([class*="text-neutral-100"], [class*="text-slate-100"], [class*="text-zinc-100"], [class*="text-gray-100"]):not(.keep-dark):not(.keep-dark *):not(.keep-white) {
   color: #0f172a !important;
 }
-html[data-theme="light"] :where(.text-neutral-200, .text-slate-200, .text-zinc-200, .text-gray-200):not(.keep-dark):not(.keep-dark *):not(.keep-white) {
+html[data-theme="light"] :where([class*="text-neutral-200"], [class*="text-slate-200"], [class*="text-zinc-200"], [class*="text-gray-200"]):not(.keep-dark):not(.keep-dark *):not(.keep-white) {
   color: #1e293b !important;
 }
-html[data-theme="light"] :where(.text-neutral-300, .text-slate-300, .text-zinc-300, .text-gray-300):not(.keep-dark):not(.keep-dark *):not(.keep-white) {
+html[data-theme="light"] :where([class*="text-neutral-300"], [class*="text-slate-300"], [class*="text-zinc-300"], [class*="text-gray-300"]):not(.keep-dark):not(.keep-dark *):not(.keep-white) {
   color: #334155 !important;
 }
-html[data-theme="light"] :where(.text-neutral-400, .text-slate-400, .text-zinc-400, .text-gray-400):not(.keep-dark):not(.keep-dark *):not(.keep-white) {
+html[data-theme="light"] :where([class*="text-neutral-400"], [class*="text-slate-400"], [class*="text-zinc-400"], [class*="text-gray-400"]):not(.keep-dark):not(.keep-dark *):not(.keep-white) {
   color: #475569 !important;
 }
-html[data-theme="light"] :where(.text-neutral-500, .text-slate-500):not(.keep-dark):not(.keep-dark *):not(.keep-white) {
+html[data-theme="light"] :where([class*="text-neutral-500"], [class*="text-slate-500"]):not(.keep-dark):not(.keep-dark *):not(.keep-white) {
   color: #64748b !important;
 }
 
@@ -650,30 +647,30 @@ html[data-theme="light"] :where(.hover\:text-rose-200:hover, .hover\:text-red-20
   color: #b91c1c !important;
 }
 
-/* 4. Badges & bannières sombres teintés (*-950/* et *-900/*) -> pastels propres en mode clair */
-html[data-theme="light"] :where(.bg-emerald-950, .bg-emerald-950\/20, .bg-emerald-950\/25, .bg-emerald-950\/30, .bg-emerald-950\/40, .bg-emerald-950\/50, .bg-emerald-950\/60, .bg-emerald-950\/70, .bg-emerald-950\/80, .bg-emerald-950\/90, .bg-emerald-900\/30, .bg-emerald-900\/40, .bg-emerald-900\/70):not(.keep-dark):not(.keep-dark *) {
+/* 4. Badges & bannières sombres teintés (*-950/* et *-900/*) -> pastels haute lisibilité (100 % des opacités couvertes) */
+html[data-theme="light"] :where([class*="bg-emerald-950"], [class*="bg-emerald-900"], [class*="bg-green-950"], [class*="bg-green-900"]):not(.keep-dark):not(.keep-dark *) {
   background-color: #ecfdf5 !important;
-  border-color: rgba(5, 150, 105, 0.3) !important;
+  border-color: rgba(5, 150, 105, 0.32) !important;
 }
-html[data-theme="light"] :where(.bg-amber-950, .bg-amber-950\/20, .bg-amber-950\/25, .bg-amber-950\/30, .bg-amber-950\/40, .bg-amber-950\/50, .bg-amber-950\/60, .bg-amber-950\/70, .bg-amber-950\/80, .bg-amber-900\/30, .bg-amber-900\/40, .bg-amber-900\/70):not(.keep-dark):not(.keep-dark *) {
+html[data-theme="light"] :where([class*="bg-amber-950"], [class*="bg-amber-900"], [class*="bg-yellow-950"], [class*="bg-yellow-900"]):not(.keep-dark):not(.keep-dark *) {
   background-color: #fffbeb !important;
-  border-color: rgba(180, 83, 9, 0.32) !important;
+  border-color: rgba(180, 83, 9, 0.34) !important;
 }
-html[data-theme="light"] :where(.bg-cyan-950, .bg-cyan-950\/20, .bg-cyan-950\/25, .bg-cyan-950\/30, .bg-cyan-950\/40, .bg-cyan-950\/50, .bg-cyan-950\/60, .bg-cyan-950\/70, .bg-cyan-950\/80, .bg-cyan-900\/30, .bg-cyan-900\/40, .bg-cyan-900\/70, .hover\:bg-cyan-900\/70:hover):not(.keep-dark):not(.keep-dark *) {
+html[data-theme="light"] :where([class*="bg-cyan-950"], [class*="bg-cyan-900"], [class*="bg-teal-950"], [class*="bg-teal-900"]):not(.keep-dark):not(.keep-dark *) {
   background-color: #ecfeff !important;
-  border-color: rgba(8, 145, 178, 0.32) !important;
+  border-color: rgba(8, 145, 178, 0.34) !important;
 }
-html[data-theme="light"] :where(.bg-purple-950, .bg-purple-950\/20, .bg-purple-950\/25, .bg-purple-950\/30, .bg-purple-950\/40, .bg-purple-950\/50, .bg-purple-950\/60, .bg-purple-950\/70, .bg-purple-900\/30, .bg-purple-900\/40, .bg-indigo-950\/40, .bg-indigo-950\/50, .bg-indigo-950\/70):not(.keep-dark):not(.keep-dark *) {
-  background-color: #f5f3ff !important;
-  border-color: rgba(109, 40, 217, 0.28) !important;
+html[data-theme="light"] :where([class*="bg-purple-950"], [class*="bg-purple-900"], [class*="bg-violet-950"], [class*="bg-violet-900"], [class*="bg-indigo-950"], [class*="bg-indigo-900"]):not(.keep-dark):not(.keep-dark *) {
+  background-color: #f3e8ff !important;
+  border-color: rgba(109, 40, 217, 0.32) !important;
 }
-html[data-theme="light"] :where(.bg-red-950, .bg-red-950\/25, .bg-red-950\/30, .bg-red-950\/40, .bg-red-950\/50, .bg-red-950\/60, .bg-red-950\/70, .bg-red-900\/30, .bg-red-900\/40, .bg-rose-950\/40, .bg-rose-950\/50, .bg-rose-950\/60, .bg-rose-950\/70):not(.keep-dark):not(.keep-dark *) {
+html[data-theme="light"] :where([class*="bg-red-950"], [class*="bg-red-900"], [class*="bg-rose-950"], [class*="bg-rose-900"]):not(.keep-dark):not(.keep-dark *) {
   background-color: #fef2f2 !important;
-  border-color: rgba(185, 28, 28, 0.28) !important;
+  border-color: rgba(185, 28, 28, 0.32) !important;
 }
-html[data-theme="light"] :where(.bg-blue-950, .bg-blue-950\/25, .bg-blue-950\/30, .bg-blue-950\/40, .bg-blue-950\/50, .bg-blue-950\/70, .bg-sky-950\/40, .bg-sky-950\/70):not(.keep-dark):not(.keep-dark *) {
+html[data-theme="light"] :where([class*="bg-blue-950"], [class*="bg-blue-900"], [class*="bg-sky-950"], [class*="bg-sky-900"]):not(.keep-dark):not(.keep-dark *) {
   background-color: #eff6ff !important;
-  border-color: rgba(29, 78, 216, 0.28) !important;
+  border-color: rgba(29, 78, 216, 0.32) !important;
 }
 
 /* 5. Inputs, Selects & Focus en Mode Clair */

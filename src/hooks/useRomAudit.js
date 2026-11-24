@@ -20,10 +20,7 @@ export function useRomAudit() {
       let files = [];
       let biosFound = false;
 
-      // 0. Synchroniser le dossier local (si lié et autorisé) puis lister les ROMs IndexedDB
-      try {
-        await romStorage.syncWithDirectory(null, true);
-      } catch (syncErr) {}
+      // 0. Récupérer d'abord les ROMs et BIOS sauvegardés localement (IndexedDB + dossier lié)
       try {
         const idbRoms = await romStorage.listSavedRoms();
         if (Array.isArray(idbRoms)) {

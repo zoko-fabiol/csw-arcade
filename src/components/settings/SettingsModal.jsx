@@ -33,7 +33,7 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import { getPlayerIdentity, setPlayerDisplayName } from '../../services/firebaseFightcadeService';
-import { formatBytes, getPlatformCacheStats, listCachedRoms, removeCachedRom } from '../../services/platformRomService';
+import { formatBytes, getPlatformCacheStats, listCachedRoms, removeCachedRom, transferAllCacheToDirectory } from '../../services/platformRomService';
 import { romStorage } from '../../services/romStorage';
 import { GamepadVisualizer } from './GamepadVisualizer';
 import { CONSOLE_CONTROL_PROFILES, getConsoleControlProfile } from '../../data/consoleControlProfiles';
@@ -95,7 +95,8 @@ const NAV_TABS = [
   { id: 'video', label: 'Affichage & CRT', short: 'Vidéo', desc: 'Shaders, Ratio & Stream', icon: Tv },
   { id: 'audio', label: 'Audio', short: 'Audio', desc: 'Volume & Sortie son', icon: Volume2 },
   { id: 'system', label: 'Système & BIOS', short: 'BIOS', desc: 'MVS/AES & Région', icon: Cpu },
-  { id: 'netplay', label: 'Salon & Cache', short: 'Salon', desc: 'CSW Arcade, P2P & ROMs', icon: Swords },
+  { id: 'storage', label: 'Stockage ROMs', short: 'ROMs', desc: 'Dossier partagé & Cache', icon: FolderOpen },
+  { id: 'netplay', label: 'Salon & Netplay', short: 'Salon', desc: 'CSW Arcade & P2P', icon: Swords },
 ];
 
 export function SettingsModal({
@@ -1333,7 +1334,11 @@ export function SettingsModal({
                   checked={settings?.netplay?.challengeSound ?? true}
                   onChange={(val) => updateNetplaySetting?.('challengeSound', val)}
                 />
+              </div>
+            )}
 
+            {activeTab === 'storage' && (
+              <div className="space-y-4">
                 {/* Gestion du cache IndexedDB */}
                 <div className="p-4 rounded-2xl bg-neutral-950/80 border border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div className="flex items-center gap-3">
@@ -1525,6 +1530,45 @@ export function SettingsModal({
                         }
                       }}
                     />
+
+                    {dirInfo.supported && dirInfo.configured && (cacheInfo.count > 0 || Number(arcadeStats.count) > 0) && (
+                      <button
+                        type="button"
+                        disabled={isSyncingRoms}
+                        onClick={async () => {
+                          setIsSyncingRoms(true);
+                          try {
+                            const res = await transferAllCacheToDirectory();
+                            const [pStats, aStats, info] = await Promise.all([
+                              getPlatformCacheStats(),
+                              romStorage.getStorageStats(),
+                              romStorage.getSavedDirectoryInfo(),
+                            ]);
+                            setCacheInfo(pStats);
+                            setArcadeStats(aStats);
+                            setDirInfo(info);
+                            onCacheCleared?.();
+                            if (res.failed > 0) {
+                              setInlineNotice(
+                                `${res.transferred} jeu(x) transféré(s) (${formatBytes(res.totalBytes)}), ${res.failed} échec(s) conservé(s) en cache.`
+                              );
+                            } else {
+                              setInlineNotice(
+                                `${res.transferred} jeu(x) transféré(s) vers « ${info.name} » (${formatBytes(res.totalBytes)}) et cache vidé.`
+                              );
+                            }
+                          } catch (err) {
+                            setInlineNotice(err?.message || 'Erreur lors du transfert vers le dossier.');
+                          } finally {
+                            setIsSyncingRoms(false);
+                          }
+                        }}
+                        className="arcade-focus-ring flex items-center justify-center gap-1.5 px-3.5 py-2 min-h-[42px] rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition-colors"
+                      >
+                        <FolderOpen className="w-3.5 h-3.5" aria-hidden="true" />
+                        <span>Transférer le cache vers le dossier &amp; vider</span>
+                      </button>
+                    )}
 
                     <button
                       type="button"

@@ -139,7 +139,7 @@ export const romStorage = {
 
     try {
       const db = await openDatabase();
-      return new Promise((resolve) => {
+      const idbData = await new Promise((resolve) => {
         const tx = db.transaction(STORE_NAME, 'readonly');
         const store = tx.objectStore(STORE_NAME);
         const req = store.get(cleanKey);
@@ -153,10 +153,12 @@ export const romStorage = {
         };
         req.onerror = () => resolve(null);
       });
+      if (idbData) return idbData;
     } catch (e) {
       console.warn('[romStorage] Erreur lecture IndexedDB:', e.message);
-      return null;
     }
+
+    return await this.readFileFromLinkedDirectory(cleanKey);
   },
 
   /**
@@ -173,9 +175,10 @@ export const romStorage = {
    * @returns {Promise<string[]>} liste des noms de fichiers (ex: ['aodk.zip', 'neogeo.zip'])
    */
   async listSavedRoms() {
+    const keys = new Set();
     try {
       const db = await openDatabase();
-      return new Promise((resolve) => {
+      const idbKeys = await new Promise((resolve) => {
         const tx = db.transaction(STORE_NAME, 'readonly');
         const store = tx.objectStore(STORE_NAME);
         const req = store.getAllKeys();
@@ -185,9 +188,28 @@ export const romStorage = {
         };
         req.onerror = () => resolve([]);
       });
+      idbKeys.forEach((k) => keys.add(k));
     } catch (e) {
-      return [];
+      // noop
     }
+
+    try {
+      const handle = await getStoredDirHandle();
+      if (handle) {
+        const perm = await handle.queryPermission({ mode: 'readwrite' });
+        if (perm === 'granted') {
+          for await (const [entryName, entryHandle] of handle.entries()) {
+            if (entryHandle.kind === 'file' && ROM_FILE_REGEX.test(entryName)) {
+              keys.add(entryName.toLowerCase().trim());
+            }
+          }
+        }
+      }
+    } catch (e) {
+      // noop
+    }
+
+    return Array.from(keys);
   },
 
   /**
@@ -318,6 +340,75 @@ export const romStorage = {
   async clearDirectory() {
     await setStoredDirHandle(null);
     return true;
+  },
+
+  /**
+   * Écrit un fichier arbitraire dans le dossier lié (si autorisé)
+   */
+  async writeFileToLinkedDirectory(filename, buffer) {
+    const handle = await getStoredDirHandle();
+    if (!handle || !filename || !buffer) return false;
+    const perm = await handle.queryPermission({ mode: 'readwrite' });
+    if (perm !== 'granted') return false;
+    const arrayBuffer = buffer.buffer
+      ? buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength)
+      : buffer;
+    return writeBufferToDir(handle, filename, arrayBuffer);
+  },
+
+  /**
+   * Lit un fichier depuis le dossier lié (si autorisé)
+   */
+  async readFileFromLinkedDirectory(filename) {
+    const handle = await getStoredDirHandle();
+    if (!handle || !filename) return null;
+    try {
+      const perm = await handle.queryPermission({ mode: 'readwrite' });
+      if (perm !== 'granted') return null;
+      const fileHandle = await handle.getFileHandle(filename);
+      const file = await fileHandle.getFile();
+      return await file.arrayBuffer();
+    } catch {
+      return null;
+    }
+  },
+
+  /**
+   * Lit le manifeste .csw-arcade-manifest.json du dossier lié
+   */
+  async readManifestFromLinkedDirectory() {
+    const buf = await this.readFileFromLinkedDirectory('.csw-arcade-manifest.json');
+    if (!buf) return {};
+    try {
+      const text = new TextDecoder().decode(buf);
+      const parsed = JSON.parse(text);
+      return parsed && typeof parsed === 'object' ? parsed : {};
+    } catch {
+      return {};
+    }
+  },
+
+  /**
+   * Enregistre le manifeste .csw-arcade-manifest.json dans le dossier lié
+   */
+  async writeManifestToLinkedDirectory(manifest) {
+    try {
+      const bytes = new TextEncoder().encode(JSON.stringify(manifest || {}, null, 2));
+      return await this.writeFileToLinkedDirectory('.csw-arcade-manifest.json', bytes);
+    } catch {
+      return false;
+    }
+  },
+
+  /**
+   * Vide toutes les ROMs du cache IndexedDB csw_arcade_roms_db
+   */
+  async clearAllIdbRoms() {
+    const keys = await this.listSavedRoms();
+    for (const key of keys) {
+      await this.deleteRom(key);
+    }
+    return keys.length;
   },
 
   /**

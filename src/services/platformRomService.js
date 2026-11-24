@@ -3,6 +3,7 @@
  */
 import { NINTENDO_CATALOG, PLAYSTATION_CATALOG, SEGA_CATALOG } from '../data/platformCatalogs';
 import fbneoMapping from '../data/fbneoMapping.json';
+import { romStorage } from './romStorage';
 
 const PLATFORM_IDB_NAME = 'csw_platform_roms_db';
 const PLATFORM_IDB_STORE = 'rom_files';
@@ -142,7 +143,22 @@ export async function getCachedRom(id) {
       req.onsuccess = () => resolve(req.result || null);
       req.onerror = () => resolve(null);
     });
-    if (!record) return null;
+    if (!record) {
+      // Fallback : vérifier dans le dossier ROMs lié (si autorisé)
+      const manifest = await romStorage.readManifestFromLinkedDirectory();
+      const meta = manifest?.[id];
+      if (meta?.filename) {
+        const dirBuffer = await romStorage.readFileFromLinkedDirectory(meta.filename);
+        if (dirBuffer && isValidRomBuffer(dirBuffer, meta.filename)) {
+          return {
+            ...meta,
+            data: dirBuffer,
+            size: dirBuffer.byteLength,
+          };
+        }
+      }
+      return null;
+    }
     const isLegacyArcadeCache =
       (record.core === 'mame2003_plus' ||
         record.core === 'fbneo' ||
@@ -243,6 +259,82 @@ export async function getPlatformCacheStats() {
     count: rows.length,
     totalBytes: rows.reduce((sum, r) => sum + (r.size || 0), 0),
   };
+}
+
+/**
+ * Transfère toutes les ROMs en cache (IndexedDB plateforme + Arcade) vers le dossier local lié,
+ * puis vide les caches IndexedDB pour libérer l'espace du navigateur.
+ */
+export async function transferAllCacheToDirectory() {
+  let dirInfo = await romStorage.getSavedDirectoryInfo();
+  if (!dirInfo.supported) {
+    throw new Error('Votre navigateur ne supporte pas le transfert direct vers un dossier.');
+  }
+  if (!dirInfo.configured) {
+    throw new Error('Veuillez d’abord sélectionner un dossier ROMs.');
+  }
+  if (dirInfo.permission !== 'granted') {
+    const auth = await romStorage.reauthorizeDirectory();
+    if (!auth.granted) {
+      throw new Error('Permission d’écriture refusée sur le dossier sélectionné.');
+    }
+  }
+
+  const manifest = await romStorage.readManifestFromLinkedDirectory();
+  const platformRows = await listCachedRoms();
+  const arcadeKeys = await romStorage.listSavedRoms();
+
+  let transferred = 0;
+  let failed = 0;
+  let totalBytes = 0;
+
+  // 1. Transfert des ROMs multi-plateformes (csw_platform_roms_db)
+  for (const row of platformRows) {
+    const record = await getCachedRom(row.id);
+    if (!record?.data) {
+      failed += 1;
+      continue;
+    }
+    const safeName = String(record.filename || `${row.id}.bin`)
+      .split(/[/\\]/)
+      .pop()
+      .trim();
+    const ok = await romStorage.writeFileToLinkedDirectory(safeName, record.data);
+    if (ok) {
+      manifest[row.id] = {
+        id: row.id,
+        title: record.title || row.id,
+        filename: safeName,
+        mode: record.mode || 'retro',
+        platform: record.platform || 'retro',
+        core: record.core || 'nes',
+        players: record.players || null,
+        supportsMultiplayer: typeof record.supportsMultiplayer === 'boolean' ? record.supportsMultiplayer : null,
+      };
+      transferred += 1;
+      totalBytes += record.data.byteLength || 0;
+      await removeCachedRom(row.id);
+    } else {
+      failed += 1;
+    }
+  }
+
+  // 2. Transfert des archives Arcade/NeoGeo (csw_arcade_roms_db)
+  for (const key of arcadeKeys) {
+    const buf = await romStorage.getRom(key);
+    if (!buf) continue;
+    const ok = await romStorage.writeFileToLinkedDirectory(key, buf);
+    if (ok) {
+      transferred += 1;
+      totalBytes += buf.byteLength || 0;
+      await romStorage.deleteRom(key);
+    } else {
+      failed += 1;
+    }
+  }
+
+  await romStorage.writeManifestToLinkedDirectory(manifest);
+  return { transferred, failed, totalBytes };
 }
 
 let jsZipPromise = null;
