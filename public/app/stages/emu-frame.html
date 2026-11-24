@@ -3419,6 +3419,16 @@
           const hasLocalCoreProxy = isFbneo ? true : await hasLocalCoreProxyPromise;
           window.EJS_player = '#game';
           window.EJS_core = normalizeEmuCore(msg.core);
+          const lowerEjsCore = String(window.EJS_core || '').toLowerCase();
+          const lowerTargetFile = String(targetFilename || '').toLowerCase();
+          const isCdImageFile = /\.(cue|chd|iso|ccd|m3u|toc)$/i.test(lowerTargetFile);
+          if (
+            ['segamd', 'genesis_plus_gx', 'picodrive', 'sega32x', 'segams', 'smsplus', 'segagg', 'pce', 'mednafen_pce'].includes(lowerEjsCore) &&
+            !isCdImageFile
+          ) {
+            // Empêche EmulatorJS de générer un faux .cue Sega CD pour les cartouches (.md, .bin, .gen, .smd, .sms, .gg, .pce)
+            window.EJS_disableCue = true;
+          }
           window.EJS_gameName = isFbneo ? shortKey.toUpperCase() : (msg.gameName || 'CSW Game');
           window.EJS_gameUrl = romBytes ? targetFilename : (msg.gameUrl || targetFilename);
           window.EJS_biosUrl = isFbneo ? 'neogeo.zip' : '';
