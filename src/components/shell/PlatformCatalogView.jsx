@@ -1167,25 +1167,25 @@ export function PlatformCatalogView({ mode, onLaunchStage, onCacheChanged, onJoi
                         </div>
                       </div>
                       <div
-                        className={`flex items-center gap-2 shrink-0 ${
-                          viewMode === 'list' ? 'w-full sm:w-[264px]' : 'flex-wrap'
+                        className={`flex items-center gap-1.5 shrink-0 flex-nowrap ${
+                          viewMode === 'list' ? 'w-full sm:w-[264px]' : 'w-full'
                         }`}
                       >
                         <button
                           type="button"
                           onClick={() => handleLaunchCached(item)}
-                          className="arcade-focus-ring flex-1 min-w-[92px] px-3 py-2 min-h-[44px] rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-black flex items-center justify-center gap-1.5 transition-all active:scale-[0.98]"
+                          className="arcade-focus-ring flex-1 min-w-0 px-2.5 py-2 min-h-[40px] rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-black flex items-center justify-center gap-1.5 transition-all active:scale-[0.98]"
                         >
                           <Play className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
-                          <span>Lancer</span>
+                          <span className="truncate">Lancer</span>
                         </button>
                         {onJoinChannel && matchedEntry && cachedBadge.isMultiplayer && (
                           <button
                             type="button"
                             onClick={() => onJoinChannel(matchedEntry)}
                             title="Rejoindre le salon CSW Arcade"
-                            className={`arcade-focus-ring px-3 py-2 min-h-[44px] rounded-xl bg-purple-500/20 hover:bg-purple-500/35 border border-purple-400/45 text-purple-100 text-xs font-bold flex items-center justify-center gap-1.5 transition-colors shrink-0 ${
-                              viewMode === 'list' ? 'sm:w-[92px]' : ''
+                            className={`arcade-focus-ring px-2.5 py-2 min-h-[40px] rounded-xl bg-purple-500/20 hover:bg-purple-500/35 border border-purple-400/45 text-purple-100 text-xs font-bold flex items-center justify-center gap-1 transition-colors shrink-0 ${
+                              viewMode === 'list' ? 'sm:w-[88px]' : ''
                             }`}
                           >
                             <Swords className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
@@ -1199,7 +1199,7 @@ export function PlatformCatalogView({ mode, onLaunchStage, onCacheChanged, onJoi
                             refreshCache();
                           }}
                           aria-label={`Supprimer ${displayTitle} du cache`}
-                          className="arcade-focus-ring p-2 min-w-[44px] min-h-[44px] rounded-xl bg-neutral-800/95 hover:bg-rose-950 border border-white/15 text-neutral-200 hover:text-rose-200 flex items-center justify-center transition-colors shrink-0"
+                          className="arcade-focus-ring p-2 w-[40px] h-[40px] rounded-xl bg-neutral-800/95 hover:bg-rose-950 border border-white/15 text-neutral-200 hover:text-rose-200 flex items-center justify-center transition-colors shrink-0"
                           title="Supprimer du cache"
                         >
                           <Trash2 className="w-4 h-4" aria-hidden="true" />
@@ -1309,15 +1309,15 @@ export function PlatformCatalogView({ mode, onLaunchStage, onCacheChanged, onJoi
                           </div>
                         </div>
                         <div
-                          className={`flex items-center gap-2 shrink-0 pt-0.5 ${
-                            viewMode === 'list' ? 'w-full sm:w-[216px]' : 'flex-wrap'
+                          className={`flex items-center gap-1.5 shrink-0 pt-0.5 flex-nowrap ${
+                            viewMode === 'list' ? 'w-full sm:w-[244px]' : 'w-full'
                           }`}
                         >
                           <button
                             type="button"
                             disabled={isBusy}
                             onClick={() => handleLaunchCatalogEntry(entry)}
-                            className={`arcade-focus-ring flex-1 min-w-[100px] px-3 py-2 min-h-[44px] rounded-xl text-xs font-black flex items-center justify-center gap-1.5 transition-all active:scale-[0.98] ${
+                            className={`arcade-focus-ring flex-1 min-w-0 px-2.5 py-2 min-h-[40px] rounded-xl text-xs font-black flex items-center justify-center gap-1.5 transition-all active:scale-[0.98] ${
                               isCached
                                 ? 'bg-emerald-500 hover:bg-emerald-400 text-black'
                                 : 'u-btn-primary disabled:opacity-50'
@@ -1333,7 +1333,7 @@ export function PlatformCatalogView({ mode, onLaunchStage, onCacheChanged, onJoi
                               onClick={() => handleLaunchCatalogEntry(entry, { autoLaunch: false })}
                               title="Télécharger en arrière-plan (multi-téléchargement)"
                               aria-label={`Télécharger ${entry.title} en arrière-plan`}
-                              className="arcade-focus-ring px-3 py-2 min-h-[44px] rounded-xl bg-neutral-800 hover:bg-neutral-700 border border-white/15 text-neutral-100 disabled:opacity-50 text-xs font-bold flex items-center justify-center gap-1 shrink-0 transition-colors"
+                              className="arcade-focus-ring p-2 w-[40px] h-[40px] rounded-xl bg-neutral-800 hover:bg-neutral-700 border border-white/15 text-neutral-100 disabled:opacity-50 text-xs font-bold flex items-center justify-center shrink-0 transition-colors"
                             >
                               <Download className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
                             </button>
@@ -1343,8 +1343,8 @@ export function PlatformCatalogView({ mode, onLaunchStage, onCacheChanged, onJoi
                               type="button"
                               onClick={() => onJoinChannel(entry)}
                               title="Rejoindre le salon CSW Arcade"
-                              className={`arcade-focus-ring px-3 py-2 min-h-[44px] rounded-xl bg-purple-500/20 hover:bg-purple-500/35 border border-purple-400/45 text-purple-100 text-xs font-bold flex items-center justify-center gap-1.5 transition-colors shrink-0 ${
-                                viewMode === 'list' ? 'sm:w-[96px]' : ''
+                              className={`arcade-focus-ring px-2.5 py-2 min-h-[40px] rounded-xl bg-purple-500/20 hover:bg-purple-500/35 border border-purple-400/45 text-purple-100 text-xs font-bold flex items-center justify-center gap-1 transition-colors shrink-0 ${
+                                viewMode === 'list' ? 'sm:w-[88px]' : ''
                               }`}
                             >
                               <Swords className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
