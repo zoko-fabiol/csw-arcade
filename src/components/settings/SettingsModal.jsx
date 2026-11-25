@@ -32,8 +32,17 @@ import {
   Upload,
   Download,
   RefreshCw,
+  Bell,
 } from 'lucide-react';
 import { getPlayerIdentity, setPlayerDisplayName } from '../../services/firebaseFightcadeService';
+import {
+  isPushSupported,
+  isPushEnabledPreference,
+  getPushPermission,
+  enablePushNotifications,
+  disablePushNotifications,
+  sendTestPushNotification,
+} from '../../services/pushNotificationService';
 import { formatBytes, getPlatformCacheStats, listCachedRoms, removeCachedRom, transferAllCacheToDirectory, restoreAllRomsFromDirectory } from '../../services/platformRomService';
 import { romStorage } from '../../services/romStorage';
 import { GamepadVisualizer } from './GamepadVisualizer';
@@ -129,6 +138,8 @@ export function SettingsModal({
   const [arcadeStats, setArcadeStats] = useState({ count: 0, totalMB: '0.0' });
   const [dirInfo, setDirInfo] = useState({ supported: false, configured: false, name: null, permission: 'none' });
   const [isSyncingRoms, setIsSyncingRoms] = useState(false);
+  const [pushEnabled, setPushEnabled] = useState(() => isPushEnabledPreference());
+  const [pushBusy, setPushBusy] = useState(false);
   const romImportInputRef = useRef(null);
   const [portalTarget, setPortalTarget] = useState(() => (typeof document !== 'undefined' ? document.body : null));
   const [controlSubTab, setControlSubTab] = useState('touch');
@@ -1366,6 +1377,82 @@ export function SettingsModal({
                   checked={settings?.netplay?.challengeSound ?? true}
                   onChange={(val) => updateNetplaySetting?.('challengeSound', val)}
                 />
+
+                {/* Notifications Web Push (Défis, Invitations & Messages Privés) */}
+                <div className="p-4 rounded-2xl bg-neutral-950/80 border border-white/10 space-y-3">
+                  <div className="flex items-center justify-between gap-3 flex-wrap">
+                    <div className="flex items-start gap-3 min-w-0">
+                      <div className="w-9 h-9 rounded-xl bg-amber-500/15 border border-amber-500/35 flex items-center justify-center shrink-0 mt-0.5">
+                        <Bell className="w-4 h-4 text-amber-400" aria-hidden="true" />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="font-bold text-white text-xs sm:text-[13px]">
+                          Notifications Push (Défis, Invitations &amp; Messages)
+                        </div>
+                        <div className="text-[11px] text-neutral-400 mt-0.5 leading-relaxed">
+                          {isPushSupported()
+                            ? `Statut : ${pushEnabled && getPushPermission() === 'granted' ? 'Activées sur cet appareil' : getPushPermission() === 'denied' ? 'Bloquées dans le navigateur' : 'Désactivées'}`
+                            : 'Notifications système non disponibles sur ce navigateur'}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      {pushEnabled && getPushPermission() === 'granted' && (
+                        <button
+                          type="button"
+                          disabled={pushBusy}
+                          onClick={async () => {
+                            setPushBusy(true);
+                            try {
+                              await sendTestPushNotification(getPlayerIdentity().uid);
+                              setInlineNotice('Notification Push de test envoyée !');
+                            } catch (err) {
+                              setInlineNotice(err?.message || 'Échec du test de notification.');
+                            } finally {
+                              setPushBusy(false);
+                            }
+                          }}
+                          className="arcade-focus-ring px-3 py-2 min-h-[38px] rounded-xl bg-neutral-800 hover:bg-neutral-700 border border-white/10 text-xs font-bold text-neutral-100 transition-colors"
+                        >
+                          Tester
+                        </button>
+                      )}
+
+                      <button
+                        type="button"
+                        disabled={pushBusy}
+                        onClick={async () => {
+                          setPushBusy(true);
+                          try {
+                            const uid = getPlayerIdentity().uid;
+                            if (pushEnabled && getPushPermission() === 'granted') {
+                              await disablePushNotifications(uid);
+                              setPushEnabled(false);
+                              setInlineNotice('Notifications Push désactivées sur cet appareil.');
+                            } else {
+                              await enablePushNotifications(uid);
+                              setPushEnabled(true);
+                              setInlineNotice('Notifications Push activées avec succès !');
+                            }
+                          } catch (err) {
+                            setPushEnabled(false);
+                            setInlineNotice(err?.message || 'Impossible d’activer les notifications Push.');
+                          } finally {
+                            setPushBusy(false);
+                          }
+                        }}
+                        className={`arcade-focus-ring px-3.5 py-2 min-h-[38px] rounded-xl text-xs font-bold border transition-all ${
+                          pushEnabled && getPushPermission() === 'granted'
+                            ? 'bg-emerald-500/20 border-emerald-500/45 text-emerald-200 hover:bg-emerald-500/30'
+                            : 'u-btn-primary'
+                        }`}
+                      >
+                        {pushEnabled && getPushPermission() === 'granted' ? 'Activées' : 'Activer'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
               </div>
             )}
 

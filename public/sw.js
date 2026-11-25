@@ -1,4 +1,4 @@
-const SHELL_CACHE_NAME = 'csw-arcade-shell-v30-netplay-ggpo-opt';
+const SHELL_CACHE_NAME = 'csw-arcade-shell-v31-web-push';
 const ENGINE_CACHE_NAME = 'csw-arcade-engine-v7';
 
 // Assets essentiels du moteur WebAssembly (FBNeo + EmulatorJS)
@@ -149,4 +149,56 @@ self.addEventListener('fetch', (event) => {
         .catch(() => caches.match(event.request))
     );
   }
+});
+
+// 3. NOTIFICATIONS WEB PUSH (Défis, Invitations Vocales/Groupe, Demandes d'amis & Messages Privés)
+self.addEventListener('push', (event) => {
+  let payload = {
+    title: 'CSW-Arcade',
+    body: 'Nouvelle notification en direct !',
+    icon: '/icons/icon-192.png',
+    badge: '/favicon.png',
+    tag: 'csw_push_default',
+    url: '/',
+    data: {},
+  };
+  if (event.data) {
+    try {
+      const parsed = event.data.json();
+      payload = { ...payload, ...parsed };
+    } catch {
+      payload.body = event.data.text() || payload.body;
+    }
+  }
+
+  event.waitUntil(
+    self.registration.showNotification(payload.title, {
+      body: payload.body,
+      icon: payload.icon || '/icons/icon-192.png',
+      badge: payload.badge || '/favicon.png',
+      tag: payload.tag || 'csw_push_default',
+      renotify: true,
+      vibrate: [120, 60, 120],
+      data: { url: payload.url || '/', ...(payload.data || {}) },
+    })
+  );
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const targetUrl = event.notification?.data?.url || '/';
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+      for (const client of clientList) {
+        if ('focus' in client) {
+          client.postMessage({ type: 'PUSH_NOTIFICATION_CLICK', data: event.notification.data || {} });
+          return client.focus();
+        }
+      }
+      if (self.clients.openWindow) {
+        return self.clients.openWindow(targetUrl);
+      }
+      return undefined;
+    })
+  );
 });

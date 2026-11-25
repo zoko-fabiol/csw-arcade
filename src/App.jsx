@@ -3,6 +3,7 @@ import { useSettings } from './hooks/useSettings';
 import { SettingsModal } from './components/settings/SettingsModal';
 import { useMobileNavigation, useOnlineStatus } from './hooks/useMobileNavigation';
 import { useGamepadNavigation } from './hooks/useGamepadNavigation';
+import { showBackgroundNotification, syncPushSubscriptionIfGranted } from './services/pushNotificationService';
 import {
   downloadAndCacheRom,
   formatBytes,
@@ -154,6 +155,11 @@ export default function App() {
     const unsub = voiceChatService.subscribe(setVoiceState);
     const unsubDm = voiceChatService.onDmEvent((ev) => {
       if (ev?.type === 'dm_message' && ev.message && ev.message.fromUid !== userProfileRef.current?.uid) {
+        showBackgroundNotification({
+          title: `💬 Message de ${ev.message.fromName || 'un ami'}`,
+          body: String(ev.message.text || '').slice(0, 100),
+          tag: `dm_${ev.message.fromUid}`,
+        });
         if (!isFriendsOpenRef.current) {
           setDmToast(ev.message);
           setTimeout(() => {
@@ -171,6 +177,7 @@ export default function App() {
   useEffect(() => {
     if (userProfile?.uid) {
       voiceChatService.connect(userProfile, settings?.voice);
+      syncPushSubscriptionIfGranted(userProfile.uid).catch(() => {});
     }
   }, [userProfile?.uid, userProfile?.displayName, userProfile?.photoURL]);
 
@@ -777,8 +784,14 @@ export default function App() {
         }
       }
       if (validList.length > 0) {
-        setIncomingChallenge(validList[0]);
+        const firstCh = validList[0];
+        setIncomingChallenge(firstCh);
         if (settings?.netplay?.challengeSound ?? true) playChallengeSound();
+        showBackgroundNotification({
+          title: `⚔️ Défi reçu de ${firstCh.fromName || 'un joueur'} !`,
+          body: `Viens l'affronter sur ${firstCh.gameTitle || 'CSW-Arcade'} !`,
+          tag: `challenge_${firstCh.challengeId || Date.now()}`,
+        });
       }
     });
     refreshPlatformCache();

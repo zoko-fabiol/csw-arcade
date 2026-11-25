@@ -8,6 +8,7 @@ import zlib from 'node:zlib';
 import crypto from 'node:crypto';
 import { supportsOnlineMultiplayer } from '../utils/gameCapabilities.js';
 import { LocalFirebaseStore } from './localFirebaseStore.js';
+import { WebPushHub } from './webPushHub.js';
 
 try {
   dns.setDefaultResultOrder('ipv4first');
@@ -905,6 +906,70 @@ export function setupNetplayHub(server) {
 
   // Répertoire joueurs & système d'amitié (persistance locale .csw-data/social-store.json + temps réel WS)
   const socialDir = path.resolve(process.cwd(), '.csw-data');
+  const webPushHub = new WebPushHub({ dataDir: socialDir });
+
+  // API Web Push VAPID (/api/push/vapid-public-key, /api/push/subscribe, /api/push/unsubscribe, /api/push/test)
+  server.middlewares.use('/api/push', (req, res) => {
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    if (req.method === 'OPTIONS') {
+      res.statusCode = 204;
+      return res.end();
+    }
+    const reqUrl = new URL(req.url || '/', 'http://localhost:3003');
+    const subPath = reqUrl.pathname.replace(/^\/?(?:api\/push)?\/?/i, '');
+
+    if (req.method === 'GET' && subPath === 'vapid-public-key') {
+      res.statusCode = 200;
+      return res.end(JSON.stringify({ ok: true, publicKey: webPushHub.getPublicKey() }));
+    }
+
+    if (req.method === 'POST') {
+      const chunks = [];
+      let size = 0;
+      req.on('data', (c) => {
+        size += c.length;
+        if (size < 65536) chunks.push(c);
+      });
+      req.on('end', async () => {
+        try {
+          const body = JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}');
+          if (subPath === 'subscribe') {
+            const ok = webPushHub.addSubscription(String(body.uid || ''), body.subscription);
+            res.statusCode = ok ? 200 : 400;
+            return res.end(JSON.stringify({ ok }));
+          }
+          if (subPath === 'unsubscribe') {
+            const ok = webPushHub.removeSubscription(String(body.uid || ''), String(body.endpoint || ''));
+            res.statusCode = 200;
+            return res.end(JSON.stringify({ ok }));
+          }
+          if (subPath === 'test') {
+            const uid = String(body.uid || '');
+            const out = await webPushHub.sendToUser(uid, {
+              title: '🔔 CSW-Arcade — Notifications actives',
+              body: 'Vous recevrez vos défis, invitations et messages en direct !',
+              tag: 'csw_test_push',
+              url: '/',
+            });
+            res.statusCode = 200;
+            return res.end(JSON.stringify({ ok: true, sent: out.sent }));
+          }
+          res.statusCode = 404;
+          return res.end(JSON.stringify({ ok: false, error: 'Route push inconnue' }));
+        } catch (err) {
+          res.statusCode = 400;
+          return res.end(JSON.stringify({ ok: false, error: err?.message || 'Erreur JSON push' }));
+        }
+      });
+      return;
+    }
+
+    res.statusCode = 404;
+    return res.end(JSON.stringify({ ok: false, error: 'Route push non trouvée' }));
+  });
   const socialStorePath = path.join(socialDir, 'social-store.json');
   const userDirectory = new Map(); // uid -> public user profile
   const friendships = new Map(); // uid -> Set<friendUid>
@@ -1061,6 +1126,21 @@ export function setupNetplayHub(server) {
   };
 
   const pushFriendWsEvent = (targetUid, eventPayload) => {
+    if (targetUid && eventPayload?.eventType === 'request_received') {
+      webPushHub.sendToUser(targetUid, {
+        title: '👥 Nouvelle demande d’ami',
+        body: `${eventPayload.fromName || 'Un joueur'} souhaite vous ajouter en ami sur CSW-Arcade.`,
+        tag: `friend_req_${eventPayload.fromUid || Date.now()}`,
+        url: '/',
+      }).catch(() => {});
+    } else if (targetUid && eventPayload?.eventType === 'request_accepted') {
+      webPushHub.sendToUser(targetUid, {
+        title: '✅ Demande d’ami acceptée',
+        body: `${eventPayload.byName || 'Votre ami'} a accepté votre invitation !`,
+        tag: `friend_acc_${eventPayload.byUid || Date.now()}`,
+        url: '/',
+      }).catch(() => {});
+    }
     const sockets = connectedUsers.get(targetUid);
     if (!sockets) return;
     const msg = JSON.stringify({ type: 'FRIEND_EVENT', ...eventPayload });
@@ -2261,6 +2341,7 @@ export function setupNetplayHub(server) {
             prof.roomId = roomId;
             broadcastVoiceRoom(roomId);
           }
+          const inviteTitle = String(msg.roomTitle || voiceRooms.get(roomId)?.title || `Groupe de ${prof.name}`);
           const delivered = pushToVoiceUser(toUid, {
             type: 'voice_invite_received',
             inviteId: `vinv_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
@@ -2268,10 +2349,16 @@ export function setupNetplayHub(server) {
             fromName: prof.name,
             fromPhotoURL: prof.photoURL || null,
             roomId,
-            roomTitle: String(msg.roomTitle || voiceRooms.get(roomId)?.title || `Groupe de ${prof.name}`),
+            roomTitle: inviteTitle,
             channel: msg.channel === 'game' ? 'game' : 'party',
             createdAtMs: Date.now(),
           });
+          webPushHub.sendToUser(toUid, {
+            title: `🎙️ Invitation de ${prof.name || 'un ami'}`,
+            body: `Rejoins « ${inviteTitle} » sur CSW-Arcade !`,
+            tag: `voice_inv_${roomId}`,
+            url: '/',
+          }).catch(() => {});
           sendVoiceJson(ws, {
             type: 'voice_invite_sent',
             toUid,
@@ -2437,6 +2524,14 @@ export function setupNetplayHub(server) {
           const recipientUnread = computeUnreadByPeer(toUid);
           pushToVoiceUser(toUid, { type: 'dm_message', message: msgObj, ...recipientUnread });
           pushToVoiceUser(fromUid, { type: 'dm_message', message: msgObj, ...computeUnreadByPeer(fromUid) });
+          if (toUid && toUid !== fromUid) {
+            webPushHub.sendToUser(toUid, {
+              title: `💬 Message de ${msgObj.fromName || 'un ami'}`,
+              body: String(msgObj.text || '').slice(0, 100),
+              tag: `dm_${fromUid}`,
+              url: '/',
+            }).catch(() => {});
+          }
 
           res.statusCode = 200;
           return res.end(JSON.stringify({ ok: true, message: msgObj }));
@@ -3124,6 +3219,14 @@ export function setupNetplayHub(server) {
                 updatedAtMs: Date.now(),
               });
               const targetUid = challenge.toUid;
+              if (targetUid) {
+                webPushHub.sendToUser(targetUid, {
+                  title: `⚔️ Défi reçu de ${challenge.fromName || 'un joueur'} !`,
+                  body: `Viens l'affronter sur ${challenge.gameTitle || 'CSW-Arcade'} !`,
+                  tag: `challenge_${challenge.challengeId}`,
+                  url: '/',
+                }).catch(() => {});
+              }
               const sockets = connectedUsers.get(targetUid);
               if (sockets) {
                 const msg = JSON.stringify({ type: 'INCOMING_CHALLENGE', challenge });
