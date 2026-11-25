@@ -14,20 +14,110 @@
       ".iso"
     ],
     "engine": "emulatorjs:psp",
-    "estimatedSize": "680 Mo",
+    "estimatedSize": "820 Mo",
     "filename": "Pro Evolution Soccer 6 (Europe).cso",
     "urls": [
-      "https://archive.org/cors/sony_psp_cso_usa/Pro%20Evolution%20Soccer%206%20(Europe).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony_psp_cso_usa%2FPro%2520Evolution%2520Soccer%25206%2520(Europe).cso",
-      "https://archive.org/download/sony_psp_cso_usa/Pro%20Evolution%20Soccer%206%20(Europe).cso",
       "https://archive.org/cors/psp-cso-collection/Pro%20Evolution%20Soccer%206%20(Europe).cso",
       "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fpsp-cso-collection%2FPro%2520Evolution%2520Soccer%25206%2520(Europe).cso",
-      "https://archive.org/download/psp-cso-collection/Pro%20Evolution%20Soccer%206%20(Europe).cso",
-      "https://archive.org/cors/sony-psp-cso-collection/Pro%20Evolution%20Soccer%206%20(Europe).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony-psp-cso-collection%2FPro%2520Evolution%2520Soccer%25206%2520(Europe).cso",
-      "https://archive.org/download/sony-psp-cso-collection/Pro%20Evolution%20Soccer%206%20(Europe).cso"
+      "https://archive.org/download/psp-cso-collection/Pro%20Evolution%20Soccer%206%20(Europe).cso"
     ],
-    "description": "Football / Sport sur PlayStation Portable (680 Mo · PPSSPP WebAssembly)."
+    "description": "Football / Sport sur PlayStation Portable (820 Mo · PPSSPP WebAssembly)."
+  },
+  {
+    "id": "psp-pro-evolution-soccer-2008",
+    "title": "Pro Evolution Soccer 2008",
+    "platform": "psp",
+    "platformLabel": "PSP",
+    "core": "psp",
+    "year": 2007,
+    "genre": "Football / Sport",
+    "players": "1–2J",
+    "supportsMultiplayer": false,
+    "formats": [
+      ".cso",
+      ".iso"
+    ],
+    "engine": "emulatorjs:psp",
+    "estimatedSize": "913 Mo",
+    "filename": "Pro Evolution Soccer 2008 (USA).cso",
+    "urls": [
+      "https://archive.org/cors/psp-cso-collection/Pro%20Evolution%20Soccer%202008%20(USA).cso",
+      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fpsp-cso-collection%2FPro%2520Evolution%2520Soccer%25202008%2520(USA).cso",
+      "https://archive.org/download/psp-cso-collection/Pro%20Evolution%20Soccer%202008%20(USA).cso"
+    ],
+    "description": "Football / Sport sur PlayStation Portable (913 Mo · PPSSPP WebAssembly)."
+  },
+  {
+    "id": "psp-pro-evolution-soccer-2009",
+    "title": "Pro Evolution Soccer 2009",
+    "platform": "psp",
+    "platformLabel": "PSP",
+    "core": "psp",
+    "year": 2008,
+    "genre": "Football / Sport",
+    "players": "1–2J",
+    "supportsMultiplayer": false,
+    "formats": [
+      ".cso",
+      ".iso"
+    ],
+    "engine": "emulatorjs:psp",
+    "estimatedSize": "979 Mo",
+    "filename": "Pro Evolution Soccer 2009 (USA).cso",
+    "urls": [
+      "https://archive.org/cors/psp-cso-collection/Pro%20Evolution%20Soccer%202009%20(USA).cso",
+      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fpsp-cso-collection%2FPro%2520Evolution%2520Soccer%25202009%2520(USA).cso",
+      "https://archive.org/download/psp-cso-collection/Pro%20Evolution%20Soccer%202009%20(USA).cso"
+    ],
+    "description": "Football / Sport sur PlayStation Portable (979 Mo · PPSSPP WebAssembly)."
+  },
+  {
+    "id": "psp-pro-evolution-soccer-2010",
+    "title": "Pro Evolution Soccer 2010",
+    "platform": "psp",
+    "platformLabel": "PSP",
+    "core": "psp",
+    "year": 2009,
+    "genre": "Football / Sport",
+    "players": "1–2J",
+    "supportsMultiplayer": false,
+    "formats": [
+      ".cso",
+      ".iso"
+    ],
+    "engine": "emulatorjs:psp",
+    "estimatedSize": "865 Mo",
+    "filename": "Pro Evolution Soccer 2010 (USA).cso",
+    "urls": [
+      "https://archive.org/cors/psp-cso-collection/Pro%20Evolution%20Soccer%202010%20(USA).cso",
+      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fpsp-cso-collection%2FPro%2520Evolution%2520Soccer%25202010%2520(USA).cso",
+      "https://archive.org/download/psp-cso-collection/Pro%20Evolution%20Soccer%202010%20(USA).cso"
+    ],
+    "description": "Football / Sport sur PlayStation Portable (865 Mo · PPSSPP WebAssembly)."
+  },
+  {
+    "id": "psp-pro-evolution-soccer-2011",
+    "title": "Pro Evolution Soccer 2011",
+    "platform": "psp",
+    "platformLabel": "PSP",
+    "core": "psp",
+    "year": 2010,
+    "genre": "Football / Sport",
+    "players": "1–2J",
+    "supportsMultiplayer": false,
+    "formats": [
+      ".cso",
+      ".iso"
+    ],
+    "engine": "emulatorjs:psp",
+    "estimatedSize": "1.26 Go",
+    "filename": "Pro Evolution Soccer 2011 (USA).cso",
+    "urls": [
+      "https://archive.org/cors/psp-cso-collection/Pro%20Evolution%20Soccer%202011%20(USA).cso",
+      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fpsp-cso-collection%2FPro%2520Evolution%2520Soccer%25202011%2520(USA).cso",
+      "https://archive.org/download/psp-cso-collection/Pro%20Evolution%20Soccer%202011%20(USA).cso"
+    ],
+    "description": "Football / Sport sur PlayStation Portable (1.26 Go · PPSSPP WebAssembly)."
   },
   {
     "id": "psp-pro-evolution-soccer-2012",
@@ -44,20 +134,14 @@
       ".iso"
     ],
     "engine": "emulatorjs:psp",
-    "estimatedSize": "920 Mo",
-    "filename": "Pro Evolution Soccer 2012 (Europe).cso",
+    "estimatedSize": "1.60 Go",
+    "filename": "Pro Evolution Soccer 2012 (USA).cso",
     "urls": [
-      "https://archive.org/cors/sony_psp_cso_usa/Pro%20Evolution%20Soccer%202012%20(Europe).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony_psp_cso_usa%2FPro%2520Evolution%2520Soccer%25202012%2520(Europe).cso",
-      "https://archive.org/download/sony_psp_cso_usa/Pro%20Evolution%20Soccer%202012%20(Europe).cso",
-      "https://archive.org/cors/psp-cso-collection/Pro%20Evolution%20Soccer%202012%20(Europe).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fpsp-cso-collection%2FPro%2520Evolution%2520Soccer%25202012%2520(Europe).cso",
-      "https://archive.org/download/psp-cso-collection/Pro%20Evolution%20Soccer%202012%20(Europe).cso",
-      "https://archive.org/cors/sony-psp-cso-collection/Pro%20Evolution%20Soccer%202012%20(Europe).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony-psp-cso-collection%2FPro%2520Evolution%2520Soccer%25202012%2520(Europe).cso",
-      "https://archive.org/download/sony-psp-cso-collection/Pro%20Evolution%20Soccer%202012%20(Europe).cso"
+      "https://archive.org/cors/psp-cso-collection/Pro%20Evolution%20Soccer%202012%20(USA).cso",
+      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fpsp-cso-collection%2FPro%2520Evolution%2520Soccer%25202012%2520(USA).cso",
+      "https://archive.org/download/psp-cso-collection/Pro%20Evolution%20Soccer%202012%20(USA).cso"
     ],
-    "description": "Football / Sport sur PlayStation Portable (920 Mo · PPSSPP WebAssembly)."
+    "description": "Football / Sport sur PlayStation Portable (1.60 Go · PPSSPP WebAssembly)."
   },
   {
     "id": "psp-pro-evolution-soccer-2013",
@@ -74,20 +158,14 @@
       ".iso"
     ],
     "engine": "emulatorjs:psp",
-    "estimatedSize": "980 Mo",
-    "filename": "Pro Evolution Soccer 2013 (Europe).cso",
+    "estimatedSize": "1.48 Go",
+    "filename": "Pro Evolution Soccer 2013 (USA).cso",
     "urls": [
-      "https://archive.org/cors/sony_psp_cso_usa/Pro%20Evolution%20Soccer%202013%20(Europe).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony_psp_cso_usa%2FPro%2520Evolution%2520Soccer%25202013%2520(Europe).cso",
-      "https://archive.org/download/sony_psp_cso_usa/Pro%20Evolution%20Soccer%202013%20(Europe).cso",
-      "https://archive.org/cors/psp-cso-collection/Pro%20Evolution%20Soccer%202013%20(Europe).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fpsp-cso-collection%2FPro%2520Evolution%2520Soccer%25202013%2520(Europe).cso",
-      "https://archive.org/download/psp-cso-collection/Pro%20Evolution%20Soccer%202013%20(Europe).cso",
-      "https://archive.org/cors/sony-psp-cso-collection/Pro%20Evolution%20Soccer%202013%20(Europe).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony-psp-cso-collection%2FPro%2520Evolution%2520Soccer%25202013%2520(Europe).cso",
-      "https://archive.org/download/sony-psp-cso-collection/Pro%20Evolution%20Soccer%202013%20(Europe).cso"
+      "https://archive.org/cors/psp-cso-collection/Pro%20Evolution%20Soccer%202013%20(USA).cso",
+      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fpsp-cso-collection%2FPro%2520Evolution%2520Soccer%25202013%2520(USA).cso",
+      "https://archive.org/download/psp-cso-collection/Pro%20Evolution%20Soccer%202013%20(USA).cso"
     ],
-    "description": "Football / Sport sur PlayStation Portable (980 Mo · PPSSPP WebAssembly)."
+    "description": "Football / Sport sur PlayStation Portable (1.48 Go · PPSSPP WebAssembly)."
   },
   {
     "id": "psp-pro-evolution-soccer-2014",
@@ -104,20 +182,14 @@
       ".iso"
     ],
     "engine": "emulatorjs:psp",
-    "estimatedSize": "1.0 Go",
-    "filename": "Pro Evolution Soccer 2014 (Europe).cso",
+    "estimatedSize": "1.36 Go",
+    "filename": "Pro Evolution Soccer 2014 (USA).cso",
     "urls": [
-      "https://archive.org/cors/sony_psp_cso_usa/Pro%20Evolution%20Soccer%202014%20(Europe).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony_psp_cso_usa%2FPro%2520Evolution%2520Soccer%25202014%2520(Europe).cso",
-      "https://archive.org/download/sony_psp_cso_usa/Pro%20Evolution%20Soccer%202014%20(Europe).cso",
-      "https://archive.org/cors/psp-cso-collection/Pro%20Evolution%20Soccer%202014%20(Europe).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fpsp-cso-collection%2FPro%2520Evolution%2520Soccer%25202014%2520(Europe).cso",
-      "https://archive.org/download/psp-cso-collection/Pro%20Evolution%20Soccer%202014%20(Europe).cso",
-      "https://archive.org/cors/sony-psp-cso-collection/Pro%20Evolution%20Soccer%202014%20(Europe).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony-psp-cso-collection%2FPro%2520Evolution%2520Soccer%25202014%2520(Europe).cso",
-      "https://archive.org/download/sony-psp-cso-collection/Pro%20Evolution%20Soccer%202014%20(Europe).cso"
+      "https://archive.org/cors/psp-cso-collection/Pro%20Evolution%20Soccer%202014%20(USA).cso",
+      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fpsp-cso-collection%2FPro%2520Evolution%2520Soccer%25202014%2520(USA).cso",
+      "https://archive.org/download/psp-cso-collection/Pro%20Evolution%20Soccer%202014%20(USA).cso"
     ],
-    "description": "Football / Sport sur PlayStation Portable (1.0 Go · PPSSPP WebAssembly)."
+    "description": "Football / Sport sur PlayStation Portable (1.36 Go · PPSSPP WebAssembly)."
   },
   {
     "id": "psp-fifa-street-2",
@@ -134,20 +206,14 @@
       ".iso"
     ],
     "engine": "emulatorjs:psp",
-    "estimatedSize": "210 Mo",
+    "estimatedSize": "219 Mo",
     "filename": "FIFA Street 2 (USA).cso",
     "urls": [
-      "https://archive.org/cors/sony_psp_cso_usa/FIFA%20Street%202%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony_psp_cso_usa%2FFIFA%2520Street%25202%2520(USA).cso",
-      "https://archive.org/download/sony_psp_cso_usa/FIFA%20Street%202%20(USA).cso",
       "https://archive.org/cors/psp-cso-collection/FIFA%20Street%202%20(USA).cso",
       "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fpsp-cso-collection%2FFIFA%2520Street%25202%2520(USA).cso",
-      "https://archive.org/download/psp-cso-collection/FIFA%20Street%202%20(USA).cso",
-      "https://archive.org/cors/sony-psp-cso-collection/FIFA%20Street%202%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony-psp-cso-collection%2FFIFA%2520Street%25202%2520(USA).cso",
-      "https://archive.org/download/sony-psp-cso-collection/FIFA%20Street%202%20(USA).cso"
+      "https://archive.org/download/psp-cso-collection/FIFA%20Street%202%20(USA).cso"
     ],
-    "description": "Football / Arcade sur PlayStation Portable (210 Mo · PPSSPP WebAssembly)."
+    "description": "Football / Arcade sur PlayStation Portable (219 Mo · PPSSPP WebAssembly)."
   },
   {
     "id": "psp-fifa-10",
@@ -164,20 +230,38 @@
       ".iso"
     ],
     "engine": "emulatorjs:psp",
-    "estimatedSize": "780 Mo",
-    "filename": "FIFA Soccer 10 (USA).cso",
+    "estimatedSize": "1.21 Go",
+    "filename": "FIFA Soccer '10 (USA).cso",
     "urls": [
-      "https://archive.org/cors/sony_psp_cso_usa/FIFA%20Soccer%2010%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony_psp_cso_usa%2FFIFA%2520Soccer%252010%2520(USA).cso",
-      "https://archive.org/download/sony_psp_cso_usa/FIFA%20Soccer%2010%20(USA).cso",
-      "https://archive.org/cors/psp-cso-collection/FIFA%20Soccer%2010%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fpsp-cso-collection%2FFIFA%2520Soccer%252010%2520(USA).cso",
-      "https://archive.org/download/psp-cso-collection/FIFA%20Soccer%2010%20(USA).cso",
-      "https://archive.org/cors/sony-psp-cso-collection/FIFA%20Soccer%2010%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony-psp-cso-collection%2FFIFA%2520Soccer%252010%2520(USA).cso",
-      "https://archive.org/download/sony-psp-cso-collection/FIFA%20Soccer%2010%20(USA).cso"
+      "https://archive.org/cors/psp-cso-collection/FIFA%20Soccer%20'10%20(USA).cso",
+      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fpsp-cso-collection%2FFIFA%2520Soccer%2520'10%2520(USA).cso",
+      "https://archive.org/download/psp-cso-collection/FIFA%20Soccer%20'10%20(USA).cso"
     ],
-    "description": "Football / Sport sur PlayStation Portable (780 Mo · PPSSPP WebAssembly)."
+    "description": "Football / Sport sur PlayStation Portable (1.21 Go · PPSSPP WebAssembly)."
+  },
+  {
+    "id": "psp-fifa-11",
+    "title": "FIFA 11",
+    "platform": "psp",
+    "platformLabel": "PSP",
+    "core": "psp",
+    "year": 2010,
+    "genre": "Football / Sport",
+    "players": "1–2J",
+    "supportsMultiplayer": false,
+    "formats": [
+      ".cso",
+      ".iso"
+    ],
+    "engine": "emulatorjs:psp",
+    "estimatedSize": "1.22 Go",
+    "filename": "FIFA Soccer '11 (USA).cso",
+    "urls": [
+      "https://archive.org/cors/psp-cso-collection/FIFA%20Soccer%20'11%20(USA).cso",
+      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fpsp-cso-collection%2FFIFA%2520Soccer%2520'11%2520(USA).cso",
+      "https://archive.org/download/psp-cso-collection/FIFA%20Soccer%20'11%20(USA).cso"
+    ],
+    "description": "Football / Sport sur PlayStation Portable (1.22 Go · PPSSPP WebAssembly)."
   },
   {
     "id": "psp-fifa-12",
@@ -194,20 +278,38 @@
       ".iso"
     ],
     "engine": "emulatorjs:psp",
-    "estimatedSize": "850 Mo",
-    "filename": "FIFA Soccer 12 (USA).cso",
+    "estimatedSize": "1.14 Go",
+    "filename": "FIFA Soccer '12 (USA).cso",
     "urls": [
-      "https://archive.org/cors/sony_psp_cso_usa/FIFA%20Soccer%2012%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony_psp_cso_usa%2FFIFA%2520Soccer%252012%2520(USA).cso",
-      "https://archive.org/download/sony_psp_cso_usa/FIFA%20Soccer%2012%20(USA).cso",
-      "https://archive.org/cors/psp-cso-collection/FIFA%20Soccer%2012%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fpsp-cso-collection%2FFIFA%2520Soccer%252012%2520(USA).cso",
-      "https://archive.org/download/psp-cso-collection/FIFA%20Soccer%2012%20(USA).cso",
-      "https://archive.org/cors/sony-psp-cso-collection/FIFA%20Soccer%2012%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony-psp-cso-collection%2FFIFA%2520Soccer%252012%2520(USA).cso",
-      "https://archive.org/download/sony-psp-cso-collection/FIFA%20Soccer%2012%20(USA).cso"
+      "https://archive.org/cors/psp-cso-collection/FIFA%20Soccer%20'12%20(USA).cso",
+      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fpsp-cso-collection%2FFIFA%2520Soccer%2520'12%2520(USA).cso",
+      "https://archive.org/download/psp-cso-collection/FIFA%20Soccer%20'12%20(USA).cso"
     ],
-    "description": "Football / Sport sur PlayStation Portable (850 Mo · PPSSPP WebAssembly)."
+    "description": "Football / Sport sur PlayStation Portable (1.14 Go · PPSSPP WebAssembly)."
+  },
+  {
+    "id": "psp-fifa-13",
+    "title": "FIFA 13",
+    "platform": "psp",
+    "platformLabel": "PSP",
+    "core": "psp",
+    "year": 2012,
+    "genre": "Football / Sport",
+    "players": "1–2J",
+    "supportsMultiplayer": false,
+    "formats": [
+      ".cso",
+      ".iso"
+    ],
+    "engine": "emulatorjs:psp",
+    "estimatedSize": "1.16 Go",
+    "filename": "FIFA Soccer '13 (USA).cso",
+    "urls": [
+      "https://archive.org/cors/psp-cso-collection/FIFA%20Soccer%20'13%20(USA).cso",
+      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fpsp-cso-collection%2FFIFA%2520Soccer%2520'13%2520(USA).cso",
+      "https://archive.org/download/psp-cso-collection/FIFA%20Soccer%20'13%20(USA).cso"
+    ],
+    "description": "Football / Sport sur PlayStation Portable (1.16 Go · PPSSPP WebAssembly)."
   },
   {
     "id": "psp-fifa-14",
@@ -224,20 +326,38 @@
       ".iso"
     ],
     "engine": "emulatorjs:psp",
-    "estimatedSize": "960 Mo",
-    "filename": "FIFA 14 - Legacy Edition (Europe).cso",
+    "estimatedSize": "1.10 Go",
+    "filename": "FIFA Soccer '14 (USA).cso",
     "urls": [
-      "https://archive.org/cors/sony_psp_cso_usa/FIFA%2014%20-%20Legacy%20Edition%20(Europe).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony_psp_cso_usa%2FFIFA%252014%2520-%2520Legacy%2520Edition%2520(Europe).cso",
-      "https://archive.org/download/sony_psp_cso_usa/FIFA%2014%20-%20Legacy%20Edition%20(Europe).cso",
-      "https://archive.org/cors/psp-cso-collection/FIFA%2014%20-%20Legacy%20Edition%20(Europe).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fpsp-cso-collection%2FFIFA%252014%2520-%2520Legacy%2520Edition%2520(Europe).cso",
-      "https://archive.org/download/psp-cso-collection/FIFA%2014%20-%20Legacy%20Edition%20(Europe).cso",
-      "https://archive.org/cors/sony-psp-cso-collection/FIFA%2014%20-%20Legacy%20Edition%20(Europe).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony-psp-cso-collection%2FFIFA%252014%2520-%2520Legacy%2520Edition%2520(Europe).cso",
-      "https://archive.org/download/sony-psp-cso-collection/FIFA%2014%20-%20Legacy%20Edition%20(Europe).cso"
+      "https://archive.org/cors/psp-cso-collection/FIFA%20Soccer%20'14%20(USA).cso",
+      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fpsp-cso-collection%2FFIFA%2520Soccer%2520'14%2520(USA).cso",
+      "https://archive.org/download/psp-cso-collection/FIFA%20Soccer%20'14%20(USA).cso"
     ],
-    "description": "Football / Sport sur PlayStation Portable (960 Mo · PPSSPP WebAssembly)."
+    "description": "Football / Sport sur PlayStation Portable (1.10 Go · PPSSPP WebAssembly)."
+  },
+  {
+    "id": "psp-fifa-world-cup-south-africa-2010",
+    "title": "FIFA World Cup South Africa 2010",
+    "platform": "psp",
+    "platformLabel": "PSP",
+    "core": "psp",
+    "year": 2010,
+    "genre": "Football / Sport",
+    "players": "1–2J",
+    "supportsMultiplayer": false,
+    "formats": [
+      ".cso",
+      ".iso"
+    ],
+    "engine": "emulatorjs:psp",
+    "estimatedSize": "1.10 Go",
+    "filename": "FIFA World Cup - South Africa 2010 (USA).cso",
+    "urls": [
+      "https://archive.org/cors/psp-cso-collection/FIFA%20World%20Cup%20-%20South%20Africa%202010%20(USA).cso",
+      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fpsp-cso-collection%2FFIFA%2520World%2520Cup%2520-%2520South%2520Africa%25202010%2520(USA).cso",
+      "https://archive.org/download/psp-cso-collection/FIFA%20World%20Cup%20-%20South%20Africa%202010%20(USA).cso"
+    ],
+    "description": "Football / Sport sur PlayStation Portable (1.10 Go · PPSSPP WebAssembly)."
   },
   {
     "id": "psp-nba-street-showdown",
@@ -254,20 +374,14 @@
       ".iso"
     ],
     "engine": "emulatorjs:psp",
-    "estimatedSize": "290 Mo",
+    "estimatedSize": "296 Mo",
     "filename": "NBA Street Showdown (USA).cso",
     "urls": [
-      "https://archive.org/cors/sony_psp_cso_usa/NBA%20Street%20Showdown%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony_psp_cso_usa%2FNBA%2520Street%2520Showdown%2520(USA).cso",
-      "https://archive.org/download/sony_psp_cso_usa/NBA%20Street%20Showdown%20(USA).cso",
       "https://archive.org/cors/psp-cso-collection/NBA%20Street%20Showdown%20(USA).cso",
       "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fpsp-cso-collection%2FNBA%2520Street%2520Showdown%2520(USA).cso",
-      "https://archive.org/download/psp-cso-collection/NBA%20Street%20Showdown%20(USA).cso",
-      "https://archive.org/cors/sony-psp-cso-collection/NBA%20Street%20Showdown%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony-psp-cso-collection%2FNBA%2520Street%2520Showdown%2520(USA).cso",
-      "https://archive.org/download/sony-psp-cso-collection/NBA%20Street%20Showdown%20(USA).cso"
+      "https://archive.org/download/psp-cso-collection/NBA%20Street%20Showdown%20(USA).cso"
     ],
-    "description": "Sport / Basket sur PlayStation Portable (290 Mo · PPSSPP WebAssembly)."
+    "description": "Sport / Basket sur PlayStation Portable (296 Mo · PPSSPP WebAssembly)."
   },
   {
     "id": "psp-virtua-tennis-world-tour",
@@ -284,20 +398,17 @@
       ".iso"
     ],
     "engine": "emulatorjs:psp",
-    "estimatedSize": "240 Mo",
+    "estimatedSize": "179 Mo",
     "filename": "Virtua Tennis - World Tour (USA).cso",
     "urls": [
-      "https://archive.org/cors/sony_psp_cso_usa/Virtua%20Tennis%20-%20World%20Tour%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony_psp_cso_usa%2FVirtua%2520Tennis%2520-%2520World%2520Tour%2520(USA).cso",
-      "https://archive.org/download/sony_psp_cso_usa/Virtua%20Tennis%20-%20World%20Tour%20(USA).cso",
       "https://archive.org/cors/psp-cso-collection/Virtua%20Tennis%20-%20World%20Tour%20(USA).cso",
       "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fpsp-cso-collection%2FVirtua%2520Tennis%2520-%2520World%2520Tour%2520(USA).cso",
       "https://archive.org/download/psp-cso-collection/Virtua%20Tennis%20-%20World%20Tour%20(USA).cso",
-      "https://archive.org/cors/sony-psp-cso-collection/Virtua%20Tennis%20-%20World%20Tour%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony-psp-cso-collection%2FVirtua%2520Tennis%2520-%2520World%2520Tour%2520(USA).cso",
-      "https://archive.org/download/sony-psp-cso-collection/Virtua%20Tennis%20-%20World%20Tour%20(USA).cso"
+      "https://archive.org/cors/ultimate-rom-collection/PSP/Virtua%20Tennis%20-%20World%20Tour%20(USA).iso",
+      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fultimate-rom-collection%2FPSP%2FVirtua%2520Tennis%2520-%2520World%2520Tour%2520(USA).iso",
+      "https://archive.org/download/ultimate-rom-collection/PSP/Virtua%20Tennis%20-%20World%20Tour%20(USA).iso"
     ],
-    "description": "Sport / Tennis sur PlayStation Portable (240 Mo · PPSSPP WebAssembly)."
+    "description": "Sport / Tennis sur PlayStation Portable (179 Mo · PPSSPP WebAssembly)."
   },
   {
     "id": "psp-virtua-tennis-3",
@@ -314,20 +425,14 @@
       ".iso"
     ],
     "engine": "emulatorjs:psp",
-    "estimatedSize": "380 Mo",
+    "estimatedSize": "358 Mo",
     "filename": "Virtua Tennis 3 (USA).cso",
     "urls": [
-      "https://archive.org/cors/sony_psp_cso_usa/Virtua%20Tennis%203%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony_psp_cso_usa%2FVirtua%2520Tennis%25203%2520(USA).cso",
-      "https://archive.org/download/sony_psp_cso_usa/Virtua%20Tennis%203%20(USA).cso",
       "https://archive.org/cors/psp-cso-collection/Virtua%20Tennis%203%20(USA).cso",
       "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fpsp-cso-collection%2FVirtua%2520Tennis%25203%2520(USA).cso",
-      "https://archive.org/download/psp-cso-collection/Virtua%20Tennis%203%20(USA).cso",
-      "https://archive.org/cors/sony-psp-cso-collection/Virtua%20Tennis%203%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony-psp-cso-collection%2FVirtua%2520Tennis%25203%2520(USA).cso",
-      "https://archive.org/download/sony-psp-cso-collection/Virtua%20Tennis%203%20(USA).cso"
+      "https://archive.org/download/psp-cso-collection/Virtua%20Tennis%203%20(USA).cso"
     ],
-    "description": "Sport / Tennis sur PlayStation Portable (380 Mo · PPSSPP WebAssembly)."
+    "description": "Sport / Tennis sur PlayStation Portable (358 Mo · PPSSPP WebAssembly)."
   },
   {
     "id": "psp-fight-night-round-3",
@@ -344,20 +449,14 @@
       ".iso"
     ],
     "engine": "emulatorjs:psp",
-    "estimatedSize": "420 Mo",
+    "estimatedSize": "523 Mo",
     "filename": "Fight Night Round 3 (USA).cso",
     "urls": [
-      "https://archive.org/cors/sony_psp_cso_usa/Fight%20Night%20Round%203%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony_psp_cso_usa%2FFight%2520Night%2520Round%25203%2520(USA).cso",
-      "https://archive.org/download/sony_psp_cso_usa/Fight%20Night%20Round%203%20(USA).cso",
       "https://archive.org/cors/psp-cso-collection/Fight%20Night%20Round%203%20(USA).cso",
       "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fpsp-cso-collection%2FFight%2520Night%2520Round%25203%2520(USA).cso",
-      "https://archive.org/download/psp-cso-collection/Fight%20Night%20Round%203%20(USA).cso",
-      "https://archive.org/cors/sony-psp-cso-collection/Fight%20Night%20Round%203%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony-psp-cso-collection%2FFight%2520Night%2520Round%25203%2520(USA).cso",
-      "https://archive.org/download/sony-psp-cso-collection/Fight%20Night%20Round%203%20(USA).cso"
+      "https://archive.org/download/psp-cso-collection/Fight%20Night%20Round%203%20(USA).cso"
     ],
-    "description": "Sport / Boxe sur PlayStation Portable (420 Mo · PPSSPP WebAssembly)."
+    "description": "Sport / Boxe sur PlayStation Portable (523 Mo · PPSSPP WebAssembly)."
   },
   {
     "id": "psp-wwe-smackdown-vs-raw-2011",
@@ -374,20 +473,14 @@
       ".iso"
     ],
     "engine": "emulatorjs:psp",
-    "estimatedSize": "1.1 Go",
-    "filename": "WWE SmackDown vs. Raw 2011 (USA).cso",
+    "estimatedSize": "1.27 Go",
+    "filename": "WWE Smackdown! vs. RAW 2011 featuring ECW (USA).cso",
     "urls": [
-      "https://archive.org/cors/sony_psp_cso_usa/WWE%20SmackDown%20vs.%20Raw%202011%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony_psp_cso_usa%2FWWE%2520SmackDown%2520vs.%2520Raw%25202011%2520(USA).cso",
-      "https://archive.org/download/sony_psp_cso_usa/WWE%20SmackDown%20vs.%20Raw%202011%20(USA).cso",
-      "https://archive.org/cors/psp-cso-collection/WWE%20SmackDown%20vs.%20Raw%202011%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fpsp-cso-collection%2FWWE%2520SmackDown%2520vs.%2520Raw%25202011%2520(USA).cso",
-      "https://archive.org/download/psp-cso-collection/WWE%20SmackDown%20vs.%20Raw%202011%20(USA).cso",
-      "https://archive.org/cors/sony-psp-cso-collection/WWE%20SmackDown%20vs.%20Raw%202011%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony-psp-cso-collection%2FWWE%2520SmackDown%2520vs.%2520Raw%25202011%2520(USA).cso",
-      "https://archive.org/download/sony-psp-cso-collection/WWE%20SmackDown%20vs.%20Raw%202011%20(USA).cso"
+      "https://archive.org/cors/psp-cso-collection/WWE%20Smackdown!%20vs.%20RAW%202011%20featuring%20ECW%20(USA).cso",
+      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fpsp-cso-collection%2FWWE%2520Smackdown!%2520vs.%2520RAW%25202011%2520featuring%2520ECW%2520(USA).cso",
+      "https://archive.org/download/psp-cso-collection/WWE%20Smackdown!%20vs.%20RAW%202011%20featuring%20ECW%20(USA).cso"
     ],
-    "description": "Catch / Combat sur PlayStation Portable (1.1 Go · PPSSPP WebAssembly)."
+    "description": "Catch / Combat sur PlayStation Portable (1.27 Go · PPSSPP WebAssembly)."
   },
   {
     "id": "psp-tony-hawk-underground-2-remix",
@@ -404,20 +497,17 @@
       ".iso"
     ],
     "engine": "emulatorjs:psp",
-    "estimatedSize": "510 Mo",
-    "filename": "Tony Hawk's Underground 2 Remix (USA).cso",
+    "estimatedSize": "907 Mo",
+    "filename": "Tony Hawk's Underground 2 - Remix (USA).cso",
     "urls": [
-      "https://archive.org/cors/sony_psp_cso_usa/Tony%20Hawk's%20Underground%202%20Remix%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony_psp_cso_usa%2FTony%2520Hawk's%2520Underground%25202%2520Remix%2520(USA).cso",
-      "https://archive.org/download/sony_psp_cso_usa/Tony%20Hawk's%20Underground%202%20Remix%20(USA).cso",
-      "https://archive.org/cors/psp-cso-collection/Tony%20Hawk's%20Underground%202%20Remix%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fpsp-cso-collection%2FTony%2520Hawk's%2520Underground%25202%2520Remix%2520(USA).cso",
-      "https://archive.org/download/psp-cso-collection/Tony%20Hawk's%20Underground%202%20Remix%20(USA).cso",
-      "https://archive.org/cors/sony-psp-cso-collection/Tony%20Hawk's%20Underground%202%20Remix%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony-psp-cso-collection%2FTony%2520Hawk's%2520Underground%25202%2520Remix%2520(USA).cso",
-      "https://archive.org/download/sony-psp-cso-collection/Tony%20Hawk's%20Underground%202%20Remix%20(USA).cso"
+      "https://archive.org/cors/psp-cso-collection/Tony%20Hawk's%20Underground%202%20-%20Remix%20(USA).cso",
+      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fpsp-cso-collection%2FTony%2520Hawk's%2520Underground%25202%2520-%2520Remix%2520(USA).cso",
+      "https://archive.org/download/psp-cso-collection/Tony%20Hawk's%20Underground%202%20-%20Remix%20(USA).cso",
+      "https://archive.org/cors/ultimate-rom-collection/PSP/Tony%20Hawk's%20Underground%202%20Remix%20(USA).iso",
+      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fultimate-rom-collection%2FPSP%2FTony%2520Hawk's%2520Underground%25202%2520Remix%2520(USA).iso",
+      "https://archive.org/download/ultimate-rom-collection/PSP/Tony%20Hawk's%20Underground%202%20Remix%20(USA).iso"
     ],
-    "description": "Skate / Sport sur PlayStation Portable (510 Mo · PPSSPP WebAssembly)."
+    "description": "Skate / Sport sur PlayStation Portable (907 Mo · PPSSPP WebAssembly)."
   },
   {
     "id": "psp-ssx-on-tour",
@@ -434,20 +524,14 @@
       ".iso"
     ],
     "engine": "emulatorjs:psp",
-    "estimatedSize": "410 Mo",
-    "filename": "SSX On Tour (USA).cso",
+    "estimatedSize": "633 Mo",
+    "filename": "SSX - On Tour (USA).cso",
     "urls": [
-      "https://archive.org/cors/sony_psp_cso_usa/SSX%20On%20Tour%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony_psp_cso_usa%2FSSX%2520On%2520Tour%2520(USA).cso",
-      "https://archive.org/download/sony_psp_cso_usa/SSX%20On%20Tour%20(USA).cso",
-      "https://archive.org/cors/psp-cso-collection/SSX%20On%20Tour%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fpsp-cso-collection%2FSSX%2520On%2520Tour%2520(USA).cso",
-      "https://archive.org/download/psp-cso-collection/SSX%20On%20Tour%20(USA).cso",
-      "https://archive.org/cors/sony-psp-cso-collection/SSX%20On%20Tour%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony-psp-cso-collection%2FSSX%2520On%2520Tour%2520(USA).cso",
-      "https://archive.org/download/sony-psp-cso-collection/SSX%20On%20Tour%20(USA).cso"
+      "https://archive.org/cors/psp-cso-collection/SSX%20-%20On%20Tour%20(USA).cso",
+      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fpsp-cso-collection%2FSSX%2520-%2520On%2520Tour%2520(USA).cso",
+      "https://archive.org/download/psp-cso-collection/SSX%20-%20On%20Tour%20(USA).cso"
     ],
-    "description": "Snowboard / Arcade sur PlayStation Portable (410 Mo · PPSSPP WebAssembly)."
+    "description": "Snowboard / Arcade sur PlayStation Portable (633 Mo · PPSSPP WebAssembly)."
   },
   {
     "id": "psp-tekken-6",
@@ -464,20 +548,17 @@
       ".iso"
     ],
     "engine": "emulatorjs:psp",
-    "estimatedSize": "730 Mo",
+    "estimatedSize": "708 Mo",
     "filename": "Tekken 6 (USA).cso",
     "urls": [
-      "https://archive.org/cors/sony_psp_cso_usa/Tekken%206%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony_psp_cso_usa%2FTekken%25206%2520(USA).cso",
-      "https://archive.org/download/sony_psp_cso_usa/Tekken%206%20(USA).cso",
       "https://archive.org/cors/psp-cso-collection/Tekken%206%20(USA).cso",
       "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fpsp-cso-collection%2FTekken%25206%2520(USA).cso",
       "https://archive.org/download/psp-cso-collection/Tekken%206%20(USA).cso",
-      "https://archive.org/cors/sony-psp-cso-collection/Tekken%206%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony-psp-cso-collection%2FTekken%25206%2520(USA).cso",
-      "https://archive.org/download/sony-psp-cso-collection/Tekken%206%20(USA).cso"
+      "https://archive.org/cors/ultimate-rom-collection/PSP/Tekken%206%20(USA)%20(En%2CJa%2CFr%2CDe%2CEs%2CIt%2CKo%2CRu).iso",
+      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fultimate-rom-collection%2FPSP%2FTekken%25206%2520(USA)%2520(En%252CJa%252CFr%252CDe%252CEs%252CIt%252CKo%252CRu).iso",
+      "https://archive.org/download/ultimate-rom-collection/PSP/Tekken%206%20(USA)%20(En%2CJa%2CFr%2CDe%2CEs%2CIt%2CKo%2CRu).iso"
     ],
-    "description": "Combat 3D sur PlayStation Portable (730 Mo · PPSSPP WebAssembly)."
+    "description": "Combat 3D sur PlayStation Portable (708 Mo · PPSSPP WebAssembly)."
   },
   {
     "id": "psp-tekken-dark-resurrection",
@@ -494,20 +575,17 @@
       ".iso"
     ],
     "engine": "emulatorjs:psp",
-    "estimatedSize": "640 Mo",
+    "estimatedSize": "1.16 Go",
     "filename": "Tekken - Dark Resurrection (USA).cso",
     "urls": [
-      "https://archive.org/cors/sony_psp_cso_usa/Tekken%20-%20Dark%20Resurrection%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony_psp_cso_usa%2FTekken%2520-%2520Dark%2520Resurrection%2520(USA).cso",
-      "https://archive.org/download/sony_psp_cso_usa/Tekken%20-%20Dark%20Resurrection%20(USA).cso",
       "https://archive.org/cors/psp-cso-collection/Tekken%20-%20Dark%20Resurrection%20(USA).cso",
       "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fpsp-cso-collection%2FTekken%2520-%2520Dark%2520Resurrection%2520(USA).cso",
       "https://archive.org/download/psp-cso-collection/Tekken%20-%20Dark%20Resurrection%20(USA).cso",
-      "https://archive.org/cors/sony-psp-cso-collection/Tekken%20-%20Dark%20Resurrection%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony-psp-cso-collection%2FTekken%2520-%2520Dark%2520Resurrection%2520(USA).cso",
-      "https://archive.org/download/sony-psp-cso-collection/Tekken%20-%20Dark%20Resurrection%20(USA).cso"
+      "https://archive.org/cors/ultimate-rom-collection/PSP/Tekken%20-%20Dark%20Resurrection%20(USA)%20(En%2CFr%2CDe%2CEs%2CIt).iso",
+      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fultimate-rom-collection%2FPSP%2FTekken%2520-%2520Dark%2520Resurrection%2520(USA)%2520(En%252CFr%252CDe%252CEs%252CIt).iso",
+      "https://archive.org/download/ultimate-rom-collection/PSP/Tekken%20-%20Dark%20Resurrection%20(USA)%20(En%2CFr%2CDe%2CEs%2CIt).iso"
     ],
-    "description": "Combat 3D sur PlayStation Portable (640 Mo · PPSSPP WebAssembly)."
+    "description": "Combat 3D sur PlayStation Portable (1.16 Go · PPSSPP WebAssembly)."
   },
   {
     "id": "psp-dragon-ball-z-tenkaichi-tag-team",
@@ -524,20 +602,17 @@
       ".iso"
     ],
     "engine": "emulatorjs:psp",
-    "estimatedSize": "1.1 Go",
+    "estimatedSize": "1.12 Go",
     "filename": "Dragon Ball Z - Tenkaichi Tag Team (USA).cso",
     "urls": [
-      "https://archive.org/cors/sony_psp_cso_usa/Dragon%20Ball%20Z%20-%20Tenkaichi%20Tag%20Team%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony_psp_cso_usa%2FDragon%2520Ball%2520Z%2520-%2520Tenkaichi%2520Tag%2520Team%2520(USA).cso",
-      "https://archive.org/download/sony_psp_cso_usa/Dragon%20Ball%20Z%20-%20Tenkaichi%20Tag%20Team%20(USA).cso",
       "https://archive.org/cors/psp-cso-collection/Dragon%20Ball%20Z%20-%20Tenkaichi%20Tag%20Team%20(USA).cso",
       "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fpsp-cso-collection%2FDragon%2520Ball%2520Z%2520-%2520Tenkaichi%2520Tag%2520Team%2520(USA).cso",
       "https://archive.org/download/psp-cso-collection/Dragon%20Ball%20Z%20-%20Tenkaichi%20Tag%20Team%20(USA).cso",
-      "https://archive.org/cors/sony-psp-cso-collection/Dragon%20Ball%20Z%20-%20Tenkaichi%20Tag%20Team%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony-psp-cso-collection%2FDragon%2520Ball%2520Z%2520-%2520Tenkaichi%2520Tag%2520Team%2520(USA).cso",
-      "https://archive.org/download/sony-psp-cso-collection/Dragon%20Ball%20Z%20-%20Tenkaichi%20Tag%20Team%20(USA).cso"
+      "https://archive.org/cors/ultimate-rom-collection/PSP/Dragon%20Ball%20Z%20-%20Tenkaichi%20Tag%20Team%20(USA)%20(En%2CFr%2CEs).iso",
+      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fultimate-rom-collection%2FPSP%2FDragon%2520Ball%2520Z%2520-%2520Tenkaichi%2520Tag%2520Team%2520(USA)%2520(En%252CFr%252CEs).iso",
+      "https://archive.org/download/ultimate-rom-collection/PSP/Dragon%20Ball%20Z%20-%20Tenkaichi%20Tag%20Team%20(USA)%20(En%2CFr%2CEs).iso"
     ],
-    "description": "Combat 3D sur PlayStation Portable (1.1 Go · PPSSPP WebAssembly)."
+    "description": "Combat 3D sur PlayStation Portable (1.12 Go · PPSSPP WebAssembly)."
   },
   {
     "id": "psp-dragon-ball-z-shin-budokai",
@@ -554,20 +629,14 @@
       ".iso"
     ],
     "engine": "emulatorjs:psp",
-    "estimatedSize": "195 Mo",
+    "estimatedSize": "209 Mo",
     "filename": "Dragon Ball Z - Shin Budokai (USA).cso",
     "urls": [
-      "https://archive.org/cors/sony_psp_cso_usa/Dragon%20Ball%20Z%20-%20Shin%20Budokai%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony_psp_cso_usa%2FDragon%2520Ball%2520Z%2520-%2520Shin%2520Budokai%2520(USA).cso",
-      "https://archive.org/download/sony_psp_cso_usa/Dragon%20Ball%20Z%20-%20Shin%20Budokai%20(USA).cso",
       "https://archive.org/cors/psp-cso-collection/Dragon%20Ball%20Z%20-%20Shin%20Budokai%20(USA).cso",
       "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fpsp-cso-collection%2FDragon%2520Ball%2520Z%2520-%2520Shin%2520Budokai%2520(USA).cso",
-      "https://archive.org/download/psp-cso-collection/Dragon%20Ball%20Z%20-%20Shin%20Budokai%20(USA).cso",
-      "https://archive.org/cors/sony-psp-cso-collection/Dragon%20Ball%20Z%20-%20Shin%20Budokai%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony-psp-cso-collection%2FDragon%2520Ball%2520Z%2520-%2520Shin%2520Budokai%2520(USA).cso",
-      "https://archive.org/download/sony-psp-cso-collection/Dragon%20Ball%20Z%20-%20Shin%20Budokai%20(USA).cso"
+      "https://archive.org/download/psp-cso-collection/Dragon%20Ball%20Z%20-%20Shin%20Budokai%20(USA).cso"
     ],
-    "description": "Combat 3D sur PlayStation Portable (195 Mo · PPSSPP WebAssembly)."
+    "description": "Combat 3D sur PlayStation Portable (209 Mo · PPSSPP WebAssembly)."
   },
   {
     "id": "psp-dragon-ball-z-shin-budokai-another-road",
@@ -584,20 +653,17 @@
       ".iso"
     ],
     "engine": "emulatorjs:psp",
-    "estimatedSize": "295 Mo",
-    "filename": "Dragon Ball Z - Shin Budokai - Another Road (USA).cso",
+    "estimatedSize": "337 Mo",
+    "filename": "Dragon Ball Z - Shin Budokai Another Road (USA).cso",
     "urls": [
-      "https://archive.org/cors/sony_psp_cso_usa/Dragon%20Ball%20Z%20-%20Shin%20Budokai%20-%20Another%20Road%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony_psp_cso_usa%2FDragon%2520Ball%2520Z%2520-%2520Shin%2520Budokai%2520-%2520Another%2520Road%2520(USA).cso",
-      "https://archive.org/download/sony_psp_cso_usa/Dragon%20Ball%20Z%20-%20Shin%20Budokai%20-%20Another%20Road%20(USA).cso",
-      "https://archive.org/cors/psp-cso-collection/Dragon%20Ball%20Z%20-%20Shin%20Budokai%20-%20Another%20Road%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fpsp-cso-collection%2FDragon%2520Ball%2520Z%2520-%2520Shin%2520Budokai%2520-%2520Another%2520Road%2520(USA).cso",
-      "https://archive.org/download/psp-cso-collection/Dragon%20Ball%20Z%20-%20Shin%20Budokai%20-%20Another%20Road%20(USA).cso",
-      "https://archive.org/cors/sony-psp-cso-collection/Dragon%20Ball%20Z%20-%20Shin%20Budokai%20-%20Another%20Road%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony-psp-cso-collection%2FDragon%2520Ball%2520Z%2520-%2520Shin%2520Budokai%2520-%2520Another%2520Road%2520(USA).cso",
-      "https://archive.org/download/sony-psp-cso-collection/Dragon%20Ball%20Z%20-%20Shin%20Budokai%20-%20Another%20Road%20(USA).cso"
+      "https://archive.org/cors/psp-cso-collection/Dragon%20Ball%20Z%20-%20Shin%20Budokai%20Another%20Road%20(USA).cso",
+      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fpsp-cso-collection%2FDragon%2520Ball%2520Z%2520-%2520Shin%2520Budokai%2520Another%2520Road%2520(USA).cso",
+      "https://archive.org/download/psp-cso-collection/Dragon%20Ball%20Z%20-%20Shin%20Budokai%20Another%20Road%20(USA).cso",
+      "https://archive.org/cors/ultimate-rom-collection/PSP/Dragon%20Ball%20Z%20-%20Shin%20Budokai%20-%20Another%20Road%20(USA).iso",
+      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fultimate-rom-collection%2FPSP%2FDragon%2520Ball%2520Z%2520-%2520Shin%2520Budokai%2520-%2520Another%2520Road%2520(USA).iso",
+      "https://archive.org/download/ultimate-rom-collection/PSP/Dragon%20Ball%20Z%20-%20Shin%20Budokai%20-%20Another%20Road%20(USA).iso"
     ],
-    "description": "Combat 3D sur PlayStation Portable (295 Mo · PPSSPP WebAssembly)."
+    "description": "Combat 3D sur PlayStation Portable (337 Mo · PPSSPP WebAssembly)."
   },
   {
     "id": "psp-naruto-shippuden-ultimate-ninja-impact",
@@ -614,20 +680,14 @@
       ".iso"
     ],
     "engine": "emulatorjs:psp",
-    "estimatedSize": "910 Mo",
+    "estimatedSize": "879 Mo",
     "filename": "Naruto Shippuden - Ultimate Ninja Impact (USA).cso",
     "urls": [
-      "https://archive.org/cors/sony_psp_cso_usa/Naruto%20Shippuden%20-%20Ultimate%20Ninja%20Impact%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony_psp_cso_usa%2FNaruto%2520Shippuden%2520-%2520Ultimate%2520Ninja%2520Impact%2520(USA).cso",
-      "https://archive.org/download/sony_psp_cso_usa/Naruto%20Shippuden%20-%20Ultimate%20Ninja%20Impact%20(USA).cso",
       "https://archive.org/cors/psp-cso-collection/Naruto%20Shippuden%20-%20Ultimate%20Ninja%20Impact%20(USA).cso",
       "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fpsp-cso-collection%2FNaruto%2520Shippuden%2520-%2520Ultimate%2520Ninja%2520Impact%2520(USA).cso",
-      "https://archive.org/download/psp-cso-collection/Naruto%20Shippuden%20-%20Ultimate%20Ninja%20Impact%20(USA).cso",
-      "https://archive.org/cors/sony-psp-cso-collection/Naruto%20Shippuden%20-%20Ultimate%20Ninja%20Impact%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony-psp-cso-collection%2FNaruto%2520Shippuden%2520-%2520Ultimate%2520Ninja%2520Impact%2520(USA).cso",
-      "https://archive.org/download/sony-psp-cso-collection/Naruto%20Shippuden%20-%20Ultimate%20Ninja%20Impact%20(USA).cso"
+      "https://archive.org/download/psp-cso-collection/Naruto%20Shippuden%20-%20Ultimate%20Ninja%20Impact%20(USA).cso"
     ],
-    "description": "Action / Combat sur PlayStation Portable (910 Mo · PPSSPP WebAssembly)."
+    "description": "Action / Combat sur PlayStation Portable (879 Mo · PPSSPP WebAssembly)."
   },
   {
     "id": "psp-naruto-shippuden-ultimate-ninja-heroes-3",
@@ -644,20 +704,14 @@
       ".iso"
     ],
     "engine": "emulatorjs:psp",
-    "estimatedSize": "960 Mo",
+    "estimatedSize": "1.16 Go",
     "filename": "Naruto Shippuden - Ultimate Ninja Heroes 3 (USA).cso",
     "urls": [
-      "https://archive.org/cors/sony_psp_cso_usa/Naruto%20Shippuden%20-%20Ultimate%20Ninja%20Heroes%203%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony_psp_cso_usa%2FNaruto%2520Shippuden%2520-%2520Ultimate%2520Ninja%2520Heroes%25203%2520(USA).cso",
-      "https://archive.org/download/sony_psp_cso_usa/Naruto%20Shippuden%20-%20Ultimate%20Ninja%20Heroes%203%20(USA).cso",
       "https://archive.org/cors/psp-cso-collection/Naruto%20Shippuden%20-%20Ultimate%20Ninja%20Heroes%203%20(USA).cso",
       "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fpsp-cso-collection%2FNaruto%2520Shippuden%2520-%2520Ultimate%2520Ninja%2520Heroes%25203%2520(USA).cso",
-      "https://archive.org/download/psp-cso-collection/Naruto%20Shippuden%20-%20Ultimate%20Ninja%20Heroes%203%20(USA).cso",
-      "https://archive.org/cors/sony-psp-cso-collection/Naruto%20Shippuden%20-%20Ultimate%20Ninja%20Heroes%203%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony-psp-cso-collection%2FNaruto%2520Shippuden%2520-%2520Ultimate%2520Ninja%2520Heroes%25203%2520(USA).cso",
-      "https://archive.org/download/sony-psp-cso-collection/Naruto%20Shippuden%20-%20Ultimate%20Ninja%20Heroes%203%20(USA).cso"
+      "https://archive.org/download/psp-cso-collection/Naruto%20Shippuden%20-%20Ultimate%20Ninja%20Heroes%203%20(USA).cso"
     ],
-    "description": "Combat 2D/3D sur PlayStation Portable (960 Mo · PPSSPP WebAssembly)."
+    "description": "Combat 2D/3D sur PlayStation Portable (1.16 Go · PPSSPP WebAssembly)."
   },
   {
     "id": "psp-naruto-ultimate-ninja-heroes-2",
@@ -674,20 +728,14 @@
       ".iso"
     ],
     "engine": "emulatorjs:psp",
-    "estimatedSize": "880 Mo",
-    "filename": "Naruto - Ultimate Ninja Heroes 2 - The Phantom Fortress (USA).cso",
+    "estimatedSize": "983 Mo",
+    "filename": "Naruto Shippuden - Ultimate Ninja Heroes 2 - The Phantom Fortress (USA).cso",
     "urls": [
-      "https://archive.org/cors/sony_psp_cso_usa/Naruto%20-%20Ultimate%20Ninja%20Heroes%202%20-%20The%20Phantom%20Fortress%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony_psp_cso_usa%2FNaruto%2520-%2520Ultimate%2520Ninja%2520Heroes%25202%2520-%2520The%2520Phantom%2520Fortress%2520(USA).cso",
-      "https://archive.org/download/sony_psp_cso_usa/Naruto%20-%20Ultimate%20Ninja%20Heroes%202%20-%20The%20Phantom%20Fortress%20(USA).cso",
-      "https://archive.org/cors/psp-cso-collection/Naruto%20-%20Ultimate%20Ninja%20Heroes%202%20-%20The%20Phantom%20Fortress%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fpsp-cso-collection%2FNaruto%2520-%2520Ultimate%2520Ninja%2520Heroes%25202%2520-%2520The%2520Phantom%2520Fortress%2520(USA).cso",
-      "https://archive.org/download/psp-cso-collection/Naruto%20-%20Ultimate%20Ninja%20Heroes%202%20-%20The%20Phantom%20Fortress%20(USA).cso",
-      "https://archive.org/cors/sony-psp-cso-collection/Naruto%20-%20Ultimate%20Ninja%20Heroes%202%20-%20The%20Phantom%20Fortress%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony-psp-cso-collection%2FNaruto%2520-%2520Ultimate%2520Ninja%2520Heroes%25202%2520-%2520The%2520Phantom%2520Fortress%2520(USA).cso",
-      "https://archive.org/download/sony-psp-cso-collection/Naruto%20-%20Ultimate%20Ninja%20Heroes%202%20-%20The%20Phantom%20Fortress%20(USA).cso"
+      "https://archive.org/cors/psp-cso-collection/Naruto%20Shippuden%20-%20Ultimate%20Ninja%20Heroes%202%20-%20The%20Phantom%20Fortress%20(USA).cso",
+      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fpsp-cso-collection%2FNaruto%2520Shippuden%2520-%2520Ultimate%2520Ninja%2520Heroes%25202%2520-%2520The%2520Phantom%2520Fortress%2520(USA).cso",
+      "https://archive.org/download/psp-cso-collection/Naruto%20Shippuden%20-%20Ultimate%20Ninja%20Heroes%202%20-%20The%20Phantom%20Fortress%20(USA).cso"
     ],
-    "description": "Combat sur PlayStation Portable (880 Mo · PPSSPP WebAssembly)."
+    "description": "Combat sur PlayStation Portable (983 Mo · PPSSPP WebAssembly)."
   },
   {
     "id": "psp-soulcalibur-broken-destiny",
@@ -705,17 +753,14 @@
     ],
     "engine": "emulatorjs:psp",
     "estimatedSize": "380 Mo",
-    "filename": "SoulCalibur - Broken Destiny (USA).cso",
+    "filename": "Soul Calibur - Broken Destiny (USA).cso",
     "urls": [
-      "https://archive.org/cors/sony_psp_cso_usa/SoulCalibur%20-%20Broken%20Destiny%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony_psp_cso_usa%2FSoulCalibur%2520-%2520Broken%2520Destiny%2520(USA).cso",
-      "https://archive.org/download/sony_psp_cso_usa/SoulCalibur%20-%20Broken%20Destiny%20(USA).cso",
-      "https://archive.org/cors/psp-cso-collection/SoulCalibur%20-%20Broken%20Destiny%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fpsp-cso-collection%2FSoulCalibur%2520-%2520Broken%2520Destiny%2520(USA).cso",
-      "https://archive.org/download/psp-cso-collection/SoulCalibur%20-%20Broken%20Destiny%20(USA).cso",
-      "https://archive.org/cors/sony-psp-cso-collection/SoulCalibur%20-%20Broken%20Destiny%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony-psp-cso-collection%2FSoulCalibur%2520-%2520Broken%2520Destiny%2520(USA).cso",
-      "https://archive.org/download/sony-psp-cso-collection/SoulCalibur%20-%20Broken%20Destiny%20(USA).cso"
+      "https://archive.org/cors/psp-cso-collection/Soul%20Calibur%20-%20Broken%20Destiny%20(USA).cso",
+      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fpsp-cso-collection%2FSoul%2520Calibur%2520-%2520Broken%2520Destiny%2520(USA).cso",
+      "https://archive.org/download/psp-cso-collection/Soul%20Calibur%20-%20Broken%20Destiny%20(USA).cso",
+      "https://archive.org/cors/ultimate-rom-collection/PSP/Soulcalibur%20-%20Broken%20Destiny%20(USA)%20(En%2CJa%2CFr%2CDe%2CEs%2CIt%2CRu).iso",
+      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fultimate-rom-collection%2FPSP%2FSoulcalibur%2520-%2520Broken%2520Destiny%2520(USA)%2520(En%252CJa%252CFr%252CDe%252CEs%252CIt%252CRu).iso",
+      "https://archive.org/download/ultimate-rom-collection/PSP/Soulcalibur%20-%20Broken%20Destiny%20(USA)%20(En%2CJa%2CFr%2CDe%2CEs%2CIt%2CRu).iso"
     ],
     "description": "Combat 3D sur PlayStation Portable (380 Mo · PPSSPP WebAssembly)."
   },
@@ -734,20 +779,14 @@
       ".iso"
     ],
     "engine": "emulatorjs:psp",
-    "estimatedSize": "980 Mo",
+    "estimatedSize": "1.04 Go",
     "filename": "Mortal Kombat - Unchained (USA).cso",
     "urls": [
-      "https://archive.org/cors/sony_psp_cso_usa/Mortal%20Kombat%20-%20Unchained%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony_psp_cso_usa%2FMortal%2520Kombat%2520-%2520Unchained%2520(USA).cso",
-      "https://archive.org/download/sony_psp_cso_usa/Mortal%20Kombat%20-%20Unchained%20(USA).cso",
       "https://archive.org/cors/psp-cso-collection/Mortal%20Kombat%20-%20Unchained%20(USA).cso",
       "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fpsp-cso-collection%2FMortal%2520Kombat%2520-%2520Unchained%2520(USA).cso",
-      "https://archive.org/download/psp-cso-collection/Mortal%20Kombat%20-%20Unchained%20(USA).cso",
-      "https://archive.org/cors/sony-psp-cso-collection/Mortal%20Kombat%20-%20Unchained%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony-psp-cso-collection%2FMortal%2520Kombat%2520-%2520Unchained%2520(USA).cso",
-      "https://archive.org/download/sony-psp-cso-collection/Mortal%20Kombat%20-%20Unchained%20(USA).cso"
+      "https://archive.org/download/psp-cso-collection/Mortal%20Kombat%20-%20Unchained%20(USA).cso"
     ],
-    "description": "Combat 3D sur PlayStation Portable (980 Mo · PPSSPP WebAssembly)."
+    "description": "Combat 3D sur PlayStation Portable (1.04 Go · PPSSPP WebAssembly)."
   },
   {
     "id": "psp-street-fighter-alpha-3-max",
@@ -764,20 +803,14 @@
       ".iso"
     ],
     "engine": "emulatorjs:psp",
-    "estimatedSize": "128 Mo",
+    "estimatedSize": "95 Mo",
     "filename": "Street Fighter Alpha 3 MAX (USA).cso",
     "urls": [
-      "https://archive.org/cors/sony_psp_cso_usa/Street%20Fighter%20Alpha%203%20MAX%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony_psp_cso_usa%2FStreet%2520Fighter%2520Alpha%25203%2520MAX%2520(USA).cso",
-      "https://archive.org/download/sony_psp_cso_usa/Street%20Fighter%20Alpha%203%20MAX%20(USA).cso",
       "https://archive.org/cors/psp-cso-collection/Street%20Fighter%20Alpha%203%20MAX%20(USA).cso",
       "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fpsp-cso-collection%2FStreet%2520Fighter%2520Alpha%25203%2520MAX%2520(USA).cso",
-      "https://archive.org/download/psp-cso-collection/Street%20Fighter%20Alpha%203%20MAX%20(USA).cso",
-      "https://archive.org/cors/sony-psp-cso-collection/Street%20Fighter%20Alpha%203%20MAX%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony-psp-cso-collection%2FStreet%2520Fighter%2520Alpha%25203%2520MAX%2520(USA).cso",
-      "https://archive.org/download/sony-psp-cso-collection/Street%20Fighter%20Alpha%203%20MAX%20(USA).cso"
+      "https://archive.org/download/psp-cso-collection/Street%20Fighter%20Alpha%203%20MAX%20(USA).cso"
     ],
-    "description": "Combat 2D sur PlayStation Portable (128 Mo · PPSSPP WebAssembly)."
+    "description": "Combat 2D sur PlayStation Portable (95 Mo · PPSSPP WebAssembly)."
   },
   {
     "id": "psp-def-jam-fight-for-ny-the-takeover",
@@ -794,20 +827,14 @@
       ".iso"
     ],
     "engine": "emulatorjs:psp",
-    "estimatedSize": "490 Mo",
+    "estimatedSize": "500 Mo",
     "filename": "Def Jam - Fight for NY - The Takeover (USA).cso",
     "urls": [
-      "https://archive.org/cors/sony_psp_cso_usa/Def%20Jam%20-%20Fight%20for%20NY%20-%20The%20Takeover%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony_psp_cso_usa%2FDef%2520Jam%2520-%2520Fight%2520for%2520NY%2520-%2520The%2520Takeover%2520(USA).cso",
-      "https://archive.org/download/sony_psp_cso_usa/Def%20Jam%20-%20Fight%20for%20NY%20-%20The%20Takeover%20(USA).cso",
       "https://archive.org/cors/psp-cso-collection/Def%20Jam%20-%20Fight%20for%20NY%20-%20The%20Takeover%20(USA).cso",
       "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fpsp-cso-collection%2FDef%2520Jam%2520-%2520Fight%2520for%2520NY%2520-%2520The%2520Takeover%2520(USA).cso",
-      "https://archive.org/download/psp-cso-collection/Def%20Jam%20-%20Fight%20for%20NY%20-%20The%20Takeover%20(USA).cso",
-      "https://archive.org/cors/sony-psp-cso-collection/Def%20Jam%20-%20Fight%20for%20NY%20-%20The%20Takeover%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony-psp-cso-collection%2FDef%2520Jam%2520-%2520Fight%2520for%2520NY%2520-%2520The%2520Takeover%2520(USA).cso",
-      "https://archive.org/download/sony-psp-cso-collection/Def%20Jam%20-%20Fight%20for%20NY%20-%20The%20Takeover%20(USA).cso"
+      "https://archive.org/download/psp-cso-collection/Def%20Jam%20-%20Fight%20for%20NY%20-%20The%20Takeover%20(USA).cso"
     ],
-    "description": "Combat / Street sur PlayStation Portable (490 Mo · PPSSPP WebAssembly)."
+    "description": "Combat / Street sur PlayStation Portable (500 Mo · PPSSPP WebAssembly)."
   },
   {
     "id": "psp-darkstalkers-chronicle-the-chaos-tower",
@@ -824,20 +851,14 @@
       ".iso"
     ],
     "engine": "emulatorjs:psp",
-    "estimatedSize": "390 Mo",
+    "estimatedSize": "523 Mo",
     "filename": "Darkstalkers Chronicle - The Chaos Tower (USA).cso",
     "urls": [
-      "https://archive.org/cors/sony_psp_cso_usa/Darkstalkers%20Chronicle%20-%20The%20Chaos%20Tower%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony_psp_cso_usa%2FDarkstalkers%2520Chronicle%2520-%2520The%2520Chaos%2520Tower%2520(USA).cso",
-      "https://archive.org/download/sony_psp_cso_usa/Darkstalkers%20Chronicle%20-%20The%20Chaos%20Tower%20(USA).cso",
       "https://archive.org/cors/psp-cso-collection/Darkstalkers%20Chronicle%20-%20The%20Chaos%20Tower%20(USA).cso",
       "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fpsp-cso-collection%2FDarkstalkers%2520Chronicle%2520-%2520The%2520Chaos%2520Tower%2520(USA).cso",
-      "https://archive.org/download/psp-cso-collection/Darkstalkers%20Chronicle%20-%20The%20Chaos%20Tower%20(USA).cso",
-      "https://archive.org/cors/sony-psp-cso-collection/Darkstalkers%20Chronicle%20-%20The%20Chaos%20Tower%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony-psp-cso-collection%2FDarkstalkers%2520Chronicle%2520-%2520The%2520Chaos%2520Tower%2520(USA).cso",
-      "https://archive.org/download/sony-psp-cso-collection/Darkstalkers%20Chronicle%20-%20The%20Chaos%20Tower%20(USA).cso"
+      "https://archive.org/download/psp-cso-collection/Darkstalkers%20Chronicle%20-%20The%20Chaos%20Tower%20(USA).cso"
     ],
-    "description": "Combat 2D sur PlayStation Portable (390 Mo · PPSSPP WebAssembly)."
+    "description": "Combat 2D sur PlayStation Portable (523 Mo · PPSSPP WebAssembly)."
   },
   {
     "id": "psp-guilty-gear-xx-accent-core-plus",
@@ -854,20 +875,14 @@
       ".iso"
     ],
     "engine": "emulatorjs:psp",
-    "estimatedSize": "450 Mo",
+    "estimatedSize": "629 Mo",
     "filename": "Guilty Gear XX Accent Core Plus (USA).cso",
     "urls": [
-      "https://archive.org/cors/sony_psp_cso_usa/Guilty%20Gear%20XX%20Accent%20Core%20Plus%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony_psp_cso_usa%2FGuilty%2520Gear%2520XX%2520Accent%2520Core%2520Plus%2520(USA).cso",
-      "https://archive.org/download/sony_psp_cso_usa/Guilty%20Gear%20XX%20Accent%20Core%20Plus%20(USA).cso",
       "https://archive.org/cors/psp-cso-collection/Guilty%20Gear%20XX%20Accent%20Core%20Plus%20(USA).cso",
       "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fpsp-cso-collection%2FGuilty%2520Gear%2520XX%2520Accent%2520Core%2520Plus%2520(USA).cso",
-      "https://archive.org/download/psp-cso-collection/Guilty%20Gear%20XX%20Accent%20Core%20Plus%20(USA).cso",
-      "https://archive.org/cors/sony-psp-cso-collection/Guilty%20Gear%20XX%20Accent%20Core%20Plus%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony-psp-cso-collection%2FGuilty%2520Gear%2520XX%2520Accent%2520Core%2520Plus%2520(USA).cso",
-      "https://archive.org/download/sony-psp-cso-collection/Guilty%20Gear%20XX%20Accent%20Core%20Plus%20(USA).cso"
+      "https://archive.org/download/psp-cso-collection/Guilty%20Gear%20XX%20Accent%20Core%20Plus%20(USA).cso"
     ],
-    "description": "Combat 2D sur PlayStation Portable (450 Mo · PPSSPP WebAssembly)."
+    "description": "Combat 2D sur PlayStation Portable (629 Mo · PPSSPP WebAssembly)."
   },
   {
     "id": "psp-blazblue-calamity-trigger-portable",
@@ -884,29 +899,23 @@
       ".iso"
     ],
     "engine": "emulatorjs:psp",
-    "estimatedSize": "780 Mo",
-    "filename": "BlazBlue - Calamity Trigger Portable (USA).cso",
+    "estimatedSize": "903 Mo",
+    "filename": "BlazBlue - Calamity Trigger (USA).cso",
     "urls": [
-      "https://archive.org/cors/sony_psp_cso_usa/BlazBlue%20-%20Calamity%20Trigger%20Portable%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony_psp_cso_usa%2FBlazBlue%2520-%2520Calamity%2520Trigger%2520Portable%2520(USA).cso",
-      "https://archive.org/download/sony_psp_cso_usa/BlazBlue%20-%20Calamity%20Trigger%20Portable%20(USA).cso",
-      "https://archive.org/cors/psp-cso-collection/BlazBlue%20-%20Calamity%20Trigger%20Portable%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fpsp-cso-collection%2FBlazBlue%2520-%2520Calamity%2520Trigger%2520Portable%2520(USA).cso",
-      "https://archive.org/download/psp-cso-collection/BlazBlue%20-%20Calamity%20Trigger%20Portable%20(USA).cso",
-      "https://archive.org/cors/sony-psp-cso-collection/BlazBlue%20-%20Calamity%20Trigger%20Portable%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony-psp-cso-collection%2FBlazBlue%2520-%2520Calamity%2520Trigger%2520Portable%2520(USA).cso",
-      "https://archive.org/download/sony-psp-cso-collection/BlazBlue%20-%20Calamity%20Trigger%20Portable%20(USA).cso"
+      "https://archive.org/cors/psp-cso-collection/BlazBlue%20-%20Calamity%20Trigger%20(USA).cso",
+      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fpsp-cso-collection%2FBlazBlue%2520-%2520Calamity%2520Trigger%2520(USA).cso",
+      "https://archive.org/download/psp-cso-collection/BlazBlue%20-%20Calamity%20Trigger%20(USA).cso"
     ],
-    "description": "Combat 2D sur PlayStation Portable (780 Mo · PPSSPP WebAssembly)."
+    "description": "Combat 2D sur PlayStation Portable (903 Mo · PPSSPP WebAssembly)."
   },
   {
-    "id": "psp-bleach-heat-the-soul-7",
-    "title": "Bleach: Heat the Soul 7",
+    "id": "psp-blazblue-continuum-shift-ii",
+    "title": "BlazBlue: Continuum Shift II",
     "platform": "psp",
     "platformLabel": "PSP",
     "core": "psp",
-    "year": 2010,
-    "genre": "Combat 3D",
+    "year": 2011,
+    "genre": "Combat 2D",
     "players": "1–2J",
     "supportsMultiplayer": false,
     "formats": [
@@ -914,20 +923,14 @@
       ".iso"
     ],
     "engine": "emulatorjs:psp",
-    "estimatedSize": "460 Mo",
-    "filename": "Bleach - Heat the Soul 7 (Japan).cso",
+    "estimatedSize": "1.25 Go",
+    "filename": "BlazBlue - Continuum Shift II (USA).cso",
     "urls": [
-      "https://archive.org/cors/sony_psp_cso_usa/Bleach%20-%20Heat%20the%20Soul%207%20(Japan).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony_psp_cso_usa%2FBleach%2520-%2520Heat%2520the%2520Soul%25207%2520(Japan).cso",
-      "https://archive.org/download/sony_psp_cso_usa/Bleach%20-%20Heat%20the%20Soul%207%20(Japan).cso",
-      "https://archive.org/cors/psp-cso-collection/Bleach%20-%20Heat%20the%20Soul%207%20(Japan).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fpsp-cso-collection%2FBleach%2520-%2520Heat%2520the%2520Soul%25207%2520(Japan).cso",
-      "https://archive.org/download/psp-cso-collection/Bleach%20-%20Heat%20the%20Soul%207%20(Japan).cso",
-      "https://archive.org/cors/sony-psp-cso-collection/Bleach%20-%20Heat%20the%20Soul%207%20(Japan).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony-psp-cso-collection%2FBleach%2520-%2520Heat%2520the%2520Soul%25207%2520(Japan).cso",
-      "https://archive.org/download/sony-psp-cso-collection/Bleach%20-%20Heat%20the%20Soul%207%20(Japan).cso"
+      "https://archive.org/cors/psp-cso-collection/BlazBlue%20-%20Continuum%20Shift%20II%20(USA).cso",
+      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fpsp-cso-collection%2FBlazBlue%2520-%2520Continuum%2520Shift%2520II%2520(USA).cso",
+      "https://archive.org/download/psp-cso-collection/BlazBlue%20-%20Continuum%20Shift%20II%20(USA).cso"
     ],
-    "description": "Combat 3D sur PlayStation Portable (460 Mo · PPSSPP WebAssembly)."
+    "description": "Combat 2D sur PlayStation Portable (1.25 Go · PPSSPP WebAssembly)."
   },
   {
     "id": "psp-dissidia-012-final-fantasy",
@@ -944,20 +947,17 @@
       ".iso"
     ],
     "engine": "emulatorjs:psp",
-    "estimatedSize": "1.2 Go",
+    "estimatedSize": "1.23 Go",
     "filename": "Dissidia 012 - Duodecim Final Fantasy (USA).cso",
     "urls": [
-      "https://archive.org/cors/sony_psp_cso_usa/Dissidia%20012%20-%20Duodecim%20Final%20Fantasy%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony_psp_cso_usa%2FDissidia%2520012%2520-%2520Duodecim%2520Final%2520Fantasy%2520(USA).cso",
-      "https://archive.org/download/sony_psp_cso_usa/Dissidia%20012%20-%20Duodecim%20Final%20Fantasy%20(USA).cso",
       "https://archive.org/cors/psp-cso-collection/Dissidia%20012%20-%20Duodecim%20Final%20Fantasy%20(USA).cso",
       "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fpsp-cso-collection%2FDissidia%2520012%2520-%2520Duodecim%2520Final%2520Fantasy%2520(USA).cso",
       "https://archive.org/download/psp-cso-collection/Dissidia%20012%20-%20Duodecim%20Final%20Fantasy%20(USA).cso",
-      "https://archive.org/cors/sony-psp-cso-collection/Dissidia%20012%20-%20Duodecim%20Final%20Fantasy%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony-psp-cso-collection%2FDissidia%2520012%2520-%2520Duodecim%2520Final%2520Fantasy%2520(USA).cso",
-      "https://archive.org/download/sony-psp-cso-collection/Dissidia%20012%20-%20Duodecim%20Final%20Fantasy%20(USA).cso"
+      "https://archive.org/cors/ultimate-rom-collection/PSP/Dissidia%20012%20-%20Duodecim%20Final%20Fantasy%20(USA)%20(En%2CFr%2CDe%2CEs%2CIt).iso",
+      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fultimate-rom-collection%2FPSP%2FDissidia%2520012%2520-%2520Duodecim%2520Final%2520Fantasy%2520(USA)%2520(En%252CFr%252CDe%252CEs%252CIt).iso",
+      "https://archive.org/download/ultimate-rom-collection/PSP/Dissidia%20012%20-%20Duodecim%20Final%20Fantasy%20(USA)%20(En%2CFr%2CDe%2CEs%2CIt).iso"
     ],
-    "description": "Combat / Action RPG sur PlayStation Portable (1.2 Go · PPSSPP WebAssembly)."
+    "description": "Combat / Action RPG sur PlayStation Portable (1.23 Go · PPSSPP WebAssembly)."
   },
   {
     "id": "psp-power-stone-collection",
@@ -974,20 +974,14 @@
       ".iso"
     ],
     "engine": "emulatorjs:psp",
-    "estimatedSize": "320 Mo",
+    "estimatedSize": "306 Mo",
     "filename": "Power Stone Collection (USA).cso",
     "urls": [
-      "https://archive.org/cors/sony_psp_cso_usa/Power%20Stone%20Collection%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony_psp_cso_usa%2FPower%2520Stone%2520Collection%2520(USA).cso",
-      "https://archive.org/download/sony_psp_cso_usa/Power%20Stone%20Collection%20(USA).cso",
       "https://archive.org/cors/psp-cso-collection/Power%20Stone%20Collection%20(USA).cso",
       "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fpsp-cso-collection%2FPower%2520Stone%2520Collection%2520(USA).cso",
-      "https://archive.org/download/psp-cso-collection/Power%20Stone%20Collection%20(USA).cso",
-      "https://archive.org/cors/sony-psp-cso-collection/Power%20Stone%20Collection%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony-psp-cso-collection%2FPower%2520Stone%2520Collection%2520(USA).cso",
-      "https://archive.org/download/sony-psp-cso-collection/Power%20Stone%20Collection%20(USA).cso"
+      "https://archive.org/download/psp-cso-collection/Power%20Stone%20Collection%20(USA).cso"
     ],
-    "description": "Combat / Arène sur PlayStation Portable (320 Mo · PPSSPP WebAssembly)."
+    "description": "Combat / Arène sur PlayStation Portable (306 Mo · PPSSPP WebAssembly)."
   },
   {
     "id": "psp-the-king-of-fighters-collection-the-orochi-saga",
@@ -1004,20 +998,14 @@
       ".iso"
     ],
     "engine": "emulatorjs:psp",
-    "estimatedSize": "590 Mo",
-    "filename": "King of Fighters Collection, The - The Orochi Saga (USA).cso",
+    "estimatedSize": "1.03 Go",
+    "filename": "The King of Fighters Collection - The Orochi Saga (USA).cso",
     "urls": [
-      "https://archive.org/cors/sony_psp_cso_usa/King%20of%20Fighters%20Collection%2C%20The%20-%20The%20Orochi%20Saga%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony_psp_cso_usa%2FKing%2520of%2520Fighters%2520Collection%252C%2520The%2520-%2520The%2520Orochi%2520Saga%2520(USA).cso",
-      "https://archive.org/download/sony_psp_cso_usa/King%20of%20Fighters%20Collection%2C%20The%20-%20The%20Orochi%20Saga%20(USA).cso",
-      "https://archive.org/cors/psp-cso-collection/King%20of%20Fighters%20Collection%2C%20The%20-%20The%20Orochi%20Saga%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fpsp-cso-collection%2FKing%2520of%2520Fighters%2520Collection%252C%2520The%2520-%2520The%2520Orochi%2520Saga%2520(USA).cso",
-      "https://archive.org/download/psp-cso-collection/King%20of%20Fighters%20Collection%2C%20The%20-%20The%20Orochi%20Saga%20(USA).cso",
-      "https://archive.org/cors/sony-psp-cso-collection/King%20of%20Fighters%20Collection%2C%20The%20-%20The%20Orochi%20Saga%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony-psp-cso-collection%2FKing%2520of%2520Fighters%2520Collection%252C%2520The%2520-%2520The%2520Orochi%2520Saga%2520(USA).cso",
-      "https://archive.org/download/sony-psp-cso-collection/King%20of%20Fighters%20Collection%2C%20The%20-%20The%20Orochi%20Saga%20(USA).cso"
+      "https://archive.org/cors/psp-cso-collection/The%20King%20of%20Fighters%20Collection%20-%20The%20Orochi%20Saga%20(USA).cso",
+      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fpsp-cso-collection%2FThe%2520King%2520of%2520Fighters%2520Collection%2520-%2520The%2520Orochi%2520Saga%2520(USA).cso",
+      "https://archive.org/download/psp-cso-collection/The%20King%20of%20Fighters%20Collection%20-%20The%20Orochi%20Saga%20(USA).cso"
     ],
-    "description": "Combat 2D sur PlayStation Portable (590 Mo · PPSSPP WebAssembly)."
+    "description": "Combat 2D sur PlayStation Portable (1.03 Go · PPSSPP WebAssembly)."
   },
   {
     "id": "psp-grand-theft-auto-vice-city-stories",
@@ -1034,20 +1022,17 @@
       ".iso"
     ],
     "engine": "emulatorjs:psp",
-    "estimatedSize": "880 Mo",
+    "estimatedSize": "896 Mo",
     "filename": "Grand Theft Auto - Vice City Stories (USA).cso",
     "urls": [
-      "https://archive.org/cors/sony_psp_cso_usa/Grand%20Theft%20Auto%20-%20Vice%20City%20Stories%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony_psp_cso_usa%2FGrand%2520Theft%2520Auto%2520-%2520Vice%2520City%2520Stories%2520(USA).cso",
-      "https://archive.org/download/sony_psp_cso_usa/Grand%20Theft%20Auto%20-%20Vice%20City%20Stories%20(USA).cso",
       "https://archive.org/cors/psp-cso-collection/Grand%20Theft%20Auto%20-%20Vice%20City%20Stories%20(USA).cso",
       "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fpsp-cso-collection%2FGrand%2520Theft%2520Auto%2520-%2520Vice%2520City%2520Stories%2520(USA).cso",
       "https://archive.org/download/psp-cso-collection/Grand%20Theft%20Auto%20-%20Vice%20City%20Stories%20(USA).cso",
-      "https://archive.org/cors/sony-psp-cso-collection/Grand%20Theft%20Auto%20-%20Vice%20City%20Stories%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony-psp-cso-collection%2FGrand%2520Theft%2520Auto%2520-%2520Vice%2520City%2520Stories%2520(USA).cso",
-      "https://archive.org/download/sony-psp-cso-collection/Grand%20Theft%20Auto%20-%20Vice%20City%20Stories%20(USA).cso"
+      "https://archive.org/cors/ultimate-rom-collection/PSP/Grand%20Theft%20Auto%20-%20Vice%20City%20Stories%20(USA).iso",
+      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fultimate-rom-collection%2FPSP%2FGrand%2520Theft%2520Auto%2520-%2520Vice%2520City%2520Stories%2520(USA).iso",
+      "https://archive.org/download/ultimate-rom-collection/PSP/Grand%20Theft%20Auto%20-%20Vice%20City%20Stories%20(USA).iso"
     ],
-    "description": "Action / Open World sur PlayStation Portable (880 Mo · PPSSPP WebAssembly)."
+    "description": "Action / Open World sur PlayStation Portable (896 Mo · PPSSPP WebAssembly)."
   },
   {
     "id": "psp-grand-theft-auto-liberty-city-stories",
@@ -1064,20 +1049,17 @@
       ".iso"
     ],
     "engine": "emulatorjs:psp",
-    "estimatedSize": "560 Mo",
+    "estimatedSize": "583 Mo",
     "filename": "Grand Theft Auto - Liberty City Stories (USA).cso",
     "urls": [
-      "https://archive.org/cors/sony_psp_cso_usa/Grand%20Theft%20Auto%20-%20Liberty%20City%20Stories%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony_psp_cso_usa%2FGrand%2520Theft%2520Auto%2520-%2520Liberty%2520City%2520Stories%2520(USA).cso",
-      "https://archive.org/download/sony_psp_cso_usa/Grand%20Theft%20Auto%20-%20Liberty%20City%20Stories%20(USA).cso",
       "https://archive.org/cors/psp-cso-collection/Grand%20Theft%20Auto%20-%20Liberty%20City%20Stories%20(USA).cso",
       "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fpsp-cso-collection%2FGrand%2520Theft%2520Auto%2520-%2520Liberty%2520City%2520Stories%2520(USA).cso",
       "https://archive.org/download/psp-cso-collection/Grand%20Theft%20Auto%20-%20Liberty%20City%20Stories%20(USA).cso",
-      "https://archive.org/cors/sony-psp-cso-collection/Grand%20Theft%20Auto%20-%20Liberty%20City%20Stories%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony-psp-cso-collection%2FGrand%2520Theft%2520Auto%2520-%2520Liberty%2520City%2520Stories%2520(USA).cso",
-      "https://archive.org/download/sony-psp-cso-collection/Grand%20Theft%20Auto%20-%20Liberty%20City%20Stories%20(USA).cso"
+      "https://archive.org/cors/ultimate-rom-collection/PSP/Grand%20Theft%20Auto%20-%20Liberty%20City%20Stories%20(USA)%20(En%2CFr%2CDe%2CEs%2CIt)%20(v3.00).iso",
+      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fultimate-rom-collection%2FPSP%2FGrand%2520Theft%2520Auto%2520-%2520Liberty%2520City%2520Stories%2520(USA)%2520(En%252CFr%252CDe%252CEs%252CIt)%2520(v3.00).iso",
+      "https://archive.org/download/ultimate-rom-collection/PSP/Grand%20Theft%20Auto%20-%20Liberty%20City%20Stories%20(USA)%20(En%2CFr%2CDe%2CEs%2CIt)%20(v3.00).iso"
     ],
-    "description": "Action / Open World sur PlayStation Portable (560 Mo · PPSSPP WebAssembly)."
+    "description": "Action / Open World sur PlayStation Portable (583 Mo · PPSSPP WebAssembly)."
   },
   {
     "id": "psp-grand-theft-auto-chinatown-wars",
@@ -1094,20 +1076,17 @@
       ".iso"
     ],
     "engine": "emulatorjs:psp",
-    "estimatedSize": "540 Mo",
+    "estimatedSize": "557 Mo",
     "filename": "Grand Theft Auto - Chinatown Wars (USA).cso",
     "urls": [
-      "https://archive.org/cors/sony_psp_cso_usa/Grand%20Theft%20Auto%20-%20Chinatown%20Wars%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony_psp_cso_usa%2FGrand%2520Theft%2520Auto%2520-%2520Chinatown%2520Wars%2520(USA).cso",
-      "https://archive.org/download/sony_psp_cso_usa/Grand%20Theft%20Auto%20-%20Chinatown%20Wars%20(USA).cso",
       "https://archive.org/cors/psp-cso-collection/Grand%20Theft%20Auto%20-%20Chinatown%20Wars%20(USA).cso",
       "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fpsp-cso-collection%2FGrand%2520Theft%2520Auto%2520-%2520Chinatown%2520Wars%2520(USA).cso",
       "https://archive.org/download/psp-cso-collection/Grand%20Theft%20Auto%20-%20Chinatown%20Wars%20(USA).cso",
-      "https://archive.org/cors/sony-psp-cso-collection/Grand%20Theft%20Auto%20-%20Chinatown%20Wars%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony-psp-cso-collection%2FGrand%2520Theft%2520Auto%2520-%2520Chinatown%2520Wars%2520(USA).cso",
-      "https://archive.org/download/sony-psp-cso-collection/Grand%20Theft%20Auto%20-%20Chinatown%20Wars%20(USA).cso"
+      "https://archive.org/cors/ultimate-rom-collection/PSP/Grand%20Theft%20Auto%20-%20Chinatown%20Wars%20(USA).iso",
+      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fultimate-rom-collection%2FPSP%2FGrand%2520Theft%2520Auto%2520-%2520Chinatown%2520Wars%2520(USA).iso",
+      "https://archive.org/download/ultimate-rom-collection/PSP/Grand%20Theft%20Auto%20-%20Chinatown%20Wars%20(USA).iso"
     ],
-    "description": "Action / Open World sur PlayStation Portable (540 Mo · PPSSPP WebAssembly)."
+    "description": "Action / Open World sur PlayStation Portable (557 Mo · PPSSPP WebAssembly)."
   },
   {
     "id": "psp-god-of-war-chains-of-olympus",
@@ -1124,20 +1103,17 @@
       ".iso"
     ],
     "engine": "emulatorjs:psp",
-    "estimatedSize": "980 Mo",
+    "estimatedSize": "1.23 Go",
     "filename": "God of War - Chains of Olympus (USA).cso",
     "urls": [
-      "https://archive.org/cors/sony_psp_cso_usa/God%20of%20War%20-%20Chains%20of%20Olympus%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony_psp_cso_usa%2FGod%2520of%2520War%2520-%2520Chains%2520of%2520Olympus%2520(USA).cso",
-      "https://archive.org/download/sony_psp_cso_usa/God%20of%20War%20-%20Chains%20of%20Olympus%20(USA).cso",
       "https://archive.org/cors/psp-cso-collection/God%20of%20War%20-%20Chains%20of%20Olympus%20(USA).cso",
       "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fpsp-cso-collection%2FGod%2520of%2520War%2520-%2520Chains%2520of%2520Olympus%2520(USA).cso",
       "https://archive.org/download/psp-cso-collection/God%20of%20War%20-%20Chains%20of%20Olympus%20(USA).cso",
-      "https://archive.org/cors/sony-psp-cso-collection/God%20of%20War%20-%20Chains%20of%20Olympus%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony-psp-cso-collection%2FGod%2520of%2520War%2520-%2520Chains%2520of%2520Olympus%2520(USA).cso",
-      "https://archive.org/download/sony-psp-cso-collection/God%20of%20War%20-%20Chains%20of%20Olympus%20(USA).cso"
+      "https://archive.org/cors/ultimate-rom-collection/PSP/God%20of%20War%20-%20Chains%20of%20Olympus%20(USA).iso",
+      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fultimate-rom-collection%2FPSP%2FGod%2520of%2520War%2520-%2520Chains%2520of%2520Olympus%2520(USA).iso",
+      "https://archive.org/download/ultimate-rom-collection/PSP/God%20of%20War%20-%20Chains%20of%20Olympus%20(USA).iso"
     ],
-    "description": "Action / Beat ’em all sur PlayStation Portable (980 Mo · PPSSPP WebAssembly)."
+    "description": "Action / Beat ’em all sur PlayStation Portable (1.23 Go · PPSSPP WebAssembly)."
   },
   {
     "id": "psp-god-of-war-ghost-of-sparta",
@@ -1154,20 +1130,17 @@
       ".iso"
     ],
     "engine": "emulatorjs:psp",
-    "estimatedSize": "1.1 Go",
+    "estimatedSize": "1.23 Go",
     "filename": "God of War - Ghost of Sparta (USA).cso",
     "urls": [
-      "https://archive.org/cors/sony_psp_cso_usa/God%20of%20War%20-%20Ghost%20of%20Sparta%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony_psp_cso_usa%2FGod%2520of%2520War%2520-%2520Ghost%2520of%2520Sparta%2520(USA).cso",
-      "https://archive.org/download/sony_psp_cso_usa/God%20of%20War%20-%20Ghost%20of%20Sparta%20(USA).cso",
       "https://archive.org/cors/psp-cso-collection/God%20of%20War%20-%20Ghost%20of%20Sparta%20(USA).cso",
       "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fpsp-cso-collection%2FGod%2520of%2520War%2520-%2520Ghost%2520of%2520Sparta%2520(USA).cso",
       "https://archive.org/download/psp-cso-collection/God%20of%20War%20-%20Ghost%20of%20Sparta%20(USA).cso",
-      "https://archive.org/cors/sony-psp-cso-collection/God%20of%20War%20-%20Ghost%20of%20Sparta%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony-psp-cso-collection%2FGod%2520of%2520War%2520-%2520Ghost%2520of%2520Sparta%2520(USA).cso",
-      "https://archive.org/download/sony-psp-cso-collection/God%20of%20War%20-%20Ghost%20of%20Sparta%20(USA).cso"
+      "https://archive.org/cors/ultimate-rom-collection/PSP/God%20of%20War%20-%20Ghost%20of%20Sparta%20(USA)%20(En%2CFr%2CEs).iso",
+      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fultimate-rom-collection%2FPSP%2FGod%2520of%2520War%2520-%2520Ghost%2520of%2520Sparta%2520(USA)%2520(En%252CFr%252CEs).iso",
+      "https://archive.org/download/ultimate-rom-collection/PSP/God%20of%20War%20-%20Ghost%20of%20Sparta%20(USA)%20(En%2CFr%2CEs).iso"
     ],
-    "description": "Action / Beat ’em all sur PlayStation Portable (1.1 Go · PPSSPP WebAssembly)."
+    "description": "Action / Beat ’em all sur PlayStation Portable (1.23 Go · PPSSPP WebAssembly)."
   },
   {
     "id": "psp-metal-gear-solid-peace-walker",
@@ -1184,20 +1157,17 @@
       ".iso"
     ],
     "engine": "emulatorjs:psp",
-    "estimatedSize": "1.3 Go",
+    "estimatedSize": "1.38 Go",
     "filename": "Metal Gear Solid - Peace Walker (USA).cso",
     "urls": [
-      "https://archive.org/cors/sony_psp_cso_usa/Metal%20Gear%20Solid%20-%20Peace%20Walker%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony_psp_cso_usa%2FMetal%2520Gear%2520Solid%2520-%2520Peace%2520Walker%2520(USA).cso",
-      "https://archive.org/download/sony_psp_cso_usa/Metal%20Gear%20Solid%20-%20Peace%20Walker%20(USA).cso",
       "https://archive.org/cors/psp-cso-collection/Metal%20Gear%20Solid%20-%20Peace%20Walker%20(USA).cso",
       "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fpsp-cso-collection%2FMetal%2520Gear%2520Solid%2520-%2520Peace%2520Walker%2520(USA).cso",
       "https://archive.org/download/psp-cso-collection/Metal%20Gear%20Solid%20-%20Peace%20Walker%20(USA).cso",
-      "https://archive.org/cors/sony-psp-cso-collection/Metal%20Gear%20Solid%20-%20Peace%20Walker%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony-psp-cso-collection%2FMetal%2520Gear%2520Solid%2520-%2520Peace%2520Walker%2520(USA).cso",
-      "https://archive.org/download/sony-psp-cso-collection/Metal%20Gear%20Solid%20-%20Peace%20Walker%20(USA).cso"
+      "https://archive.org/cors/ultimate-rom-collection/PSP/Metal%20Gear%20Solid%20-%20Peace%20Walker%20(USA)%20(En%2CFr%2CEs)%20(v2.00).iso",
+      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fultimate-rom-collection%2FPSP%2FMetal%2520Gear%2520Solid%2520-%2520Peace%2520Walker%2520(USA)%2520(En%252CFr%252CEs)%2520(v2.00).iso",
+      "https://archive.org/download/ultimate-rom-collection/PSP/Metal%20Gear%20Solid%20-%20Peace%20Walker%20(USA)%20(En%2CFr%2CEs)%20(v2.00).iso"
     ],
-    "description": "Infiltration / Action sur PlayStation Portable (1.3 Go · PPSSPP WebAssembly)."
+    "description": "Infiltration / Action sur PlayStation Portable (1.38 Go · PPSSPP WebAssembly)."
   },
   {
     "id": "psp-metal-gear-solid-portable-ops",
@@ -1214,20 +1184,17 @@
       ".iso"
     ],
     "engine": "emulatorjs:psp",
-    "estimatedSize": "860 Mo",
+    "estimatedSize": "822 Mo",
     "filename": "Metal Gear Solid - Portable Ops (USA).cso",
     "urls": [
-      "https://archive.org/cors/sony_psp_cso_usa/Metal%20Gear%20Solid%20-%20Portable%20Ops%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony_psp_cso_usa%2FMetal%2520Gear%2520Solid%2520-%2520Portable%2520Ops%2520(USA).cso",
-      "https://archive.org/download/sony_psp_cso_usa/Metal%20Gear%20Solid%20-%20Portable%20Ops%20(USA).cso",
       "https://archive.org/cors/psp-cso-collection/Metal%20Gear%20Solid%20-%20Portable%20Ops%20(USA).cso",
       "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fpsp-cso-collection%2FMetal%2520Gear%2520Solid%2520-%2520Portable%2520Ops%2520(USA).cso",
       "https://archive.org/download/psp-cso-collection/Metal%20Gear%20Solid%20-%20Portable%20Ops%20(USA).cso",
-      "https://archive.org/cors/sony-psp-cso-collection/Metal%20Gear%20Solid%20-%20Portable%20Ops%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony-psp-cso-collection%2FMetal%2520Gear%2520Solid%2520-%2520Portable%2520Ops%2520(USA).cso",
-      "https://archive.org/download/sony-psp-cso-collection/Metal%20Gear%20Solid%20-%20Portable%20Ops%20(USA).cso"
+      "https://archive.org/cors/ultimate-rom-collection/PSP/Metal%20Gear%20Solid%20-%20Portable%20Ops%20(USA)%20(v1.02).iso",
+      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fultimate-rom-collection%2FPSP%2FMetal%2520Gear%2520Solid%2520-%2520Portable%2520Ops%2520(USA)%2520(v1.02).iso",
+      "https://archive.org/download/ultimate-rom-collection/PSP/Metal%20Gear%20Solid%20-%20Portable%20Ops%20(USA)%20(v1.02).iso"
     ],
-    "description": "Infiltration / Action sur PlayStation Portable (860 Mo · PPSSPP WebAssembly)."
+    "description": "Infiltration / Action sur PlayStation Portable (822 Mo · PPSSPP WebAssembly)."
   },
   {
     "id": "psp-assassin-s-creed-bloodlines",
@@ -1244,20 +1211,14 @@
       ".iso"
     ],
     "engine": "emulatorjs:psp",
-    "estimatedSize": "520 Mo",
+    "estimatedSize": "543 Mo",
     "filename": "Assassin's Creed - Bloodlines (USA).cso",
     "urls": [
-      "https://archive.org/cors/sony_psp_cso_usa/Assassin's%20Creed%20-%20Bloodlines%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony_psp_cso_usa%2FAssassin's%2520Creed%2520-%2520Bloodlines%2520(USA).cso",
-      "https://archive.org/download/sony_psp_cso_usa/Assassin's%20Creed%20-%20Bloodlines%20(USA).cso",
       "https://archive.org/cors/psp-cso-collection/Assassin's%20Creed%20-%20Bloodlines%20(USA).cso",
       "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fpsp-cso-collection%2FAssassin's%2520Creed%2520-%2520Bloodlines%2520(USA).cso",
-      "https://archive.org/download/psp-cso-collection/Assassin's%20Creed%20-%20Bloodlines%20(USA).cso",
-      "https://archive.org/cors/sony-psp-cso-collection/Assassin's%20Creed%20-%20Bloodlines%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony-psp-cso-collection%2FAssassin's%2520Creed%2520-%2520Bloodlines%2520(USA).cso",
-      "https://archive.org/download/sony-psp-cso-collection/Assassin's%20Creed%20-%20Bloodlines%20(USA).cso"
+      "https://archive.org/download/psp-cso-collection/Assassin's%20Creed%20-%20Bloodlines%20(USA).cso"
     ],
-    "description": "Action / Aventure sur PlayStation Portable (520 Mo · PPSSPP WebAssembly)."
+    "description": "Action / Aventure sur PlayStation Portable (543 Mo · PPSSPP WebAssembly)."
   },
   {
     "id": "psp-daxter",
@@ -1274,20 +1235,17 @@
       ".iso"
     ],
     "engine": "emulatorjs:psp",
-    "estimatedSize": "910 Mo",
+    "estimatedSize": "1.14 Go",
     "filename": "Daxter (USA).cso",
     "urls": [
-      "https://archive.org/cors/sony_psp_cso_usa/Daxter%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony_psp_cso_usa%2FDaxter%2520(USA).cso",
-      "https://archive.org/download/sony_psp_cso_usa/Daxter%20(USA).cso",
       "https://archive.org/cors/psp-cso-collection/Daxter%20(USA).cso",
       "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fpsp-cso-collection%2FDaxter%2520(USA).cso",
       "https://archive.org/download/psp-cso-collection/Daxter%20(USA).cso",
-      "https://archive.org/cors/sony-psp-cso-collection/Daxter%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony-psp-cso-collection%2FDaxter%2520(USA).cso",
-      "https://archive.org/download/sony-psp-cso-collection/Daxter%20(USA).cso"
+      "https://archive.org/cors/ultimate-rom-collection/PSP/Daxter%20(USA)%20(En%2CFr%2CDe%2CEs%2CIt).iso",
+      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fultimate-rom-collection%2FPSP%2FDaxter%2520(USA)%2520(En%252CFr%252CDe%252CEs%252CIt).iso",
+      "https://archive.org/download/ultimate-rom-collection/PSP/Daxter%20(USA)%20(En%2CFr%2CDe%2CEs%2CIt).iso"
     ],
-    "description": "Plateforme / Aventure sur PlayStation Portable (910 Mo · PPSSPP WebAssembly)."
+    "description": "Plateforme / Aventure sur PlayStation Portable (1.14 Go · PPSSPP WebAssembly)."
   },
   {
     "id": "psp-ratchet-clank-size-matters",
@@ -1304,20 +1262,17 @@
       ".iso"
     ],
     "engine": "emulatorjs:psp",
-    "estimatedSize": "670 Mo",
+    "estimatedSize": "797 Mo",
     "filename": "Ratchet & Clank - Size Matters (USA).cso",
     "urls": [
-      "https://archive.org/cors/sony_psp_cso_usa/Ratchet%20%26%20Clank%20-%20Size%20Matters%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony_psp_cso_usa%2FRatchet%2520%2526%2520Clank%2520-%2520Size%2520Matters%2520(USA).cso",
-      "https://archive.org/download/sony_psp_cso_usa/Ratchet%20%26%20Clank%20-%20Size%20Matters%20(USA).cso",
       "https://archive.org/cors/psp-cso-collection/Ratchet%20%26%20Clank%20-%20Size%20Matters%20(USA).cso",
       "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fpsp-cso-collection%2FRatchet%2520%2526%2520Clank%2520-%2520Size%2520Matters%2520(USA).cso",
       "https://archive.org/download/psp-cso-collection/Ratchet%20%26%20Clank%20-%20Size%20Matters%20(USA).cso",
-      "https://archive.org/cors/sony-psp-cso-collection/Ratchet%20%26%20Clank%20-%20Size%20Matters%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony-psp-cso-collection%2FRatchet%2520%2526%2520Clank%2520-%2520Size%2520Matters%2520(USA).cso",
-      "https://archive.org/download/sony-psp-cso-collection/Ratchet%20%26%20Clank%20-%20Size%20Matters%20(USA).cso"
+      "https://archive.org/cors/ultimate-rom-collection/PSP/Ratchet%20%26%20Clank%20-%20Size%20Matters%20(USA)%20(En%2CFr%2CDe%2CEs%2CIt).iso",
+      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fultimate-rom-collection%2FPSP%2FRatchet%2520%2526%2520Clank%2520-%2520Size%2520Matters%2520(USA)%2520(En%252CFr%252CDe%252CEs%252CIt).iso",
+      "https://archive.org/download/ultimate-rom-collection/PSP/Ratchet%20%26%20Clank%20-%20Size%20Matters%20(USA)%20(En%2CFr%2CDe%2CEs%2CIt).iso"
     ],
-    "description": "Plateforme / Action sur PlayStation Portable (670 Mo · PPSSPP WebAssembly)."
+    "description": "Plateforme / Action sur PlayStation Portable (797 Mo · PPSSPP WebAssembly)."
   },
   {
     "id": "psp-jak-and-daxter-the-lost-frontier",
@@ -1334,20 +1289,17 @@
       ".iso"
     ],
     "engine": "emulatorjs:psp",
-    "estimatedSize": "940 Mo",
+    "estimatedSize": "1008 Mo",
     "filename": "Jak and Daxter - The Lost Frontier (USA).cso",
     "urls": [
-      "https://archive.org/cors/sony_psp_cso_usa/Jak%20and%20Daxter%20-%20The%20Lost%20Frontier%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony_psp_cso_usa%2FJak%2520and%2520Daxter%2520-%2520The%2520Lost%2520Frontier%2520(USA).cso",
-      "https://archive.org/download/sony_psp_cso_usa/Jak%20and%20Daxter%20-%20The%20Lost%20Frontier%20(USA).cso",
       "https://archive.org/cors/psp-cso-collection/Jak%20and%20Daxter%20-%20The%20Lost%20Frontier%20(USA).cso",
       "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fpsp-cso-collection%2FJak%2520and%2520Daxter%2520-%2520The%2520Lost%2520Frontier%2520(USA).cso",
       "https://archive.org/download/psp-cso-collection/Jak%20and%20Daxter%20-%20The%20Lost%20Frontier%20(USA).cso",
-      "https://archive.org/cors/sony-psp-cso-collection/Jak%20and%20Daxter%20-%20The%20Lost%20Frontier%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony-psp-cso-collection%2FJak%2520and%2520Daxter%2520-%2520The%2520Lost%2520Frontier%2520(USA).cso",
-      "https://archive.org/download/sony-psp-cso-collection/Jak%20and%20Daxter%20-%20The%20Lost%20Frontier%20(USA).cso"
+      "https://archive.org/cors/ultimate-rom-collection/PSP/Jak%20and%20Daxter%20-%20The%20Lost%20Frontier%20(USA)%20(En%2CFr%2CEs).iso",
+      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fultimate-rom-collection%2FPSP%2FJak%2520and%2520Daxter%2520-%2520The%2520Lost%2520Frontier%2520(USA)%2520(En%252CFr%252CEs).iso",
+      "https://archive.org/download/ultimate-rom-collection/PSP/Jak%20and%20Daxter%20-%20The%20Lost%20Frontier%20(USA)%20(En%2CFr%2CEs).iso"
     ],
-    "description": "Plateforme / Aventure sur PlayStation Portable (940 Mo · PPSSPP WebAssembly)."
+    "description": "Plateforme / Aventure sur PlayStation Portable (1008 Mo · PPSSPP WebAssembly)."
   },
   {
     "id": "psp-prince-of-persia-revelations",
@@ -1364,20 +1316,14 @@
       ".iso"
     ],
     "engine": "emulatorjs:psp",
-    "estimatedSize": "980 Mo",
+    "estimatedSize": "1.23 Go",
     "filename": "Prince of Persia - Revelations (USA).cso",
     "urls": [
-      "https://archive.org/cors/sony_psp_cso_usa/Prince%20of%20Persia%20-%20Revelations%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony_psp_cso_usa%2FPrince%2520of%2520Persia%2520-%2520Revelations%2520(USA).cso",
-      "https://archive.org/download/sony_psp_cso_usa/Prince%20of%20Persia%20-%20Revelations%20(USA).cso",
       "https://archive.org/cors/psp-cso-collection/Prince%20of%20Persia%20-%20Revelations%20(USA).cso",
       "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fpsp-cso-collection%2FPrince%2520of%2520Persia%2520-%2520Revelations%2520(USA).cso",
-      "https://archive.org/download/psp-cso-collection/Prince%20of%20Persia%20-%20Revelations%20(USA).cso",
-      "https://archive.org/cors/sony-psp-cso-collection/Prince%20of%20Persia%20-%20Revelations%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony-psp-cso-collection%2FPrince%2520of%2520Persia%2520-%2520Revelations%2520(USA).cso",
-      "https://archive.org/download/sony-psp-cso-collection/Prince%20of%20Persia%20-%20Revelations%20(USA).cso"
+      "https://archive.org/download/psp-cso-collection/Prince%20of%20Persia%20-%20Revelations%20(USA).cso"
     ],
-    "description": "Action / Aventure sur PlayStation Portable (980 Mo · PPSSPP WebAssembly)."
+    "description": "Action / Aventure sur PlayStation Portable (1.23 Go · PPSSPP WebAssembly)."
   },
   {
     "id": "psp-prince-of-persia-rival-swords",
@@ -1394,20 +1340,14 @@
       ".iso"
     ],
     "engine": "emulatorjs:psp",
-    "estimatedSize": "790 Mo",
+    "estimatedSize": "988 Mo",
     "filename": "Prince of Persia - Rival Swords (USA).cso",
     "urls": [
-      "https://archive.org/cors/sony_psp_cso_usa/Prince%20of%20Persia%20-%20Rival%20Swords%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony_psp_cso_usa%2FPrince%2520of%2520Persia%2520-%2520Rival%2520Swords%2520(USA).cso",
-      "https://archive.org/download/sony_psp_cso_usa/Prince%20of%20Persia%20-%20Rival%20Swords%20(USA).cso",
       "https://archive.org/cors/psp-cso-collection/Prince%20of%20Persia%20-%20Rival%20Swords%20(USA).cso",
       "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fpsp-cso-collection%2FPrince%2520of%2520Persia%2520-%2520Rival%2520Swords%2520(USA).cso",
-      "https://archive.org/download/psp-cso-collection/Prince%20of%20Persia%20-%20Rival%20Swords%20(USA).cso",
-      "https://archive.org/cors/sony-psp-cso-collection/Prince%20of%20Persia%20-%20Rival%20Swords%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony-psp-cso-collection%2FPrince%2520of%2520Persia%2520-%2520Rival%2520Swords%2520(USA).cso",
-      "https://archive.org/download/sony-psp-cso-collection/Prince%20of%20Persia%20-%20Rival%20Swords%20(USA).cso"
+      "https://archive.org/download/psp-cso-collection/Prince%20of%20Persia%20-%20Rival%20Swords%20(USA).cso"
     ],
-    "description": "Action / Aventure sur PlayStation Portable (790 Mo · PPSSPP WebAssembly)."
+    "description": "Action / Aventure sur PlayStation Portable (988 Mo · PPSSPP WebAssembly)."
   },
   {
     "id": "psp-tomb-raider-anniversary",
@@ -1424,20 +1364,14 @@
       ".iso"
     ],
     "engine": "emulatorjs:psp",
-    "estimatedSize": "950 Mo",
-    "filename": "Tomb Raider - Anniversary (USA).cso",
+    "estimatedSize": "1.03 Go",
+    "filename": "Lara Croft - Tomb Raider - Anniversary (USA).cso",
     "urls": [
-      "https://archive.org/cors/sony_psp_cso_usa/Tomb%20Raider%20-%20Anniversary%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony_psp_cso_usa%2FTomb%2520Raider%2520-%2520Anniversary%2520(USA).cso",
-      "https://archive.org/download/sony_psp_cso_usa/Tomb%20Raider%20-%20Anniversary%20(USA).cso",
-      "https://archive.org/cors/psp-cso-collection/Tomb%20Raider%20-%20Anniversary%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fpsp-cso-collection%2FTomb%2520Raider%2520-%2520Anniversary%2520(USA).cso",
-      "https://archive.org/download/psp-cso-collection/Tomb%20Raider%20-%20Anniversary%20(USA).cso",
-      "https://archive.org/cors/sony-psp-cso-collection/Tomb%20Raider%20-%20Anniversary%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony-psp-cso-collection%2FTomb%2520Raider%2520-%2520Anniversary%2520(USA).cso",
-      "https://archive.org/download/sony-psp-cso-collection/Tomb%20Raider%20-%20Anniversary%20(USA).cso"
+      "https://archive.org/cors/psp-cso-collection/Lara%20Croft%20-%20Tomb%20Raider%20-%20Anniversary%20(USA).cso",
+      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fpsp-cso-collection%2FLara%2520Croft%2520-%2520Tomb%2520Raider%2520-%2520Anniversary%2520(USA).cso",
+      "https://archive.org/download/psp-cso-collection/Lara%20Croft%20-%20Tomb%20Raider%20-%20Anniversary%20(USA).cso"
     ],
-    "description": "Action / Aventure sur PlayStation Portable (950 Mo · PPSSPP WebAssembly)."
+    "description": "Action / Aventure sur PlayStation Portable (1.03 Go · PPSSPP WebAssembly)."
   },
   {
     "id": "psp-spider-man-3",
@@ -1454,20 +1388,14 @@
       ".iso"
     ],
     "engine": "emulatorjs:psp",
-    "estimatedSize": "1.1 Go",
+    "estimatedSize": "1.41 Go",
     "filename": "Spider-Man 3 (USA).cso",
     "urls": [
-      "https://archive.org/cors/sony_psp_cso_usa/Spider-Man%203%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony_psp_cso_usa%2FSpider-Man%25203%2520(USA).cso",
-      "https://archive.org/download/sony_psp_cso_usa/Spider-Man%203%20(USA).cso",
       "https://archive.org/cors/psp-cso-collection/Spider-Man%203%20(USA).cso",
       "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fpsp-cso-collection%2FSpider-Man%25203%2520(USA).cso",
-      "https://archive.org/download/psp-cso-collection/Spider-Man%203%20(USA).cso",
-      "https://archive.org/cors/sony-psp-cso-collection/Spider-Man%203%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony-psp-cso-collection%2FSpider-Man%25203%2520(USA).cso",
-      "https://archive.org/download/sony-psp-cso-collection/Spider-Man%203%20(USA).cso"
+      "https://archive.org/download/psp-cso-collection/Spider-Man%203%20(USA).cso"
     ],
-    "description": "Action / Super-Héros sur PlayStation Portable (1.1 Go · PPSSPP WebAssembly)."
+    "description": "Action / Super-Héros sur PlayStation Portable (1.41 Go · PPSSPP WebAssembly)."
   },
   {
     "id": "psp-ben-10-protector-of-earth",
@@ -1484,20 +1412,14 @@
       ".iso"
     ],
     "engine": "emulatorjs:psp",
-    "estimatedSize": "470 Mo",
+    "estimatedSize": "593 Mo",
     "filename": "Ben 10 - Protector of Earth (USA).cso",
     "urls": [
-      "https://archive.org/cors/sony_psp_cso_usa/Ben%2010%20-%20Protector%20of%20Earth%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony_psp_cso_usa%2FBen%252010%2520-%2520Protector%2520of%2520Earth%2520(USA).cso",
-      "https://archive.org/download/sony_psp_cso_usa/Ben%2010%20-%20Protector%20of%20Earth%20(USA).cso",
       "https://archive.org/cors/psp-cso-collection/Ben%2010%20-%20Protector%20of%20Earth%20(USA).cso",
       "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fpsp-cso-collection%2FBen%252010%2520-%2520Protector%2520of%2520Earth%2520(USA).cso",
-      "https://archive.org/download/psp-cso-collection/Ben%2010%20-%20Protector%20of%20Earth%20(USA).cso",
-      "https://archive.org/cors/sony-psp-cso-collection/Ben%2010%20-%20Protector%20of%20Earth%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony-psp-cso-collection%2FBen%252010%2520-%2520Protector%2520of%2520Earth%2520(USA).cso",
-      "https://archive.org/download/sony-psp-cso-collection/Ben%2010%20-%20Protector%20of%20Earth%20(USA).cso"
+      "https://archive.org/download/psp-cso-collection/Ben%2010%20-%20Protector%20of%20Earth%20(USA).cso"
     ],
-    "description": "Action / Aventure sur PlayStation Portable (470 Mo · PPSSPP WebAssembly)."
+    "description": "Action / Aventure sur PlayStation Portable (593 Mo · PPSSPP WebAssembly)."
   },
   {
     "id": "psp-resistance-retribution",
@@ -1514,20 +1436,17 @@
       ".iso"
     ],
     "engine": "emulatorjs:psp",
-    "estimatedSize": "1.2 Go",
+    "estimatedSize": "1.36 Go",
     "filename": "Resistance - Retribution (USA).cso",
     "urls": [
-      "https://archive.org/cors/sony_psp_cso_usa/Resistance%20-%20Retribution%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony_psp_cso_usa%2FResistance%2520-%2520Retribution%2520(USA).cso",
-      "https://archive.org/download/sony_psp_cso_usa/Resistance%20-%20Retribution%20(USA).cso",
       "https://archive.org/cors/psp-cso-collection/Resistance%20-%20Retribution%20(USA).cso",
       "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fpsp-cso-collection%2FResistance%2520-%2520Retribution%2520(USA).cso",
       "https://archive.org/download/psp-cso-collection/Resistance%20-%20Retribution%20(USA).cso",
-      "https://archive.org/cors/sony-psp-cso-collection/Resistance%20-%20Retribution%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony-psp-cso-collection%2FResistance%2520-%2520Retribution%2520(USA).cso",
-      "https://archive.org/download/sony-psp-cso-collection/Resistance%20-%20Retribution%20(USA).cso"
+      "https://archive.org/cors/ultimate-rom-collection/PSP/Resistance%20-%20Retribution%20(USA)%20(En%2CFr%2CEs).iso",
+      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fultimate-rom-collection%2FPSP%2FResistance%2520-%2520Retribution%2520(USA)%2520(En%252CFr%252CEs).iso",
+      "https://archive.org/download/ultimate-rom-collection/PSP/Resistance%20-%20Retribution%20(USA)%20(En%2CFr%2CEs).iso"
     ],
-    "description": "TPS / Action sur PlayStation Portable (1.2 Go · PPSSPP WebAssembly)."
+    "description": "TPS / Action sur PlayStation Portable (1.36 Go · PPSSPP WebAssembly)."
   },
   {
     "id": "psp-syphon-filter-dark-mirror",
@@ -1544,20 +1463,17 @@
       ".iso"
     ],
     "engine": "emulatorjs:psp",
-    "estimatedSize": "910 Mo",
+    "estimatedSize": "1023 Mo",
     "filename": "Syphon Filter - Dark Mirror (USA).cso",
     "urls": [
-      "https://archive.org/cors/sony_psp_cso_usa/Syphon%20Filter%20-%20Dark%20Mirror%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony_psp_cso_usa%2FSyphon%2520Filter%2520-%2520Dark%2520Mirror%2520(USA).cso",
-      "https://archive.org/download/sony_psp_cso_usa/Syphon%20Filter%20-%20Dark%20Mirror%20(USA).cso",
       "https://archive.org/cors/psp-cso-collection/Syphon%20Filter%20-%20Dark%20Mirror%20(USA).cso",
       "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fpsp-cso-collection%2FSyphon%2520Filter%2520-%2520Dark%2520Mirror%2520(USA).cso",
       "https://archive.org/download/psp-cso-collection/Syphon%20Filter%20-%20Dark%20Mirror%20(USA).cso",
-      "https://archive.org/cors/sony-psp-cso-collection/Syphon%20Filter%20-%20Dark%20Mirror%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony-psp-cso-collection%2FSyphon%2520Filter%2520-%2520Dark%2520Mirror%2520(USA).cso",
-      "https://archive.org/download/sony-psp-cso-collection/Syphon%20Filter%20-%20Dark%20Mirror%20(USA).cso"
+      "https://archive.org/cors/ultimate-rom-collection/PSP/Syphon%20Filter%20-%20Dark%20Mirror%20(USA).iso",
+      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fultimate-rom-collection%2FPSP%2FSyphon%2520Filter%2520-%2520Dark%2520Mirror%2520(USA).iso",
+      "https://archive.org/download/ultimate-rom-collection/PSP/Syphon%20Filter%20-%20Dark%20Mirror%20(USA).iso"
     ],
-    "description": "Infiltration / TPS sur PlayStation Portable (910 Mo · PPSSPP WebAssembly)."
+    "description": "Infiltration / TPS sur PlayStation Portable (1023 Mo · PPSSPP WebAssembly)."
   },
   {
     "id": "psp-silent-hill-origins",
@@ -1574,20 +1490,44 @@
       ".iso"
     ],
     "engine": "emulatorjs:psp",
-    "estimatedSize": "680 Mo",
-    "filename": "Silent Hill - Origins (USA).cso",
+    "estimatedSize": "709 Mo",
+    "filename": "Silent Hill Origins (USA).cso",
     "urls": [
-      "https://archive.org/cors/sony_psp_cso_usa/Silent%20Hill%20-%20Origins%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony_psp_cso_usa%2FSilent%2520Hill%2520-%2520Origins%2520(USA).cso",
-      "https://archive.org/download/sony_psp_cso_usa/Silent%20Hill%20-%20Origins%20(USA).cso",
-      "https://archive.org/cors/psp-cso-collection/Silent%20Hill%20-%20Origins%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fpsp-cso-collection%2FSilent%2520Hill%2520-%2520Origins%2520(USA).cso",
-      "https://archive.org/download/psp-cso-collection/Silent%20Hill%20-%20Origins%20(USA).cso",
-      "https://archive.org/cors/sony-psp-cso-collection/Silent%20Hill%20-%20Origins%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony-psp-cso-collection%2FSilent%2520Hill%2520-%2520Origins%2520(USA).cso",
-      "https://archive.org/download/sony-psp-cso-collection/Silent%20Hill%20-%20Origins%20(USA).cso"
+      "https://archive.org/cors/psp-cso-collection/Silent%20Hill%20Origins%20(USA).cso",
+      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fpsp-cso-collection%2FSilent%2520Hill%2520Origins%2520(USA).cso",
+      "https://archive.org/download/psp-cso-collection/Silent%20Hill%20Origins%20(USA).cso",
+      "https://archive.org/cors/ultimate-rom-collection/PSP/Silent%20Hill%20Origins%20(USA)%20(En%2CFr%2CDe%2CEs%2CIt).iso",
+      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fultimate-rom-collection%2FPSP%2FSilent%2520Hill%2520Origins%2520(USA)%2520(En%252CFr%252CDe%252CEs%252CIt).iso",
+      "https://archive.org/download/ultimate-rom-collection/PSP/Silent%20Hill%20Origins%20(USA)%20(En%2CFr%2CDe%2CEs%2CIt).iso"
     ],
-    "description": "Survival Horror sur PlayStation Portable (680 Mo · PPSSPP WebAssembly)."
+    "description": "Survival Horror sur PlayStation Portable (709 Mo · PPSSPP WebAssembly)."
+  },
+  {
+    "id": "psp-silent-hill-shattered-memories",
+    "title": "Silent Hill: Shattered Memories",
+    "platform": "psp",
+    "platformLabel": "PSP",
+    "core": "psp",
+    "year": 2010,
+    "genre": "Survival Horror",
+    "players": "1J",
+    "supportsMultiplayer": false,
+    "formats": [
+      ".cso",
+      ".iso"
+    ],
+    "engine": "emulatorjs:psp",
+    "estimatedSize": "748 Mo",
+    "filename": "Silent Hill - Shattered Memories (USA).cso",
+    "urls": [
+      "https://archive.org/cors/psp-cso-collection/Silent%20Hill%20-%20Shattered%20Memories%20(USA).cso",
+      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fpsp-cso-collection%2FSilent%2520Hill%2520-%2520Shattered%2520Memories%2520(USA).cso",
+      "https://archive.org/download/psp-cso-collection/Silent%20Hill%20-%20Shattered%20Memories%20(USA).cso",
+      "https://archive.org/cors/ultimate-rom-collection/PSP/Silent%20Hill%20-%20Shattered%20Memories%20(USA).iso",
+      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fultimate-rom-collection%2FPSP%2FSilent%2520Hill%2520-%2520Shattered%2520Memories%2520(USA).iso",
+      "https://archive.org/download/ultimate-rom-collection/PSP/Silent%20Hill%20-%20Shattered%20Memories%20(USA).iso"
+    ],
+    "description": "Survival Horror sur PlayStation Portable (748 Mo · PPSSPP WebAssembly)."
   },
   {
     "id": "psp-star-wars-battlefront-ii",
@@ -1604,20 +1544,17 @@
       ".iso"
     ],
     "engine": "emulatorjs:psp",
-    "estimatedSize": "460 Mo",
-    "filename": "Star Wars - Battlefront II (USA).cso",
+    "estimatedSize": "564 Mo",
+    "filename": "Star Wars Battlefront II (USA).cso",
     "urls": [
-      "https://archive.org/cors/sony_psp_cso_usa/Star%20Wars%20-%20Battlefront%20II%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony_psp_cso_usa%2FStar%2520Wars%2520-%2520Battlefront%2520II%2520(USA).cso",
-      "https://archive.org/download/sony_psp_cso_usa/Star%20Wars%20-%20Battlefront%20II%20(USA).cso",
-      "https://archive.org/cors/psp-cso-collection/Star%20Wars%20-%20Battlefront%20II%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fpsp-cso-collection%2FStar%2520Wars%2520-%2520Battlefront%2520II%2520(USA).cso",
-      "https://archive.org/download/psp-cso-collection/Star%20Wars%20-%20Battlefront%20II%20(USA).cso",
-      "https://archive.org/cors/sony-psp-cso-collection/Star%20Wars%20-%20Battlefront%20II%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony-psp-cso-collection%2FStar%2520Wars%2520-%2520Battlefront%2520II%2520(USA).cso",
-      "https://archive.org/download/sony-psp-cso-collection/Star%20Wars%20-%20Battlefront%20II%20(USA).cso"
+      "https://archive.org/cors/psp-cso-collection/Star%20Wars%20Battlefront%20II%20(USA).cso",
+      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fpsp-cso-collection%2FStar%2520Wars%2520Battlefront%2520II%2520(USA).cso",
+      "https://archive.org/download/psp-cso-collection/Star%20Wars%20Battlefront%20II%20(USA).cso",
+      "https://archive.org/cors/ultimate-rom-collection/PSP/Star%20Wars%20-%20Battlefront%20II%20(USA).iso",
+      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fultimate-rom-collection%2FPSP%2FStar%2520Wars%2520-%2520Battlefront%2520II%2520(USA).iso",
+      "https://archive.org/download/ultimate-rom-collection/PSP/Star%20Wars%20-%20Battlefront%20II%20(USA).iso"
     ],
-    "description": "Action / TPS sur PlayStation Portable (460 Mo · PPSSPP WebAssembly)."
+    "description": "Action / TPS sur PlayStation Portable (564 Mo · PPSSPP WebAssembly)."
   },
   {
     "id": "psp-dante-s-inferno",
@@ -1634,20 +1571,17 @@
       ".iso"
     ],
     "engine": "emulatorjs:psp",
-    "estimatedSize": "1.2 Go",
+    "estimatedSize": "1.40 Go",
     "filename": "Dante's Inferno (USA).cso",
     "urls": [
-      "https://archive.org/cors/sony_psp_cso_usa/Dante's%20Inferno%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony_psp_cso_usa%2FDante's%2520Inferno%2520(USA).cso",
-      "https://archive.org/download/sony_psp_cso_usa/Dante's%20Inferno%20(USA).cso",
       "https://archive.org/cors/psp-cso-collection/Dante's%20Inferno%20(USA).cso",
       "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fpsp-cso-collection%2FDante's%2520Inferno%2520(USA).cso",
       "https://archive.org/download/psp-cso-collection/Dante's%20Inferno%20(USA).cso",
-      "https://archive.org/cors/sony-psp-cso-collection/Dante's%20Inferno%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony-psp-cso-collection%2FDante's%2520Inferno%2520(USA).cso",
-      "https://archive.org/download/sony-psp-cso-collection/Dante's%20Inferno%20(USA).cso"
+      "https://archive.org/cors/ultimate-rom-collection/PSP/Dante's%20Inferno%20(USA).iso",
+      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fultimate-rom-collection%2FPSP%2FDante's%2520Inferno%2520(USA).iso",
+      "https://archive.org/download/ultimate-rom-collection/PSP/Dante's%20Inferno%20(USA).iso"
     ],
-    "description": "Action / Beat ’em all sur PlayStation Portable (1.2 Go · PPSSPP WebAssembly)."
+    "description": "Action / Beat ’em all sur PlayStation Portable (1.40 Go · PPSSPP WebAssembly)."
   },
   {
     "id": "psp-the-warriors",
@@ -1664,20 +1598,14 @@
       ".iso"
     ],
     "engine": "emulatorjs:psp",
-    "estimatedSize": "1.1 Go",
-    "filename": "Warriors, The (USA).cso",
+    "estimatedSize": "1.51 Go",
+    "filename": "The Warriors (USA).cso",
     "urls": [
-      "https://archive.org/cors/sony_psp_cso_usa/Warriors%2C%20The%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony_psp_cso_usa%2FWarriors%252C%2520The%2520(USA).cso",
-      "https://archive.org/download/sony_psp_cso_usa/Warriors%2C%20The%20(USA).cso",
-      "https://archive.org/cors/psp-cso-collection/Warriors%2C%20The%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fpsp-cso-collection%2FWarriors%252C%2520The%2520(USA).cso",
-      "https://archive.org/download/psp-cso-collection/Warriors%2C%20The%20(USA).cso",
-      "https://archive.org/cors/sony-psp-cso-collection/Warriors%2C%20The%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony-psp-cso-collection%2FWarriors%252C%2520The%2520(USA).cso",
-      "https://archive.org/download/sony-psp-cso-collection/Warriors%2C%20The%20(USA).cso"
+      "https://archive.org/cors/psp-cso-collection/The%20Warriors%20(USA).cso",
+      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fpsp-cso-collection%2FThe%2520Warriors%2520(USA).cso",
+      "https://archive.org/download/psp-cso-collection/The%20Warriors%20(USA).cso"
     ],
-    "description": "Beat ’em all / Action sur PlayStation Portable (1.1 Go · PPSSPP WebAssembly)."
+    "description": "Beat ’em all / Action sur PlayStation Portable (1.51 Go · PPSSPP WebAssembly)."
   },
   {
     "id": "psp-need-for-speed-most-wanted-5-1-0",
@@ -1694,20 +1622,14 @@
       ".iso"
     ],
     "engine": "emulatorjs:psp",
-    "estimatedSize": "210 Mo",
+    "estimatedSize": "179 Mo",
     "filename": "Need for Speed - Most Wanted 5-1-0 (USA).cso",
     "urls": [
-      "https://archive.org/cors/sony_psp_cso_usa/Need%20for%20Speed%20-%20Most%20Wanted%205-1-0%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony_psp_cso_usa%2FNeed%2520for%2520Speed%2520-%2520Most%2520Wanted%25205-1-0%2520(USA).cso",
-      "https://archive.org/download/sony_psp_cso_usa/Need%20for%20Speed%20-%20Most%20Wanted%205-1-0%20(USA).cso",
       "https://archive.org/cors/psp-cso-collection/Need%20for%20Speed%20-%20Most%20Wanted%205-1-0%20(USA).cso",
       "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fpsp-cso-collection%2FNeed%2520for%2520Speed%2520-%2520Most%2520Wanted%25205-1-0%2520(USA).cso",
-      "https://archive.org/download/psp-cso-collection/Need%20for%20Speed%20-%20Most%20Wanted%205-1-0%20(USA).cso",
-      "https://archive.org/cors/sony-psp-cso-collection/Need%20for%20Speed%20-%20Most%20Wanted%205-1-0%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony-psp-cso-collection%2FNeed%2520for%2520Speed%2520-%2520Most%2520Wanted%25205-1-0%2520(USA).cso",
-      "https://archive.org/download/sony-psp-cso-collection/Need%20for%20Speed%20-%20Most%20Wanted%205-1-0%20(USA).cso"
+      "https://archive.org/download/psp-cso-collection/Need%20for%20Speed%20-%20Most%20Wanted%205-1-0%20(USA).cso"
     ],
-    "description": "Course Arcade sur PlayStation Portable (210 Mo · PPSSPP WebAssembly)."
+    "description": "Course Arcade sur PlayStation Portable (179 Mo · PPSSPP WebAssembly)."
   },
   {
     "id": "psp-need-for-speed-carbon-own-the-city",
@@ -1724,20 +1646,14 @@
       ".iso"
     ],
     "engine": "emulatorjs:psp",
-    "estimatedSize": "360 Mo",
-    "filename": "Need for Speed - Carbon - Own the City (USA).cso",
+    "estimatedSize": "350 Mo",
+    "filename": "Need for Speed Carbon - Own the City (USA).cso",
     "urls": [
-      "https://archive.org/cors/sony_psp_cso_usa/Need%20for%20Speed%20-%20Carbon%20-%20Own%20the%20City%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony_psp_cso_usa%2FNeed%2520for%2520Speed%2520-%2520Carbon%2520-%2520Own%2520the%2520City%2520(USA).cso",
-      "https://archive.org/download/sony_psp_cso_usa/Need%20for%20Speed%20-%20Carbon%20-%20Own%20the%20City%20(USA).cso",
-      "https://archive.org/cors/psp-cso-collection/Need%20for%20Speed%20-%20Carbon%20-%20Own%20the%20City%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fpsp-cso-collection%2FNeed%2520for%2520Speed%2520-%2520Carbon%2520-%2520Own%2520the%2520City%2520(USA).cso",
-      "https://archive.org/download/psp-cso-collection/Need%20for%20Speed%20-%20Carbon%20-%20Own%20the%20City%20(USA).cso",
-      "https://archive.org/cors/sony-psp-cso-collection/Need%20for%20Speed%20-%20Carbon%20-%20Own%20the%20City%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony-psp-cso-collection%2FNeed%2520for%2520Speed%2520-%2520Carbon%2520-%2520Own%2520the%2520City%2520(USA).cso",
-      "https://archive.org/download/sony-psp-cso-collection/Need%20for%20Speed%20-%20Carbon%20-%20Own%20the%20City%20(USA).cso"
+      "https://archive.org/cors/psp-cso-collection/Need%20for%20Speed%20Carbon%20-%20Own%20the%20City%20(USA).cso",
+      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fpsp-cso-collection%2FNeed%2520for%2520Speed%2520Carbon%2520-%2520Own%2520the%2520City%2520(USA).cso",
+      "https://archive.org/download/psp-cso-collection/Need%20for%20Speed%20Carbon%20-%20Own%20the%20City%20(USA).cso"
     ],
-    "description": "Course Arcade sur PlayStation Portable (360 Mo · PPSSPP WebAssembly)."
+    "description": "Course Arcade sur PlayStation Portable (350 Mo · PPSSPP WebAssembly)."
   },
   {
     "id": "psp-need-for-speed-underground-rivals",
@@ -1754,20 +1670,14 @@
       ".iso"
     ],
     "engine": "emulatorjs:psp",
-    "estimatedSize": "240 Mo",
+    "estimatedSize": "218 Mo",
     "filename": "Need for Speed - Underground Rivals (USA).cso",
     "urls": [
-      "https://archive.org/cors/sony_psp_cso_usa/Need%20for%20Speed%20-%20Underground%20Rivals%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony_psp_cso_usa%2FNeed%2520for%2520Speed%2520-%2520Underground%2520Rivals%2520(USA).cso",
-      "https://archive.org/download/sony_psp_cso_usa/Need%20for%20Speed%20-%20Underground%20Rivals%20(USA).cso",
       "https://archive.org/cors/psp-cso-collection/Need%20for%20Speed%20-%20Underground%20Rivals%20(USA).cso",
       "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fpsp-cso-collection%2FNeed%2520for%2520Speed%2520-%2520Underground%2520Rivals%2520(USA).cso",
-      "https://archive.org/download/psp-cso-collection/Need%20for%20Speed%20-%20Underground%20Rivals%20(USA).cso",
-      "https://archive.org/cors/sony-psp-cso-collection/Need%20for%20Speed%20-%20Underground%20Rivals%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony-psp-cso-collection%2FNeed%2520for%2520Speed%2520-%2520Underground%2520Rivals%2520(USA).cso",
-      "https://archive.org/download/sony-psp-cso-collection/Need%20for%20Speed%20-%20Underground%20Rivals%20(USA).cso"
+      "https://archive.org/download/psp-cso-collection/Need%20for%20Speed%20-%20Underground%20Rivals%20(USA).cso"
     ],
-    "description": "Course Arcade sur PlayStation Portable (240 Mo · PPSSPP WebAssembly)."
+    "description": "Course Arcade sur PlayStation Portable (218 Mo · PPSSPP WebAssembly)."
   },
   {
     "id": "psp-midnight-club-3-dub-edition",
@@ -1784,20 +1694,14 @@
       ".iso"
     ],
     "engine": "emulatorjs:psp",
-    "estimatedSize": "980 Mo",
+    "estimatedSize": "1.00 Go",
     "filename": "Midnight Club 3 - DUB Edition (USA).cso",
     "urls": [
-      "https://archive.org/cors/sony_psp_cso_usa/Midnight%20Club%203%20-%20DUB%20Edition%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony_psp_cso_usa%2FMidnight%2520Club%25203%2520-%2520DUB%2520Edition%2520(USA).cso",
-      "https://archive.org/download/sony_psp_cso_usa/Midnight%20Club%203%20-%20DUB%20Edition%20(USA).cso",
       "https://archive.org/cors/psp-cso-collection/Midnight%20Club%203%20-%20DUB%20Edition%20(USA).cso",
       "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fpsp-cso-collection%2FMidnight%2520Club%25203%2520-%2520DUB%2520Edition%2520(USA).cso",
-      "https://archive.org/download/psp-cso-collection/Midnight%20Club%203%20-%20DUB%20Edition%20(USA).cso",
-      "https://archive.org/cors/sony-psp-cso-collection/Midnight%20Club%203%20-%20DUB%20Edition%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony-psp-cso-collection%2FMidnight%2520Club%25203%2520-%2520DUB%2520Edition%2520(USA).cso",
-      "https://archive.org/download/sony-psp-cso-collection/Midnight%20Club%203%20-%20DUB%20Edition%20(USA).cso"
+      "https://archive.org/download/psp-cso-collection/Midnight%20Club%203%20-%20DUB%20Edition%20(USA).cso"
     ],
-    "description": "Course Open World sur PlayStation Portable (980 Mo · PPSSPP WebAssembly)."
+    "description": "Course Open World sur PlayStation Portable (1.00 Go · PPSSPP WebAssembly)."
   },
   {
     "id": "psp-midnight-club-l-a-remix",
@@ -1814,20 +1718,14 @@
       ".iso"
     ],
     "engine": "emulatorjs:psp",
-    "estimatedSize": "640 Mo",
-    "filename": "Midnight Club - L.A. Remix (USA).cso",
+    "estimatedSize": "575 Mo",
+    "filename": "Midnight Club - L. A. Remix (USA).cso",
     "urls": [
-      "https://archive.org/cors/sony_psp_cso_usa/Midnight%20Club%20-%20L.A.%20Remix%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony_psp_cso_usa%2FMidnight%2520Club%2520-%2520L.A.%2520Remix%2520(USA).cso",
-      "https://archive.org/download/sony_psp_cso_usa/Midnight%20Club%20-%20L.A.%20Remix%20(USA).cso",
-      "https://archive.org/cors/psp-cso-collection/Midnight%20Club%20-%20L.A.%20Remix%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fpsp-cso-collection%2FMidnight%2520Club%2520-%2520L.A.%2520Remix%2520(USA).cso",
-      "https://archive.org/download/psp-cso-collection/Midnight%20Club%20-%20L.A.%20Remix%20(USA).cso",
-      "https://archive.org/cors/sony-psp-cso-collection/Midnight%20Club%20-%20L.A.%20Remix%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony-psp-cso-collection%2FMidnight%2520Club%2520-%2520L.A.%2520Remix%2520(USA).cso",
-      "https://archive.org/download/sony-psp-cso-collection/Midnight%20Club%20-%20L.A.%20Remix%20(USA).cso"
+      "https://archive.org/cors/psp-cso-collection/Midnight%20Club%20-%20L.%20A.%20Remix%20(USA).cso",
+      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fpsp-cso-collection%2FMidnight%2520Club%2520-%2520L.%2520A.%2520Remix%2520(USA).cso",
+      "https://archive.org/download/psp-cso-collection/Midnight%20Club%20-%20L.%20A.%20Remix%20(USA).cso"
     ],
-    "description": "Course Open World sur PlayStation Portable (640 Mo · PPSSPP WebAssembly)."
+    "description": "Course Open World sur PlayStation Portable (575 Mo · PPSSPP WebAssembly)."
   },
   {
     "id": "psp-burnout-legends",
@@ -1844,20 +1742,17 @@
       ".iso"
     ],
     "engine": "emulatorjs:psp",
-    "estimatedSize": "215 Mo",
+    "estimatedSize": "269 Mo",
     "filename": "Burnout Legends (USA).cso",
     "urls": [
-      "https://archive.org/cors/sony_psp_cso_usa/Burnout%20Legends%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony_psp_cso_usa%2FBurnout%2520Legends%2520(USA).cso",
-      "https://archive.org/download/sony_psp_cso_usa/Burnout%20Legends%20(USA).cso",
       "https://archive.org/cors/psp-cso-collection/Burnout%20Legends%20(USA).cso",
       "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fpsp-cso-collection%2FBurnout%2520Legends%2520(USA).cso",
       "https://archive.org/download/psp-cso-collection/Burnout%20Legends%20(USA).cso",
-      "https://archive.org/cors/sony-psp-cso-collection/Burnout%20Legends%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony-psp-cso-collection%2FBurnout%2520Legends%2520(USA).cso",
-      "https://archive.org/download/sony-psp-cso-collection/Burnout%20Legends%20(USA).cso"
+      "https://archive.org/cors/ultimate-rom-collection/PSP/Burnout%20Legends%20(USA)%20(En%2CFr%2CDe%2CEs%2CIt%2CNl)%20(v2.00).iso",
+      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fultimate-rom-collection%2FPSP%2FBurnout%2520Legends%2520(USA)%2520(En%252CFr%252CDe%252CEs%252CIt%252CNl)%2520(v2.00).iso",
+      "https://archive.org/download/ultimate-rom-collection/PSP/Burnout%20Legends%20(USA)%20(En%2CFr%2CDe%2CEs%2CIt%2CNl)%20(v2.00).iso"
     ],
-    "description": "Course Arcade sur PlayStation Portable (215 Mo · PPSSPP WebAssembly)."
+    "description": "Course Arcade sur PlayStation Portable (269 Mo · PPSSPP WebAssembly)."
   },
   {
     "id": "psp-burnout-dominator",
@@ -1874,20 +1769,14 @@
       ".iso"
     ],
     "engine": "emulatorjs:psp",
-    "estimatedSize": "410 Mo",
+    "estimatedSize": "415 Mo",
     "filename": "Burnout Dominator (USA).cso",
     "urls": [
-      "https://archive.org/cors/sony_psp_cso_usa/Burnout%20Dominator%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony_psp_cso_usa%2FBurnout%2520Dominator%2520(USA).cso",
-      "https://archive.org/download/sony_psp_cso_usa/Burnout%20Dominator%20(USA).cso",
       "https://archive.org/cors/psp-cso-collection/Burnout%20Dominator%20(USA).cso",
       "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fpsp-cso-collection%2FBurnout%2520Dominator%2520(USA).cso",
-      "https://archive.org/download/psp-cso-collection/Burnout%20Dominator%20(USA).cso",
-      "https://archive.org/cors/sony-psp-cso-collection/Burnout%20Dominator%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony-psp-cso-collection%2FBurnout%2520Dominator%2520(USA).cso",
-      "https://archive.org/download/sony-psp-cso-collection/Burnout%20Dominator%20(USA).cso"
+      "https://archive.org/download/psp-cso-collection/Burnout%20Dominator%20(USA).cso"
     ],
-    "description": "Course Arcade sur PlayStation Portable (410 Mo · PPSSPP WebAssembly)."
+    "description": "Course Arcade sur PlayStation Portable (415 Mo · PPSSPP WebAssembly)."
   },
   {
     "id": "psp-gran-turismo",
@@ -1904,20 +1793,17 @@
       ".iso"
     ],
     "engine": "emulatorjs:psp",
-    "estimatedSize": "920 Mo",
+    "estimatedSize": "962 Mo",
     "filename": "Gran Turismo (USA).cso",
     "urls": [
-      "https://archive.org/cors/sony_psp_cso_usa/Gran%20Turismo%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony_psp_cso_usa%2FGran%2520Turismo%2520(USA).cso",
-      "https://archive.org/download/sony_psp_cso_usa/Gran%20Turismo%20(USA).cso",
       "https://archive.org/cors/psp-cso-collection/Gran%20Turismo%20(USA).cso",
       "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fpsp-cso-collection%2FGran%2520Turismo%2520(USA).cso",
       "https://archive.org/download/psp-cso-collection/Gran%20Turismo%20(USA).cso",
-      "https://archive.org/cors/sony-psp-cso-collection/Gran%20Turismo%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony-psp-cso-collection%2FGran%2520Turismo%2520(USA).cso",
-      "https://archive.org/download/sony-psp-cso-collection/Gran%20Turismo%20(USA).cso"
+      "https://archive.org/cors/ultimate-rom-collection/PSP/Gran%20Turismo%20(USA)%20(En%2CFr%2CEs)%20(v2.00).iso",
+      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fultimate-rom-collection%2FPSP%2FGran%2520Turismo%2520(USA)%2520(En%252CFr%252CEs)%2520(v2.00).iso",
+      "https://archive.org/download/ultimate-rom-collection/PSP/Gran%20Turismo%20(USA)%20(En%2CFr%2CEs)%20(v2.00).iso"
     ],
-    "description": "Simulation Course sur PlayStation Portable (920 Mo · PPSSPP WebAssembly)."
+    "description": "Simulation Course sur PlayStation Portable (962 Mo · PPSSPP WebAssembly)."
   },
   {
     "id": "psp-ridge-racer",
@@ -1934,20 +1820,17 @@
       ".iso"
     ],
     "engine": "emulatorjs:psp",
-    "estimatedSize": "360 Mo",
+    "estimatedSize": "596 Mo",
     "filename": "Ridge Racer (USA).cso",
     "urls": [
-      "https://archive.org/cors/sony_psp_cso_usa/Ridge%20Racer%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony_psp_cso_usa%2FRidge%2520Racer%2520(USA).cso",
-      "https://archive.org/download/sony_psp_cso_usa/Ridge%20Racer%20(USA).cso",
       "https://archive.org/cors/psp-cso-collection/Ridge%20Racer%20(USA).cso",
       "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fpsp-cso-collection%2FRidge%2520Racer%2520(USA).cso",
       "https://archive.org/download/psp-cso-collection/Ridge%20Racer%20(USA).cso",
-      "https://archive.org/cors/sony-psp-cso-collection/Ridge%20Racer%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony-psp-cso-collection%2FRidge%2520Racer%2520(USA).cso",
-      "https://archive.org/download/sony-psp-cso-collection/Ridge%20Racer%20(USA).cso"
+      "https://archive.org/cors/ultimate-rom-collection/PSP/Ridge%20Racer%20(USA)%20(En%2CFr%2CDe%2CEs%2CIt).iso",
+      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fultimate-rom-collection%2FPSP%2FRidge%2520Racer%2520(USA)%2520(En%252CFr%252CDe%252CEs%252CIt).iso",
+      "https://archive.org/download/ultimate-rom-collection/PSP/Ridge%20Racer%20(USA)%20(En%2CFr%2CDe%2CEs%2CIt).iso"
     ],
-    "description": "Course Arcade sur PlayStation Portable (360 Mo · PPSSPP WebAssembly)."
+    "description": "Course Arcade sur PlayStation Portable (596 Mo · PPSSPP WebAssembly)."
   },
   {
     "id": "psp-ridge-racer-2",
@@ -1964,20 +1847,14 @@
       ".iso"
     ],
     "engine": "emulatorjs:psp",
-    "estimatedSize": "620 Mo",
+    "estimatedSize": "874 Mo",
     "filename": "Ridge Racer 2 (Europe).cso",
     "urls": [
-      "https://archive.org/cors/sony_psp_cso_usa/Ridge%20Racer%202%20(Europe).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony_psp_cso_usa%2FRidge%2520Racer%25202%2520(Europe).cso",
-      "https://archive.org/download/sony_psp_cso_usa/Ridge%20Racer%202%20(Europe).cso",
       "https://archive.org/cors/psp-cso-collection/Ridge%20Racer%202%20(Europe).cso",
       "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fpsp-cso-collection%2FRidge%2520Racer%25202%2520(Europe).cso",
-      "https://archive.org/download/psp-cso-collection/Ridge%20Racer%202%20(Europe).cso",
-      "https://archive.org/cors/sony-psp-cso-collection/Ridge%20Racer%202%20(Europe).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony-psp-cso-collection%2FRidge%2520Racer%25202%2520(Europe).cso",
-      "https://archive.org/download/sony-psp-cso-collection/Ridge%20Racer%202%20(Europe).cso"
+      "https://archive.org/download/psp-cso-collection/Ridge%20Racer%202%20(Europe).cso"
     ],
-    "description": "Course Arcade sur PlayStation Portable (620 Mo · PPSSPP WebAssembly)."
+    "description": "Course Arcade sur PlayStation Portable (874 Mo · PPSSPP WebAssembly)."
   },
   {
     "id": "psp-outrun-2006-coast-2-coast",
@@ -1994,20 +1871,17 @@
       ".iso"
     ],
     "engine": "emulatorjs:psp",
-    "estimatedSize": "290 Mo",
+    "estimatedSize": "391 Mo",
     "filename": "OutRun 2006 - Coast 2 Coast (USA).cso",
     "urls": [
-      "https://archive.org/cors/sony_psp_cso_usa/OutRun%202006%20-%20Coast%202%20Coast%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony_psp_cso_usa%2FOutRun%25202006%2520-%2520Coast%25202%2520Coast%2520(USA).cso",
-      "https://archive.org/download/sony_psp_cso_usa/OutRun%202006%20-%20Coast%202%20Coast%20(USA).cso",
       "https://archive.org/cors/psp-cso-collection/OutRun%202006%20-%20Coast%202%20Coast%20(USA).cso",
       "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fpsp-cso-collection%2FOutRun%25202006%2520-%2520Coast%25202%2520Coast%2520(USA).cso",
       "https://archive.org/download/psp-cso-collection/OutRun%202006%20-%20Coast%202%20Coast%20(USA).cso",
-      "https://archive.org/cors/sony-psp-cso-collection/OutRun%202006%20-%20Coast%202%20Coast%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony-psp-cso-collection%2FOutRun%25202006%2520-%2520Coast%25202%2520Coast%2520(USA).cso",
-      "https://archive.org/download/sony-psp-cso-collection/OutRun%202006%20-%20Coast%202%20Coast%20(USA).cso"
+      "https://archive.org/cors/ultimate-rom-collection/PSP/OutRun%202006%20-%20Coast%202%20Coast%20(USA).iso",
+      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fultimate-rom-collection%2FPSP%2FOutRun%25202006%2520-%2520Coast%25202%2520Coast%2520(USA).iso",
+      "https://archive.org/download/ultimate-rom-collection/PSP/OutRun%202006%20-%20Coast%202%20Coast%20(USA).iso"
     ],
-    "description": "Course Arcade sur PlayStation Portable (290 Mo · PPSSPP WebAssembly)."
+    "description": "Course Arcade sur PlayStation Portable (391 Mo · PPSSPP WebAssembly)."
   },
   {
     "id": "psp-wipeout-pure",
@@ -2024,20 +1898,17 @@
       ".iso"
     ],
     "engine": "emulatorjs:psp",
-    "estimatedSize": "230 Mo",
+    "estimatedSize": "153 Mo",
     "filename": "Wipeout Pure (USA).cso",
     "urls": [
-      "https://archive.org/cors/sony_psp_cso_usa/Wipeout%20Pure%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony_psp_cso_usa%2FWipeout%2520Pure%2520(USA).cso",
-      "https://archive.org/download/sony_psp_cso_usa/Wipeout%20Pure%20(USA).cso",
       "https://archive.org/cors/psp-cso-collection/Wipeout%20Pure%20(USA).cso",
       "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fpsp-cso-collection%2FWipeout%2520Pure%2520(USA).cso",
       "https://archive.org/download/psp-cso-collection/Wipeout%20Pure%20(USA).cso",
-      "https://archive.org/cors/sony-psp-cso-collection/Wipeout%20Pure%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony-psp-cso-collection%2FWipeout%2520Pure%2520(USA).cso",
-      "https://archive.org/download/sony-psp-cso-collection/Wipeout%20Pure%20(USA).cso"
+      "https://archive.org/cors/ultimate-rom-collection/PSP/WipEout%20Pure%20(USA)%20(En%2CFr%2CEs)%20(v2.00).iso",
+      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fultimate-rom-collection%2FPSP%2FWipEout%2520Pure%2520(USA)%2520(En%252CFr%252CEs)%2520(v2.00).iso",
+      "https://archive.org/download/ultimate-rom-collection/PSP/WipEout%20Pure%20(USA)%20(En%2CFr%2CEs)%20(v2.00).iso"
     ],
-    "description": "Course Futuriste sur PlayStation Portable (230 Mo · PPSSPP WebAssembly)."
+    "description": "Course Futuriste sur PlayStation Portable (153 Mo · PPSSPP WebAssembly)."
   },
   {
     "id": "psp-wipeout-pulse",
@@ -2054,20 +1925,14 @@
       ".iso"
     ],
     "engine": "emulatorjs:psp",
-    "estimatedSize": "270 Mo",
-    "filename": "Wipeout Pulse (USA).cso",
+    "estimatedSize": "200 Mo",
+    "filename": "WipEout Pulse (USA).cso",
     "urls": [
-      "https://archive.org/cors/sony_psp_cso_usa/Wipeout%20Pulse%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony_psp_cso_usa%2FWipeout%2520Pulse%2520(USA).cso",
-      "https://archive.org/download/sony_psp_cso_usa/Wipeout%20Pulse%20(USA).cso",
-      "https://archive.org/cors/psp-cso-collection/Wipeout%20Pulse%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fpsp-cso-collection%2FWipeout%2520Pulse%2520(USA).cso",
-      "https://archive.org/download/psp-cso-collection/Wipeout%20Pulse%20(USA).cso",
-      "https://archive.org/cors/sony-psp-cso-collection/Wipeout%20Pulse%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony-psp-cso-collection%2FWipeout%2520Pulse%2520(USA).cso",
-      "https://archive.org/download/sony-psp-cso-collection/Wipeout%20Pulse%20(USA).cso"
+      "https://archive.org/cors/psp-cso-collection/WipEout%20Pulse%20(USA).cso",
+      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fpsp-cso-collection%2FWipEout%2520Pulse%2520(USA).cso",
+      "https://archive.org/download/psp-cso-collection/WipEout%20Pulse%20(USA).cso"
     ],
-    "description": "Course Futuriste sur PlayStation Portable (270 Mo · PPSSPP WebAssembly)."
+    "description": "Course Futuriste sur PlayStation Portable (200 Mo · PPSSPP WebAssembly)."
   },
   {
     "id": "psp-motorstorm-arctic-edge",
@@ -2084,20 +1949,17 @@
       ".iso"
     ],
     "engine": "emulatorjs:psp",
-    "estimatedSize": "640 Mo",
+    "estimatedSize": "550 Mo",
     "filename": "MotorStorm - Arctic Edge (USA).cso",
     "urls": [
-      "https://archive.org/cors/sony_psp_cso_usa/MotorStorm%20-%20Arctic%20Edge%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony_psp_cso_usa%2FMotorStorm%2520-%2520Arctic%2520Edge%2520(USA).cso",
-      "https://archive.org/download/sony_psp_cso_usa/MotorStorm%20-%20Arctic%20Edge%20(USA).cso",
       "https://archive.org/cors/psp-cso-collection/MotorStorm%20-%20Arctic%20Edge%20(USA).cso",
       "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fpsp-cso-collection%2FMotorStorm%2520-%2520Arctic%2520Edge%2520(USA).cso",
       "https://archive.org/download/psp-cso-collection/MotorStorm%20-%20Arctic%20Edge%20(USA).cso",
-      "https://archive.org/cors/sony-psp-cso-collection/MotorStorm%20-%20Arctic%20Edge%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony-psp-cso-collection%2FMotorStorm%2520-%2520Arctic%2520Edge%2520(USA).cso",
-      "https://archive.org/download/sony-psp-cso-collection/MotorStorm%20-%20Arctic%20Edge%20(USA).cso"
+      "https://archive.org/cors/ultimate-rom-collection/PSP/MotorStorm%20-%20Arctic%20Edge%20(USA)%20(En%2CFr%2CDe%2CEs%2CIt%2CNl%2CPt%2CRu).iso",
+      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fultimate-rom-collection%2FPSP%2FMotorStorm%2520-%2520Arctic%2520Edge%2520(USA)%2520(En%252CFr%252CDe%252CEs%252CIt%252CNl%252CPt%252CRu).iso",
+      "https://archive.org/download/ultimate-rom-collection/PSP/MotorStorm%20-%20Arctic%20Edge%20(USA)%20(En%2CFr%2CDe%2CEs%2CIt%2CNl%2CPt%2CRu).iso"
     ],
-    "description": "Course Off-Road sur PlayStation Portable (640 Mo · PPSSPP WebAssembly)."
+    "description": "Course Off-Road sur PlayStation Portable (550 Mo · PPSSPP WebAssembly)."
   },
   {
     "id": "psp-split-second",
@@ -2114,20 +1976,17 @@
       ".iso"
     ],
     "engine": "emulatorjs:psp",
-    "estimatedSize": "820 Mo",
-    "filename": "Split Second (USA).cso",
+    "estimatedSize": "1.19 Go",
+    "filename": "Split-Second (USA).cso",
     "urls": [
-      "https://archive.org/cors/sony_psp_cso_usa/Split%20Second%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony_psp_cso_usa%2FSplit%2520Second%2520(USA).cso",
-      "https://archive.org/download/sony_psp_cso_usa/Split%20Second%20(USA).cso",
-      "https://archive.org/cors/psp-cso-collection/Split%20Second%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fpsp-cso-collection%2FSplit%2520Second%2520(USA).cso",
-      "https://archive.org/download/psp-cso-collection/Split%20Second%20(USA).cso",
-      "https://archive.org/cors/sony-psp-cso-collection/Split%20Second%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony-psp-cso-collection%2FSplit%2520Second%2520(USA).cso",
-      "https://archive.org/download/sony-psp-cso-collection/Split%20Second%20(USA).cso"
+      "https://archive.org/cors/psp-cso-collection/Split-Second%20(USA).cso",
+      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fpsp-cso-collection%2FSplit-Second%2520(USA).cso",
+      "https://archive.org/download/psp-cso-collection/Split-Second%20(USA).cso",
+      "https://archive.org/cors/ultimate-rom-collection/PSP/Split-Second%20(USA)%20(En%2CFr%2CEs).iso",
+      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fultimate-rom-collection%2FPSP%2FSplit-Second%2520(USA)%2520(En%252CFr%252CEs).iso",
+      "https://archive.org/download/ultimate-rom-collection/PSP/Split-Second%20(USA)%20(En%2CFr%2CEs).iso"
     ],
-    "description": "Course Arcade sur PlayStation Portable (820 Mo · PPSSPP WebAssembly)."
+    "description": "Course Arcade sur PlayStation Portable (1.19 Go · PPSSPP WebAssembly)."
   },
   {
     "id": "psp-crazy-taxi-fare-wars",
@@ -2144,20 +2003,14 @@
       ".iso"
     ],
     "engine": "emulatorjs:psp",
-    "estimatedSize": "290 Mo",
+    "estimatedSize": "332 Mo",
     "filename": "Crazy Taxi - Fare Wars (USA).cso",
     "urls": [
-      "https://archive.org/cors/sony_psp_cso_usa/Crazy%20Taxi%20-%20Fare%20Wars%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony_psp_cso_usa%2FCrazy%2520Taxi%2520-%2520Fare%2520Wars%2520(USA).cso",
-      "https://archive.org/download/sony_psp_cso_usa/Crazy%20Taxi%20-%20Fare%20Wars%20(USA).cso",
       "https://archive.org/cors/psp-cso-collection/Crazy%20Taxi%20-%20Fare%20Wars%20(USA).cso",
       "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fpsp-cso-collection%2FCrazy%2520Taxi%2520-%2520Fare%2520Wars%2520(USA).cso",
-      "https://archive.org/download/psp-cso-collection/Crazy%20Taxi%20-%20Fare%20Wars%20(USA).cso",
-      "https://archive.org/cors/sony-psp-cso-collection/Crazy%20Taxi%20-%20Fare%20Wars%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony-psp-cso-collection%2FCrazy%2520Taxi%2520-%2520Fare%2520Wars%2520(USA).cso",
-      "https://archive.org/download/sony-psp-cso-collection/Crazy%20Taxi%20-%20Fare%20Wars%20(USA).cso"
+      "https://archive.org/download/psp-cso-collection/Crazy%20Taxi%20-%20Fare%20Wars%20(USA).cso"
     ],
-    "description": "Course / Arcade sur PlayStation Portable (290 Mo · PPSSPP WebAssembly)."
+    "description": "Course / Arcade sur PlayStation Portable (332 Mo · PPSSPP WebAssembly)."
   },
   {
     "id": "psp-crisis-core-final-fantasy-vii",
@@ -2174,20 +2027,17 @@
       ".iso"
     ],
     "engine": "emulatorjs:psp",
-    "estimatedSize": "1.1 Go",
+    "estimatedSize": "1.09 Go",
     "filename": "Crisis Core - Final Fantasy VII (USA).cso",
     "urls": [
-      "https://archive.org/cors/sony_psp_cso_usa/Crisis%20Core%20-%20Final%20Fantasy%20VII%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony_psp_cso_usa%2FCrisis%2520Core%2520-%2520Final%2520Fantasy%2520VII%2520(USA).cso",
-      "https://archive.org/download/sony_psp_cso_usa/Crisis%20Core%20-%20Final%20Fantasy%20VII%20(USA).cso",
       "https://archive.org/cors/psp-cso-collection/Crisis%20Core%20-%20Final%20Fantasy%20VII%20(USA).cso",
       "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fpsp-cso-collection%2FCrisis%2520Core%2520-%2520Final%2520Fantasy%2520VII%2520(USA).cso",
       "https://archive.org/download/psp-cso-collection/Crisis%20Core%20-%20Final%20Fantasy%20VII%20(USA).cso",
-      "https://archive.org/cors/sony-psp-cso-collection/Crisis%20Core%20-%20Final%20Fantasy%20VII%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony-psp-cso-collection%2FCrisis%2520Core%2520-%2520Final%2520Fantasy%2520VII%2520(USA).cso",
-      "https://archive.org/download/sony-psp-cso-collection/Crisis%20Core%20-%20Final%20Fantasy%20VII%20(USA).cso"
+      "https://archive.org/cors/ultimate-rom-collection/PSP/Crisis%20Core%20-%20Final%20Fantasy%20VII%20(USA).iso",
+      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fultimate-rom-collection%2FPSP%2FCrisis%2520Core%2520-%2520Final%2520Fantasy%2520VII%2520(USA).iso",
+      "https://archive.org/download/ultimate-rom-collection/PSP/Crisis%20Core%20-%20Final%20Fantasy%20VII%20(USA).iso"
     ],
-    "description": "Action RPG sur PlayStation Portable (1.1 Go · PPSSPP WebAssembly)."
+    "description": "Action RPG sur PlayStation Portable (1.09 Go · PPSSPP WebAssembly)."
   },
   {
     "id": "psp-kingdom-hearts-birth-by-sleep",
@@ -2204,20 +2054,17 @@
       ".iso"
     ],
     "engine": "emulatorjs:psp",
-    "estimatedSize": "1.3 Go",
+    "estimatedSize": "1.45 Go",
     "filename": "Kingdom Hearts - Birth by Sleep (USA).cso",
     "urls": [
-      "https://archive.org/cors/sony_psp_cso_usa/Kingdom%20Hearts%20-%20Birth%20by%20Sleep%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony_psp_cso_usa%2FKingdom%2520Hearts%2520-%2520Birth%2520by%2520Sleep%2520(USA).cso",
-      "https://archive.org/download/sony_psp_cso_usa/Kingdom%20Hearts%20-%20Birth%20by%20Sleep%20(USA).cso",
       "https://archive.org/cors/psp-cso-collection/Kingdom%20Hearts%20-%20Birth%20by%20Sleep%20(USA).cso",
       "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fpsp-cso-collection%2FKingdom%2520Hearts%2520-%2520Birth%2520by%2520Sleep%2520(USA).cso",
       "https://archive.org/download/psp-cso-collection/Kingdom%20Hearts%20-%20Birth%20by%20Sleep%20(USA).cso",
-      "https://archive.org/cors/sony-psp-cso-collection/Kingdom%20Hearts%20-%20Birth%20by%20Sleep%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony-psp-cso-collection%2FKingdom%2520Hearts%2520-%2520Birth%2520by%2520Sleep%2520(USA).cso",
-      "https://archive.org/download/sony-psp-cso-collection/Kingdom%20Hearts%20-%20Birth%20by%20Sleep%20(USA).cso"
+      "https://archive.org/cors/ultimate-rom-collection/PSP/Kingdom%20Hearts%20-%20Birth%20by%20Sleep%20(USA)%20(En%2CFr%2CEs).iso",
+      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fultimate-rom-collection%2FPSP%2FKingdom%2520Hearts%2520-%2520Birth%2520by%2520Sleep%2520(USA)%2520(En%252CFr%252CEs).iso",
+      "https://archive.org/download/ultimate-rom-collection/PSP/Kingdom%20Hearts%20-%20Birth%20by%20Sleep%20(USA)%20(En%2CFr%2CEs).iso"
     ],
-    "description": "Action RPG sur PlayStation Portable (1.3 Go · PPSSPP WebAssembly)."
+    "description": "Action RPG sur PlayStation Portable (1.45 Go · PPSSPP WebAssembly)."
   },
   {
     "id": "psp-monster-hunter-freedom-unite",
@@ -2234,20 +2081,17 @@
       ".iso"
     ],
     "engine": "emulatorjs:psp",
-    "estimatedSize": "790 Mo",
+    "estimatedSize": "741 Mo",
     "filename": "Monster Hunter Freedom Unite (USA).cso",
     "urls": [
-      "https://archive.org/cors/sony_psp_cso_usa/Monster%20Hunter%20Freedom%20Unite%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony_psp_cso_usa%2FMonster%2520Hunter%2520Freedom%2520Unite%2520(USA).cso",
-      "https://archive.org/download/sony_psp_cso_usa/Monster%20Hunter%20Freedom%20Unite%20(USA).cso",
       "https://archive.org/cors/psp-cso-collection/Monster%20Hunter%20Freedom%20Unite%20(USA).cso",
       "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fpsp-cso-collection%2FMonster%2520Hunter%2520Freedom%2520Unite%2520(USA).cso",
       "https://archive.org/download/psp-cso-collection/Monster%20Hunter%20Freedom%20Unite%20(USA).cso",
-      "https://archive.org/cors/sony-psp-cso-collection/Monster%20Hunter%20Freedom%20Unite%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony-psp-cso-collection%2FMonster%2520Hunter%2520Freedom%2520Unite%2520(USA).cso",
-      "https://archive.org/download/sony-psp-cso-collection/Monster%20Hunter%20Freedom%20Unite%20(USA).cso"
+      "https://archive.org/cors/ultimate-rom-collection/PSP/Monster%20Hunter%20Freedom%20Unite%20(USA)%20(En%2CFr%2CDe%2CEs%2CIt).iso",
+      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fultimate-rom-collection%2FPSP%2FMonster%2520Hunter%2520Freedom%2520Unite%2520(USA)%2520(En%252CFr%252CDe%252CEs%252CIt).iso",
+      "https://archive.org/download/ultimate-rom-collection/PSP/Monster%20Hunter%20Freedom%20Unite%20(USA)%20(En%2CFr%2CDe%2CEs%2CIt).iso"
     ],
-    "description": "Action RPG / Chasse sur PlayStation Portable (790 Mo · PPSSPP WebAssembly)."
+    "description": "Action RPG / Chasse sur PlayStation Portable (741 Mo · PPSSPP WebAssembly)."
   },
   {
     "id": "psp-persona-3-portable",
@@ -2264,20 +2108,17 @@
       ".iso"
     ],
     "engine": "emulatorjs:psp",
-    "estimatedSize": "950 Mo",
+    "estimatedSize": "1.02 Go",
     "filename": "Shin Megami Tensei - Persona 3 Portable (USA).cso",
     "urls": [
-      "https://archive.org/cors/sony_psp_cso_usa/Shin%20Megami%20Tensei%20-%20Persona%203%20Portable%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony_psp_cso_usa%2FShin%2520Megami%2520Tensei%2520-%2520Persona%25203%2520Portable%2520(USA).cso",
-      "https://archive.org/download/sony_psp_cso_usa/Shin%20Megami%20Tensei%20-%20Persona%203%20Portable%20(USA).cso",
       "https://archive.org/cors/psp-cso-collection/Shin%20Megami%20Tensei%20-%20Persona%203%20Portable%20(USA).cso",
       "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fpsp-cso-collection%2FShin%2520Megami%2520Tensei%2520-%2520Persona%25203%2520Portable%2520(USA).cso",
       "https://archive.org/download/psp-cso-collection/Shin%20Megami%20Tensei%20-%20Persona%203%20Portable%20(USA).cso",
-      "https://archive.org/cors/sony-psp-cso-collection/Shin%20Megami%20Tensei%20-%20Persona%203%20Portable%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony-psp-cso-collection%2FShin%2520Megami%2520Tensei%2520-%2520Persona%25203%2520Portable%2520(USA).cso",
-      "https://archive.org/download/sony-psp-cso-collection/Shin%20Megami%20Tensei%20-%20Persona%203%20Portable%20(USA).cso"
+      "https://archive.org/cors/ultimate-rom-collection/PSP/Shin%20Megami%20Tensei%20-%20Persona%203%20Portable%20(USA).iso",
+      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fultimate-rom-collection%2FPSP%2FShin%2520Megami%2520Tensei%2520-%2520Persona%25203%2520Portable%2520(USA).iso",
+      "https://archive.org/download/ultimate-rom-collection/PSP/Shin%20Megami%20Tensei%20-%20Persona%203%20Portable%20(USA).iso"
     ],
-    "description": "JRPG sur PlayStation Portable (950 Mo · PPSSPP WebAssembly)."
+    "description": "JRPG sur PlayStation Portable (1.02 Go · PPSSPP WebAssembly)."
   },
   {
     "id": "psp-final-fantasy-tactics-the-war-of-the-lions",
@@ -2294,20 +2135,17 @@
       ".iso"
     ],
     "engine": "emulatorjs:psp",
-    "estimatedSize": "220 Mo",
+    "estimatedSize": "224 Mo",
     "filename": "Final Fantasy Tactics - The War of the Lions (USA).cso",
     "urls": [
-      "https://archive.org/cors/sony_psp_cso_usa/Final%20Fantasy%20Tactics%20-%20The%20War%20of%20the%20Lions%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony_psp_cso_usa%2FFinal%2520Fantasy%2520Tactics%2520-%2520The%2520War%2520of%2520the%2520Lions%2520(USA).cso",
-      "https://archive.org/download/sony_psp_cso_usa/Final%20Fantasy%20Tactics%20-%20The%20War%20of%20the%20Lions%20(USA).cso",
       "https://archive.org/cors/psp-cso-collection/Final%20Fantasy%20Tactics%20-%20The%20War%20of%20the%20Lions%20(USA).cso",
       "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fpsp-cso-collection%2FFinal%2520Fantasy%2520Tactics%2520-%2520The%2520War%2520of%2520the%2520Lions%2520(USA).cso",
       "https://archive.org/download/psp-cso-collection/Final%20Fantasy%20Tactics%20-%20The%20War%20of%20the%20Lions%20(USA).cso",
-      "https://archive.org/cors/sony-psp-cso-collection/Final%20Fantasy%20Tactics%20-%20The%20War%20of%20the%20Lions%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony-psp-cso-collection%2FFinal%2520Fantasy%2520Tactics%2520-%2520The%2520War%2520of%2520the%2520Lions%2520(USA).cso",
-      "https://archive.org/download/sony-psp-cso-collection/Final%20Fantasy%20Tactics%20-%20The%20War%20of%20the%20Lions%20(USA).cso"
+      "https://archive.org/cors/ultimate-rom-collection/PSP/Final%20Fantasy%20Tactics%20-%20The%20War%20of%20the%20Lions%20(USA).iso",
+      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fultimate-rom-collection%2FPSP%2FFinal%2520Fantasy%2520Tactics%2520-%2520The%2520War%2520of%2520the%2520Lions%2520(USA).iso",
+      "https://archive.org/download/ultimate-rom-collection/PSP/Final%20Fantasy%20Tactics%20-%20The%20War%20of%20the%20Lions%20(USA).iso"
     ],
-    "description": "RPG Tactique sur PlayStation Portable (220 Mo · PPSSPP WebAssembly)."
+    "description": "RPG Tactique sur PlayStation Portable (224 Mo · PPSSPP WebAssembly)."
   },
   {
     "id": "psp-ys-seven",
@@ -2324,20 +2162,17 @@
       ".iso"
     ],
     "engine": "emulatorjs:psp",
-    "estimatedSize": "410 Mo",
+    "estimatedSize": "437 Mo",
     "filename": "Ys Seven (USA).cso",
     "urls": [
-      "https://archive.org/cors/sony_psp_cso_usa/Ys%20Seven%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony_psp_cso_usa%2FYs%2520Seven%2520(USA).cso",
-      "https://archive.org/download/sony_psp_cso_usa/Ys%20Seven%20(USA).cso",
       "https://archive.org/cors/psp-cso-collection/Ys%20Seven%20(USA).cso",
       "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fpsp-cso-collection%2FYs%2520Seven%2520(USA).cso",
       "https://archive.org/download/psp-cso-collection/Ys%20Seven%20(USA).cso",
-      "https://archive.org/cors/sony-psp-cso-collection/Ys%20Seven%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony-psp-cso-collection%2FYs%2520Seven%2520(USA).cso",
-      "https://archive.org/download/sony-psp-cso-collection/Ys%20Seven%20(USA).cso"
+      "https://archive.org/cors/ultimate-rom-collection/PSP/Ys%20Seven%20(USA).iso",
+      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fultimate-rom-collection%2FPSP%2FYs%2520Seven%2520(USA).iso",
+      "https://archive.org/download/ultimate-rom-collection/PSP/Ys%20Seven%20(USA).iso"
     ],
-    "description": "Action RPG sur PlayStation Portable (410 Mo · PPSSPP WebAssembly)."
+    "description": "Action RPG sur PlayStation Portable (437 Mo · PPSSPP WebAssembly)."
   },
   {
     "id": "psp-metal-slug-anthology",
@@ -2354,20 +2189,14 @@
       ".iso"
     ],
     "engine": "emulatorjs:psp",
-    "estimatedSize": "310 Mo",
-    "filename": "Metal Slug Anthology (USA).cso",
+    "estimatedSize": "721 Mo",
+    "filename": "Metal Slug Anthology.cso",
     "urls": [
-      "https://archive.org/cors/sony_psp_cso_usa/Metal%20Slug%20Anthology%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony_psp_cso_usa%2FMetal%2520Slug%2520Anthology%2520(USA).cso",
-      "https://archive.org/download/sony_psp_cso_usa/Metal%20Slug%20Anthology%20(USA).cso",
-      "https://archive.org/cors/psp-cso-collection/Metal%20Slug%20Anthology%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fpsp-cso-collection%2FMetal%2520Slug%2520Anthology%2520(USA).cso",
-      "https://archive.org/download/psp-cso-collection/Metal%20Slug%20Anthology%20(USA).cso",
-      "https://archive.org/cors/sony-psp-cso-collection/Metal%20Slug%20Anthology%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony-psp-cso-collection%2FMetal%2520Slug%2520Anthology%2520(USA).cso",
-      "https://archive.org/download/sony-psp-cso-collection/Metal%20Slug%20Anthology%20(USA).cso"
+      "https://archive.org/cors/psp-cso-collection/Metal%20Slug%20Anthology.cso",
+      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fpsp-cso-collection%2FMetal%2520Slug%2520Anthology.cso",
+      "https://archive.org/download/psp-cso-collection/Metal%20Slug%20Anthology.cso"
     ],
-    "description": "Run & Gun / Arcade sur PlayStation Portable (310 Mo · PPSSPP WebAssembly)."
+    "description": "Run & Gun / Arcade sur PlayStation Portable (721 Mo · PPSSPP WebAssembly)."
   },
   {
     "id": "psp-metal-slug-xx",
@@ -2384,20 +2213,14 @@
       ".iso"
     ],
     "engine": "emulatorjs:psp",
-    "estimatedSize": "160 Mo",
+    "estimatedSize": "179 Mo",
     "filename": "Metal Slug XX (USA).cso",
     "urls": [
-      "https://archive.org/cors/sony_psp_cso_usa/Metal%20Slug%20XX%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony_psp_cso_usa%2FMetal%2520Slug%2520XX%2520(USA).cso",
-      "https://archive.org/download/sony_psp_cso_usa/Metal%20Slug%20XX%20(USA).cso",
       "https://archive.org/cors/psp-cso-collection/Metal%20Slug%20XX%20(USA).cso",
       "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fpsp-cso-collection%2FMetal%2520Slug%2520XX%2520(USA).cso",
-      "https://archive.org/download/psp-cso-collection/Metal%20Slug%20XX%20(USA).cso",
-      "https://archive.org/cors/sony-psp-cso-collection/Metal%20Slug%20XX%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony-psp-cso-collection%2FMetal%2520Slug%2520XX%2520(USA).cso",
-      "https://archive.org/download/sony-psp-cso-collection/Metal%20Slug%20XX%20(USA).cso"
+      "https://archive.org/download/psp-cso-collection/Metal%20Slug%20XX%20(USA).cso"
     ],
-    "description": "Run & Gun / Arcade sur PlayStation Portable (160 Mo · PPSSPP WebAssembly)."
+    "description": "Run & Gun / Arcade sur PlayStation Portable (179 Mo · PPSSPP WebAssembly)."
   },
   {
     "id": "psp-castlevania-the-dracula-x-chronicles",
@@ -2414,20 +2237,17 @@
       ".iso"
     ],
     "engine": "emulatorjs:psp",
-    "estimatedSize": "680 Mo",
+    "estimatedSize": "763 Mo",
     "filename": "Castlevania - The Dracula X Chronicles (USA).cso",
     "urls": [
-      "https://archive.org/cors/sony_psp_cso_usa/Castlevania%20-%20The%20Dracula%20X%20Chronicles%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony_psp_cso_usa%2FCastlevania%2520-%2520The%2520Dracula%2520X%2520Chronicles%2520(USA).cso",
-      "https://archive.org/download/sony_psp_cso_usa/Castlevania%20-%20The%20Dracula%20X%20Chronicles%20(USA).cso",
       "https://archive.org/cors/psp-cso-collection/Castlevania%20-%20The%20Dracula%20X%20Chronicles%20(USA).cso",
       "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fpsp-cso-collection%2FCastlevania%2520-%2520The%2520Dracula%2520X%2520Chronicles%2520(USA).cso",
       "https://archive.org/download/psp-cso-collection/Castlevania%20-%20The%20Dracula%20X%20Chronicles%20(USA).cso",
-      "https://archive.org/cors/sony-psp-cso-collection/Castlevania%20-%20The%20Dracula%20X%20Chronicles%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony-psp-cso-collection%2FCastlevania%2520-%2520The%2520Dracula%2520X%2520Chronicles%2520(USA).cso",
-      "https://archive.org/download/sony-psp-cso-collection/Castlevania%20-%20The%20Dracula%20X%20Chronicles%20(USA).cso"
+      "https://archive.org/cors/ultimate-rom-collection/PSP/Castlevania%20-%20The%20Dracula%20X%20Chronicles%20(USA).iso",
+      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fultimate-rom-collection%2FPSP%2FCastlevania%2520-%2520The%2520Dracula%2520X%2520Chronicles%2520(USA).iso",
+      "https://archive.org/download/ultimate-rom-collection/PSP/Castlevania%20-%20The%20Dracula%20X%20Chronicles%20(USA).iso"
     ],
-    "description": "Action / Plateforme sur PlayStation Portable (680 Mo · PPSSPP WebAssembly)."
+    "description": "Action / Plateforme sur PlayStation Portable (763 Mo · PPSSPP WebAssembly)."
   },
   {
     "id": "psp-mega-man-maverick-hunter-x",
@@ -2444,20 +2264,17 @@
       ".iso"
     ],
     "engine": "emulatorjs:psp",
-    "estimatedSize": "380 Mo",
-    "filename": "Mega Man - Maverick Hunter X (USA).cso",
+    "estimatedSize": "401 Mo",
+    "filename": "MegaMan - Maverick Hunter X (USA).cso",
     "urls": [
-      "https://archive.org/cors/sony_psp_cso_usa/Mega%20Man%20-%20Maverick%20Hunter%20X%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony_psp_cso_usa%2FMega%2520Man%2520-%2520Maverick%2520Hunter%2520X%2520(USA).cso",
-      "https://archive.org/download/sony_psp_cso_usa/Mega%20Man%20-%20Maverick%20Hunter%20X%20(USA).cso",
-      "https://archive.org/cors/psp-cso-collection/Mega%20Man%20-%20Maverick%20Hunter%20X%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fpsp-cso-collection%2FMega%2520Man%2520-%2520Maverick%2520Hunter%2520X%2520(USA).cso",
-      "https://archive.org/download/psp-cso-collection/Mega%20Man%20-%20Maverick%20Hunter%20X%20(USA).cso",
-      "https://archive.org/cors/sony-psp-cso-collection/Mega%20Man%20-%20Maverick%20Hunter%20X%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony-psp-cso-collection%2FMega%2520Man%2520-%2520Maverick%2520Hunter%2520X%2520(USA).cso",
-      "https://archive.org/download/sony-psp-cso-collection/Mega%20Man%20-%20Maverick%20Hunter%20X%20(USA).cso"
+      "https://archive.org/cors/psp-cso-collection/MegaMan%20-%20Maverick%20Hunter%20X%20(USA).cso",
+      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fpsp-cso-collection%2FMegaMan%2520-%2520Maverick%2520Hunter%2520X%2520(USA).cso",
+      "https://archive.org/download/psp-cso-collection/MegaMan%20-%20Maverick%20Hunter%20X%20(USA).cso",
+      "https://archive.org/cors/ultimate-rom-collection/PSP/Mega%20Man%20-%20Maverick%20Hunter%20X%20(USA).iso",
+      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fultimate-rom-collection%2FPSP%2FMega%2520Man%2520-%2520Maverick%2520Hunter%2520X%2520(USA).iso",
+      "https://archive.org/download/ultimate-rom-collection/PSP/Mega%20Man%20-%20Maverick%20Hunter%20X%20(USA).iso"
     ],
-    "description": "Action / Plateforme sur PlayStation Portable (380 Mo · PPSSPP WebAssembly)."
+    "description": "Action / Plateforme sur PlayStation Portable (401 Mo · PPSSPP WebAssembly)."
   },
   {
     "id": "psp-mega-man-powered-up",
@@ -2474,20 +2291,17 @@
       ".iso"
     ],
     "engine": "emulatorjs:psp",
-    "estimatedSize": "210 Mo",
-    "filename": "Mega Man - Powered Up (USA).cso",
+    "estimatedSize": "266 Mo",
+    "filename": "MegaMan - Powered Up (USA).cso",
     "urls": [
-      "https://archive.org/cors/sony_psp_cso_usa/Mega%20Man%20-%20Powered%20Up%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony_psp_cso_usa%2FMega%2520Man%2520-%2520Powered%2520Up%2520(USA).cso",
-      "https://archive.org/download/sony_psp_cso_usa/Mega%20Man%20-%20Powered%20Up%20(USA).cso",
-      "https://archive.org/cors/psp-cso-collection/Mega%20Man%20-%20Powered%20Up%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fpsp-cso-collection%2FMega%2520Man%2520-%2520Powered%2520Up%2520(USA).cso",
-      "https://archive.org/download/psp-cso-collection/Mega%20Man%20-%20Powered%20Up%20(USA).cso",
-      "https://archive.org/cors/sony-psp-cso-collection/Mega%20Man%20-%20Powered%20Up%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony-psp-cso-collection%2FMega%2520Man%2520-%2520Powered%2520Up%2520(USA).cso",
-      "https://archive.org/download/sony-psp-cso-collection/Mega%20Man%20-%20Powered%20Up%20(USA).cso"
+      "https://archive.org/cors/psp-cso-collection/MegaMan%20-%20Powered%20Up%20(USA).cso",
+      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fpsp-cso-collection%2FMegaMan%2520-%2520Powered%2520Up%2520(USA).cso",
+      "https://archive.org/download/psp-cso-collection/MegaMan%20-%20Powered%20Up%20(USA).cso",
+      "https://archive.org/cors/ultimate-rom-collection/PSP/Mega%20Man%20-%20Powered%20Up%20(USA).iso",
+      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fultimate-rom-collection%2FPSP%2FMega%2520Man%2520-%2520Powered%2520Up%2520(USA).iso",
+      "https://archive.org/download/ultimate-rom-collection/PSP/Mega%20Man%20-%20Powered%20Up%20(USA).iso"
     ],
-    "description": "Plateforme sur PlayStation Portable (210 Mo · PPSSPP WebAssembly)."
+    "description": "Plateforme sur PlayStation Portable (266 Mo · PPSSPP WebAssembly)."
   },
   {
     "id": "psp-ultimate-ghosts-n-goblins",
@@ -2504,20 +2318,14 @@
       ".iso"
     ],
     "engine": "emulatorjs:psp",
-    "estimatedSize": "280 Mo",
+    "estimatedSize": "272 Mo",
     "filename": "Ultimate Ghosts 'n Goblins (USA).cso",
     "urls": [
-      "https://archive.org/cors/sony_psp_cso_usa/Ultimate%20Ghosts%20'n%20Goblins%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony_psp_cso_usa%2FUltimate%2520Ghosts%2520'n%2520Goblins%2520(USA).cso",
-      "https://archive.org/download/sony_psp_cso_usa/Ultimate%20Ghosts%20'n%20Goblins%20(USA).cso",
       "https://archive.org/cors/psp-cso-collection/Ultimate%20Ghosts%20'n%20Goblins%20(USA).cso",
       "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fpsp-cso-collection%2FUltimate%2520Ghosts%2520'n%2520Goblins%2520(USA).cso",
-      "https://archive.org/download/psp-cso-collection/Ultimate%20Ghosts%20'n%20Goblins%20(USA).cso",
-      "https://archive.org/cors/sony-psp-cso-collection/Ultimate%20Ghosts%20'n%20Goblins%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony-psp-cso-collection%2FUltimate%2520Ghosts%2520'n%2520Goblins%2520(USA).cso",
-      "https://archive.org/download/sony-psp-cso-collection/Ultimate%20Ghosts%20'n%20Goblins%20(USA).cso"
+      "https://archive.org/download/psp-cso-collection/Ultimate%20Ghosts%20'n%20Goblins%20(USA).cso"
     ],
-    "description": "Action / Arcade sur PlayStation Portable (280 Mo · PPSSPP WebAssembly)."
+    "description": "Action / Arcade sur PlayStation Portable (272 Mo · PPSSPP WebAssembly)."
   },
   {
     "id": "psp-patapon",
@@ -2534,20 +2342,17 @@
       ".iso"
     ],
     "engine": "emulatorjs:psp",
-    "estimatedSize": "190 Mo",
+    "estimatedSize": "187 Mo",
     "filename": "Patapon (USA).cso",
     "urls": [
-      "https://archive.org/cors/sony_psp_cso_usa/Patapon%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony_psp_cso_usa%2FPatapon%2520(USA).cso",
-      "https://archive.org/download/sony_psp_cso_usa/Patapon%20(USA).cso",
       "https://archive.org/cors/psp-cso-collection/Patapon%20(USA).cso",
       "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fpsp-cso-collection%2FPatapon%2520(USA).cso",
       "https://archive.org/download/psp-cso-collection/Patapon%20(USA).cso",
-      "https://archive.org/cors/sony-psp-cso-collection/Patapon%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony-psp-cso-collection%2FPatapon%2520(USA).cso",
-      "https://archive.org/download/sony-psp-cso-collection/Patapon%20(USA).cso"
+      "https://archive.org/cors/ultimate-rom-collection/PSP/Patapon%20(USA).iso",
+      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fultimate-rom-collection%2FPSP%2FPatapon%2520(USA).iso",
+      "https://archive.org/download/ultimate-rom-collection/PSP/Patapon%20(USA).iso"
     ],
-    "description": "Rythme / Stratégie sur PlayStation Portable (190 Mo · PPSSPP WebAssembly)."
+    "description": "Rythme / Stratégie sur PlayStation Portable (187 Mo · PPSSPP WebAssembly)."
   },
   {
     "id": "psp-patapon-2",
@@ -2564,20 +2369,17 @@
       ".iso"
     ],
     "engine": "emulatorjs:psp",
-    "estimatedSize": "340 Mo",
+    "estimatedSize": "383 Mo",
     "filename": "Patapon 2 (USA).cso",
     "urls": [
-      "https://archive.org/cors/sony_psp_cso_usa/Patapon%202%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony_psp_cso_usa%2FPatapon%25202%2520(USA).cso",
-      "https://archive.org/download/sony_psp_cso_usa/Patapon%202%20(USA).cso",
       "https://archive.org/cors/psp-cso-collection/Patapon%202%20(USA).cso",
       "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fpsp-cso-collection%2FPatapon%25202%2520(USA).cso",
       "https://archive.org/download/psp-cso-collection/Patapon%202%20(USA).cso",
-      "https://archive.org/cors/sony-psp-cso-collection/Patapon%202%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony-psp-cso-collection%2FPatapon%25202%2520(USA).cso",
-      "https://archive.org/download/sony-psp-cso-collection/Patapon%202%20(USA).cso"
+      "https://archive.org/cors/ultimate-rom-collection/PSP/Patapon%202%20(USA).iso",
+      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fultimate-rom-collection%2FPSP%2FPatapon%25202%2520(USA).iso",
+      "https://archive.org/download/ultimate-rom-collection/PSP/Patapon%202%20(USA).iso"
     ],
-    "description": "Rythme / Stratégie sur PlayStation Portable (340 Mo · PPSSPP WebAssembly)."
+    "description": "Rythme / Stratégie sur PlayStation Portable (383 Mo · PPSSPP WebAssembly)."
   },
   {
     "id": "psp-locoroco",
@@ -2594,20 +2396,17 @@
       ".iso"
     ],
     "engine": "emulatorjs:psp",
-    "estimatedSize": "320 Mo",
+    "estimatedSize": "505 Mo",
     "filename": "LocoRoco (USA).cso",
     "urls": [
-      "https://archive.org/cors/sony_psp_cso_usa/LocoRoco%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony_psp_cso_usa%2FLocoRoco%2520(USA).cso",
-      "https://archive.org/download/sony_psp_cso_usa/LocoRoco%20(USA).cso",
       "https://archive.org/cors/psp-cso-collection/LocoRoco%20(USA).cso",
       "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fpsp-cso-collection%2FLocoRoco%2520(USA).cso",
       "https://archive.org/download/psp-cso-collection/LocoRoco%20(USA).cso",
-      "https://archive.org/cors/sony-psp-cso-collection/LocoRoco%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony-psp-cso-collection%2FLocoRoco%2520(USA).cso",
-      "https://archive.org/download/sony-psp-cso-collection/LocoRoco%20(USA).cso"
+      "https://archive.org/cors/ultimate-rom-collection/PSP/LocoRoco%20(USA)%20(En%2CJa%2CFr%2CDe%2CEs%2CIt%2CNl%2CPt%2CSv%2CNo%2CDa%2CFi%2CZh%2CKo%2CRu).iso",
+      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fultimate-rom-collection%2FPSP%2FLocoRoco%2520(USA)%2520(En%252CJa%252CFr%252CDe%252CEs%252CIt%252CNl%252CPt%252CSv%252CNo%252CDa%252CFi%252CZh%252CKo%252CRu).iso",
+      "https://archive.org/download/ultimate-rom-collection/PSP/LocoRoco%20(USA)%20(En%2CJa%2CFr%2CDe%2CEs%2CIt%2CNl%2CPt%2CSv%2CNo%2CDa%2CFi%2CZh%2CKo%2CRu).iso"
     ],
-    "description": "Plateforme / Puzzle sur PlayStation Portable (320 Mo · PPSSPP WebAssembly)."
+    "description": "Plateforme / Puzzle sur PlayStation Portable (505 Mo · PPSSPP WebAssembly)."
   },
   {
     "id": "psp-locoroco-2",
@@ -2624,20 +2423,17 @@
       ".iso"
     ],
     "engine": "emulatorjs:psp",
-    "estimatedSize": "780 Mo",
+    "estimatedSize": "1.53 Go",
     "filename": "LocoRoco 2 (USA).cso",
     "urls": [
-      "https://archive.org/cors/sony_psp_cso_usa/LocoRoco%202%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony_psp_cso_usa%2FLocoRoco%25202%2520(USA).cso",
-      "https://archive.org/download/sony_psp_cso_usa/LocoRoco%202%20(USA).cso",
       "https://archive.org/cors/psp-cso-collection/LocoRoco%202%20(USA).cso",
       "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fpsp-cso-collection%2FLocoRoco%25202%2520(USA).cso",
       "https://archive.org/download/psp-cso-collection/LocoRoco%202%20(USA).cso",
-      "https://archive.org/cors/sony-psp-cso-collection/LocoRoco%202%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony-psp-cso-collection%2FLocoRoco%25202%2520(USA).cso",
-      "https://archive.org/download/sony-psp-cso-collection/LocoRoco%202%20(USA).cso"
+      "https://archive.org/cors/ultimate-rom-collection/PSP/LocoRoco%202%20(USA)%20(En%2CJa%2CFr%2CDe%2CEs%2CIt%2CNl%2CPt%2CSv%2CNo%2CDa%2CFi%2CKo%2CRu).iso",
+      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fultimate-rom-collection%2FPSP%2FLocoRoco%25202%2520(USA)%2520(En%252CJa%252CFr%252CDe%252CEs%252CIt%252CNl%252CPt%252CSv%252CNo%252CDa%252CFi%252CKo%252CRu).iso",
+      "https://archive.org/download/ultimate-rom-collection/PSP/LocoRoco%202%20(USA)%20(En%2CJa%2CFr%2CDe%2CEs%2CIt%2CNl%2CPt%2CSv%2CNo%2CDa%2CFi%2CKo%2CRu).iso"
     ],
-    "description": "Plateforme / Puzzle sur PlayStation Portable (780 Mo · PPSSPP WebAssembly)."
+    "description": "Plateforme / Puzzle sur PlayStation Portable (1.53 Go · PPSSPP WebAssembly)."
   },
   {
     "id": "psp-lumines",
@@ -2654,20 +2450,14 @@
       ".iso"
     ],
     "engine": "emulatorjs:psp",
-    "estimatedSize": "165 Mo",
+    "estimatedSize": "152 Mo",
     "filename": "Lumines (USA).cso",
     "urls": [
-      "https://archive.org/cors/sony_psp_cso_usa/Lumines%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony_psp_cso_usa%2FLumines%2520(USA).cso",
-      "https://archive.org/download/sony_psp_cso_usa/Lumines%20(USA).cso",
       "https://archive.org/cors/psp-cso-collection/Lumines%20(USA).cso",
       "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fpsp-cso-collection%2FLumines%2520(USA).cso",
-      "https://archive.org/download/psp-cso-collection/Lumines%20(USA).cso",
-      "https://archive.org/cors/sony-psp-cso-collection/Lumines%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony-psp-cso-collection%2FLumines%2520(USA).cso",
-      "https://archive.org/download/sony-psp-cso-collection/Lumines%20(USA).cso"
+      "https://archive.org/download/psp-cso-collection/Lumines%20(USA).cso"
     ],
-    "description": "Puzzle / Musique sur PlayStation Portable (165 Mo · PPSSPP WebAssembly)."
+    "description": "Puzzle / Musique sur PlayStation Portable (152 Mo · PPSSPP WebAssembly)."
   },
   {
     "id": "psp-sonic-rivals-2",
@@ -2684,20 +2474,14 @@
       ".iso"
     ],
     "engine": "emulatorjs:psp",
-    "estimatedSize": "195 Mo",
+    "estimatedSize": "233 Mo",
     "filename": "Sonic Rivals 2 (USA).cso",
     "urls": [
-      "https://archive.org/cors/sony_psp_cso_usa/Sonic%20Rivals%202%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony_psp_cso_usa%2FSonic%2520Rivals%25202%2520(USA).cso",
-      "https://archive.org/download/sony_psp_cso_usa/Sonic%20Rivals%202%20(USA).cso",
       "https://archive.org/cors/psp-cso-collection/Sonic%20Rivals%202%20(USA).cso",
       "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fpsp-cso-collection%2FSonic%2520Rivals%25202%2520(USA).cso",
-      "https://archive.org/download/psp-cso-collection/Sonic%20Rivals%202%20(USA).cso",
-      "https://archive.org/cors/sony-psp-cso-collection/Sonic%20Rivals%202%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony-psp-cso-collection%2FSonic%2520Rivals%25202%2520(USA).cso",
-      "https://archive.org/download/sony-psp-cso-collection/Sonic%20Rivals%202%20(USA).cso"
+      "https://archive.org/download/psp-cso-collection/Sonic%20Rivals%202%20(USA).cso"
     ],
-    "description": "Plateforme / Vitesse sur PlayStation Portable (195 Mo · PPSSPP WebAssembly)."
+    "description": "Plateforme / Vitesse sur PlayStation Portable (233 Mo · PPSSPP WebAssembly)."
   },
   {
     "id": "psp-crash-tag-team-racing",
@@ -2714,20 +2498,14 @@
       ".iso"
     ],
     "engine": "emulatorjs:psp",
-    "estimatedSize": "710 Mo",
+    "estimatedSize": "1002 Mo",
     "filename": "Crash Tag Team Racing (USA).cso",
     "urls": [
-      "https://archive.org/cors/sony_psp_cso_usa/Crash%20Tag%20Team%20Racing%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony_psp_cso_usa%2FCrash%2520Tag%2520Team%2520Racing%2520(USA).cso",
-      "https://archive.org/download/sony_psp_cso_usa/Crash%20Tag%20Team%20Racing%20(USA).cso",
       "https://archive.org/cors/psp-cso-collection/Crash%20Tag%20Team%20Racing%20(USA).cso",
       "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fpsp-cso-collection%2FCrash%2520Tag%2520Team%2520Racing%2520(USA).cso",
-      "https://archive.org/download/psp-cso-collection/Crash%20Tag%20Team%20Racing%20(USA).cso",
-      "https://archive.org/cors/sony-psp-cso-collection/Crash%20Tag%20Team%20Racing%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony-psp-cso-collection%2FCrash%2520Tag%2520Team%2520Racing%2520(USA).cso",
-      "https://archive.org/download/sony-psp-cso-collection/Crash%20Tag%20Team%20Racing%20(USA).cso"
+      "https://archive.org/download/psp-cso-collection/Crash%20Tag%20Team%20Racing%20(USA).cso"
     ],
-    "description": "Course / Plateforme sur PlayStation Portable (710 Mo · PPSSPP WebAssembly)."
+    "description": "Course / Plateforme sur PlayStation Portable (1002 Mo · PPSSPP WebAssembly)."
   },
   {
     "id": "psp-crash-of-the-titans",
@@ -2744,20 +2522,14 @@
       ".iso"
     ],
     "engine": "emulatorjs:psp",
-    "estimatedSize": "640 Mo",
+    "estimatedSize": "586 Mo",
     "filename": "Crash of the Titans (USA).cso",
     "urls": [
-      "https://archive.org/cors/sony_psp_cso_usa/Crash%20of%20the%20Titans%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony_psp_cso_usa%2FCrash%2520of%2520the%2520Titans%2520(USA).cso",
-      "https://archive.org/download/sony_psp_cso_usa/Crash%20of%20the%20Titans%20(USA).cso",
       "https://archive.org/cors/psp-cso-collection/Crash%20of%20the%20Titans%20(USA).cso",
       "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fpsp-cso-collection%2FCrash%2520of%2520the%2520Titans%2520(USA).cso",
-      "https://archive.org/download/psp-cso-collection/Crash%20of%20the%20Titans%20(USA).cso",
-      "https://archive.org/cors/sony-psp-cso-collection/Crash%20of%20the%20Titans%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony-psp-cso-collection%2FCrash%2520of%2520the%2520Titans%2520(USA).cso",
-      "https://archive.org/download/sony-psp-cso-collection/Crash%20of%20the%20Titans%20(USA).cso"
+      "https://archive.org/download/psp-cso-collection/Crash%20of%20the%20Titans%20(USA).cso"
     ],
-    "description": "Action / Plateforme sur PlayStation Portable (640 Mo · PPSSPP WebAssembly)."
+    "description": "Action / Plateforme sur PlayStation Portable (586 Mo · PPSSPP WebAssembly)."
   },
   {
     "id": "psp-bomberman",
@@ -2774,20 +2546,14 @@
       ".iso"
     ],
     "engine": "emulatorjs:psp",
-    "estimatedSize": "110 Mo",
+    "estimatedSize": "75 Mo",
     "filename": "Bomberman (USA).cso",
     "urls": [
-      "https://archive.org/cors/sony_psp_cso_usa/Bomberman%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony_psp_cso_usa%2FBomberman%2520(USA).cso",
-      "https://archive.org/download/sony_psp_cso_usa/Bomberman%20(USA).cso",
       "https://archive.org/cors/psp-cso-collection/Bomberman%20(USA).cso",
       "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fpsp-cso-collection%2FBomberman%2520(USA).cso",
-      "https://archive.org/download/psp-cso-collection/Bomberman%20(USA).cso",
-      "https://archive.org/cors/sony-psp-cso-collection/Bomberman%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony-psp-cso-collection%2FBomberman%2520(USA).cso",
-      "https://archive.org/download/sony-psp-cso-collection/Bomberman%20(USA).cso"
+      "https://archive.org/download/psp-cso-collection/Bomberman%20(USA).cso"
     ],
-    "description": "Arcade / Party sur PlayStation Portable (110 Mo · PPSSPP WebAssembly)."
+    "description": "Arcade / Party sur PlayStation Portable (75 Mo · PPSSPP WebAssembly)."
   },
   {
     "id": "psp-pac-man-world-3",
@@ -2804,19 +2570,13 @@
       ".iso"
     ],
     "engine": "emulatorjs:psp",
-    "estimatedSize": "380 Mo",
+    "estimatedSize": "428 Mo",
     "filename": "Pac-Man World 3 (USA).cso",
     "urls": [
-      "https://archive.org/cors/sony_psp_cso_usa/Pac-Man%20World%203%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony_psp_cso_usa%2FPac-Man%2520World%25203%2520(USA).cso",
-      "https://archive.org/download/sony_psp_cso_usa/Pac-Man%20World%203%20(USA).cso",
       "https://archive.org/cors/psp-cso-collection/Pac-Man%20World%203%20(USA).cso",
       "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fpsp-cso-collection%2FPac-Man%2520World%25203%2520(USA).cso",
-      "https://archive.org/download/psp-cso-collection/Pac-Man%20World%203%20(USA).cso",
-      "https://archive.org/cors/sony-psp-cso-collection/Pac-Man%20World%203%20(USA).cso",
-      "/api/rom-proxy?url=https%3A%2F%2Farchive.org%2Fdownload%2Fsony-psp-cso-collection%2FPac-Man%2520World%25203%2520(USA).cso",
-      "https://archive.org/download/sony-psp-cso-collection/Pac-Man%20World%203%20(USA).cso"
+      "https://archive.org/download/psp-cso-collection/Pac-Man%20World%203%20(USA).cso"
     ],
-    "description": "Plateforme 3D sur PlayStation Portable (380 Mo · PPSSPP WebAssembly)."
+    "description": "Plateforme 3D sur PlayStation Portable (428 Mo · PPSSPP WebAssembly)."
   }
 ]
