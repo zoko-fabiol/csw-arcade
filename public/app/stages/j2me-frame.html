@@ -1050,6 +1050,28 @@
         bootJarBlob(msg);
       } else if (msg.type === "UPDATE_DISPLAY") {
         display.classList.toggle("smooth-filter", msg.filter === "smooth");
+        if (msg.ratio === "stretch" || msg.ratio === "16:9") {
+          display.style.width = "100%";
+          display.style.height = "100%";
+          display.style.maxWidth = "none";
+          display.style.maxHeight = "none";
+          display.style.objectFit = "fill";
+        } else if (msg.ratio === "pixel-perfect") {
+          display.style.width = "auto";
+          display.style.height = "100%";
+          display.style.maxWidth = "100%";
+          display.style.maxHeight = "100%";
+          display.style.aspectRatio = "1 / 1";
+          display.style.objectFit = "contain";
+          display.style.imageRendering = "pixelated";
+        } else if (msg.ratio) {
+          display.style.width = "";
+          display.style.height = "";
+          display.style.maxWidth = "";
+          display.style.maxHeight = "";
+          display.style.aspectRatio = "";
+          display.style.objectFit = "contain";
+        }
       } else if (msg.type === "J2ME_KEY" && msg.code) {
         triggerVirtualKey(Boolean(msg.pressed), msg.code);
       } else if (msg.type === "SET_CUSTOM_TOUCH_PAD") {
