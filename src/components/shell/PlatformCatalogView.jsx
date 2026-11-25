@@ -298,8 +298,25 @@ export function PlatformCatalogView({ mode, onLaunchStage, onCacheChanged, onJoi
   const [onlineQuery, setOnlineQuery] = useState('');
   const [onlineResults, setOnlineResults] = useState([]);
   const [onlineSearching, setOnlineSearching] = useState(false);
-  const [downloadingId, setDownloadingId] = useState(null);
-  const [downloadProgress, setDownloadProgress] = useState('');
+  const [activeDownloads, setActiveDownloads] = useState({});
+  const activeDownloadsRef = useRef({});
+  activeDownloadsRef.current = activeDownloads;
+
+  const updateDownloadEntry = useCallback((id, patch) => {
+    setActiveDownloads((prev) => ({
+      ...prev,
+      [id]: { ...(prev[id] || {}), ...patch },
+    }));
+  }, []);
+
+  const clearDownloadEntry = useCallback((id) => {
+    setActiveDownloads((prev) => {
+      if (!(id in prev)) return prev;
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
+  }, []);
   const [errorMsg, setErrorMsg] = useState('');
   const [vitaBridgeEntry, setVitaBridgeEntry] = useState(null);
   const [vitaLaunchStatus, setVitaLaunchStatus] = useState('');
@@ -525,21 +542,18 @@ export function PlatformCatalogView({ mode, onLaunchStage, onCacheChanged, onJoi
     if (!entryOverride && isKnownNeoZip) {
       if (neoragexVerified?.padFixable?.[rawZipKey]) {
         try {
-          setDownloadingId('local-import');
-          setDownloadProgress('Adaptation CSW Arcade…');
+          updateDownloadEntry('local-import', { title: resolvedFilename, progress: 'Adaptation CSW Arcade…', pct: 0 });
           finalBlob = await padNeoRAGExZipFile(file, neoragexVerified.padFixable[rawZipKey], resolvedFilename);
         } catch {
           finalBlob = file;
         } finally {
-          setDownloadingId(null);
-          setDownloadProgress('');
+          clearDownloadEntry('local-import');
         }
       } else if (!NATIVE_NEORAGEX_SET.has(rawZipKey)) {
         // Les dumps décryptés CSW Arcade dont les CRC diffèrent de FBNeo (ex: metalslug1, metalslug3, kof98)
         // basculent automatiquement sur le romset FBNeo vérifié via /api/rom-proxy?source=fbneo si disponible.
         try {
-          setDownloadingId('local-import');
-          setDownloadProgress('Synchronisation FBNeo…');
+          updateDownloadEntry('local-import', { title: resolvedFilename, progress: 'Synchronisation FBNeo…', pct: 0 });
           const res = await fetch(`/api/rom-proxy?file=${encodeURIComponent(resolvedFilename)}&source=fbneo`);
           if (res.ok) {
             const ab = await res.arrayBuffer();
@@ -551,8 +565,7 @@ export function PlatformCatalogView({ mode, onLaunchStage, onCacheChanged, onJoi
         } catch {
           /* conserve le fichier importé si hors-ligne */
         } finally {
-          setDownloadingId(null);
-          setDownloadProgress('');
+          clearDownloadEntry('local-import');
         }
       }
     }
@@ -595,13 +608,14 @@ export function PlatformCatalogView({ mode, onLaunchStage, onCacheChanged, onJoi
     );
   };
 
-  const handleLaunchCatalogEntry = async (entry) => {
+  const handleLaunchCatalogEntry = async (entry, { autoLaunch = true } = {}) => {
     if (entry?.core === 'psvita' || entry?.requiresNativeLauncher || entry?.engine === 'native:vita3k') {
       setVitaLaunchStatus('');
       setVitaBridgeEntry(entry);
       return;
     }
-    if (onRequireCoin && !onRequireCoin()) return;
+    if (activeDownloadsRef.current[entry.id]) return;
+    if (autoLaunch && onRequireCoin && !onRequireCoin()) return;
     if (!entry.urls?.length) {
       setErrorMsg(`Ce titre (${entry.title}) nécessite une image locale : cliquez sur « Importer ROM ».`);
       return;
@@ -609,8 +623,12 @@ export function PlatformCatalogView({ mode, onLaunchStage, onCacheChanged, onJoi
     const core = entry.core || entry.platform || cfg.defaultCore;
     const isArcadeZip = core === 'fbneo' || core === 'mame2003_plus';
     setErrorMsg('');
-    setDownloadingId(entry.id);
-    setDownloadProgress('Préparation…');
+    updateDownloadEntry(entry.id, {
+      title: entry.title || entry.filename || entry.id,
+      progress: 'Préparation…',
+      pct: 0,
+      autoLaunch,
+    });
     try {
       const file = await downloadAndCacheRom(entry, {
         mode: cfg.cacheMode,
@@ -619,21 +637,30 @@ export function PlatformCatalogView({ mode, onLaunchStage, onCacheChanged, onJoi
         onProgress: ({ received, total }) => {
           if (total > 0) {
             const pct = Math.min(100, Math.round((received / total) * 100));
-            setDownloadProgress(`${pct}% (${formatBytes(received)})`);
+            updateDownloadEntry(entry.id, {
+              progress: `${pct}% (${formatBytes(received)})`,
+              pct,
+            });
           } else {
-            setDownloadProgress(formatBytes(received));
+            updateDownloadEntry(entry.id, {
+              progress: formatBytes(received),
+              pct: null,
+            });
           }
         },
       });
       await refreshCache();
-      launchFile(file, core, entry.title, entry);
+      if (autoLaunch) {
+        launchFile(file, core, entry.title, entry);
+      }
     } catch (err) {
       markRomAsDead(entry.id);
-      addCoins(1);
-      setErrorMsg(`ROM indisponible (« ${entry.title} ») : retirée automatiquement de la liste (1 Coin remboursé).`);
+      if (autoLaunch) addCoins(1);
+      setErrorMsg(
+        `ROM indisponible (« ${entry.title} ») : retirée automatiquement de la liste${autoLaunch ? ' (1 Coin remboursé)' : ''}.`
+      );
     } finally {
-      setDownloadingId(null);
-      setDownloadProgress('');
+      clearDownloadEntry(entry.id);
     }
   };
 
@@ -1011,7 +1038,8 @@ export function PlatformCatalogView({ mode, onLaunchStage, onCacheChanged, onJoi
                 {onlineResults.map((item) => {
                   const ext = item.filename?.split('.').pop()?.toLowerCase() || '';
                   const guessedCore = RETRO_EXT_CORE_MAP[ext] || cfg.defaultCore;
-                  const isBusy = downloadingId === item.id;
+                  const dlState = activeDownloads[item.id];
+                  const isBusy = Boolean(dlState);
                   return (
                     <article
                       key={item.id}
@@ -1033,18 +1061,58 @@ export function PlatformCatalogView({ mode, onLaunchStage, onCacheChanged, onJoi
                           </p>
                         </div>
                       </div>
-                      <button
-                        type="button"
-                        disabled={Boolean(downloadingId)}
-                        onClick={() => handleLaunchCatalogEntry({ ...item, core: guessedCore, supportsMultiplayer: false })}
-                        className="arcade-focus-ring px-3.5 py-2 min-h-[44px] rounded-xl u-btn-primary disabled:opacity-50 text-xs font-black flex items-center justify-center gap-1.5 shrink-0 transition-all active:scale-[0.98]"
-                      >
-                        <Download className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
-                        <span className="truncate">{isBusy ? downloadProgress : 'Jouer'}</span>
-                      </button>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <button
+                          type="button"
+                          disabled={isBusy}
+                          onClick={() => handleLaunchCatalogEntry({ ...item, core: guessedCore, supportsMultiplayer: false }, { autoLaunch: false })}
+                          title="Télécharger en arrière-plan"
+                          className="arcade-focus-ring px-2.5 py-2 min-h-[44px] rounded-xl bg-neutral-800 hover:bg-neutral-700 border border-white/15 text-neutral-100 disabled:opacity-50 text-xs font-bold flex items-center justify-center shrink-0 transition-colors"
+                        >
+                          <Download className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+                        </button>
+                        <button
+                          type="button"
+                          disabled={isBusy}
+                          onClick={() => handleLaunchCatalogEntry({ ...item, core: guessedCore, supportsMultiplayer: false })}
+                          className="arcade-focus-ring px-3.5 py-2 min-h-[44px] rounded-xl u-btn-primary disabled:opacity-50 text-xs font-black flex items-center justify-center gap-1.5 shrink-0 transition-all active:scale-[0.98]"
+                        >
+                          <Play className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+                          <span className="truncate">{isBusy ? dlState.progress : 'Jouer'}</span>
+                        </button>
+                      </div>
                     </article>
                   );
                 })}
+              </div>
+            </section>
+          )}
+
+          {/* Téléchargements parallèles en cours */}
+          {Object.keys(activeDownloads).length > 0 && (
+            <section className="rounded-2xl bg-neutral-950/90 border border-sky-500/35 p-3 space-y-2">
+              <div className="flex items-center justify-between text-xs font-bold text-sky-300">
+                <span className="flex items-center gap-1.5">
+                  <Download className="w-3.5 h-3.5 animate-bounce" aria-hidden="true" />
+                  <span>Téléchargements en cours ({Object.keys(activeDownloads).length})</span>
+                </span>
+                <span className="text-[10px] font-mono text-neutral-400">Multi-téléchargement actif</span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                {Object.entries(activeDownloads).map(([id, dl]) => (
+                  <div key={id} className="px-2.5 py-2 rounded-xl bg-neutral-900/90 border border-white/10 space-y-1">
+                    <div className="flex items-center justify-between gap-2 text-[11px]">
+                      <span className="font-bold text-white truncate">{dl.title}</span>
+                      <span className="font-mono text-sky-300 shrink-0 tabular-nums">{dl.progress}</span>
+                    </div>
+                    <div className="h-1.5 rounded-full bg-neutral-800 overflow-hidden">
+                      <div
+                        className="h-full bg-sky-400 transition-all duration-150"
+                        style={{ width: `${typeof dl.pct === 'number' ? Math.max(4, dl.pct) : 35}%` }}
+                      />
+                    </div>
+                  </div>
+                ))}
               </div>
             </section>
           )}
@@ -1166,7 +1234,8 @@ export function PlatformCatalogView({ mode, onLaunchStage, onCacheChanged, onJoi
                 <div className={viewMode === 'grid' ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3' : 'space-y-2.5'}>
                   {visibleItems.map((entry, idx) => {
                     const isCached = cachedIds.has(entry.id);
-                    const isBusy = downloadingId === entry.id;
+                    const dlState = activeDownloads[entry.id];
+                    const isBusy = Boolean(dlState);
                     const isFocused = focusedIdx === idx;
                     const showPlatformBadge = mode === 'all' || mode === 'arcade' || mode === 'playstation' || mode === 'nintendo' || mode === 'sega';
                     const badgeMeta = getMultiplayerBadgeMeta(entry, { mode });
@@ -1246,7 +1315,7 @@ export function PlatformCatalogView({ mode, onLaunchStage, onCacheChanged, onJoi
                         >
                           <button
                             type="button"
-                            disabled={Boolean(downloadingId)}
+                            disabled={isBusy}
                             onClick={() => handleLaunchCatalogEntry(entry)}
                             className={`arcade-focus-ring flex-1 min-w-[100px] px-3 py-2 min-h-[44px] rounded-xl text-xs font-black flex items-center justify-center gap-1.5 transition-all active:scale-[0.98] ${
                               isCached
@@ -1255,8 +1324,20 @@ export function PlatformCatalogView({ mode, onLaunchStage, onCacheChanged, onJoi
                             }`}
                           >
                             {isCached ? <Play className="w-3.5 h-3.5 shrink-0" aria-hidden="true" /> : <Download className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />}
-                            <span className="truncate">{isBusy ? downloadProgress : 'Jouer'}</span>
+                            <span className="truncate">{isBusy ? dlState.progress : 'Jouer'}</span>
                           </button>
+                          {!isCached && entry.urls?.length > 0 && entry.core !== 'psvita' && !entry.requiresNativeLauncher && (
+                            <button
+                              type="button"
+                              disabled={isBusy}
+                              onClick={() => handleLaunchCatalogEntry(entry, { autoLaunch: false })}
+                              title="Télécharger en arrière-plan (multi-téléchargement)"
+                              aria-label={`Télécharger ${entry.title} en arrière-plan`}
+                              className="arcade-focus-ring px-3 py-2 min-h-[44px] rounded-xl bg-neutral-800 hover:bg-neutral-700 border border-white/15 text-neutral-100 disabled:opacity-50 text-xs font-bold flex items-center justify-center gap-1 shrink-0 transition-colors"
+                            >
+                              <Download className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+                            </button>
+                          )}
                           {onJoinChannel && badgeMeta.isMultiplayer && (
                             <button
                               type="button"
