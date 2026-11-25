@@ -5,6 +5,7 @@ import https from 'node:https';
 import fs from 'node:fs';
 import path from 'node:path';
 import zlib from 'node:zlib';
+import crypto from 'node:crypto';
 import { supportsOnlineMultiplayer } from '../utils/gameCapabilities.js';
 import { LocalFirebaseStore } from './localFirebaseStore.js';
 
@@ -852,6 +853,50 @@ export function setupNetplayHub(server) {
 
   server.middlewares.use('/api/emu-cores', serveEmulatorCore);
   server.middlewares.use('/emulatorjs/cores', serveEmulatorCore);
+
+  // Endpoint d'identifiants éphémères HMAC-SHA1 pour coturn (RFC 5389 / REST API TURN) sur votre VPS
+  server.middlewares.use('/api/turn-credentials', (req, res) => {
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Cache-Control', 'no-store');
+    if (req.method === 'OPTIONS') {
+      res.statusCode = 204;
+      return res.end();
+    }
+    const secret = process.env.TURN_SHARED_SECRET || '';
+    const turnHost = process.env.TURN_HOST || '';
+    if (!secret || !turnHost) {
+      res.statusCode = 200;
+      return res.end(JSON.stringify({ ok: true, iceServers: [] }));
+    }
+    try {
+      const ttl = 86400;
+      const unixExpiry = Math.floor(Date.now() / 1000) + ttl;
+      const username = `${unixExpiry}:cswplayer`;
+      const credential = crypto.createHmac('sha1', secret).update(username).digest('base64');
+      res.statusCode = 200;
+      return res.end(
+        JSON.stringify({
+          ok: true,
+          ttl,
+          iceServers: [
+            {
+              urls: [
+                `turn:${turnHost}:3478?transport=udp`,
+                `turn:${turnHost}:3478?transport=tcp`,
+                `turns:${turnHost}:5349?transport=tcp`,
+              ],
+              username,
+              credential,
+            },
+          ],
+        })
+      );
+    } catch (err) {
+      res.statusCode = 500;
+      return res.end(JSON.stringify({ ok: false, error: err?.message || 'TURN error' }));
+    }
+  });
 
   // Relais temps réel local / LAN pour les salons Fightcade 2 (chat & présence) — garantit le fonctionnement même sans règles Firestore publiées
   const fcLobbies = new Map(); // gameId -> { messages: [], users: Map<uid, userObj> }

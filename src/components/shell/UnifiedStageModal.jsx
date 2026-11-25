@@ -364,6 +364,9 @@ export function UnifiedStageModal({
           { type: 'SET_CUSTOM_TOUCH_PAD', enabled: touchPadVisible },
           window.location.origin
         );
+        if (session.isNetplay && p2pEngine?.attachDirectIframeWindow) {
+          p2pEngine.attachDirectIframeWindow(iframeRef.current.contentWindow, window.location.origin);
+        }
       } else if (event.data.type === 'STAGE_STATUS') {
         if (event.data.message) setStatusText(event.data.message);
         if (event.data.status === 'playing') {
@@ -587,6 +590,9 @@ export function UnifiedStageModal({
   // Pont P2P entrant : répercuter les paquets GGPO, inputs distants, événements multijoueur et le savestate Frame 0 dans l'iframe de l'émulateur
   useEffect(() => {
     if (!p2pEngine) return;
+    if (iframeRef.current?.contentWindow && p2pEngine.attachDirectIframeWindow) {
+      p2pEngine.attachDirectIframeWindow(iframeRef.current.contentWindow, window.location.origin);
+    }
     p2pEngine.onGgpoPacket = (buffer) => {
       if (buffer) {
         iframeRef.current?.contentWindow?.postMessage(

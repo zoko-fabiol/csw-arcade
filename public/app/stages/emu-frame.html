@@ -881,6 +881,17 @@
       }
     }
 
+    let netplayDirectPort = null;
+    function sendDirectGgpoBuffer(buf) {
+      if (netplayDirectPort && buf instanceof ArrayBuffer) {
+        try {
+          netplayDirectPort.postMessage(buf, [buf]);
+          return;
+        } catch {}
+      }
+      notifyParent('NETPLAY_GGPO_PACKET', { buffer: buf });
+    }
+
     // =========================================================================
     // MOTEUR FIGHTCADE GGPO DÉTERMINISTE 100 % (60.00 FPS + 128-FRAME ROLLBACK + CHECKSUM 0xCB)
     // =========================================================================
@@ -930,6 +941,9 @@
         this.spectatorReadyTimer = null;
         this.syncMuted = false;
         this.lastSentMask = -1;
+        this.lastBurstMask = 0;
+        this.inputBurstLeft = 0;
+        this.peerReportedAdvantage = 0;
         this.autoHealEnabled = true;
         this.waitingForFrame0 = false;
         this.waitingForFrame0Ack = false;
@@ -940,6 +954,7 @@
         this.guestReadyTimer = null;
         this.hostReadyTimer = null;
         this.lastPaceHoldMs = 0;
+        this.lockstepWaitSinceMs = 0;
 
         this.localLiveMask = 0;
         this.lastAppliedP1Mask = -1;
@@ -1158,20 +1173,19 @@
 
         const slice = buf.length === len ? buf : buf.subarray(0, len);
         try {
-          if (this.gm.FS && this.gm.functions?.loadState) {
-            try {
-              this.gm.FS.unlink('csw_rb.state');
-            } catch {}
-            this.gm.FS.writeFile('/csw_rb.state', slice);
-            this.gm.functions.loadState('csw_rb.state', 0);
+          // Priorité 1 : Chargement direct en mémoire RAM (zéro I/O Virtual FS)
+          if (typeof this.gm.loadState === 'function') {
+            this.gm.loadState(slice);
             if (this.originalMainLoopFunc && !this.isWasmAsyncifyBusy()) {
-              this.originalMainLoopFunc(); // Flush tick: RetroArch consomme load_state au tick suivant sans avancer l'émulation
+              this.originalMainLoopFunc();
             }
             this.forceApplyAllInputs = true;
             return true;
           }
-          if (typeof this.gm.loadState === 'function') {
-            this.gm.loadState(slice);
+          // Fallback : Virtual FS si gm.loadState(Uint8Array) n'est pas exposé
+          if (this.gm.FS && this.gm.functions?.loadState) {
+            this.gm.FS.writeFile('/csw_rb.state', slice);
+            this.gm.functions.loadState('csw_rb.state', 0);
             if (this.originalMainLoopFunc && !this.isWasmAsyncifyBusy()) {
               this.originalMainLoopFunc();
             }
@@ -1220,22 +1234,18 @@
 
       send0x5APacket(targetFrame) {
         this.seq = (this.seq + 1) & 0xffff;
-        const m0 = this.getScheduledLocalMask(targetFrame);
-        const m1 = this.getScheduledLocalMask(targetFrame - 1);
-        const m2 = this.getScheduledLocalMask(targetFrame - 2);
-        const m3 = this.getScheduledLocalMask(targetFrame - 3);
-
-        const buf = new ArrayBuffer(15);
+        const buf = new ArrayBuffer(24);
         const view = new DataView(buf);
         view.setUint8(0, 0x5a);
         view.setUint16(1, this.seq, false);
         view.setUint32(3, targetFrame, false);
-        view.setUint16(7, m0, false);
-        view.setUint16(9, m1, false);
-        view.setUint16(11, m2, false);
-        view.setUint16(13, m3, false);
+        for (let k = 0; k < 8; k++) {
+          view.setUint16(7 + k * 2, this.getScheduledLocalMask(targetFrame - k), false);
+        }
+        const localAdv = Math.max(-64, Math.min(64, Math.round(this.currentFrame - this.remoteFrameAdvancement)));
+        view.setInt8(23, localAdv);
 
-        notifyParent('NETPLAY_GGPO_PACKET', { buffer: buf });
+        sendDirectGgpoBuffer(buf);
       }
 
       send0x5BAckPacket(syncFrame = 0) {
@@ -1244,7 +1254,7 @@
         const view = new DataView(buf);
         view.setUint8(0, 0x5b);
         view.setUint32(1, clean, false);
-        notifyParent('NETPLAY_GGPO_PACKET', { buffer: buf });
+        sendDirectGgpoBuffer(buf);
         notifyParent('NETPLAY_FRAME0_ACK', { syncFrame: clean });
       }
 
@@ -1254,7 +1264,7 @@
         const view = new DataView(buf);
         view.setUint8(0, 0x5c);
         view.setUint32(1, clean, false);
-        notifyParent('NETPLAY_GGPO_PACKET', { buffer: buf });
+        sendDirectGgpoBuffer(buf);
         notifyParent('NETPLAY_FRAME0_GO', { syncFrame: clean });
       }
 
@@ -1323,7 +1333,7 @@
         view.setUint8(0, 0xcb);
         view.setUint32(1, frame, false);
         view.setUint32(5, checksumInt >>> 0, false);
-        notifyParent('NETPLAY_GGPO_PACKET', { buffer: buf });
+        sendDirectGgpoBuffer(buf);
       }
 
       requestDesyncRecovery(frame) {
@@ -1335,7 +1345,7 @@
         const view = new DataView(buf);
         view.setUint8(0, 0xcc);
         view.setUint32(1, Math.max(0, Number(frame) || 0), false);
-        notifyParent('NETPLAY_GGPO_PACKET', { buffer: buf });
+        sendDirectGgpoBuffer(buf);
       }
 
       verifyPendingChecksums() {
@@ -1560,10 +1570,17 @@
 
         if (magic === 0x5a && view.byteLength >= 15) {
           const targetFrame = view.getUint32(3, false);
-          const m0 = view.getUint16(7, false);
-          const m1 = view.getUint16(9, false);
-          const m2 = view.getUint16(11, false);
-          const m3 = view.getUint16(13, false);
+          const count = view.byteLength >= 23 ? 8 : 4;
+          const inputs = [];
+          for (let k = count - 1; k >= 0; k--) {
+            inputs.push({
+              f: targetFrame - k,
+              mask: view.getUint16(7 + k * 2, false),
+            });
+          }
+          if (view.byteLength >= 24) {
+            this.peerReportedAdvantage = view.getInt8(23);
+          }
 
           this.hasRemotePeer = true;
           this.lastRemotePacketMs = performance.now();
@@ -1579,12 +1596,7 @@
 
           this.incomingQueue.push({
             targetFrame,
-            inputs: [
-              { f: targetFrame - 3, mask: m3 },
-              { f: targetFrame - 2, mask: m2 },
-              { f: targetFrame - 1, mask: m1 },
-              { f: targetFrame, mask: m0 },
-            ],
+            inputs,
           });
         }
       }
@@ -1671,7 +1683,17 @@
           for (let rf = rollbackFrame; rf < this.currentFrame; rf++) {
             if (this.isWasmAsyncifyBusy()) break;
             const rIdx = rf & this.BUFFER_MASK;
-            if (rf > rollbackFrame) {
+            const isConfirmedHere = this.remoteFrameNums[rIdx] === rf && this.remoteConfirmed[rIdx] === 1;
+            const nextIdx = (rf + 1) & this.BUFFER_MASK;
+            const nextUnconfirmed = !(this.remoteFrameNums[nextIdx] === rf + 1 && this.remoteConfirmed[nextIdx] === 1);
+            // Optimisation CPU : ne recapturer l'état qu'à la frontière confirmée/non-confirmée, toutes les 2 frames prédites, ou sur les frames de checksum
+            if (
+              rf > rollbackFrame &&
+              ((isConfirmedHere && nextUnconfirmed) ||
+                (!isConfirmedHere && (rf - rollbackFrame) % 2 === 0) ||
+                rf === this.currentFrame - 1 ||
+                rf % 30 === 0)
+            ) {
               this.captureSnapshot(rf);
             }
 
@@ -1748,8 +1770,13 @@
         this.localInputs[targetIdx] = this.localLiveMask;
         this.localFrameNums[targetIdx] = targetFrame;
 
-        // 3. Envoyer le paquet binaire 0x5A dès qu'une touche change ou toutes les 3 frames (50ms, pacing fluide)
-        if (this.localLiveMask !== this.lastSentMask || frame % 3 === 0) {
+        // 3. Envoyer le paquet binaire 0x5A (N-7) : burst 60 Hz sur 8 frames après tout changement de touche, puis 30 Hz au repos
+        if (this.localLiveMask !== this.lastBurstMask) {
+          this.lastBurstMask = this.localLiveMask;
+          this.inputBurstLeft = 8;
+        }
+        if (this.inputBurstLeft > 0 || frame % 2 === 0) {
+          if (this.inputBurstLeft > 0) this.inputBurstLeft -= 1;
           this.lastSentMask = this.localLiveMask;
           this.send0x5APacket(targetFrame);
         }
@@ -2222,40 +2249,59 @@
           console.log(`[CSW GGPO] Départ simultané P1 <-> P2 (Frame ${releaseFrame}) !`);
         }
 
-        // 4. Accumulateur d'horloge strict 60.00 FPS (empêche un écran 120Hz/144Hz de tourner 2x plus vite qu'un 60Hz)
+        // 4. Accumulateur d'horloge 60.00 FPS + Time-Rift Sync symétrique GGPO (±3 % doux, sans saccade)
+        const peerActive = this.hasRemotePeer && now - this.lastRemotePacketMs < 3000;
+        const localAdv = peerActive ? this.currentFrame - this.remoteFrameAdvancement : 0;
+        const symmetricRift = peerActive ? (localAdv - (this.peerReportedAdvantage || 0)) * 0.5 : 0;
+        const effectiveFrameMs =
+          peerActive && Math.abs(symmetricRift) > 0.6
+            ? Math.max(16.15, Math.min(17.25, this.FRAME_TIME_MS + symmetricRift * 0.16))
+            : this.FRAME_TIME_MS;
+
         if (!this.lastTickMs) this.lastTickMs = now;
         const dt = Math.max(0, Math.min(80, now - this.lastTickMs));
         this.lastTickMs = now;
-        this.accumulatorMs = Math.min(this.FRAME_TIME_MS * 2.5, this.accumulatorMs + dt);
+        this.accumulatorMs = Math.min(effectiveFrameMs * 2.5, this.accumulatorMs + dt);
 
-        if (this.accumulatorMs < 15.2) {
+        if (this.accumulatorMs < effectiveFrameMs * 0.92) {
           return;
         }
-        this.accumulatorMs -= this.FRAME_TIME_MS;
+        this.accumulatorMs -= effectiveFrameMs;
 
-        // 5. Time-Sync / Frame Advantage Pacing GGPO (borné à 250ms max pour ne jamais geler)
-        const peerActive = this.hasRemotePeer && now - this.lastRemotePacketMs < 3000;
-        const advantage = peerActive ? this.currentFrame - this.remoteFrameAdvancement : 0;
+        // 5. Garde anti-dérive extrême uniquement si l'écart dépasse 10 frames (borné à 220ms max)
+        const advantage = symmetricRift;
 
-        if (peerActive && advantage >= 12) {
+        if (peerActive && advantage >= 10) {
           if (!this.lastPaceHoldMs) this.lastPaceHoldMs = now;
-          if (now - this.lastPaceHoldMs < 240) {
+          if (now - this.lastPaceHoldMs < 220) {
             return;
           }
           this.lastPaceHoldMs = now;
         } else {
           this.lastPaceHoldMs = 0;
-          if (peerActive && advantage >= 4) {
-            this.throttleCounter += 1;
-            if (this.throttleCounter % 3 === 0) {
-              return;
+        }
+
+        // 5B. Mode Delay-Based Lockstep déterministe automatique pour les consoles 3D lourdes (PS1, N64, PSP, NDS)
+        if (peerActive && isHeavy3dCore(currentCoreName) && this.currentFrame >= this.INPUT_DELAY) {
+          const adaptive3dDelay = Math.min(5, Math.max(2, Math.ceil((this.peerPingMs || 40) / 32)));
+          if (adaptive3dDelay > this.INPUT_DELAY) {
+            this.INPUT_DELAY = adaptive3dDelay;
+          }
+          const curSlot = this.currentFrame & this.BUFFER_MASK;
+          const hasConfirmed3dInput =
+            this.remoteFrameNums[curSlot] === this.currentFrame && this.remoteConfirmed[curSlot] === 1;
+          if (!hasConfirmed3dInput) {
+            if (!this.lockstepWaitSinceMs) {
+              this.lockstepWaitSinceMs = now;
             }
-          } else if (peerActive && advantage >= 2) {
-            this.throttleCounter += 1;
-            if (this.throttleCounter % 6 === 0) {
+            if (now - this.lockstepWaitSinceMs < 75) {
+              this.accumulatorMs = Math.min(this.accumulatorMs + effectiveFrameMs, effectiveFrameMs * 1.2);
               return;
             }
           }
+          this.lockstepWaitSinceMs = 0;
+        } else {
+          this.lockstepWaitSinceMs = 0;
         }
 
         if (this.isWasmAsyncifyBusy()) return;
@@ -3073,6 +3119,22 @@
         const btnIdx = resolveUniversalKey({ code, key, keyCode: kc, which: kc });
         handleUniversalKeyboardBridge(code, kc, isDown);
         routeLocalPlayerInput(btnIdx, isDown);
+        return;
+      }
+
+      if (msg.type === 'ATTACH_NETPLAY_PORT' && event.ports && event.ports[0]) {
+        try {
+          if (netplayDirectPort) {
+            try { netplayDirectPort.close(); } catch {}
+          }
+          netplayDirectPort = event.ports[0];
+          netplayDirectPort.onmessage = (ev) => {
+            if (ev.data) {
+              window.__cswGgpoEngine?.handleIncomingBinary(ev.data);
+            }
+          };
+          netplayDirectPort.start?.();
+        } catch {}
         return;
       }
 

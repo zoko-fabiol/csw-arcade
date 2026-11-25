@@ -37,6 +37,32 @@ function buildIceServers() {
 
 const ICE_SERVERS = buildIceServers();
 
+let cachedDynamicTurnServers = null;
+let dynamicTurnFetchPromise = null;
+async function fetchDynamicTurnServers() {
+  if (cachedDynamicTurnServers) return cachedDynamicTurnServers;
+  if (typeof fetch !== 'function') return [];
+  if (!dynamicTurnFetchPromise) {
+    dynamicTurnFetchPromise = fetch('/api/turn-credentials')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (data?.ok && Array.isArray(data.iceServers) && data.iceServers.length > 0) {
+          cachedDynamicTurnServers = data.iceServers;
+          setTimeout(() => {
+            cachedDynamicTurnServers = null;
+          }, 3600 * 1000);
+          return data.iceServers;
+        }
+        return [];
+      })
+      .catch(() => [])
+      .finally(() => {
+        dynamicTurnFetchPromise = null;
+      });
+  }
+  return dynamicTurnFetchPromise;
+}
+
 const MAX_ROLLBACK_FRAMES = 8;
 const PACKET_BTN_MASK_SYNC = 0xb1;
 const PACKET_PING_BIN = 0xee;
@@ -71,6 +97,7 @@ export class RollbackP2PEngine {
     this.pc = null;
     this.udpChannel = null; // { ordered: false, maxRetransmits: 0 }
     this.reliableChannel = null; // { ordered: true }
+    this.directPort = null; // MessagePort zéro-copie direct vers emu-frame.html
     this.pingInterval = null;
     this.iceRestartTimer = null;
     this.connectTimeoutTimer = null;
@@ -199,9 +226,39 @@ export class RollbackP2PEngine {
     this.onStats?.({ ...this.stats });
   }
 
+  /**
+   * Attache un MessageChannel dédié zéro-copie directement à l'iframe emu-frame.html
+   * pour court-circuiter React et éviter tout clonage postMessage à 60 Hz.
+   */
+  attachDirectIframeWindow(iframeWin, targetOrigin = '*') {
+    if (!iframeWin || typeof MessageChannel === 'undefined') return false;
+    try {
+      if (this.directPort) {
+        try { this.directPort.close(); } catch {}
+        this.directPort = null;
+      }
+      const ch = new MessageChannel();
+      this.directPort = ch.port1;
+      this.directPort.onmessage = (e) => {
+        if (e.data instanceof ArrayBuffer || ArrayBuffer.isView(e.data)) {
+          this.sendGgpoPacket(e.data);
+        }
+      };
+      this.directPort.start?.();
+      iframeWin.postMessage({ type: 'ATTACH_NETPLAY_PORT' }, targetOrigin, [ch.port2]);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   async initConnection() {
+    const dynTurn = await Promise.race([
+      fetchDynamicTurnServers(),
+      new Promise((r) => setTimeout(() => r([]), 450)),
+    ]);
     this.pc = new RTCPeerConnection({
-      iceServers: ICE_SERVERS,
+      iceServers: [...ICE_SERVERS, ...(Array.isArray(dynTurn) ? dynTurn : [])],
       iceCandidatePoolSize: 4,
       bundlePolicy: 'max-bundle',
       rtcpMuxPolicy: 'require',
@@ -225,6 +282,8 @@ export class RollbackP2PEngine {
       }
     };
 
+    // Démarrage hybride rapide (1.8s) : active immédiatement le relais VPS si le trouage NAT tarde,
+    // puis bascule à chaud (hot-upgrade) sur le DataChannel UDP dès qu'il s'ouvre !
     if (this.connectTimeoutTimer) clearTimeout(this.connectTimeoutTimer);
     this.connectTimeoutTimer = setTimeout(() => {
       if (this.destroyed || !this.pc) return;
@@ -233,7 +292,7 @@ export class RollbackP2PEngine {
         this.emitStats();
         this.startPingLoop();
       }
-    }, 4500);
+    }, 1800);
 
     this.pc.oniceconnectionstatechange = () => {
       const s = this.pc?.iceConnectionState || 'closed';
@@ -391,9 +450,25 @@ export class RollbackP2PEngine {
     this.udpChannel = dc;
     dc.binaryType = 'arraybuffer';
     dc.onopen = () => {
+      if (this.connectTimeoutTimer) {
+        clearTimeout(this.connectTimeoutTimer);
+        this.connectTimeoutTimer = null;
+      }
       this.stats.p2pState = 'connected';
       this.emitStats();
       this.startPingLoop();
+      // Détecter le vrai type de candidat ICE actif (P2P direct vs TURN UDP)
+      this.pc?.getStats?.().then((report) => {
+        report.forEach((stat) => {
+          if (stat.type === 'candidate-pair' && stat.state === 'succeeded' && stat.nominated) {
+            const localCand = report.get(stat.localCandidateId);
+            const remoteCand = report.get(stat.remoteCandidateId);
+            const isRelay = localCand?.candidateType === 'relay' || remoteCand?.candidateType === 'relay';
+            this.stats.p2pState = isRelay ? 'turn-udp' : 'p2p-direct';
+            this.emitStats();
+          }
+        });
+      }).catch(() => {});
     };
     dc.onmessage = (e) => {
       if (e.data instanceof ArrayBuffer) {
@@ -422,6 +497,10 @@ export class RollbackP2PEngine {
 
   attachReliableChannel(dc) {
     this.reliableChannel = dc;
+    dc.binaryType = 'arraybuffer';
+    try {
+      dc.bufferedAmountLowThreshold = 32768;
+    } catch {}
     dc.onopen = () => {
       if (!this.isHost && this.guestEmuReady) {
         try {
@@ -437,6 +516,10 @@ export class RollbackP2PEngine {
       }
     };
     dc.onmessage = (e) => {
+      if (e.data instanceof ArrayBuffer) {
+        this._handleIncomingBinaryStateChunk(e.data);
+        return;
+      }
       try {
         const msg = JSON.parse(e.data);
         if (msg.type === 'FRAME0_STATE' && msg.stateBase64) {
@@ -588,12 +671,12 @@ export class RollbackP2PEngine {
     // Pour les paquets de contrôle critiques (0x5B = FRAME0_ACK, 0x5C = FRAME0_GO, 0xCC = DESYNC_REQ) ou si l'UDP WebRTC n'est pas encore ouvert
     if (!sentUdp || magic === 0x5b || magic === 0x5c || magic === 0xcc) {
       if (this.onRelayButtonFallback) {
-        let hex = '';
+        let binStr = '';
         for (let i = 0; i < bytes.length; i++) {
-          hex += bytes[i].toString(16).padStart(2, '0');
+          binStr += String.fromCharCode(bytes[i]);
         }
         try {
-          this.onRelayButtonFallback({ packetHex: hex });
+          this.onRelayButtonFallback({ packetB64: btoa(binStr) });
         } catch {
           /* noop */
         }
@@ -608,6 +691,59 @@ export class RollbackP2PEngine {
       this.onFrame0State(stateBase64, Number(syncFrame || 0));
     } else {
       this.pendingIncomingFrame0 = { stateBase64, syncFrame: Number(syncFrame || 0) };
+    }
+  }
+
+  _handleIncomingBinaryStateChunk(buffer) {
+    if (!buffer || buffer.byteLength < 13) return;
+    const view = new DataView(buffer);
+    const magic = view.getUint8(0);
+    if (magic !== 0xf0 && magic !== 0xf1) return;
+    const transferNum = view.getUint32(1, false);
+    const index = view.getUint16(5, false);
+    const total = view.getUint16(7, false);
+    const syncFrame = view.getUint32(9, false);
+    if (!total || index >= total) return;
+
+    const baseId = `f0bin_${transferNum}`;
+    if (this.lastDeliveredTransferId === baseId) return;
+
+    let entry = this.incomingStateTransfers.get(baseId);
+    if (!entry) {
+      entry = { total, syncFrame, magic, chunks: new Map(), totalBytes: 0 };
+      this.incomingStateTransfers.set(baseId, entry);
+    }
+    const payload = new Uint8Array(buffer, 13);
+    if (!entry.chunks.has(index)) {
+      entry.chunks.set(index, new Uint8Array(payload));
+      entry.totalBytes += payload.byteLength;
+    }
+
+    if (entry.chunks.size === entry.total) {
+      const merged = new Uint8Array(entry.totalBytes);
+      let offset = 0;
+      for (let i = 0; i < entry.total; i++) {
+        const part = entry.chunks.get(i);
+        if (!part) return;
+        merged.set(part, offset);
+        offset += part.byteLength;
+      }
+      this.incomingStateTransfers.delete(baseId);
+      this.lastDeliveredTransferId = baseId;
+
+      let reconstructed = '';
+      if (entry.magic === 0xf0) {
+        // Reconstruire "GZ:" + Base64 à partir des octets gzip bruts (-33% de bande passante réseau !)
+        const STEP = 0x8000;
+        const b64Parts = [];
+        for (let i = 0; i < merged.length; i += STEP) {
+          b64Parts.push(String.fromCharCode.apply(null, merged.subarray(i, i + STEP)));
+        }
+        reconstructed = 'GZ:' + btoa(b64Parts.join(''));
+      } else {
+        reconstructed = new TextDecoder().decode(merged);
+      }
+      this._deliverFrame0State(reconstructed, entry.syncFrame);
     }
   }
 
@@ -686,6 +822,17 @@ export class RollbackP2PEngine {
       if (data.transferId && this.lastDeliveredTransferId === data.transferId) return;
       if (data.transferId) this.lastDeliveredTransferId = data.transferId;
       this._deliverFrame0State(data.stateBase64, Number(data.syncFrame || 0));
+      return;
+    }
+    if (typeof data.packetB64 === 'string' && data.packetB64.length >= 2) {
+      try {
+        const binStr = atob(data.packetB64);
+        const bytes = new Uint8Array(binStr.length);
+        for (let i = 0; i < binStr.length; i++) {
+          bytes[i] = binStr.charCodeAt(i);
+        }
+        this.handleBinaryPacket(bytes.buffer);
+      } catch {}
       return;
     }
     if (typeof data.packetHex === 'string' && data.packetHex.length >= 2) {
@@ -822,37 +969,55 @@ export class RollbackP2PEngine {
       this.frame0FallbackTimer = null;
     }
     const cleanSyncFrame = Number(syncFrame || 0);
-    const transferId = `f0_${Date.now()}_${cleanSyncFrame}`;
+    const transferNum = ((Date.now() & 0x7fffffff) ^ ((cleanSyncFrame & 0xffff) << 8)) >>> 0;
+    const transferId = `f0bin_${transferNum}`;
     this.pendingAckTransferId = transferId;
-    const CHUNK_SIZE = 24576; // 24 KB par paquet SCTP WebRTC fiable
-    const total = Math.ceil(stateBase64.length / CHUNK_SIZE);
     let sentOverRtc = false;
 
     if (this.reliableChannel?.readyState === 'open') {
       sentOverRtc = true;
-      const rtcTransferId = `${transferId}_rtc`;
       const dc = this.reliableChannel;
-      // Envoi avec contrôle de flux (backpressure < 64 Ko) pour ne jamais saturer le canal UDP
+      // Décoder Base64 -> binaire brut (-33% de volume réseau) et streamer par blocs de 32 Ko avec bufferedAmountLowThreshold natif
       (async () => {
         try {
-          for (let i = 0; i < total; i++) {
+          const isGz = stateBase64.startsWith('GZ:');
+          let rawBytes;
+          if (isGz) {
+            const binStr = atob(stateBase64.slice(3));
+            rawBytes = new Uint8Array(binStr.length);
+            for (let k = 0; k < binStr.length; k++) rawBytes[k] = binStr.charCodeAt(k);
+          } else {
+            rawBytes = new TextEncoder().encode(stateBase64);
+          }
+          const BIN_CHUNK = 32768;
+          const binTotal = Math.max(1, Math.ceil(rawBytes.byteLength / BIN_CHUNK));
+          const magic = isGz ? 0xf0 : 0xf1;
+
+          for (let i = 0; i < binTotal; i++) {
             if (this.destroyed || this.pendingAckTransferId !== transferId || dc.readyState !== 'open') break;
-            let waits = 0;
-            while (dc.bufferedAmount > 65536 && waits < 50) {
-              await new Promise((r) => setTimeout(r, 8));
-              waits++;
+            if (dc.bufferedAmount > 65536) {
+              await new Promise((resolve) => {
+                let done = false;
+                const finish = () => {
+                  if (done) return;
+                  done = true;
+                  dc.removeEventListener?.('bufferedamountlow', finish);
+                  resolve();
+                };
+                dc.addEventListener?.('bufferedamountlow', finish);
+                setTimeout(finish, 14);
+              });
             }
-            const chunk = stateBase64.slice(i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE);
-            dc.send(
-              JSON.stringify({
-                type: 'FRAME0_CHUNK',
-                transferId: rtcTransferId,
-                index: i,
-                total,
-                chunk,
-                syncFrame: cleanSyncFrame,
-              })
-            );
+            const slice = rawBytes.subarray(i * BIN_CHUNK, Math.min(rawBytes.byteLength, (i + 1) * BIN_CHUNK));
+            const pkt = new ArrayBuffer(13 + slice.byteLength);
+            const hdr = new DataView(pkt);
+            hdr.setUint8(0, magic);
+            hdr.setUint32(1, transferNum, false);
+            hdr.setUint16(5, i, false);
+            hdr.setUint16(7, binTotal, false);
+            hdr.setUint32(9, cleanSyncFrame, false);
+            new Uint8Array(pkt, 13).set(slice);
+            dc.send(pkt);
           }
         } catch {
           this.pendingFrame0State = { stateBase64, syncFrame: cleanSyncFrame };
@@ -955,6 +1120,13 @@ export class RollbackP2PEngine {
         const goFrame = view.getUint32(1, false);
         this.onFrame0Go?.(goFrame);
       }
+      if (this.directPort) {
+        try {
+          const copy = buffer.slice(0);
+          this.directPort.postMessage(copy, [copy]);
+          return;
+        } catch {}
+      }
       this.onGgpoPacket?.(buffer);
       return;
     }
@@ -1038,12 +1210,14 @@ export class RollbackP2PEngine {
     this.onStateChange = null;
 
     try {
+      this.directPort?.close();
       this.udpChannel?.close();
       this.reliableChannel?.close();
       this.pc?.close();
     } catch {
       /* noop */
     }
+    this.directPort = null;
     this.pc = null;
     this.udpChannel = null;
     this.reliableChannel = null;
