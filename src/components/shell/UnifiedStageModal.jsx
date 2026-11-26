@@ -468,15 +468,26 @@ export function UnifiedStageModal({
         p2pEngine?.sendGgpoPacket?.(event.data.buffer);
       } else if (event.data.type === 'NETPLAY_EMU_READY') {
         setLocalEmuReady(true);
+        p2pEngine?.resetPingAfterBoot?.();
         p2pEngine?.notifyEmuReady?.(Boolean(session?.isHost));
+        if (session?.isHost && (remoteEmuReady || p2pEngine?.guestEmuReady)) {
+          try {
+            iframeRef.current?.contentWindow?.postMessage(
+              { type: 'EXPORT_NETPLAY_SYNC', slot: 'frame0', force: Boolean(session?.isLiveDropIn) },
+              window.location.origin
+            );
+          } catch {}
+        }
       } else if (event.data.type === 'NETPLAY_GUEST_READY') {
         setLocalEmuReady(true);
+        p2pEngine?.resetPingAfterBoot?.();
         p2pEngine?.notifyGuestEmuReady?.();
       } else if (event.data.type === 'NETPLAY_FRAME0_ACK') {
         p2pEngine?.sendFrame0Ack?.(Number(event.data.syncFrame || 0));
       } else if (event.data.type === 'NETPLAY_FRAME0_GO') {
         p2pEngine?.sendFrame0Go?.(Number(event.data.syncFrame || 0));
       } else if (event.data.type === 'NETPLAY_SYNC_COMPLETE') {
+        p2pEngine?.resetPingAfterBoot?.();
         setNetplaySyncReady(true);
       } else if (event.data.type === 'NETPLAY_SPECTATOR_READY') {
         if (isSpectator) {

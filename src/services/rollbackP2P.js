@@ -201,22 +201,55 @@ export class RollbackP2PEngine {
     }
   }
 
+  resetPingAfterBoot() {
+    this.rttSamples = [];
+    this.smoothedRttMs = 0;
+    this.jitterMs = 0;
+  }
+
+  _refreshIcePathType() {
+    if (!this.pc || typeof this.pc.getStats !== 'function' || this.destroyed) return;
+    this.pc.getStats().then((report) => {
+      if (this.destroyed) return;
+      let nominatedPair = null;
+      report.forEach((stat) => {
+        if (stat.type === 'candidate-pair' && stat.state === 'succeeded' && stat.nominated) {
+          nominatedPair = stat;
+        }
+      });
+      if (!nominatedPair) return;
+      const localCand = report.get(nominatedPair.localCandidateId);
+      const remoteCand = report.get(nominatedPair.remoteCandidateId);
+      const isRelay = localCand?.candidateType === 'relay' || remoteCand?.candidateType === 'relay';
+      const resolvedState = isRelay ? 'turn-udp' : 'p2p-direct';
+      this.icePathState = resolvedState;
+      if (this.udpChannel?.readyState === 'open' || this.stats.p2pState === 'connected' || this.stats.p2pState === 'turn-udp' || this.stats.p2pState === 'p2p-direct') {
+        if (this.stats.p2pState !== resolvedState) {
+          this.stats.p2pState = resolvedState;
+          this.emitStats();
+        }
+      }
+    }).catch(() => {});
+  }
+
   _recordRttSample(rawRttMs) {
     const clamped = Math.max(1, Math.min(2500, Math.round(rawRttMs)));
     this.rttSamples.push(clamped);
     if (this.rttSamples.length > 7) this.rttSamples.shift();
     const sorted = [...this.rttSamples].sort((a, b) => a - b);
-    const median = sorted[Math.floor(sorted.length / 2)];
+    // Filtrer les pics ponctuels (compilation WASM / bufferbloat Wi-Fi) en prenant le 30e percentile
+    const p30Idx = Math.max(0, Math.floor((sorted.length - 1) * 0.3));
+    const sample = sorted[p30Idx];
 
-    // Lissage EWMA + calcul du jitter pour stabiliser le ping entre continents
-    const alpha = Number(this.regionalProfile?.ewmaAlpha || 0.22);
+    // Lissage EWMA + calcul du jitter pour stabiliser le ping
+    const alpha = Number(this.regionalProfile?.ewmaAlpha || 0.28);
     if (!this.smoothedRttMs) {
-      this.smoothedRttMs = median;
+      this.smoothedRttMs = sample;
       this.jitterMs = 0;
     } else {
-      const diff = Math.abs(median - this.smoothedRttMs);
+      const diff = Math.abs(sample - this.smoothedRttMs);
       this.jitterMs = Math.round(this.jitterMs * 0.75 + diff * 0.25);
-      this.smoothedRttMs = Math.round(this.smoothedRttMs * (1 - alpha) + median * alpha);
+      this.smoothedRttMs = Math.round(this.smoothedRttMs * (1 - alpha) + sample * alpha);
     }
 
     const effectiveRtt = this.smoothedRttMs + Math.round(this.jitterMs * 1.1);
@@ -313,7 +346,7 @@ export class RollbackP2PEngine {
       }
     };
 
-    // Laisser 3.5s à WebRTC (STUN + Cloudflare Anycast TURN UDP ~60ms) pour s'ouvrir avant d'activer le relais WS Europe
+    // Laisser 6s à WebRTC (STUN + Cloudflare Anycast TURN UDP + signalisation VPS) avant d'afficher relay-vps
     if (this.connectTimeoutTimer) clearTimeout(this.connectTimeoutTimer);
     this.connectTimeoutTimer = setTimeout(() => {
       if (this.destroyed || !this.pc) return;
@@ -322,14 +355,16 @@ export class RollbackP2PEngine {
         this.emitStats();
         this.startPingLoop();
       }
-    }, 3500);
+    }, 6000);
 
-    // Auto-récupération P2P à 3.5s puis 9s si le match reste sur le relais WebSocket TCP (Head-of-Line Blocking)
+    // Auto-récupération P2P à 8.5s puis 16s UNIQUEMENT si ICE n'est pas déjà en train de négocier ('checking'/'connected')
     const scheduleP2pRecovery = (delayMs, timerKey) => {
       if (this[timerKey]) clearTimeout(this[timerKey]);
       this[timerKey] = setTimeout(async () => {
         if (this.destroyed || !this.pc) return;
         if (this.udpChannel?.readyState === 'open') return;
+        const iceState = this.pc.iceConnectionState;
+        if (iceState === 'checking' || iceState === 'connected' || iceState === 'completed') return;
         if (this.isHost) {
           try {
             if (typeof this.pc.restartIce === 'function') this.pc.restartIce();
@@ -347,12 +382,17 @@ export class RollbackP2PEngine {
         }
       }, delayMs);
     };
-    scheduleP2pRecovery(3500, 'p2pUpgradeRetryTimer');
-    scheduleP2pRecovery(9000, 'p2pSecondRetryTimer');
+    scheduleP2pRecovery(8500, 'p2pUpgradeRetryTimer');
+    scheduleP2pRecovery(16000, 'p2pSecondRetryTimer');
 
     this.pc.oniceconnectionstatechange = () => {
       const s = this.pc?.iceConnectionState || 'closed';
-      this.stats.p2pState = s;
+      if (s === 'connected' || s === 'completed') {
+        this.stats.p2pState = this.icePathState || 'connected';
+        this._refreshIcePathType();
+      } else if (this.udpChannel?.readyState !== 'open') {
+        this.stats.p2pState = s;
+      }
       this.emitStats();
       this.onStateChange?.(s);
 
@@ -534,18 +574,10 @@ export class RollbackP2PEngine {
         dc.send(pBuf);
       } catch {}
       this.startPingLoop();
-      // Détecter le vrai type de candidat ICE actif (P2P direct vs TURN UDP)
-      this.pc?.getStats?.().then((report) => {
-        report.forEach((stat) => {
-          if (stat.type === 'candidate-pair' && stat.state === 'succeeded' && stat.nominated) {
-            const localCand = report.get(stat.localCandidateId);
-            const remoteCand = report.get(stat.remoteCandidateId);
-            const isRelay = localCand?.candidateType === 'relay' || remoteCand?.candidateType === 'relay';
-            this.stats.p2pState = isRelay ? 'turn-udp' : 'p2p-direct';
-            this.emitStats();
-          }
-        });
-      }).catch(() => {});
+      // Détecter le vrai type de candidat ICE actif (P2P direct vs TURN UDP Cloudflare), puis revérifier après nomination
+      this._refreshIcePathType();
+      setTimeout(() => this._refreshIcePathType(), 1500);
+      setTimeout(() => this._refreshIcePathType(), 4500);
     };
     dc.onmessage = (e) => {
       if (e.data instanceof ArrayBuffer) {
@@ -1179,7 +1211,9 @@ export class RollbackP2PEngine {
     }
     if (buffer.byteLength === 9 && magic === PACKET_PONG_BIN) {
       const ts = view.getFloat64(1, false);
-      this.stats.p2pState = 'connected';
+      if (this.stats.p2pState !== 'turn-udp' && this.stats.p2pState !== 'p2p-direct') {
+        this.stats.p2pState = this.icePathState || 'connected';
+      }
       this._recordRttSample(performance.now() - ts);
       return;
     }
