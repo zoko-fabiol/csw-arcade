@@ -266,7 +266,7 @@ class FirebaseFightcadeService {
     } else {
       // Ne jamais encombrer la file d'attente de reconnexion avec des paquets GGPO/PING temps-réel périmés
       if (
-        (data?.type === 'RELAY_INPUT' && (data.packetHex || data.syncType === 'PING' || data.syncType === 'PONG')) ||
+        (data?.type === 'RELAY_INPUT' && (data.packetHex || data.packetB64 || data.syncType === 'PING' || data.syncType === 'PONG')) ||
         data?.type === 'SPECTATE_INPUT_BATCH'
       ) {
         return;

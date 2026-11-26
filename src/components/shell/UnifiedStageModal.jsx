@@ -127,15 +127,22 @@ export function UnifiedStageModal({
   }, [session?.isNetplay, isSpectator, netplaySyncReady, localEmuReady, remoteEmuReady]);
 
   useEffect(() => {
-    if (session?.isNetplay && typeof p2pStats?.pingMs === 'number' && p2pStats.pingMs > 0) {
-      try {
-        iframeRef.current?.contentWindow?.postMessage(
+    if (!session?.isNetplay || !iframeRef.current?.contentWindow) return;
+    try {
+      if (typeof p2pStats?.pingMs === 'number' && p2pStats.pingMs > 0) {
+        iframeRef.current.contentWindow.postMessage(
           { type: 'SET_PEER_PING', pingMs: p2pStats.pingMs },
           window.location.origin
         );
-      } catch {}
-    }
-  }, [session?.isNetplay, p2pStats?.pingMs]);
+      }
+      if (typeof p2pStats?.inputDelay === 'number' && p2pStats.inputDelay >= 0) {
+        iframeRef.current.contentWindow.postMessage(
+          { type: 'SET_GGPO_OPTIONS', inputDelay: p2pStats.inputDelay },
+          window.location.origin
+        );
+      }
+    } catch {}
+  }, [session?.isNetplay, p2pStats?.pingMs, p2pStats?.inputDelay]);
 
   const getMyDisplayName = () =>
     userProfileRef.current?.displayName ||
@@ -258,6 +265,9 @@ export function UnifiedStageModal({
         return;
       }
       if (session.kind !== 'j2me' && !isSpectator && !quickMenuOpen && !pauseMenuOpen && !isTypingTarget(e.target)) {
+        if (['Space', 'Enter', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code) || [' ', 'Enter', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+          e.preventDefault();
+        }
         try {
           iframeRef.current?.contentWindow?.postMessage(
             {
@@ -366,6 +376,12 @@ export function UnifiedStageModal({
         );
         if (session.isNetplay && p2pEngine?.attachDirectIframeWindow) {
           p2pEngine.attachDirectIframeWindow(iframeRef.current.contentWindow, window.location.origin);
+          if (typeof p2pEngine.inputDelay === 'number') {
+            iframeRef.current.contentWindow.postMessage(
+              { type: 'SET_GGPO_OPTIONS', inputDelay: p2pEngine.inputDelay },
+              window.location.origin
+            );
+          }
         }
       } else if (event.data.type === 'STAGE_STATUS') {
         if (event.data.message) setStatusText(event.data.message);

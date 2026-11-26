@@ -202,7 +202,7 @@
             if (text && text.includes('MainLoop.resume')) {
               text = text.replace(
                 'Module["resumeMainLoop"]=MainLoop.resume;',
-                'Module["resumeMainLoop"]=MainLoop.resume;Module["MainLoop"]=MainLoop;if(typeof Asyncify!=="undefined")Module["Asyncify"]=Asyncify;'
+                'Module["resumeMainLoop"]=MainLoop.resume;Module["MainLoop"]=MainLoop;if(typeof Asyncify!=="undefined")Module["Asyncify"]=Asyncify;Object.defineProperty(Module,"wasmTable",{get(){return typeof wasmTable!=="undefined"?wasmTable:null},configurable:true});'
               );
               return new _OrigBlob([text], options);
             }
@@ -899,7 +899,7 @@
       constructor() {
         this.BUFFER_SIZE = 128;
         this.BUFFER_MASK = 127;
-        this.MAX_ROLLBACK = 12;
+        this.MAX_ROLLBACK = 18;
         this.INPUT_DELAY = 2; // 2 frames (33.3 ms) : absorbe la latence réseau et évite 90% des rollbacks
         this.FRAME_TIME_MS = 1000 / 60;
 
@@ -1000,6 +1000,13 @@
         this.gm = null;
         this.module = null;
         this.originalMainLoopFunc = null;
+        this._rbApiChecked = false;
+        this._rbPtr = 0;
+        this._rbPayloadLen = 0;
+        this._rbPayloadOffset = 0;
+        this._rbHeader = null;
+        this._serFn = null;
+        this._unserFn = null;
       }
 
       isActive() {
@@ -1113,16 +1120,169 @@
         this.stats.syncStatus = '100%';
       }
 
-      captureSnapshot(frame) {
-        if (isHeavy3dCore(currentCoreName) || this.isWasmAsyncifyBusy()) return false;
-        // Sur les gros jeux NeoGeo/Arcade où la sérialisation prend > 4ms, capturer 1 frame sur 2
-        // (restoreSnapshot cherchera la frame la plus proche <= rollbackFrame et rejouera 1 frame de plus)
-        if (this.heavySnapshotThrottle && (frame & 1) !== 0 && frame % 30 !== 0) return false;
+      initDirectRollbackApi() {
+        this._rbApiChecked = true;
         this.gm = this.gm || window.EJS_emulator?.gameManager;
         this.module = this.module || getWasmModule();
+        const mod = this.module;
+        const wt = mod?.wasmTable;
+        if (!this.gm?.functions?.saveStateInfo || !mod?.HEAPU8 || !wt || typeof mod._malloc !== 'function') return false;
+
+        try {
+          const info = this.gm.functions.saveStateInfo().split('|');
+          if (info[2] !== '1') return false;
+          const totalLen = parseInt(info[0], 10);
+          const ptr = parseInt(info[1], 10);
+          const heap = mod.HEAPU8;
+          if (!(totalLen > 0 && ptr > 0 && ptr + totalLen <= heap.length)) return false;
+
+          let payloadOffset = 0;
+          let expectedLen = totalLen;
+          let headerBytes = null;
+          if (
+            totalLen >= 16 &&
+            heap[ptr] === 0x52 && heap[ptr + 1] === 0x41 && heap[ptr + 2] === 0x53 && heap[ptr + 3] === 0x54 &&
+            heap[ptr + 4] === 0x41 && heap[ptr + 5] === 0x54 && heap[ptr + 6] === 0x45 &&
+            heap[ptr + 8] === 0x4d && heap[ptr + 9] === 0x45 && heap[ptr + 10] === 0x4d && heap[ptr + 11] === 0x20
+          ) {
+            payloadOffset = 16;
+            expectedLen = (heap[ptr + 12] | (heap[ptr + 13] << 8) | (heap[ptr + 14] << 16) | (heap[ptr + 15] << 24)) >>> 0;
+            headerBytes = new Uint8Array(heap.subarray(ptr, ptr + 16));
+          }
+          if (!(expectedLen > 0 && payloadOffset + expectedLen <= totalLen)) return false;
+
+          const wtLen = wt.length;
+          const heapU32 = new Uint32Array(heap.buffer);
+          const maxWord = Math.min(heapU32.length - 8, 8 * 1024 * 1024);
+          // Fingerprint struct retro_core_t [set_controller(2), reset(0), run(0), serialize_size(0), serialize(2), unserialize(2), cheat_reset(0), cheat_set(3), load_game(1)]
+          for (let w = 256; w < maxWord; w++) {
+            const sz = heapU32[w], ser = heapU32[w + 1], uns = heapU32[w + 2];
+            if (sz > 0 && sz < wtLen && ser > 0 && ser < wtLen && uns > 0 && uns < wtLen && sz !== ser && ser !== uns && sz !== uns) {
+              const scp = heapU32[w - 3], rst = heapU32[w - 2], run = heapU32[w - 1];
+              const chR = heapU32[w + 3], chS = heapU32[w + 4], ldG = heapU32[w + 5];
+              if (
+                scp > 0 && scp < wtLen && rst > 0 && rst < wtLen && run > 0 && run < wtLen &&
+                chR > 0 && chR < wtLen && chS > 0 && chS < wtLen && ldG > 0 && ldG < wtLen
+              ) {
+                const fSz = wt.get(sz), fSer = wt.get(ser), fUns = wt.get(uns);
+                const fScp = wt.get(scp), fRst = wt.get(rst), fRun = wt.get(run);
+                const fChR = wt.get(chR), fChS = wt.get(chS), fLdG = wt.get(ldG);
+                if (
+                  typeof fSz === 'function' && fSz.length === 0 &&
+                  typeof fSer === 'function' && fSer.length === 2 &&
+                  typeof fUns === 'function' && fUns.length === 2 &&
+                  typeof fScp === 'function' && fScp.length === 2 &&
+                  typeof fRst === 'function' && fRst.length === 0 &&
+                  typeof fRun === 'function' && fRun.length === 0 &&
+                  typeof fChR === 'function' && fChR.length === 0 &&
+                  typeof fChS === 'function' && fChS.length === 3 &&
+                  typeof fLdG === 'function' && fLdG.length === 1 &&
+                  fSz() === expectedLen
+                ) {
+                  const rbPtr = mod._malloc(expectedLen);
+                  if (rbPtr > 0) {
+                    this._rbPtr = rbPtr;
+                    this._rbPayloadLen = expectedLen;
+                    this._rbPayloadOffset = payloadOffset;
+                    this._rbHeader = headerBytes;
+                    this._serFn = fSer;
+                    this._unserFn = fUns;
+                    this.heavySnapshotThrottle = false;
+                    console.log(`[CSW GGPO] ✓ Direct retro_serialize/unserialize actif (${expectedLen}B @ 0x${(w * 4).toString(16)})`);
+                    return true;
+                  }
+                }
+              }
+            }
+          }
+        } catch {}
+        return false;
+      }
+
+      applyStateBytesSync(bytes) {
+        if (!bytes || bytes.length <= 0) return false;
+        this.gm = this.gm || window.EJS_emulator?.gameManager;
+        this.module = this.module || getWasmModule();
+        if (!this._rbApiChecked) this.initDirectRollbackApi();
+
+        if (this._unserFn && this._rbPtr > 0 && this._rbPayloadLen > 0 && this.module?.HEAPU8) {
+          let payload = null;
+          if (bytes.length === this._rbPayloadLen) {
+            payload = bytes;
+          } else if (
+            this._rbPayloadOffset === 16 &&
+            bytes.length >= 16 + this._rbPayloadLen &&
+            bytes[0] === 0x52 && bytes[1] === 0x41 && bytes[2] === 0x53 && bytes[3] === 0x54 &&
+            bytes[8] === 0x4d && bytes[9] === 0x45 && bytes[10] === 0x4d && bytes[11] === 0x20
+          ) {
+            const blockLen = (bytes[12] | (bytes[13] << 8) | (bytes[14] << 16) | (bytes[15] << 24)) >>> 0;
+            if (blockLen === this._rbPayloadLen) {
+              payload = bytes.subarray(16, 16 + this._rbPayloadLen);
+            }
+          }
+          if (payload) {
+            this.module.HEAPU8.set(payload, this._rbPtr);
+            const ok = this._unserFn(this._rbPtr, this._rbPayloadLen);
+            if (ok) {
+              this.forceApplyAllInputs = true;
+              return true;
+            }
+          }
+        }
+
         if (!this.gm) return false;
+        if (this.gm.FS && this.gm.functions?.loadState) {
+          this.gm.FS.writeFile('/csw_rb.state', bytes);
+          this.gm.functions.loadState('csw_rb.state', 0);
+          if (this.originalMainLoopFunc && !this.isWasmAsyncifyBusy()) {
+            this.originalMainLoopFunc();
+          }
+          this.forceApplyAllInputs = true;
+          return true;
+        }
+        if (typeof this.gm.loadState === 'function') {
+          this.gm.loadState(bytes);
+          if (this.originalMainLoopFunc && !this.isWasmAsyncifyBusy()) {
+            this.originalMainLoopFunc();
+          }
+          this.forceApplyAllInputs = true;
+          return true;
+        }
+        return false;
+      }
+
+      captureSnapshot(frame) {
+        if (isHeavy3dCore(currentCoreName) || this.isWasmAsyncifyBusy()) return false;
+        if (!this._rbApiChecked) this.initDirectRollbackApi();
 
         const slot = frame & this.BUFFER_MASK;
+        this.gm = this.gm || window.EJS_emulator?.gameManager;
+        this.module = this.module || getWasmModule();
+        if (this._serFn && this._rbPtr > 0 && this._rbPayloadLen > 0 && this.module?.HEAPU8) {
+          try {
+            if (this._serFn(this._rbPtr, this._rbPayloadLen)) {
+              const totalLen = this._rbPayloadOffset + this._rbPayloadLen;
+              if (!this.savestates[slot] || this.savestates[slot].length < totalLen) {
+                this.savestates[slot] = new Uint8Array(totalLen);
+                if (this._rbHeader && this._rbPayloadOffset === 16) {
+                  this.savestates[slot].set(this._rbHeader, 0);
+                }
+              }
+              this.savestates[slot].set(
+                this.module.HEAPU8.subarray(this._rbPtr, this._rbPtr + this._rbPayloadLen),
+                this._rbPayloadOffset
+              );
+              this.savestateLengths[slot] = totalLen;
+              this.savestateFrames[slot] = frame;
+              return true;
+            }
+          } catch {}
+        }
+
+        // Fallback RetroArch classique pour cœurs sans retro_serialize direct
+        if (this.heavySnapshotThrottle && (frame & 1) !== 0 && frame % 30 !== 0) return false;
+        if (!this.gm) return false;
+
         try {
           if (this.gm.functions?.saveStateInfo && this.module?.HEAPU8) {
             const t0 = performance.now();
@@ -1131,7 +1291,7 @@
               const len = parseInt(info[0], 10);
               const offset = parseInt(info[1], 10);
               const heap = this.module.HEAPU8;
-              if (len > 0 && offset >= 0 && offset + len <= heap.length) {
+              if (len > 0 && offset > 0 && offset + len <= heap.length) {
                 if (!this.savestates[slot] || this.savestates[slot].length < len) {
                   this.savestates[slot] = new Uint8Array(len);
                 }
@@ -1169,13 +1329,12 @@
       }
 
       restoreSnapshot(frame) {
-        if (isHeavy3dCore(currentCoreName)) return false;
+        if (isHeavy3dCore(currentCoreName)) return -1;
         this.gm = this.gm || window.EJS_emulator?.gameManager;
-        if (!this.gm) return false;
+        if (!this.gm) return -1;
 
         let targetSnap = frame;
         if (this.savestateFrames[frame & this.BUFFER_MASK] !== frame) {
-          // Si le throttling 1/2 frame est actif, reculer jusqu'à la snapshot valide la plus proche
           let found = -1;
           for (let back = 1; back <= 4; back++) {
             const candidate = frame - back;
@@ -1184,37 +1343,21 @@
               break;
             }
           }
-          if (found === -1) return false;
+          if (found === -1) return -1;
           targetSnap = found;
         }
         const slot = targetSnap & this.BUFFER_MASK;
         const len = this.savestateLengths[slot];
         const buf = this.savestates[slot];
-        if (!buf || len <= 0) return false;
+        if (!buf || len <= 0) return -1;
 
         const slice = buf.length === len ? buf : buf.subarray(0, len);
         try {
-          // Priorité 1 : Chargement direct en mémoire RAM (zéro I/O Virtual FS)
-          if (typeof this.gm.loadState === 'function') {
-            this.gm.loadState(slice);
-            if (this.originalMainLoopFunc && !this.isWasmAsyncifyBusy()) {
-              this.originalMainLoopFunc();
-            }
-            this.forceApplyAllInputs = true;
-            return true;
-          }
-          // Fallback : Virtual FS si gm.loadState(Uint8Array) n'est pas exposé
-          if (this.gm.FS && this.gm.functions?.loadState) {
-            this.gm.FS.writeFile('/csw_rb.state', slice);
-            this.gm.functions.loadState('csw_rb.state', 0);
-            if (this.originalMainLoopFunc && !this.isWasmAsyncifyBusy()) {
-              this.originalMainLoopFunc();
-            }
-            this.forceApplyAllInputs = true;
-            return true;
+          if (this.applyStateBytesSync(slice)) {
+            return targetSnap;
           }
         } catch {}
-        return false;
+        return -1;
       }
 
       applyInputs(pIdx, mask) {
@@ -1359,7 +1502,7 @@
 
       requestDesyncRecovery(frame) {
         const now = performance.now();
-        if (now - this.lastDesyncRequestMs < 2500) return;
+        if (now - this.lastDesyncRequestMs < 12000) return;
         this.lastDesyncRequestMs = now;
         this.stats.syncStatus = 'RESYNC...';
         const buf = new ArrayBuffer(5);
@@ -1384,7 +1527,8 @@
               this.pendingHostChecksums.delete(f);
               if (localHash && hostHash && localHash !== hostHash) {
                 this.desyncStreak += 1;
-                if (this.desyncStreak >= 2) {
+                // Exiger 8 intervalles consécutifs (4 secondes de divergence réelle) pour ne jamais déclencher de faux resyncs sur un micro-rollback
+                if (this.desyncStreak >= 8) {
                   this.desyncStreak = 0;
                   this.requestDesyncRecovery(f);
                 }
@@ -1608,11 +1752,11 @@
           if (this.waitingForGoAck) {
             this.onFrame0GoReceived(0);
           }
-          if (this.waitingForFrame0Ack) {
+          if (this.waitingForFrame0Ack && (this.currentFrame === 0 || targetFrame >= this.currentFrame)) {
             this.waitingForFrame0Ack = false;
             this.hostGoDelayUntilMs = 0;
             this.setSyncWaitMute(false);
-            notifyParent('NETPLAY_SYNC_COMPLETE', { syncFrame: 0 });
+            notifyParent('NETPLAY_SYNC_COMPLETE', { syncFrame: this.currentFrame });
           }
 
           this.incomingQueue.push({
@@ -1689,33 +1833,25 @@
         const prevSyncMute = this.syncMuted;
         this.setSyncWaitMute(true);
         try {
-          this.gm?.functions?.setVSync?.(0);
-          this.gm?.functions?.setFastForwardRatio?.(0);
-          this.gm?.functions?.toggleFastForward?.(1);
-
-          if (!this.restoreSnapshot(rollbackFrame)) {
+          const startFrame = this.restoreSnapshot(rollbackFrame);
+          if (startFrame < 0) {
             if (netplayPlayerIndex === 1) this.requestDesyncRecovery(rollbackFrame);
             return;
           }
 
           this.stats.totalRollbacks += 1;
-          this.stats.lastRollbackDistance = dist;
+          this.stats.lastRollbackDistance = this.currentFrame - startFrame;
 
-          for (let rf = rollbackFrame; rf < this.currentFrame; rf++) {
+          for (let rf = startFrame; rf < this.currentFrame; rf++) {
             if (this.isWasmAsyncifyBusy()) break;
             const rIdx = rf & this.BUFFER_MASK;
-            const isConfirmedHere = this.remoteFrameNums[rIdx] === rf && this.remoteConfirmed[rIdx] === 1;
-            const nextIdx = (rf + 1) & this.BUFFER_MASK;
-            const nextUnconfirmed = !(this.remoteFrameNums[nextIdx] === rf + 1 && this.remoteConfirmed[nextIdx] === 1);
-            // Optimisation CPU : ne recapturer l'état qu'à la frontière confirmée/non-confirmée, toutes les 2 frames prédites, ou sur les frames de checksum
-            if (
-              rf > rollbackFrame &&
-              ((isConfirmedHere && nextUnconfirmed) ||
-                (!isConfirmedHere && (rf - rollbackFrame) % 2 === 0) ||
-                rf === this.currentFrame - 1 ||
-                rf % 30 === 0)
-            ) {
-              this.captureSnapshot(rf);
+            // Toujours recapturer ou invalider la snapshot sur la nouvelle timeline corrigée (jamais laisser un vieil état erroné dans l'anneau !)
+            if (rf > startFrame) {
+              if (!this.heavySnapshotThrottle || (rf & 1) === 0 || rf % 30 === 0 || rf === this.currentFrame - 1) {
+                this.captureSnapshot(rf);
+              } else {
+                this.savestateFrames[rIdx] = -1;
+              }
             }
 
             const localMask = this.localFrameNums[rIdx] === rf ? this.localInputs[rIdx] : this.localLiveMask;
@@ -1748,7 +1884,6 @@
             }
           }
         } finally {
-          try { this.gm?.functions?.toggleFastForward?.(0); } catch {}
           this.setSyncWaitMute(prevSyncMute);
         }
       }
@@ -1791,16 +1926,14 @@
         this.localInputs[targetIdx] = this.localLiveMask;
         this.localFrameNums[targetIdx] = targetFrame;
 
-        // 3. Envoyer le paquet binaire 0x5A (N-7) : burst 60 Hz sur 8 frames après tout changement de touche, puis 30 Hz au repos
+        // 3. Envoyer le paquet binaire 0x5A (N-7) à 60 Hz (24 octets seulement) pour garder frameAdvantage < 2 frames et zéro latence de prédiction
         if (this.localLiveMask !== this.lastBurstMask) {
           this.lastBurstMask = this.localLiveMask;
           this.inputBurstLeft = 8;
         }
-        if (this.inputBurstLeft > 0 || frame % 2 === 0) {
-          if (this.inputBurstLeft > 0) this.inputBurstLeft -= 1;
-          this.lastSentMask = this.localLiveMask;
-          this.send0x5APacket(targetFrame);
-        }
+        if (this.inputBurstLeft > 0) this.inputBurstLeft -= 1;
+        this.lastSentMask = this.localLiveMask;
+        this.send0x5APacket(targetFrame);
 
         // 4. Résoudre l'input local et distant pour la frame courante `frame`
         const localMask = this.localInputs[rIdx];
@@ -2192,11 +2325,7 @@
           const loadJob = this.pendingSyncLoad;
           this.pendingSyncLoad = null;
           try {
-            this.gm = this.gm || window.EJS_emulator?.gameManager;
-            this.gm?.loadState?.(loadJob.bytes);
-            if (this.originalMainLoopFunc && !this.isWasmAsyncifyBusy()) {
-              this.originalMainLoopFunc(); // Flush tick: applique réellement loadJob.bytes en RAM avant captureSnapshot(syncFrame)
-            }
+            this.applyStateBytesSync(loadJob.bytes);
             this.onRemoteSyncStateLoaded(loadJob.syncFrame);
           } catch (err) {
             console.warn('[CSW GGPO] Erreur sync loadState:', err);
@@ -2250,13 +2379,14 @@
           this.onFrame0GoReceived(0);
         }
         if (this.waitingForFrame0Ack) {
-          if (now - this.waitingForFrame0AckSinceMs < 4500) {
+          const maxWait = this.currentFrame === 0 ? 4500 : 1200;
+          if (now - this.waitingForFrame0AckSinceMs < maxWait) {
             this.lastTickMs = now;
             return;
           }
           this.waitingForFrame0Ack = false;
           this.setSyncWaitMute(false);
-          notifyParent('NETPLAY_SYNC_COMPLETE', { syncFrame: 0 });
+          notifyParent('NETPLAY_SYNC_COMPLETE', { syncFrame: this.currentFrame });
         }
         if (this.hostGoDelayUntilMs > 0) {
           if (now < this.hostGoDelayUntilMs) {
@@ -2272,36 +2402,37 @@
           console.log(`[CSW GGPO] Départ simultané P1 <-> P2 (Frame ${releaseFrame}) !`);
         }
 
-        // 4. Accumulateur d'horloge 60.00 FPS + Time-Rift Sync symétrique GGPO (±3 % doux, sans saccade)
+        // 4. Accumulateur d'horloge 60.00 FPS + Time-Rift Sync symétrique GGPO fluide (garde 52-60 FPS sans saccade)
         const peerActive = this.hasRemotePeer && now - this.lastRemotePacketMs < 3000;
         const localAdv = peerActive ? this.currentFrame - this.remoteFrameAdvancement : 0;
         const symmetricRift = peerActive ? (localAdv - (this.peerReportedAdvantage || 0)) * 0.5 : 0;
         const effectiveFrameMs =
-          peerActive && Math.abs(symmetricRift) > 0.6
-            ? Math.max(16.15, Math.min(17.25, this.FRAME_TIME_MS + symmetricRift * 0.16))
+          peerActive && Math.abs(symmetricRift) > 0.4
+            ? Math.max(15.2, Math.min(21.5, this.FRAME_TIME_MS + symmetricRift * 0.6))
             : this.FRAME_TIME_MS;
 
         if (!this.lastTickMs) this.lastTickMs = now;
-        const dt = Math.max(0, Math.min(80, now - this.lastTickMs));
+        const dt = Math.max(0, Math.min(60, now - this.lastTickMs));
         this.lastTickMs = now;
-        this.accumulatorMs = Math.min(effectiveFrameMs * 2.5, this.accumulatorMs + dt);
+        this.accumulatorMs = Math.min(effectiveFrameMs * 2.2, this.accumulatorMs + dt);
 
-        if (this.accumulatorMs < effectiveFrameMs * 0.92) {
+        // Seuil 0.78 (~13ms) pour ne jamais rater un tick rAF 60Hz (~15.5-17ms) tout en bridant les écrans 120Hz/144Hz
+        if (this.accumulatorMs < effectiveFrameMs * 0.78) {
           return;
         }
         this.accumulatorMs -= effectiveFrameMs;
 
-        // 5. Garde anti-dérive extrême uniquement si l'écart dépasse 10 frames (borné à 220ms max)
+        // 5. Garde anti-dérive douce : sauter au max 1 tick sur 4 si l'avance symétrique dépasse 5 frames
         const advantage = symmetricRift;
 
-        if (peerActive && advantage >= 10) {
-          if (!this.lastPaceHoldMs) this.lastPaceHoldMs = now;
-          if (now - this.lastPaceHoldMs < 220) {
+        if (peerActive && advantage >= 5) {
+          this.paceHoldCounter = (this.paceHoldCounter || 0) + 1;
+          if (this.paceHoldCounter % 4 === 0) {
+            this.accumulatorMs = Math.min(this.accumulatorMs, effectiveFrameMs * 0.4);
             return;
           }
-          this.lastPaceHoldMs = now;
         } else {
-          this.lastPaceHoldMs = 0;
+          this.paceHoldCounter = 0;
         }
 
         // 5B. Mode Delay-Based Lockstep déterministe automatique pour les consoles 3D lourdes (PS1, N64, PSP, NDS)
@@ -2334,11 +2465,11 @@
           this.processSpectatorStreaming();
         }
 
-        // Ne jamais ré-entrer WASM pour une 2e frame si Asyncify vient de déclencher un unwind ou pendant les 6 premières frames
+        // Rattrapage rapide si en retard (advantage <= -2) ou accumulateur >= 1.75x frame
         if (
           this.currentFrame >= 6 &&
           !this.isWasmAsyncifyBusy() &&
-          ((peerActive && advantage <= -2) || this.accumulatorMs >= this.FRAME_TIME_MS)
+          ((peerActive && advantage <= -2) || this.accumulatorMs >= this.FRAME_TIME_MS * 1.75)
         ) {
           this.accumulatorMs = Math.max(0, this.accumulatorMs - this.FRAME_TIME_MS);
           this.processIncomingPackets();
@@ -2384,6 +2515,13 @@
           cancelAnimationFrame(netplayGamepadRafId);
           netplayGamepadRafId = null;
         }
+        if (this._rbPtr && this.module?._free) {
+          try { this.module._free(this._rbPtr); } catch {}
+        }
+        this._rbPtr = 0;
+        this._serFn = null;
+        this._unserFn = null;
+        this._rbApiChecked = false;
         this.setSyncWaitMute(true);
         try { window.EJS_emulator?.pause?.(); } catch {}
         console.log('[CSW GGPO] Match arrêté net.');

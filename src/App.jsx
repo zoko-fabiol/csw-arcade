@@ -482,7 +482,7 @@ export default function App() {
     p2pEngineRef.current?.destroy();
     const engine = new RollbackP2PEngine({
       isHost,
-      inputDelay: settings?.netplay?.inputDelay ?? 1,
+      inputDelay: settings?.netplay?.inputDelay ?? 2,
       onSignalIce: (cand) => {
         firebaseFightcadeService.postIceCandidate(challengeId, isHost ? 'caller' : 'callee', cand, opponentUid);
       },

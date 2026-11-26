@@ -253,7 +253,7 @@ export class RollbackP2PEngine {
     }
 
     const effectiveRtt = this.smoothedRttMs + Math.round(this.jitterMs * 1.1);
-    const rawRec = effectiveRtt < 40 ? 0 : effectiveRtt < 90 ? 1 : effectiveRtt < 150 ? 2 : effectiveRtt < 210 ? 3 : 4;
+    const rawRec = effectiveRtt < 25 ? 1 : effectiveRtt < 60 ? 2 : effectiveRtt < 105 ? 3 : 4;
     const minD = Number(this.regionalProfile?.minDelay || 0);
     const maxD = Number(this.regionalProfile?.maxDelay || 4);
     const stabilizedRec = Math.max(minD, Math.min(maxD, rawRec));
@@ -1168,14 +1168,22 @@ export class RollbackP2PEngine {
       }
     };
 
-    // Si WebRTC fiable est ouvert, basculer sur le relais WS uniquement si l'ACK tarde (> 2500ms).
+    // Si WebRTC fiable est ouvert, ne basculer sur le relais WS que si l'ACK tarde vraiment (> 4500ms) pour ne pas saturer la ligne.
     if (!sentOverRtc) {
       dispatchWsChunks();
     } else if (this.onRelayButtonFallback) {
       this.frame0FallbackTimer = setTimeout(() => {
         this.frame0FallbackTimer = null;
+        if (this.reliableChannel?.readyState === 'open' && this.reliableChannel.bufferedAmount > 0) {
+          // Canal WebRTC toujours en train de débiter activement : patienter encore 3s avant doublon WS
+          this.frame0FallbackTimer = setTimeout(() => {
+            this.frame0FallbackTimer = null;
+            dispatchWsChunks();
+          }, 3000);
+          return;
+        }
         dispatchWsChunks();
-      }, 2500);
+      }, 4500);
     }
   }
 
