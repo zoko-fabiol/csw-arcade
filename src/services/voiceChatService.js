@@ -10,11 +10,14 @@
  * - Transporte aussi les événements DM temps réel sur la même connexion WS VPS
  */
 
+import { fetchDynamicTurnServers } from './rollbackP2P';
+
 function buildVoiceIceServers() {
   const servers = [
+    { urls: 'stun:stun.cloudflare.com:3478' },
+    { urls: 'stun:csw-arcade.tech:3478' },
     { urls: 'stun:stun.l.google.com:19302' },
     { urls: 'stun:stun1.l.google.com:19302' },
-    { urls: 'stun:stun.cloudflare.com:3478' },
   ];
   try {
     const turnUrlsRaw = import.meta?.env?.VITE_TURN_URLS || '';
@@ -34,23 +37,30 @@ function buildVoiceIceServers() {
       }
     }
   } catch {}
-  // Fallback TURN/TURNS port 443 TCP/TLS pour traverser les réseaux 4G/NAT symétriques
-  servers.push(
-    {
-      urls: [
-        'turn:openrelay.metered.ca:80',
-        'turn:openrelay.metered.ca:443',
-        'turn:openrelay.metered.ca:443?transport=tcp',
-        'turns:openrelay.metered.ca:443?transport=tcp',
-      ],
-      username: 'openrelayproject',
-      credential: 'openrelayproject',
-    }
-  );
   return servers;
 }
 
-const ICE_SERVERS = buildVoiceIceServers();
+const BASE_VOICE_ICE_SERVERS = buildVoiceIceServers();
+let cachedVoiceIceServers = BASE_VOICE_ICE_SERVERS;
+
+async function getVoiceIceServers() {
+  try {
+    const dynTurn = await Promise.race([
+      fetchDynamicTurnServers(),
+      new Promise((r) => setTimeout(() => r([]), 450)),
+    ]);
+    if (Array.isArray(dynTurn) && dynTurn.length > 0) {
+      cachedVoiceIceServers = [...BASE_VOICE_ICE_SERVERS, ...dynTurn];
+    }
+  } catch {}
+  return cachedVoiceIceServers;
+}
+
+if (typeof window !== 'undefined') {
+  setTimeout(() => {
+    getVoiceIceServers().catch(() => {});
+  }, 1200);
+}
 const RELAY_SAMPLE_RATE = 12000;
 const RELAY_FRAME_SAMPLES = 1200; // 100 ms à 12 kHz = 1,2 Ko en µ-law
 
@@ -820,18 +830,25 @@ class VoiceChatService {
       }
     }
 
-    for (const m of members) {
-      if (!m.uid || m.uid === myUid) continue;
-      if (!this.peers.has(m.uid)) {
-        const shouldInitiate = String(myUid) > String(m.uid);
-        this.createPeerConnection(m.uid, shouldInitiate);
+    getVoiceIceServers().then(() => {
+      for (const m of members) {
+        if (!m.uid || m.uid === myUid) continue;
+        if (!this.peers.has(m.uid)) {
+          const shouldInitiate = String(myUid) > String(m.uid);
+          this.createPeerConnection(m.uid, shouldInitiate);
+        }
       }
-    }
+    });
   }
 
   createPeerConnection(peerUid, initiate = false) {
     if (typeof RTCPeerConnection === 'undefined') return null;
-    const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
+    const pc = new RTCPeerConnection({
+      iceServers: cachedVoiceIceServers,
+      iceCandidatePoolSize: 2,
+      bundlePolicy: 'max-bundle',
+      rtcpMuxPolicy: 'require',
+    });
     const audioEl = document.createElement('audio');
     audioEl.autoplay = true;
     audioEl.playsInline = true;
@@ -839,7 +856,7 @@ class VoiceChatService {
     audioEl.volume = this.state.mutedPeers[peerUid] ? 0 : vol;
     this.ensureAudioContainer()?.appendChild(audioEl);
 
-    const entry = { pc, audioEl, connected: false };
+    const entry = { pc, audioEl, connected: false, pendingCandidates: [] };
     this.peers.set(peerUid, entry);
 
     if (this.localStream) {
@@ -865,14 +882,19 @@ class VoiceChatService {
       }
     };
 
-    pc.onconnectionstatechange = () => {
-      entry.connected = pc.connectionState === 'connected';
+    const updateConn = () => {
+      entry.connected =
+        pc.connectionState === 'connected' ||
+        pc.iceConnectionState === 'connected' ||
+        pc.iceConnectionState === 'completed';
     };
+    pc.onconnectionstatechange = updateConn;
+    pc.oniceconnectionstatechange = updateConn;
 
     if (initiate) {
       pc.createOffer()
         .then((offer) => {
-          offer.sdp = capOpusBitrate(offer.sdp, 24);
+          offer.sdp = capOpusBitrate(offer.sdp, 32);
           return pc.setLocalDescription(offer);
         })
         .then(() => {
@@ -890,17 +912,26 @@ class VoiceChatService {
 
   async handleWebRtcSignal(fromUid, signal) {
     if (!fromUid || !signal || !this.state.roomId) return;
+    await getVoiceIceServers();
     let entry = this.peers.get(fromUid);
     if (!entry) {
       entry = this.createPeerConnection(fromUid, false);
     }
     if (!entry?.pc) return;
     const pc = entry.pc;
+    const flushPending = async () => {
+      const list = entry.pendingCandidates || [];
+      entry.pendingCandidates = [];
+      for (const c of list) {
+        try { await pc.addIceCandidate(new RTCIceCandidate(c)); } catch {}
+      }
+    };
     try {
       if (signal.type === 'offer' && signal.sdp) {
         await pc.setRemoteDescription(new RTCSessionDescription(signal.sdp));
+        await flushPending();
         const answer = await pc.createAnswer();
-        answer.sdp = capOpusBitrate(answer.sdp, 24);
+        answer.sdp = capOpusBitrate(answer.sdp, 32);
         await pc.setLocalDescription(answer);
         this.sendWs({
           type: 'webrtc_signal',
@@ -909,8 +940,13 @@ class VoiceChatService {
         });
       } else if (signal.type === 'answer' && signal.sdp) {
         await pc.setRemoteDescription(new RTCSessionDescription(signal.sdp));
+        await flushPending();
       } else if (signal.type === 'candidate' && signal.candidate) {
-        await pc.addIceCandidate(new RTCIceCandidate(signal.candidate));
+        if (!pc.remoteDescription) {
+          entry.pendingCandidates.push(signal.candidate);
+        } else {
+          await pc.addIceCandidate(new RTCIceCandidate(signal.candidate));
+        }
       }
     } catch {}
   }
