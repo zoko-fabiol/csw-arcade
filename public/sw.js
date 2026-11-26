@@ -1,5 +1,6 @@
-const SHELL_CACHE_NAME = 'csw-arcade-shell-v31-web-push';
+const SHELL_CACHE_NAME = 'csw-arcade-shell-v32-netplay-fix';
 const ENGINE_CACHE_NAME = 'csw-arcade-engine-v7';
+const ROMS_CACHE_NAME = 'csw-arcade-roms-v1';
 
 // Assets essentiels du moteur WebAssembly (FBNeo + EmulatorJS)
 const ENGINE_ASSETS = [
@@ -81,15 +82,35 @@ self.addEventListener('fetch', (event) => {
   if (self.location.hostname === 'localhost' || self.location.hostname === '127.0.0.1') return;
   const url = new URL(event.request.url);
 
-  // Ignorer les API dynamiques de salons, les ROMs lourdes, le benchmark et les flux WebSockets / WebRTC
+  // Ignorer les API dynamiques de salons, le benchmark et les flux WebSockets / WebRTC
   if (
     url.pathname.startsWith('/api/') ||
     url.pathname.startsWith('/ws/') ||
-    url.pathname.startsWith('/roms/') ||
     url.pathname.includes('benchmark') ||
     url.protocol === 'ws:' ||
     url.protocol === 'wss:'
   ) {
+    return;
+  }
+
+  // 0. CACHE-FIRST POUR LES ROMS ARCADE/CONSOLE (< 60 Mo) afin d'éviter de re-télécharger depuis l'Europe à chaque partie
+  if (url.pathname.startsWith('/roms/') && !event.request.headers.get('range')) {
+    event.respondWith(
+      caches.open(ROMS_CACHE_NAME).then((cache) =>
+        cache.match(event.request).then((cached) => {
+          if (cached) return cached;
+          return fetch(event.request).then((res) => {
+            if (res && res.status === 200) {
+              const len = Number(res.headers.get('content-length') || 0);
+              if (len > 0 && len < 65 * 1024 * 1024) {
+                cache.put(event.request, res.clone());
+              }
+            }
+            return res;
+          });
+        })
+      )
+    );
     return;
   }
 

@@ -1115,6 +1115,9 @@
 
       captureSnapshot(frame) {
         if (isHeavy3dCore(currentCoreName) || this.isWasmAsyncifyBusy()) return false;
+        // Sur les gros jeux NeoGeo/Arcade où la sérialisation prend > 4ms, capturer 1 frame sur 2
+        // (restoreSnapshot cherchera la frame la plus proche <= rollbackFrame et rejouera 1 frame de plus)
+        if (this.heavySnapshotThrottle && (frame & 1) !== 0 && frame % 30 !== 0) return false;
         this.gm = this.gm || window.EJS_emulator?.gameManager;
         this.module = this.module || getWasmModule();
         if (!this.gm) return false;
@@ -1122,6 +1125,7 @@
         const slot = frame & this.BUFFER_MASK;
         try {
           if (this.gm.functions?.saveStateInfo && this.module?.HEAPU8) {
+            const t0 = performance.now();
             const info = this.gm.functions.saveStateInfo().split('|');
             if (info[2] === '1') {
               const len = parseInt(info[0], 10);
@@ -1134,6 +1138,10 @@
                 this.savestates[slot].set(heap.subarray(offset, offset + len), 0);
                 this.savestateLengths[slot] = len;
                 this.savestateFrames[slot] = frame;
+                const elapsed = performance.now() - t0;
+                if (elapsed > 4.5 || len > 1500000) {
+                  this.heavySnapshotThrottle = true;
+                }
                 return true;
               }
             }
@@ -1165,8 +1173,21 @@
         this.gm = this.gm || window.EJS_emulator?.gameManager;
         if (!this.gm) return false;
 
-        const slot = frame & this.BUFFER_MASK;
-        if (this.savestateFrames[slot] !== frame) return false;
+        let targetSnap = frame;
+        if (this.savestateFrames[frame & this.BUFFER_MASK] !== frame) {
+          // Si le throttling 1/2 frame est actif, reculer jusqu'à la snapshot valide la plus proche
+          let found = -1;
+          for (let back = 1; back <= 4; back++) {
+            const candidate = frame - back;
+            if (candidate >= 0 && this.savestateFrames[candidate & this.BUFFER_MASK] === candidate) {
+              found = candidate;
+              break;
+            }
+          }
+          if (found === -1) return false;
+          targetSnap = found;
+        }
+        const slot = targetSnap & this.BUFFER_MASK;
         const len = this.savestateLengths[slot];
         const buf = this.savestates[slot];
         if (!buf || len <= 0) return false;
@@ -1411,7 +1432,7 @@
           return false;
         }
         const now = performance.now();
-        if (!force && now - this.lastHostResyncMs < 4000) return false;
+        if (!force && now - this.lastHostResyncMs < 8000) return false;
         this.lastHostResyncMs = now;
         this.initialFrame0Sent = true;
 
@@ -2151,14 +2172,16 @@
                 this.guestReadyTimer = null;
               }
             }, 450);
+            // Ne jamais démarrer P2 tout seul au bout de 25s si P1 est encore en train de télécharger la ROM :
+            // P2 reste synchronisé en attente de Frame 0 (délai de sécurité porté à 60s uniquement si la session est déjà active)
             setTimeout(() => {
-              if (this.waitingForFrame0 && !this.pendingSyncLoad) {
+              if (this.waitingForFrame0 && !this.pendingSyncLoad && this.hasRemotePeer) {
                 this.waitingForFrame0 = false;
                 this.resetAtFrame(0);
                 this.setSyncWaitMute(false);
                 notifyParent('NETPLAY_SYNC_COMPLETE', { syncFrame: 0 });
               }
-            }, 25000);
+            }, 60000);
           }
           this.lastTickMs = now;
           return;
