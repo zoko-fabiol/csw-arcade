@@ -6,6 +6,10 @@
 
 const PUSH_PREF_KEY = 'csw_push_enabled_v1';
 
+function hasNativeDesktopBridge() {
+  return typeof window !== 'undefined' && typeof window.CSW_NATIVE_CPP?.notify === 'function';
+}
+
 function urlBase64ToUint8Array(base64String) {
   const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
   const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
@@ -18,6 +22,7 @@ function urlBase64ToUint8Array(base64String) {
 }
 
 export function isPushSupported() {
+  if (hasNativeDesktopBridge()) return true;
   return (
     typeof window !== 'undefined' &&
     'Notification' in window &&
@@ -32,10 +37,12 @@ export function isPushEnabledPreference() {
     if (raw === '0') return false;
     if (raw === '1') return true;
   } catch {}
+  if (hasNativeDesktopBridge()) return true;
   return typeof Notification !== 'undefined' && Notification.permission === 'granted';
 }
 
 export function getPushPermission() {
+  if (hasNativeDesktopBridge()) return 'granted';
   if (typeof Notification === 'undefined') return 'unsupported';
   return Notification.permission;
 }
@@ -51,6 +58,17 @@ async function getReadyServiceWorker() {
 }
 
 export async function enablePushNotifications(uid) {
+  if (hasNativeDesktopBridge()) {
+    try {
+      localStorage.setItem(PUSH_PREF_KEY, '1');
+    } catch {}
+    window.CSW_NATIVE_CPP.notify(
+      'CSW-Arcade Desktop — Notifications actives',
+      'Vous recevrez vos défis, invitations et messages en direct sur Windows !'
+    );
+    return { ok: true, mode: 'desktop-native' };
+  }
+
   if (typeof Notification === 'undefined') {
     throw new Error('Les notifications ne sont pas supportées sur cet appareil.');
   }
@@ -156,6 +174,14 @@ export async function syncPushSubscriptionIfGranted(uid) {
 }
 
 export async function sendTestPushNotification(uid) {
+  if (hasNativeDesktopBridge()) {
+    window.CSW_NATIVE_CPP.notify(
+      'CSW-Arcade — Notifications actives',
+      'Vous recevrez vos défis, invitations et messages en direct sur PC !'
+    );
+    return { ok: true, mode: 'desktop-native' };
+  }
+
   if (uid) {
     try {
       const res = await fetch('/api/push/test', {
@@ -191,9 +217,17 @@ export async function sendTestPushNotification(uid) {
 }
 
 export function showBackgroundNotification({ title, body, tag }) {
-  if (typeof document === 'undefined' || !document.hidden) return;
-  if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
+  if (typeof document === 'undefined') return;
   if (!isPushEnabledPreference()) return;
+
+  if (hasNativeDesktopBridge()) {
+    if (!document.hidden && document.hasFocus()) return;
+    window.CSW_NATIVE_CPP.notify(title || 'CSW-Arcade', body || '');
+    return;
+  }
+
+  if (!document.hidden) return;
+  if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
   try {
     navigator.serviceWorker?.getRegistration?.('/').then((reg) => {
       if (reg?.showNotification) {
