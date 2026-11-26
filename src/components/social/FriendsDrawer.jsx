@@ -280,6 +280,7 @@ export function FriendsDrawer({
                         ? Math.round(peerPings.__self + friend.ping)
                         : friend.ping ?? null)
                     }
+                    isDirect={Boolean(peerPings.__meta?.[friend.uid]?.direct)}
                   />
                 )}
               </div>

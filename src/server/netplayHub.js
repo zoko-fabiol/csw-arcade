@@ -3955,6 +3955,28 @@ export function setupNetplayHub(server) {
             break;
           }
 
+          case 'PROBE_SIGNAL': {
+            const { targetUid, signalType, payload } = data;
+            if (targetUid && ws.uid && signalType) {
+              const sockets = connectedUsers.get(targetUid);
+              if (sockets) {
+                const msg = JSON.stringify({
+                  type: 'PROBE_SIGNAL',
+                  fromUid: ws.uid,
+                  signalType,
+                  payload,
+                });
+                for (const s of sockets) {
+                  if (s !== ws && s.readyState === WebSocket.OPEN) {
+                    s.send(msg);
+                    break;
+                  }
+                }
+              }
+            }
+            break;
+          }
+
           case 'CLOSE_ROOM': {
             const { roomCode } = data;
             if (roomCode && rooms.has(roomCode)) {

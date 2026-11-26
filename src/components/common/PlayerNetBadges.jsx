@@ -65,9 +65,9 @@ export function CountryFlagBadge({ countryCode, countryName, city, region, size 
 }
 
 /**
- * Indicateur de Ping réel façon Fightcade 2 (4 barres ascendantes + valeur exacte en ms)
+ * Indicateur de Ping réel façon Fightcade 2 (4 barres ascendantes + valeur exacte en ms + badge P2P direct)
  */
-export function FightcadePingIndicator({ pingMs, isSelf = false, showLabel = true }) {
+export function FightcadePingIndicator({ pingMs, isDirect = false, isSelf = false, showLabel = true }) {
   const valid = typeof pingMs === 'number' && Number.isFinite(pingMs) && pingMs > 0;
   const ms = valid ? Math.round(pingMs) : null;
 
@@ -102,8 +102,14 @@ export function FightcadePingIndicator({ pingMs, isSelf = false, showLabel = tru
 
   const tooltip =
     ms !== null
-      ? `${isSelf ? 'Votre ping vers le serveur' : 'Ping réel mesuré'} : ${ms} ms (${qualityLabel})`
-      : 'Mesure du ping réel en cours…';
+      ? `${
+          isSelf
+            ? 'Votre ping vers le serveur'
+            : isDirect
+              ? 'Ping P2P Direct (sans passer par le serveur)'
+              : 'Ping via relais serveur'
+        } : ${ms} ms (${qualityLabel})`
+      : 'Mesure du ping P2P direct en cours…';
 
   return (
     <span className="inline-flex items-center gap-1.5 shrink-0" title={tooltip}>
@@ -121,6 +127,11 @@ export function FightcadePingIndicator({ pingMs, isSelf = false, showLabel = tru
       {showLabel && (
         <span className={`text-[10px] font-mono font-bold tabular-nums ${textColor}`}>
           {ms !== null ? `${ms}ms` : '…'}
+        </span>
+      )}
+      {isDirect && !isSelf && ms !== null && (
+        <span className="text-[8px] font-mono font-black px-1 py-0.2 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+          P2P
         </span>
       )}
     </span>

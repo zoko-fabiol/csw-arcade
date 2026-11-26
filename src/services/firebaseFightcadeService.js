@@ -23,6 +23,7 @@ import {
 } from './localFirestore';
 import { db } from '../config/firebase';
 import { getCurrentUserProfile, getPlayerFriendCode, getPlayerFriendTag, subscribeAuthProfile, updateUserProfile } from './authService';
+import { P2pLobbyProbe, trimmedLowRtt } from './p2pLobbyProbe';
 import { isJ2meGame, supportsOnlineMultiplayer } from '../utils/gameCapabilities';
 
 const MAX_ACTIVE_CHANNELS = 3;
@@ -106,10 +107,23 @@ class FirebaseFightcadeService {
     this.friendEventListeners = new Set();
     this.relayInputListener = null;
     this.measuredVpsPingMs = null;
+    this.vpsRttSamples = [];
     this.detectedGeo = null;
-    this.peerPings = new Map();
+    this.peerPings = new Map(); // uid -> { ms, direct, samples: [] }
     this.peerPingSentAt = new Map();
     this.peerPingListeners = new Set();
+
+    // Sonde P2P WebRTC directe dans le salon (façon Fightcade 2 : mesure Douala <-> Douala sans détour par l'Europe)
+    this.p2pProbe = new P2pLobbyProbe({
+      getMyUid: () => this.identity?.uid,
+      sendProbeSignal: (targetUid, signalType, payload) => {
+        this.sendWs({ type: 'PROBE_SIGNAL', targetUid, signalType, payload });
+      },
+      onDirectPingMeasured: (peerUid, ms) => {
+        this.peerPings.set(peerUid, { ms, direct: true, samples: [ms] });
+        this._emitPeerPings();
+      },
+    });
 
     // Détection automatique du pays réel via le VPS (/api/geo)
     if (typeof window !== 'undefined' && typeof fetch === 'function') {
@@ -204,7 +218,10 @@ class FirebaseFightcadeService {
             try { this.ws.send(JSON.stringify({ type: 'PING', clientTime: performance.now() })); } catch {}
           }
         };
-        sendVpsPing();
+        // Attendre la fin du chargement initial puis envoyer 3 mesures rapides pour obtenir le vrai ping plancher
+        setTimeout(sendVpsPing, 1000);
+        setTimeout(sendVpsPing, 1600);
+        setTimeout(sendVpsPing, 2300);
         this.wsKeepaliveTimer = setInterval(sendVpsPing, 10000);
       };
 
@@ -264,10 +281,15 @@ class FirebaseFightcadeService {
 
     if (data.type === 'PONG' && typeof data.clientTime === 'number') {
       const rtt = Math.max(1, Math.min(2000, Math.round(performance.now() - data.clientTime)));
-      this.measuredVpsPingMs = this.measuredVpsPingMs
-        ? Math.round(this.measuredVpsPingMs * 0.65 + rtt * 0.35)
-        : rtt;
+      this.vpsRttSamples.push(rtt);
+      if (this.vpsRttSamples.length > 6) this.vpsRttSamples.shift();
+      this.measuredVpsPingMs = trimmedLowRtt(this.vpsRttSamples);
       this._emitPeerPings();
+      return;
+    }
+
+    if (data.type === 'PROBE_SIGNAL' && data.fromUid && data.signalType) {
+      this.p2pProbe?.handleSignal(data.fromUid, data.signalType, data.payload);
       return;
     }
 
@@ -277,9 +299,17 @@ class FirebaseFightcadeService {
     }
 
     if (data.type === 'PEER_PONG' && data.fromUid && typeof data.ts === 'number') {
+      const existing = this.peerPings.get(data.fromUid);
+      // Ne jamais écraser une vraie mesure P2P directe par un ping relayé via l'Europe !
+      if (existing?.direct) return;
       const rtt = Math.max(1, Math.min(2000, Math.round(performance.now() - data.ts)));
-      const prev = this.peerPings.get(data.fromUid);
-      this.peerPings.set(data.fromUid, prev ? Math.round(prev * 0.55 + rtt * 0.45) : rtt);
+      const samples = Array.isArray(existing?.samples) ? [...existing.samples, rtt] : [rtt];
+      if (samples.length > 5) samples.shift();
+      this.peerPings.set(data.fromUid, {
+        ms: trimmedLowRtt(samples),
+        direct: false,
+        samples,
+      });
       this._emitPeerPings();
       return;
     }
@@ -886,9 +916,13 @@ class FirebaseFightcadeService {
   }
 
   _emitPeerPings() {
-    const snapshot = { __self: this.measuredVpsPingMs };
-    for (const [uid, ms] of this.peerPings.entries()) {
+    const meta = {};
+    const snapshot = { __self: this.measuredVpsPingMs, __meta: meta };
+    for (const [uid, entry] of this.peerPings.entries()) {
+      const ms = typeof entry === 'number' ? entry : entry?.ms;
+      const direct = Boolean(typeof entry === 'object' && entry?.direct);
       snapshot[uid] = ms;
+      meta[uid] = { ms, direct };
     }
     this.peerPingListeners.forEach((cb) => {
       try { cb(snapshot); } catch {}
@@ -908,6 +942,12 @@ class FirebaseFightcadeService {
     const myUid = this.identity?.uid;
     for (const uid of uids) {
       if (!uid || uid === myUid) continue;
+      // 1. Toujours tenter la sonde P2P directe WebRTC UDP (zéro détour par le serveur Europe)
+      this.p2pProbe?.probe(uid);
+
+      // 2. Secours léger via relais WS uniquement si le P2P direct n'est pas encore mesuré
+      const existing = this.peerPings.get(uid);
+      if (existing?.direct) continue;
       const last = this.peerPingSentAt.get(uid) || 0;
       if (now - last < 8000) continue;
       this.peerPingSentAt.set(uid, now);

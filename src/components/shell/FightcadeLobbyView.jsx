@@ -904,6 +904,7 @@ export function FightcadeLobbyView({
                                         ? Math.round(peerPings.__self + u.ping)
                                         : u.ping ?? null))
                               }
+                              isDirect={Boolean(!isMe && peerPings.__meta?.[u.uid]?.direct)}
                               isSelf={isMe}
                             />
                           </div>
