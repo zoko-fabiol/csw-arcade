@@ -1196,7 +1196,14 @@ class FirebaseFightcadeService {
       const now = Date.now();
       const map = new Map();
       [...relayList, ...firestoreList].forEach((c) => {
-        if (c && c.challengeId && c.expiresAt > now && c.status === 'pending' && c.fromUid !== this.identity.uid) {
+        if (
+          c &&
+          c.challengeId &&
+          !this._respondedChallenges?.has(c.challengeId) &&
+          c.expiresAt > now &&
+          c.status === 'pending' &&
+          c.fromUid !== this.identity.uid
+        ) {
           map.set(c.challengeId, c);
         }
       });

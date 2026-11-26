@@ -190,6 +190,7 @@ export default function App() {
   const voiceInviteCooldownRef = useRef(new Map());
   const challengeSendLockRef = useRef(new Map());
   const challengeRespondLockRef = useRef(new Set());
+  const lastNotifiedChallengeIdRef = useRef(null);
 
   const handleInviteVoiceFriend = useCallback(
     async (friend) => {
@@ -738,12 +739,12 @@ export default function App() {
   const handleRespondChallenge = async (accept) => {
     if (!incomingChallenge) return;
     const ch = incomingChallenge;
+    setIncomingChallenge(null);
     if (!ch.challengeId || challengeRespondLockRef.current.has(ch.challengeId)) return;
     challengeRespondLockRef.current.add(ch.challengeId);
     const channel = activeChannels.find((c) => c.gameId === ch.gameId);
     const resolvedGameEntry = ch.gameEntry || channel?.entry || { id: ch.gameId, title: ch.gameTitle };
     const allowAccept = Boolean(accept) && supportsOnlineMultiplayer(resolvedGameEntry);
-    setIncomingChallenge(null);
     await firebaseFightcadeService.respondChallenge(ch.challengeId, allowAccept, ch.fromUid);
     if (allowAccept) {
       const curStage = stageSessionRef.current;
@@ -823,22 +824,31 @@ export default function App() {
     const unsubCh = firebaseFightcadeService.subscribeIncomingChallenges((list) => {
       const validList = [];
       for (const ch of list) {
+        if (!ch?.challengeId || challengeRespondLockRef.current.has(ch.challengeId)) continue;
         const entry = ch?.gameEntry || { id: ch?.gameId, title: ch?.gameTitle };
         if (supportsOnlineMultiplayer(entry)) {
           validList.push(ch);
-        } else if (ch?.challengeId) {
+        } else {
+          challengeRespondLockRef.current.add(ch.challengeId);
           firebaseFightcadeService.respondChallenge(ch.challengeId, false, ch.fromUid);
         }
       }
       if (validList.length > 0) {
         const firstCh = validList[0];
         setIncomingChallenge(firstCh);
-        if (settings?.netplay?.challengeSound ?? true) playChallengeSound();
-        showBackgroundNotification({
-          title: `⚔️ Défi reçu de ${firstCh.fromName || 'un joueur'} !`,
-          body: `Viens l'affronter sur ${firstCh.gameTitle || 'CSW-Arcade'} !`,
-          tag: `challenge_${firstCh.challengeId || Date.now()}`,
-        });
+        if (lastNotifiedChallengeIdRef.current !== firstCh.challengeId) {
+          lastNotifiedChallengeIdRef.current = firstCh.challengeId;
+          if (settings?.netplay?.challengeSound ?? true) playChallengeSound();
+          showBackgroundNotification({
+            title: `⚔️ Défi reçu de ${firstCh.fromName || 'un joueur'} !`,
+            body: `Viens l'affronter sur ${firstCh.gameTitle || 'CSW-Arcade'} !`,
+            tag: `challenge_${firstCh.challengeId || Date.now()}`,
+          });
+        }
+      } else {
+        setIncomingChallenge((prev) =>
+          prev && challengeRespondLockRef.current.has(prev.challengeId) ? null : prev
+        );
       }
     });
     refreshPlatformCache();
