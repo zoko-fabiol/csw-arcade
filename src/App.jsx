@@ -516,6 +516,14 @@ export default function App() {
     if (isHost) {
       const offer = await engine.initConnection();
       await firebaseFightcadeService.postOffer(challengeId, offer, opponentUid);
+      // Si l'invité (P2) rejoint après l'envoi initial (Drop-In / Invitation), rejouer instantanément l'offre + tous les candidats ICE
+      engine.onRequestOffer = () => {
+        if (engine.destroyed || !engine.localOffer) return;
+        firebaseFightcadeService.postOffer(challengeId, engine.localOffer, opponentUid);
+        for (const cand of engine.localCandidates) {
+          firebaseFightcadeService.postIceCandidate(challengeId, 'caller', cand, opponentUid);
+        }
+      };
       const unsubIce = firebaseFightcadeService.subscribeIceCandidates(challengeId, 'callee', (c) =>
         engine.addRemoteCandidate(c)
       );
@@ -531,6 +539,24 @@ export default function App() {
       engine.addCleanup(unsubCh);
     } else {
       await engine.initConnection();
+      // Demander immédiatement à l'hôte (P1) de rejouer son offre + candidats ICE (résout la race condition Drop-In / Web <-> Desktop)
+      if (opponentUid) {
+        firebaseFightcadeService.sendRelayInput(opponentUid, { syncType: 'REQUEST_OFFER' });
+        const retryOffer1 = setTimeout(() => {
+          if (!engine.destroyed && !engine.hasRemoteDesc) {
+            firebaseFightcadeService.sendRelayInput(opponentUid, { syncType: 'REQUEST_OFFER' });
+          }
+        }, 700);
+        const retryOffer2 = setTimeout(() => {
+          if (!engine.destroyed && !engine.hasRemoteDesc) {
+            firebaseFightcadeService.sendRelayInput(opponentUid, { syncType: 'REQUEST_OFFER' });
+          }
+        }, 1800);
+        engine.addCleanup(() => {
+          clearTimeout(retryOffer1);
+          clearTimeout(retryOffer2);
+        });
+      }
       const unsubIce = firebaseFightcadeService.subscribeIceCandidates(challengeId, 'caller', (c) =>
         engine.addRemoteCandidate(c)
       );

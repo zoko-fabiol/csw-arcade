@@ -101,7 +101,11 @@ export class RollbackP2PEngine {
     this.pingInterval = null;
     this.iceRestartTimer = null;
     this.connectTimeoutTimer = null;
+    this.p2pUpgradeRetryTimer = null;
     this.pendingCandidates = [];
+    this.localCandidates = [];
+    this.localOffer = null;
+    this.onRequestOffer = null;
     this.pendingFrame0State = null;
     this.cleanupCallbacks = [];
     this.hasRemoteDesc = false;
@@ -266,7 +270,9 @@ export class RollbackP2PEngine {
 
     this.pc.onicecandidate = (e) => {
       if (e.candidate) {
-        this.onSignalIce?.(e.candidate.toJSON());
+        const json = e.candidate.toJSON();
+        this.localCandidates.push(json);
+        this.onSignalIce?.(json);
       }
     };
 
@@ -293,6 +299,28 @@ export class RollbackP2PEngine {
         this.startPingLoop();
       }
     }, 1800);
+
+    // Auto-récupération P2P à 3.5s si l'offre ou les candidats ICE initiaux ont été manqués (Drop-In / Invitation)
+    if (this.p2pUpgradeRetryTimer) clearTimeout(this.p2pUpgradeRetryTimer);
+    this.p2pUpgradeRetryTimer = setTimeout(async () => {
+      if (this.destroyed || !this.pc) return;
+      if (this.udpChannel?.readyState === 'open') return;
+      if (this.isHost) {
+        try {
+          if (typeof this.pc.restartIce === 'function') this.pc.restartIce();
+          if (this.pc.signalingState === 'stable' || this.pc.signalingState === 'have-local-offer') {
+            const offer = await this.pc.createOffer({ iceRestart: true });
+            await this.pc.setLocalDescription(offer);
+            this.localOffer = offer;
+            this.onRenegotiateOffer?.(offer);
+          }
+        } catch {
+          /* noop */
+        }
+      } else if (!this.hasRemoteDesc) {
+        this.onRelayButtonFallback?.({ syncType: 'REQUEST_OFFER' });
+      }
+    }, 3500);
 
     this.pc.oniceconnectionstatechange = () => {
       const s = this.pc?.iceConnectionState || 'closed';
@@ -349,6 +377,7 @@ export class RollbackP2PEngine {
 
       const offer = await this.pc.createOffer();
       await this.pc.setLocalDescription(offer);
+      this.localOffer = offer;
       this.initialOfferSent = true;
       return offer;
     }
@@ -454,8 +483,24 @@ export class RollbackP2PEngine {
         clearTimeout(this.connectTimeoutTimer);
         this.connectTimeoutTimer = null;
       }
+      if (this.p2pUpgradeRetryTimer) {
+        clearTimeout(this.p2pUpgradeRetryTimer);
+        this.p2pUpgradeRetryTimer = null;
+      }
+      // Réinitialiser les échantillons RTT du relais WS pour afficher immédiatement le vrai ping P2P UDP (< 50ms / 3-6ms)
+      this.rttSamples = [];
+      this.smoothedRttMs = 0;
+      this.jitterMs = 0;
       this.stats.p2pState = 'connected';
       this.emitStats();
+      // Envoyer un premier PING binaire immédiatement sans attendre le prochain tick setInterval
+      try {
+        const pBuf = new ArrayBuffer(9);
+        const pView = new DataView(pBuf);
+        pView.setUint8(0, PACKET_PING_BIN);
+        pView.setFloat64(1, performance.now(), false);
+        dc.send(pBuf);
+      } catch {}
       this.startPingLoop();
       // Détecter le vrai type de candidat ICE actif (P2P direct vs TURN UDP)
       this.pc?.getStats?.().then((report) => {
@@ -773,6 +818,12 @@ export class RollbackP2PEngine {
 
   handleRelayData(data) {
     if (!data) return;
+    if (data.syncType === 'REQUEST_OFFER') {
+      if (this.isHost) {
+        this.onRequestOffer?.();
+      }
+      return;
+    }
     if (data.syncType === 'PING' && typeof data.t === 'number') {
       this.onRelayButtonFallback?.({ syncType: 'PONG', t: data.t });
       return;
@@ -1182,10 +1233,12 @@ export class RollbackP2PEngine {
     if (this.pingInterval) clearInterval(this.pingInterval);
     if (this.iceRestartTimer) clearTimeout(this.iceRestartTimer);
     if (this.connectTimeoutTimer) clearTimeout(this.connectTimeoutTimer);
+    if (this.p2pUpgradeRetryTimer) clearTimeout(this.p2pUpgradeRetryTimer);
     if (this.frame0FallbackTimer) clearTimeout(this.frame0FallbackTimer);
     this.pingInterval = null;
     this.iceRestartTimer = null;
     this.connectTimeoutTimer = null;
+    this.p2pUpgradeRetryTimer = null;
     this.frame0FallbackTimer = null;
 
     const cleanups = [...this.cleanupCallbacks];
