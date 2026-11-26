@@ -47,7 +47,7 @@ async function getVoiceIceServers() {
   try {
     const dynTurn = await Promise.race([
       fetchDynamicTurnServers(),
-      new Promise((r) => setTimeout(() => r([]), 450)),
+      new Promise((r) => setTimeout(() => r([]), 3000)),
     ]);
     if (Array.isArray(dynTurn) && dynTurn.length > 0) {
       cachedVoiceIceServers = [...BASE_VOICE_ICE_SERVERS, ...dynTurn];

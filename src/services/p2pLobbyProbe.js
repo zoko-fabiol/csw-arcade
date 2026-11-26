@@ -122,7 +122,7 @@ export class P2pLobbyProbe {
   async _startInitiator(peerUid) {
     const dynTurn = await Promise.race([
       fetchDynamicTurnServers().catch(() => []),
-      new Promise((r) => setTimeout(() => r([]), 350)),
+      new Promise((r) => setTimeout(() => r([]), 2500)),
     ]);
     const session = this._createSession(peerUid, true, dynTurn);
     try {
@@ -142,7 +142,7 @@ export class P2pLobbyProbe {
   async _startResponder(peerUid, offer) {
     const dynTurn = await Promise.race([
       fetchDynamicTurnServers().catch(() => []),
-      new Promise((r) => setTimeout(() => r([]), 350)),
+      new Promise((r) => setTimeout(() => r([]), 2500)),
     ]);
     const session = this._createSession(peerUid, false, dynTurn);
     session.pc.ondatachannel = (e) => {

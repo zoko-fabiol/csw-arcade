@@ -855,7 +855,9 @@ export function setupNetplayHub(server) {
   server.middlewares.use('/api/emu-cores', serveEmulatorCore);
   server.middlewares.use('/emulatorjs/cores', serveEmulatorCore);
 
-  // Endpoint d'identifiants éphémères HMAC-SHA1 pour coturn (UDP prioritaire) + option Cloudflare Anycast TURN mondial
+  // Endpoint d'identifiants éphémères HMAC-SHA1 pour coturn (UDP prioritaire) + Cloudflare Anycast TURN mondial (cache 12h)
+  let cachedCfTurnServers = null;
+  let cachedCfTurnAt = 0;
   server.middlewares.use('/api/turn-credentials', async (req, res) => {
     res.setHeader('Content-Type', 'application/json; charset=utf-8');
     res.setHeader('Access-Control-Allow-Origin', '*');
@@ -870,30 +872,33 @@ export function setupNetplayHub(server) {
     const cfToken = process.env.CLOUDFLARE_TURN_API_TOKEN || '';
     const iceServers = [];
 
-    // 1. Relais TURN Anycast mondial (Cloudflare Calls, 330+ PoPs dont Afrique) -> < 60-120ms même Wi-Fi <-> 4G
+    // 1. Relais TURN Anycast mondial (Cloudflare Calls, 330+ PoPs dont Afrique ~55-70ms depuis Douala)
     let hasGlobalAnycastTurn = false;
     if (cfKeyId && cfToken) {
-      try {
-        const cfRes = await fetch(
-          `https://rtc.live.cloudflare.com/v1/turn/keys/${encodeURIComponent(cfKeyId)}/credentials/generate-ice-servers`,
-          {
-            method: 'POST',
-            headers: {
-              Authorization: `Bearer ${cfToken}`,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ ttl: 86400 }),
-          }
-        );
-        if (cfRes.ok) {
-          const cfJson = await cfRes.json();
-          const cfList = Array.isArray(cfJson?.iceServers)
-            ? cfJson.iceServers
-            : cfJson?.iceServers
-              ? [cfJson.iceServers]
-              : [];
-          if (cfList.length > 0) {
-            // Prioriser les endpoints UDP Anycast (3478 & 443) pour éviter tout Head-of-Line Blocking TCP
+      if (cachedCfTurnServers && Date.now() - cachedCfTurnAt < 12 * 3600 * 1000) {
+        iceServers.push(...cachedCfTurnServers);
+        hasGlobalAnycastTurn = true;
+      } else {
+        try {
+          const cfRes = await fetch(
+            `https://rtc.live.cloudflare.com/v1/turn/keys/${encodeURIComponent(cfKeyId)}/credentials/generate-ice-servers`,
+            {
+              method: 'POST',
+              headers: {
+                Authorization: `Bearer ${cfToken}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ ttl: 86400 }),
+            }
+          );
+          if (cfRes.ok) {
+            const cfJson = await cfRes.json();
+            const cfList = Array.isArray(cfJson?.iceServers)
+              ? cfJson.iceServers
+              : cfJson?.iceServers
+                ? [cfJson.iceServers]
+                : [];
+            const built = [];
             for (const entry of cfList) {
               const rawUrls = Array.isArray(entry?.urls) ? entry.urls : entry?.urls ? [entry.urls] : [];
               const udpFirst = [
@@ -901,16 +906,19 @@ export function setupNetplayHub(server) {
                 ...rawUrls.filter((u) => !String(u).includes('transport=udp')),
               ];
               if (udpFirst.length > 0) {
-                iceServers.push({ ...entry, urls: udpFirst });
-                if (udpFirst.some((u) => String(u).startsWith('turn'))) {
-                  hasGlobalAnycastTurn = true;
-                }
+                built.push({ ...entry, urls: udpFirst });
               }
             }
+            if (built.some((e) => e.urls.some((u) => String(u).startsWith('turn')))) {
+              cachedCfTurnServers = built;
+              cachedCfTurnAt = Date.now();
+              iceServers.push(...built);
+              hasGlobalAnycastTurn = true;
+            }
           }
+        } catch {
+          /* fallback to local VPS coturn */
         }
-      } catch {
-        /* fallback to local VPS coturn */
       }
     }
 

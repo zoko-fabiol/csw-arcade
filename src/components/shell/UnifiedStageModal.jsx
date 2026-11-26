@@ -1268,6 +1268,13 @@ export function UnifiedStageModal({
                 {p2pStats && (
                   <span className={`font-mono text-[10px] font-black ${netplayPanelOpen ? 'text-black' : pingColor}`}>
                     {ping}ms
+                    {p2pStats.p2pState === 'p2p-direct'
+                      ? ' P2P'
+                      : p2pStats.p2pState === 'turn-udp'
+                        ? ' CF'
+                        : p2pStats.p2pState === 'relay-vps'
+                          ? ' WS'
+                          : ''}
                   </span>
                 )}
                 {spectatorsCount > 0 && (

@@ -37,8 +37,19 @@ function buildIceServers() {
 
 const ICE_SERVERS = buildIceServers();
 
+const TURN_STORAGE_KEY = 'csw_cf_turn_cache_v1';
 let cachedDynamicTurnServers = null;
 let dynamicTurnFetchPromise = null;
+
+try {
+  if (typeof localStorage !== 'undefined') {
+    const saved = JSON.parse(localStorage.getItem(TURN_STORAGE_KEY) || 'null');
+    if (saved && Array.isArray(saved.iceServers) && saved.iceServers.length > 0 && saved.expiresAt > Date.now()) {
+      cachedDynamicTurnServers = saved.iceServers;
+    }
+  }
+} catch {}
+
 export async function fetchDynamicTurnServers() {
   if (cachedDynamicTurnServers) return cachedDynamicTurnServers;
   if (typeof fetch !== 'function') return [];
@@ -48,9 +59,17 @@ export async function fetchDynamicTurnServers() {
       .then((data) => {
         if (data?.ok && Array.isArray(data.iceServers) && data.iceServers.length > 0) {
           cachedDynamicTurnServers = data.iceServers;
+          try {
+            if (typeof localStorage !== 'undefined') {
+              localStorage.setItem(
+                TURN_STORAGE_KEY,
+                JSON.stringify({ iceServers: data.iceServers, expiresAt: Date.now() + 10 * 3600 * 1000 })
+              );
+            }
+          } catch {}
           setTimeout(() => {
             cachedDynamicTurnServers = null;
-          }, 3600 * 1000);
+          }, 10 * 3600 * 1000);
           return data.iceServers;
         }
         return [];
@@ -63,11 +82,9 @@ export async function fetchDynamicTurnServers() {
   return dynamicTurnFetchPromise;
 }
 
-// Pré-chauffage silencieux des identifiants STUN/TURN dès l'ouverture de la page (0 ms d'attente au lancement du match)
-if (typeof window !== 'undefined' && typeof fetch === 'function') {
-  setTimeout(() => {
-    fetchDynamicTurnServers().catch(() => {});
-  }, 800);
+// Pré-chauffage immédiat dès l'ouverture (0 ms d'attente au lancement d'un match ou d'un appel vocal)
+if (typeof window !== 'undefined' && typeof fetch === 'function' && !cachedDynamicTurnServers) {
+  fetchDynamicTurnServers().catch(() => {});
 }
 
 const MAX_ROLLBACK_FRAMES = 8;
@@ -267,7 +284,7 @@ export class RollbackP2PEngine {
   async initConnection() {
     const dynTurn = await Promise.race([
       fetchDynamicTurnServers(),
-      new Promise((r) => setTimeout(() => r([]), 450)),
+      new Promise((r) => setTimeout(() => r([]), 3500)),
     ]);
     this.pc = new RTCPeerConnection({
       iceServers: [...ICE_SERVERS, ...(Array.isArray(dynTurn) ? dynTurn : [])],
@@ -296,8 +313,7 @@ export class RollbackP2PEngine {
       }
     };
 
-    // Démarrage hybride rapide (1.8s) : active immédiatement le relais VPS si le trouage NAT tarde,
-    // puis bascule à chaud (hot-upgrade) sur le DataChannel UDP dès qu'il s'ouvre !
+    // Laisser 3.5s à WebRTC (STUN + Cloudflare Anycast TURN UDP ~60ms) pour s'ouvrir avant d'activer le relais WS Europe
     if (this.connectTimeoutTimer) clearTimeout(this.connectTimeoutTimer);
     this.connectTimeoutTimer = setTimeout(() => {
       if (this.destroyed || !this.pc) return;
@@ -306,7 +322,7 @@ export class RollbackP2PEngine {
         this.emitStats();
         this.startPingLoop();
       }
-    }, 1800);
+    }, 3500);
 
     // Auto-récupération P2P à 3.5s puis 9s si le match reste sur le relais WebSocket TCP (Head-of-Line Blocking)
     const scheduleP2pRecovery = (delayMs, timerKey) => {
