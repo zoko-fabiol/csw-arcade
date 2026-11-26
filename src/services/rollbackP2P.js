@@ -4,10 +4,10 @@
 
 function buildIceServers() {
   const servers = [
+    { urls: 'stun:csw-arcade.tech:3478' },
+    { urls: 'stun:stun.cloudflare.com:3478' },
     { urls: 'stun:stun.l.google.com:19302' },
     { urls: 'stun:stun1.l.google.com:19302' },
-    { urls: 'stun:stun2.l.google.com:19302' },
-    { urls: 'stun:stun.cloudflare.com:3478' },
   ];
   try {
     const turnUrlsRaw = import.meta?.env?.VITE_TURN_URLS || '';
@@ -63,6 +63,13 @@ async function fetchDynamicTurnServers() {
   return dynamicTurnFetchPromise;
 }
 
+// Pré-chauffage silencieux des identifiants STUN/TURN dès l'ouverture de la page (0 ms d'attente au lancement du match)
+if (typeof window !== 'undefined' && typeof fetch === 'function') {
+  setTimeout(() => {
+    fetchDynamicTurnServers().catch(() => {});
+  }, 800);
+}
+
 const MAX_ROLLBACK_FRAMES = 8;
 const PACKET_BTN_MASK_SYNC = 0xb1;
 const PACKET_PING_BIN = 0xee;
@@ -102,6 +109,7 @@ export class RollbackP2PEngine {
     this.iceRestartTimer = null;
     this.connectTimeoutTimer = null;
     this.p2pUpgradeRetryTimer = null;
+    this.p2pSecondRetryTimer = null;
     this.pendingCandidates = [];
     this.localCandidates = [];
     this.localOffer = null;
@@ -300,27 +308,31 @@ export class RollbackP2PEngine {
       }
     }, 1800);
 
-    // Auto-récupération P2P à 3.5s si l'offre ou les candidats ICE initiaux ont été manqués (Drop-In / Invitation)
-    if (this.p2pUpgradeRetryTimer) clearTimeout(this.p2pUpgradeRetryTimer);
-    this.p2pUpgradeRetryTimer = setTimeout(async () => {
-      if (this.destroyed || !this.pc) return;
-      if (this.udpChannel?.readyState === 'open') return;
-      if (this.isHost) {
-        try {
-          if (typeof this.pc.restartIce === 'function') this.pc.restartIce();
-          if (this.pc.signalingState === 'stable' || this.pc.signalingState === 'have-local-offer') {
-            const offer = await this.pc.createOffer({ iceRestart: true });
-            await this.pc.setLocalDescription(offer);
-            this.localOffer = offer;
-            this.onRenegotiateOffer?.(offer);
+    // Auto-récupération P2P à 3.5s puis 9s si le match reste sur le relais WebSocket TCP (Head-of-Line Blocking)
+    const scheduleP2pRecovery = (delayMs, timerKey) => {
+      if (this[timerKey]) clearTimeout(this[timerKey]);
+      this[timerKey] = setTimeout(async () => {
+        if (this.destroyed || !this.pc) return;
+        if (this.udpChannel?.readyState === 'open') return;
+        if (this.isHost) {
+          try {
+            if (typeof this.pc.restartIce === 'function') this.pc.restartIce();
+            if (this.pc.signalingState === 'stable' || this.pc.signalingState === 'have-local-offer') {
+              const offer = await this.pc.createOffer({ iceRestart: true });
+              await this.pc.setLocalDescription(offer);
+              this.localOffer = offer;
+              this.onRenegotiateOffer?.(offer);
+            }
+          } catch {
+            /* noop */
           }
-        } catch {
-          /* noop */
+        } else {
+          this.onRelayButtonFallback?.({ syncType: 'REQUEST_OFFER' });
         }
-      } else if (!this.hasRemoteDesc) {
-        this.onRelayButtonFallback?.({ syncType: 'REQUEST_OFFER' });
-      }
-    }, 3500);
+      }, delayMs);
+    };
+    scheduleP2pRecovery(3500, 'p2pUpgradeRetryTimer');
+    scheduleP2pRecovery(9000, 'p2pSecondRetryTimer');
 
     this.pc.oniceconnectionstatechange = () => {
       const s = this.pc?.iceConnectionState || 'closed';
@@ -486,6 +498,10 @@ export class RollbackP2PEngine {
       if (this.p2pUpgradeRetryTimer) {
         clearTimeout(this.p2pUpgradeRetryTimer);
         this.p2pUpgradeRetryTimer = null;
+      }
+      if (this.p2pSecondRetryTimer) {
+        clearTimeout(this.p2pSecondRetryTimer);
+        this.p2pSecondRetryTimer = null;
       }
       // Réinitialiser les échantillons RTT du relais WS pour afficher immédiatement le vrai ping P2P UDP (< 50ms / 3-6ms)
       this.rttSamples = [];
@@ -1234,11 +1250,13 @@ export class RollbackP2PEngine {
     if (this.iceRestartTimer) clearTimeout(this.iceRestartTimer);
     if (this.connectTimeoutTimer) clearTimeout(this.connectTimeoutTimer);
     if (this.p2pUpgradeRetryTimer) clearTimeout(this.p2pUpgradeRetryTimer);
+    if (this.p2pSecondRetryTimer) clearTimeout(this.p2pSecondRetryTimer);
     if (this.frame0FallbackTimer) clearTimeout(this.frame0FallbackTimer);
     this.pingInterval = null;
     this.iceRestartTimer = null;
     this.connectTimeoutTimer = null;
     this.p2pUpgradeRetryTimer = null;
+    this.p2pSecondRetryTimer = null;
     this.frame0FallbackTimer = null;
 
     const cleanups = [...this.cleanupCallbacks];

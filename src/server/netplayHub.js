@@ -855,8 +855,8 @@ export function setupNetplayHub(server) {
   server.middlewares.use('/api/emu-cores', serveEmulatorCore);
   server.middlewares.use('/emulatorjs/cores', serveEmulatorCore);
 
-  // Endpoint d'identifiants éphémères HMAC-SHA1 pour coturn (RFC 5389 / REST API TURN) sur votre VPS
-  server.middlewares.use('/api/turn-credentials', (req, res) => {
+  // Endpoint d'identifiants éphémères HMAC-SHA1 pour coturn (UDP prioritaire) + option Cloudflare Anycast TURN mondial
+  server.middlewares.use('/api/turn-credentials', async (req, res) => {
     res.setHeader('Content-Type', 'application/json; charset=utf-8');
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Cache-Control', 'no-store');
@@ -866,37 +866,61 @@ export function setupNetplayHub(server) {
     }
     const secret = process.env.TURN_SHARED_SECRET || '';
     const turnHost = process.env.TURN_HOST || '';
-    if (!secret || !turnHost) {
-      res.statusCode = 200;
-      return res.end(JSON.stringify({ ok: true, iceServers: [] }));
-    }
-    try {
-      const ttl = 86400;
-      const unixExpiry = Math.floor(Date.now() / 1000) + ttl;
-      const username = `${unixExpiry}:cswplayer`;
-      const credential = crypto.createHmac('sha1', secret).update(username).digest('base64');
-      res.statusCode = 200;
-      return res.end(
-        JSON.stringify({
-          ok: true,
-          ttl,
-          iceServers: [
-            {
-              urls: [
-                `turn:${turnHost}:3478?transport=udp`,
-                `turn:${turnHost}:3478?transport=tcp`,
-                `turns:${turnHost}:5349?transport=tcp`,
-              ],
-              username,
-              credential,
+    const cfKeyId = process.env.CLOUDFLARE_TURN_KEY_ID || '';
+    const cfToken = process.env.CLOUDFLARE_TURN_API_TOKEN || '';
+    const iceServers = [];
+
+    // 1. Relais TURN Anycast mondial (Cloudflare Calls, 300+ PoPs) si configuré -> < 80ms partout dans le monde
+    if (cfKeyId && cfToken) {
+      try {
+        const cfRes = await fetch(
+          `https://rtc.live.cloudflare.com/v1/turn/keys/${encodeURIComponent(cfKeyId)}/credentials/generate-ice-servers`,
+          {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${cfToken}`,
+              'Content-Type': 'application/json',
             },
-          ],
-        })
-      );
-    } catch (err) {
-      res.statusCode = 500;
-      return res.end(JSON.stringify({ ok: false, error: err?.message || 'TURN error' }));
+            body: JSON.stringify({ ttl: 86400 }),
+          }
+        );
+        if (cfRes.ok) {
+          const cfJson = await cfRes.json();
+          if (Array.isArray(cfJson?.iceServers)) {
+            iceServers.push(...cfJson.iceServers);
+          }
+        }
+      } catch {
+        /* fallback to local VPS coturn */
+      }
     }
+
+    // 2. Relais coturn natif sur le VPS (UDP prioritaire, port 3478 ouvert — sans 5349 fermé qui ralentissait ICE)
+    if (secret && turnHost) {
+      try {
+        const ttl = 86400;
+        const unixExpiry = Math.floor(Date.now() / 1000) + ttl;
+        const username = `${unixExpiry}:cswplayer`;
+        const credential = crypto.createHmac('sha1', secret).update(username).digest('base64');
+        iceServers.push(
+          {
+            urls: `turn:${turnHost}:3478?transport=udp`,
+            username,
+            credential,
+          },
+          {
+            urls: `turn:${turnHost}:3478?transport=tcp`,
+            username,
+            credential,
+          }
+        );
+      } catch {
+        /* ignore */
+      }
+    }
+
+    res.statusCode = 200;
+    return res.end(JSON.stringify({ ok: true, ttl: 86400, iceServers }));
   });
 
   // Relais temps réel local / LAN pour les salons Fightcade 2 (chat & présence) — garantit le fonctionnement même sans règles Firestore publiées
