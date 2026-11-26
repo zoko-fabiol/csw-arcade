@@ -187,9 +187,17 @@ export default function App() {
     }
   }, [settings?.voice]);
 
+  const voiceInviteCooldownRef = useRef(new Map());
+  const challengeSendLockRef = useRef(new Map());
+  const challengeRespondLockRef = useRef(new Set());
+
   const handleInviteVoiceFriend = useCallback(
     async (friend) => {
       if (!friend?.uid) return;
+      const now = Date.now();
+      const prev = voiceInviteCooldownRef.current.get(friend.uid) || 0;
+      if (now - prev < 4000) return;
+      voiceInviteCooldownRef.current.set(friend.uid, now);
       await voiceChatService.inviteUser({
         toUid: friend.uid,
         roomTitle: `Groupe de ${userProfile?.displayName || 'Joueur'}`,
@@ -201,6 +209,11 @@ export default function App() {
 
   const handleAcceptVoiceInvite = useCallback(async (invite) => {
     if (!invite?.roomId) return;
+    const key = `accept_${invite.roomId}`;
+    const now = Date.now();
+    const prev = voiceInviteCooldownRef.current.get(key) || 0;
+    if (now - prev < 3000) return;
+    voiceInviteCooldownRef.current.set(key, now);
     await voiceChatService.joinRoom({
       roomId: invite.roomId,
       title: invite.roomTitle || 'Groupe CSW Arcade',
@@ -684,6 +697,12 @@ export default function App() {
       setTimeout(() => setBootNotice(''), 3500);
       return;
     }
+    const lockKey = `${channel?.gameId || targetEntry?.id || ''}:${targetUser?.uid || ''}`;
+    const now = Date.now();
+    const lastAttempt = challengeSendLockRef.current.get(lockKey) || 0;
+    if (now - lastAttempt < 4000) return;
+    challengeSendLockRef.current.set(lockKey, now);
+
     const targetIsAlreadyPlaying = Boolean(
       targetUser?.status === 'in_game_available' ||
       targetUser?.status === 'playing' ||
@@ -719,6 +738,8 @@ export default function App() {
   const handleRespondChallenge = async (accept) => {
     if (!incomingChallenge) return;
     const ch = incomingChallenge;
+    if (!ch.challengeId || challengeRespondLockRef.current.has(ch.challengeId)) return;
+    challengeRespondLockRef.current.add(ch.challengeId);
     const channel = activeChannels.find((c) => c.gameId === ch.gameId);
     const resolvedGameEntry = ch.gameEntry || channel?.entry || { id: ch.gameId, title: ch.gameTitle };
     const allowAccept = Boolean(accept) && supportsOnlineMultiplayer(resolvedGameEntry);

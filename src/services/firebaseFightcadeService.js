@@ -1101,6 +1101,16 @@ class FirebaseFightcadeService {
   }
 
   async sendChallenge(gameId, targetUser, gameEntry) {
+    if (!this._challengeCooldowns) this._challengeCooldowns = new Map();
+    const targetUid = targetUser?.uid || '';
+    const dedupeKey = `${gameId || ''}:${targetUid}`;
+    const now = Date.now();
+    const lastSent = this._challengeCooldowns.get(dedupeKey) || 0;
+    if (now - lastSent < 4000) {
+      return null;
+    }
+    this._challengeCooldowns.set(dedupeKey, now);
+
     this.identity = getPlayerIdentity();
     const challengeId = `ch_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
     const fallbackTargetGame =
@@ -1289,6 +1299,17 @@ class FirebaseFightcadeService {
   }
 
   async respondChallenge(challengeId, accept = true, toUid = null) {
+    if (!challengeId) return;
+    if (!this._respondedChallenges) this._respondedChallenges = new Set();
+    if (this._respondedChallenges.has(challengeId)) {
+      return;
+    }
+    this._respondedChallenges.add(challengeId);
+    if (this._respondedChallenges.size > 200) {
+      const first = this._respondedChallenges.values().next().value;
+      this._respondedChallenges.delete(first);
+    }
+
     const status = accept ? 'accepted' : 'declined';
     fetch('/api/fc-challenge', {
       method: 'POST',
