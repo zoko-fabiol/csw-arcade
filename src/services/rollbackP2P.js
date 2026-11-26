@@ -39,7 +39,7 @@ const ICE_SERVERS = buildIceServers();
 
 let cachedDynamicTurnServers = null;
 let dynamicTurnFetchPromise = null;
-async function fetchDynamicTurnServers() {
+export async function fetchDynamicTurnServers() {
   if (cachedDynamicTurnServers) return cachedDynamicTurnServers;
   if (typeof fetch !== 'function') return [];
   if (!dynamicTurnFetchPromise) {

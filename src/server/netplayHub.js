@@ -870,7 +870,8 @@ export function setupNetplayHub(server) {
     const cfToken = process.env.CLOUDFLARE_TURN_API_TOKEN || '';
     const iceServers = [];
 
-    // 1. Relais TURN Anycast mondial (Cloudflare Calls, 300+ PoPs) si configuré -> < 80ms partout dans le monde
+    // 1. Relais TURN Anycast mondial (Cloudflare Calls, 330+ PoPs dont Afrique) -> < 60-120ms même Wi-Fi <-> 4G
+    let hasGlobalAnycastTurn = false;
     if (cfKeyId && cfToken) {
       try {
         const cfRes = await fetch(
@@ -886,8 +887,26 @@ export function setupNetplayHub(server) {
         );
         if (cfRes.ok) {
           const cfJson = await cfRes.json();
-          if (Array.isArray(cfJson?.iceServers)) {
-            iceServers.push(...cfJson.iceServers);
+          const cfList = Array.isArray(cfJson?.iceServers)
+            ? cfJson.iceServers
+            : cfJson?.iceServers
+              ? [cfJson.iceServers]
+              : [];
+          if (cfList.length > 0) {
+            // Prioriser les endpoints UDP Anycast (3478 & 443) pour éviter tout Head-of-Line Blocking TCP
+            for (const entry of cfList) {
+              const rawUrls = Array.isArray(entry?.urls) ? entry.urls : entry?.urls ? [entry.urls] : [];
+              const udpFirst = [
+                ...rawUrls.filter((u) => String(u).includes('transport=udp')),
+                ...rawUrls.filter((u) => !String(u).includes('transport=udp')),
+              ];
+              if (udpFirst.length > 0) {
+                iceServers.push({ ...entry, urls: udpFirst });
+                if (udpFirst.some((u) => String(u).startsWith('turn'))) {
+                  hasGlobalAnycastTurn = true;
+                }
+              }
+            }
           }
         }
       } catch {
@@ -895,8 +914,8 @@ export function setupNetplayHub(server) {
       }
     }
 
-    // 2. Relais coturn natif sur le VPS (UDP prioritaire, port 3478 ouvert — sans 5349 fermé qui ralentissait ICE)
-    if (secret && turnHost) {
+    // 2. Relais coturn VPS Europe en secours automatique uniquement si Cloudflare Anycast TURN est indisponible
+    if (!hasGlobalAnycastTurn && secret && turnHost) {
       try {
         const ttl = 86400;
         const unixExpiry = Math.floor(Date.now() / 1000) + ttl;

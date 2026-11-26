@@ -5,6 +5,8 @@
  * retient le p20 (filtre anti-pics bufferbloat) puis ferme proprement la connexion.
  */
 
+import { fetchDynamicTurnServers } from './rollbackP2P';
+
 const PROBE_STUN_SERVERS = [
   { urls: 'stun:stun.cloudflare.com:3478' },
   { urls: 'stun:stun.l.google.com:19302' },
@@ -118,7 +120,11 @@ export class P2pLobbyProbe {
   }
 
   async _startInitiator(peerUid) {
-    const session = this._createSession(peerUid, true);
+    const dynTurn = await Promise.race([
+      fetchDynamicTurnServers().catch(() => []),
+      new Promise((r) => setTimeout(() => r([]), 350)),
+    ]);
+    const session = this._createSession(peerUid, true, dynTurn);
     try {
       const dc = session.pc.createDataChannel('csw-ping', {
         ordered: false,
@@ -134,7 +140,11 @@ export class P2pLobbyProbe {
   }
 
   async _startResponder(peerUid, offer) {
-    const session = this._createSession(peerUid, false);
+    const dynTurn = await Promise.race([
+      fetchDynamicTurnServers().catch(() => []),
+      new Promise((r) => setTimeout(() => r([]), 350)),
+    ]);
+    const session = this._createSession(peerUid, false, dynTurn);
     session.pc.ondatachannel = (e) => {
       this._attachDataChannel(peerUid, session, e.channel);
     };
@@ -150,9 +160,9 @@ export class P2pLobbyProbe {
     }
   }
 
-  _createSession(peerUid, isInitiator) {
+  _createSession(peerUid, isInitiator, dynTurn = []) {
     const pc = new RTCPeerConnection({
-      iceServers: PROBE_STUN_SERVERS,
+      iceServers: [...PROBE_STUN_SERVERS, ...(Array.isArray(dynTurn) ? dynTurn : [])],
       bundlePolicy: 'max-bundle',
     });
     const session = {
