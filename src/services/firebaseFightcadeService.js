@@ -105,6 +105,28 @@ class FirebaseFightcadeService {
     this.spectateChunks = new Map();
     this.friendEventListeners = new Set();
     this.relayInputListener = null;
+    this.measuredVpsPingMs = null;
+    this.detectedGeo = null;
+    this.peerPings = new Map();
+    this.peerPingSentAt = new Map();
+    this.peerPingListeners = new Set();
+
+    // Détection automatique du pays réel via le VPS (/api/geo)
+    if (typeof window !== 'undefined' && typeof fetch === 'function') {
+      fetch('/api/geo')
+        .then((r) => (r.ok ? r.json() : null))
+        .then((geo) => {
+          if (geo?.ok && geo.countryCode) {
+            this.detectedGeo = {
+              countryCode: geo.countryCode,
+              countryName: geo.countryName || '',
+              city: geo.city || '',
+            };
+            this.refreshAllPresences();
+          }
+        })
+        .catch(() => {});
+    }
 
     // Toujours maintenir la présence dans le salon global + les salons actifs
     this.startHeartbeat(GLOBAL_CHANNEL_ID);
@@ -177,11 +199,13 @@ class FirebaseFightcadeService {
           try { this.ws.send(JSON.stringify(item)); } catch {}
         }
         if (this.wsKeepaliveTimer) clearInterval(this.wsKeepaliveTimer);
-        this.wsKeepaliveTimer = setInterval(() => {
+        const sendVpsPing = () => {
           if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-            try { this.ws.send(JSON.stringify({ type: 'PING', clientTime: Date.now() })); } catch {}
+            try { this.ws.send(JSON.stringify({ type: 'PING', clientTime: performance.now() })); } catch {}
           }
-        }, 20000);
+        };
+        sendVpsPing();
+        this.wsKeepaliveTimer = setInterval(sendVpsPing, 10000);
       };
 
       this.ws.onmessage = (event) => {
@@ -235,6 +259,28 @@ class FirebaseFightcadeService {
 
     if (data.type === 'LOCAL_FS_EVENT') {
       notifyLocalFirestoreRemoteEvent(data);
+      return;
+    }
+
+    if (data.type === 'PONG' && typeof data.clientTime === 'number') {
+      const rtt = Math.max(1, Math.min(2000, Math.round(performance.now() - data.clientTime)));
+      this.measuredVpsPingMs = this.measuredVpsPingMs
+        ? Math.round(this.measuredVpsPingMs * 0.65 + rtt * 0.35)
+        : rtt;
+      this._emitPeerPings();
+      return;
+    }
+
+    if (data.type === 'PEER_PING' && data.fromUid && typeof data.ts === 'number') {
+      this.sendWs({ type: 'PEER_PONG', targetUid: data.fromUid, ts: data.ts });
+      return;
+    }
+
+    if (data.type === 'PEER_PONG' && data.fromUid && typeof data.ts === 'number') {
+      const rtt = Math.max(1, Math.min(2000, Math.round(performance.now() - data.ts)));
+      const prev = this.peerPings.get(data.fromUid);
+      this.peerPings.set(data.fromUid, prev ? Math.round(prev * 0.55 + rtt * 0.45) : rtt);
+      this._emitPeerPings();
       return;
     }
 
@@ -839,6 +885,36 @@ class FirebaseFightcadeService {
     }
   }
 
+  _emitPeerPings() {
+    const snapshot = { __self: this.measuredVpsPingMs };
+    for (const [uid, ms] of this.peerPings.entries()) {
+      snapshot[uid] = ms;
+    }
+    this.peerPingListeners.forEach((cb) => {
+      try { cb(snapshot); } catch {}
+    });
+  }
+
+  subscribePeerPings(cb) {
+    if (typeof cb !== 'function') return () => {};
+    this.peerPingListeners.add(cb);
+    this._emitPeerPings();
+    return () => this.peerPingListeners.delete(cb);
+  }
+
+  probePeersPing(uids = []) {
+    if (!this.wsConnected || !Array.isArray(uids) || uids.length === 0) return;
+    const now = Date.now();
+    const myUid = this.identity?.uid;
+    for (const uid of uids) {
+      if (!uid || uid === myUid) continue;
+      const last = this.peerPingSentAt.get(uid) || 0;
+      if (now - last < 8000) continue;
+      this.peerPingSentAt.set(uid, now);
+      this.sendWs({ type: 'PEER_PING', targetUid: uid, ts: performance.now() });
+    }
+  }
+
   async upsertPresence(gameId, explicitStatus = null, matchMeta = null) {
     this.identity = getPlayerIdentity();
     const status = explicitStatus || this.getEffectiveStatus();
@@ -849,7 +925,10 @@ class FirebaseFightcadeService {
       displayName: this.identity.name,
       friendCode: this.identity.friendCode || getPlayerFriendCode(this.identity.uid),
       friendTag: this.identity.friendTag || getPlayerFriendTag(this.identity.name, this.identity.uid),
-      region: this.identity.region,
+      region: this.detectedGeo?.countryCode || this.identity.region,
+      countryCode: this.detectedGeo?.countryCode || null,
+      countryName: this.detectedGeo?.countryName || '',
+      city: this.detectedGeo?.city || '',
       rank: this.identity.rank || 'D',
       photoURL: this.identity.photoURL || null,
       isAuthenticated: Boolean(this.identity.isAuthenticated),
@@ -858,7 +937,7 @@ class FirebaseFightcadeService {
       activeGames,
       matchMeta: matchMeta || (this.currentPlayingGame?.isNetplay ? this.currentPlayingGame : null),
       lastSeen: Date.now(),
-      ping: Math.floor(14 + Math.random() * 20),
+      ping: typeof this.measuredVpsPingMs === 'number' ? this.measuredVpsPingMs : null,
     };
 
     // 1. Relais serveur local / LAN (toujours actif même sans règles Firestore publiées)

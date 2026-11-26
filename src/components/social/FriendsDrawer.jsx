@@ -3,6 +3,8 @@ import {
   X, Users, UserPlus, Search, Copy, Check, Swords, Eye, UserMinus, Clock, MessageSquare, Sparkles, ArrowLeft, Send, PhoneCall, Hash
 } from 'lucide-react';
 import { PlayerAvatar } from '../common/PlayerAvatar';
+import { CountryFlagBadge, FightcadePingIndicator } from '../common/PlayerNetBadges';
+import { firebaseFightcadeService } from '../../services/firebaseFightcadeService';
 import { countryCodeToFlag } from '../../data/countries';
 import { getPlayerFriendTag } from '../../services/authService';
 import { getRankTierMeta } from '../../services/scoreRankingService';
@@ -79,6 +81,18 @@ export function FriendsDrawer({
   }, [isOpen, onClose]);
   const onlineFriends = friends.filter((f) => f.isOnline);
   const offlineFriends = friends.filter((f) => !f.isOnline);
+  const [peerPings, setPeerPings] = useState({});
+
+  useEffect(() => firebaseFightcadeService.subscribePeerPings(setPeerPings), []);
+
+  useEffect(() => {
+    if (!isOpen) return undefined;
+    const uids = onlineFriends.map((f) => f.uid).filter(Boolean);
+    if (uids.length === 0) return undefined;
+    firebaseFightcadeService.probePeersPing(uids);
+    const id = setInterval(() => firebaseFightcadeService.probePeersPing(uids), 10000);
+    return () => clearInterval(id);
+  }, [isOpen, onlineFriends.length]);
   const myTag =
     userProfile?.friendTag ||
     getPlayerFriendTag(userProfile?.displayName || userProfile?.name, userProfile?.uid);
@@ -237,7 +251,14 @@ export function FriendsDrawer({
         }`}
       >
         <div className="flex items-center justify-between gap-2.5">
-          <div className="flex items-center gap-2.5 min-w-0">
+          <div className="flex items-center gap-2 min-w-0">
+            <CountryFlagBadge
+              countryCode={friend.countryCode}
+              countryName={friend.countryName}
+              city={friend.city}
+              region={friend.region}
+              size={18}
+            />
             <PlayerAvatar
               photoURL={friend.photoURL}
               name={friend.displayName}
@@ -246,14 +267,21 @@ export function FriendsDrawer({
             />
             <div className="min-w-0">
               <div className="flex items-center gap-1.5 flex-wrap">
-                <span className={`px-1 py-0.2 rounded border text-[9px] font-mono font-black ${rankMeta.color}`}>
+                <span className={`px-1 py-0.2 rounded-full border text-[9px] font-mono font-black ${rankMeta.color}`}>
                   {rankMeta.id}
                 </span>
                 <span className="text-xs font-bold text-white truncate">{friend.displayName}</span>
                 <span className="text-[10px] font-mono text-neutral-300">#{friend.friendCode}</span>
-                <span className="text-[10px] font-mono px-1 rounded bg-white/10 text-neutral-200">
-                  {String(friend.region || 'FR').toUpperCase()}
-                </span>
+                {friend.isOnline && (
+                  <FightcadePingIndicator
+                    pingMs={
+                      peerPings[friend.uid] ??
+                      (peerPings.__self && friend.ping
+                        ? Math.round(peerPings.__self + friend.ping)
+                        : friend.ping ?? null)
+                    }
+                  />
+                )}
               </div>
               <div className="text-[11px] font-mono text-neutral-300 truncate mt-0.5">
                 {describeFriendActivity(friend)}

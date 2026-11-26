@@ -12,6 +12,7 @@ import { acceptFriendRequest, sendFriendRequest } from '../../services/friendsSe
 import { countryCodeToFlag } from '../../data/countries';
 import { GameCover } from './GameCover';
 import { PlayerAvatar } from '../common/PlayerAvatar';
+import { CountryFlagBadge, FightcadePingIndicator } from '../common/PlayerNetBadges';
 import { supportsOnlineMultiplayer } from '../../utils/gameCapabilities';
 
 const RANK_BADGE_STYLE = {
@@ -74,9 +75,22 @@ export function FightcadeLobbyView({
   const [chatFilter, setChatFilter] = useState('all'); // 'all' | 'chat' | 'system'
   const [chatInput, setChatInput] = useState('');
   const [pendingChallengeId, setPendingChallengeId] = useState(null);
+  const [peerPings, setPeerPings] = useState({});
   const chatEndRef = useRef(null);
   const me = getPlayerIdentity();
   const isGlobal = channel?.gameId === GLOBAL_CHANNEL_ID || channel?.isGlobal;
+
+  useEffect(() => firebaseFightcadeService.subscribePeerPings(setPeerPings), []);
+
+  useEffect(() => {
+    const peerUids = users.map((u) => u?.uid).filter((id) => id && id !== me.uid);
+    if (peerUids.length === 0) return undefined;
+    firebaseFightcadeService.probePeersPing(peerUids);
+    const id = setInterval(() => {
+      firebaseFightcadeService.probePeersPing(peerUids);
+    }, 10000);
+    return () => clearInterval(id);
+  }, [users, me.uid]);
 
   useEffect(() => {
     if (!channel?.gameId) return;
@@ -851,17 +865,26 @@ export function FightcadeLobbyView({
                     }`}
                   >
                     <div className="flex items-start justify-between gap-2">
-                      <div className="flex items-start gap-2.5 min-w-0">
-                        <PlayerAvatar
-                          photoURL={u.photoURL}
-                          name={u.name}
-                          size="sm"
-                          status={isNetplayMatch ? 'playing' : isInGameAvailable ? 'in_game_available' : isAfk ? 'afk' : 'available'}
-                        />
+                      <div className="flex items-start gap-2 min-w-0">
+                        <div className="flex items-center gap-1.5 shrink-0 pt-0.5">
+                          <CountryFlagBadge
+                            countryCode={u.countryCode}
+                            countryName={u.countryName}
+                            city={u.city}
+                            region={u.region}
+                            size={20}
+                          />
+                          <PlayerAvatar
+                            photoURL={u.photoURL}
+                            name={u.name}
+                            size="sm"
+                            status={isNetplayMatch ? 'playing' : isInGameAvailable ? 'in_game_available' : isAfk ? 'afk' : 'available'}
+                          />
+                        </div>
                         <div className="min-w-0">
                           <div className="flex items-center gap-1.5 flex-wrap">
                             <span
-                              className={`px-1.5 py-0.2 rounded text-[10px] font-mono font-black border ${rankStyle}`}
+                              className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono font-black border ${rankStyle}`}
                             >
                               {u.rank || 'D'}
                             </span>
@@ -872,16 +895,29 @@ export function FightcadeLobbyView({
                             >
                               {u.name} {isMe && '(Vous)'}
                             </button>
-                            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-white/10 text-neutral-200 border border-white/10 shrink-0">
-                              {String(u.region || 'FR').toUpperCase()}
-                            </span>
+                            <FightcadePingIndicator
+                              pingMs={
+                                isMe
+                                  ? (peerPings.__self ?? u.ping ?? null)
+                                  : (peerPings[u.uid] ??
+                                      (peerPings.__self && u.ping
+                                        ? Math.round(peerPings.__self + u.ping)
+                                        : u.ping ?? null))
+                              }
+                              isSelf={isMe}
+                            />
                           </div>
 
                           {/* Statut précis du joueur */}
                           <div className="flex items-center gap-2 mt-1 text-[10px] font-mono text-neutral-300 flex-wrap">
-                            <PingBars ping={u.ping || 22} />
-                            <span>{u.ping || 22}ms</span>
-                            <span>·</span>
+                            {u.countryName && (
+                              <>
+                                <span className="text-neutral-400">
+                                  {u.city ? `${u.countryName} · ${u.city}` : u.countryName}
+                                </span>
+                                <span>·</span>
+                              </>
+                            )}
                             {isNetplayMatch ? (
                               <span className="text-amber-300 font-bold">
                                 En match P2P {u.currentGame?.title ? `sur ${u.currentGame.title}` : ''}

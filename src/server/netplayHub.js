@@ -928,6 +928,100 @@ export function setupNetplayHub(server) {
   const allGlobalUsers = new Map(); // uid -> userObj (présence unifiée partagée sur tous les salons)
   const fcChallenges = new Map(); // challengeId -> challengeObj
 
+  // Géolocalisation IP réelle mise en cache 24h (drapeaux pays réels façon Fightcade 2)
+  const geoByIp = new Map();
+  const geoInFlight = new Map();
+  const extractClientIp = (req) => {
+    const raw =
+      req?.headers?.['cf-connecting-ip'] ||
+      String(req?.headers?.['x-forwarded-for'] || '').split(',')[0].trim() ||
+      req?.headers?.['x-real-ip'] ||
+      req?.socket?.remoteAddress ||
+      '';
+    return String(raw).replace(/^::ffff:/, '').trim();
+  };
+  const isPrivateIp = (ip) =>
+    !ip ||
+    ip === '::1' ||
+    ip.startsWith('127.') ||
+    ip.startsWith('10.') ||
+    ip.startsWith('192.168.') ||
+    /^172\.(1[6-9]|2\d|3[01])\./.test(ip);
+
+  const resolveIpGeo = async (ip) => {
+    if (isPrivateIp(ip)) {
+      return { countryCode: 'LAN', countryName: 'Réseau local', city: 'LAN' };
+    }
+    const cached = geoByIp.get(ip);
+    if (cached && Date.now() - cached.fetchedAt < 24 * 3600 * 1000) {
+      return cached;
+    }
+    if (geoInFlight.has(ip)) return geoInFlight.get(ip);
+
+    const p = (async () => {
+      try {
+        const r = await fetch(`http://ip-api.com/json/${encodeURIComponent(ip)}?fields=status,countryCode,country,city`);
+        if (r.ok) {
+          const j = await r.json();
+          if (j?.status === 'success' && j.countryCode) {
+            const out = {
+              countryCode: String(j.countryCode).toUpperCase().slice(0, 2),
+              countryName: String(j.country || j.countryCode),
+              city: String(j.city || ''),
+              fetchedAt: Date.now(),
+            };
+            geoByIp.set(ip, out);
+            return out;
+          }
+        }
+      } catch {
+        /* fallback below */
+      }
+      try {
+        const r2 = await fetch(`https://ipwho.is/${encodeURIComponent(ip)}`);
+        if (r2.ok) {
+          const j2 = await r2.json();
+          if (j2?.success && j2.country_code) {
+            const out = {
+              countryCode: String(j2.country_code).toUpperCase().slice(0, 2),
+              countryName: String(j2.country || j2.country_code),
+              city: String(j2.city || ''),
+              fetchedAt: Date.now(),
+            };
+            geoByIp.set(ip, out);
+            return out;
+          }
+        }
+      } catch {
+        /* ignore */
+      }
+      const fallback = { countryCode: null, countryName: '', city: '', fetchedAt: Date.now() };
+      geoByIp.set(ip, fallback);
+      return fallback;
+    })().finally(() => {
+      geoInFlight.delete(ip);
+    });
+    geoInFlight.set(ip, p);
+    return p;
+  };
+
+  server.middlewares.use('/api/geo', async (req, res) => {
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Cache-Control', 'no-store');
+    const ip = extractClientIp(req);
+    const geo = await resolveIpGeo(ip);
+    res.statusCode = 200;
+    return res.end(
+      JSON.stringify({
+        ok: true,
+        countryCode: geo.countryCode,
+        countryName: geo.countryName,
+        city: geo.city,
+      })
+    );
+  });
+
   // Répertoire joueurs & système d'amitié (persistance locale .csw-data/social-store.json + temps réel WS)
   const socialDir = path.resolve(process.cwd(), '.csw-data');
   const webPushHub = new WebPushHub({ dataDir: socialDir });
@@ -1020,7 +1114,10 @@ export function setupNetplayHub(server) {
       friendTag,
       firstName: String(raw.firstName || ''),
       lastName: String(raw.lastName || ''),
-      region: String(raw.region || 'FR').toUpperCase().slice(0, 2),
+      region: String(raw.countryCode || raw.region || 'FR').toUpperCase().slice(0, 3),
+      countryCode: raw.countryCode ? String(raw.countryCode).toUpperCase().slice(0, 3) : null,
+      countryName: raw.countryName ? String(raw.countryName) : '',
+      city: raw.city ? String(raw.city) : '',
       rank: String(raw.rank || 'D'),
       ratingPoints: Number(raw.ratingPoints || 0),
       photoURL: raw.photoURL !== undefined ? raw.photoURL : null,
@@ -1130,7 +1227,10 @@ export function setupNetplayHub(server) {
       currentGame: isLive ? liveRaw.currentGame || null : null,
       activeGames: isLive && Array.isArray(liveRaw.activeGames) ? liveRaw.activeGames : [],
       matchMeta: isLive ? liveRaw.matchMeta || null : null,
-      ping: isLive ? liveRaw.ping || 22 : null,
+      ping: isLive && typeof liveRaw.ping === 'number' && liveRaw.ping > 0 ? Math.round(liveRaw.ping) : null,
+      countryCode: (isLive && liveRaw.countryCode) || base.countryCode || null,
+      countryName: (isLive && liveRaw.countryName) || base.countryName || '',
+      city: (isLive && liveRaw.city) || base.city || '',
       lastSeen: isLive ? liveRaw.lastSeen : dir?.updatedAtMs || 0,
     };
   };
@@ -1384,15 +1484,51 @@ export function setupNetplayHub(server) {
               }
             }
           } else if (payload.action === 'presence' && payload.user?.uid) {
-            console.log(`[LOBBY PRESENCE] ${payload.user.name} (${payload.user.uid}) in ${targetId}`);
+            const clientIp = extractClientIp(req);
+            const cachedGeo = geoByIp.get(clientIp);
+            const prevUser = allGlobalUsers.get(payload.user.uid);
+            const resolvedCc =
+              cachedGeo?.countryCode ||
+              payload.user.countryCode ||
+              prevUser?.countryCode ||
+              (isPrivateIp(clientIp) ? 'LAN' : null);
+            const resolvedCn =
+              cachedGeo?.countryName ||
+              payload.user.countryName ||
+              prevUser?.countryName ||
+              (isPrivateIp(clientIp) ? 'Réseau local' : '');
+            const resolvedCity = cachedGeo?.city || payload.user.city || prevUser?.city || '';
+
             const u = {
               ...payload.user,
+              countryCode: resolvedCc,
+              countryName: resolvedCn,
+              city: resolvedCity,
+              region: resolvedCc || payload.user.region || 'FR',
+              ping:
+                typeof payload.user.ping === 'number' && payload.user.ping > 0
+                  ? Math.round(payload.user.ping)
+                  : (prevUser?.ping ?? null),
               currentLobby: targetId,
               lastSeen: Date.now(),
             };
             lobby.users.set(payload.user.uid, u);
             allGlobalUsers.set(payload.user.uid, u);
             upsertDirectoryUser(u);
+
+            if (!cachedGeo && !isPrivateIp(clientIp)) {
+              resolveIpGeo(clientIp).then((geo) => {
+                if (!geo?.countryCode) return;
+                const cur = allGlobalUsers.get(payload.user.uid);
+                if (cur) {
+                  cur.countryCode = geo.countryCode;
+                  cur.countryName = geo.countryName;
+                  cur.city = geo.city;
+                  cur.region = geo.countryCode;
+                  upsertDirectoryUser(cur);
+                }
+              }).catch(() => {});
+            }
           } else if (payload.action === 'leave' && payload.uid) {
             console.log(`[LOBBY LEAVE] ${payload.uid} from ${targetId}`);
             lobby.users.delete(payload.uid);
@@ -3783,6 +3919,39 @@ export function setupNetplayHub(server) {
               clientTime: data.clientTime,
               serverTime: Date.now()
             }));
+            break;
+          }
+
+          case 'PEER_PING': {
+            const { targetUid, ts } = data;
+            if (targetUid && ws.uid && typeof ts === 'number') {
+              const sockets = connectedUsers.get(targetUid);
+              if (sockets) {
+                const msg = JSON.stringify({ type: 'PEER_PING', fromUid: ws.uid, ts });
+                for (const s of sockets) {
+                  if (s !== ws && s.readyState === WebSocket.OPEN) {
+                    s.send(msg);
+                    break;
+                  }
+                }
+              }
+            }
+            break;
+          }
+
+          case 'PEER_PONG': {
+            const { targetUid, ts } = data;
+            if (targetUid && ws.uid && typeof ts === 'number') {
+              const sockets = connectedUsers.get(targetUid);
+              if (sockets) {
+                const msg = JSON.stringify({ type: 'PEER_PONG', fromUid: ws.uid, ts });
+                for (const s of sockets) {
+                  if (s !== ws && s.readyState === WebSocket.OPEN) {
+                    s.send(msg);
+                  }
+                }
+              }
+            }
             break;
           }
 
