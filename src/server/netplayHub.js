@@ -3931,7 +3931,6 @@ export function setupNetplayHub(server) {
                 for (const s of sockets) {
                   if (s !== ws && s.readyState === WebSocket.OPEN) {
                     s.send(msg);
-                    break;
                   }
                 }
               }
@@ -3969,7 +3968,6 @@ export function setupNetplayHub(server) {
                 for (const s of sockets) {
                   if (s !== ws && s.readyState === WebSocket.OPEN) {
                     s.send(msg);
-                    break;
                   }
                 }
               }

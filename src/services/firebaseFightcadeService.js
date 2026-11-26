@@ -112,6 +112,7 @@ class FirebaseFightcadeService {
     this.peerPings = new Map(); // uid -> { ms, direct, samples: [] }
     this.peerPingSentAt = new Map();
     this.peerPingListeners = new Set();
+    this._pendingProbeUids = new Set();
 
     // Sonde P2P WebRTC directe dans le salon (façon Fightcade 2 : mesure Douala <-> Douala sans détour par l'Europe)
     this.p2pProbe = new P2pLobbyProbe({
@@ -223,6 +224,12 @@ class FirebaseFightcadeService {
         setTimeout(sendVpsPing, 1600);
         setTimeout(sendVpsPing, 2300);
         this.wsKeepaliveTimer = setInterval(sendVpsPing, 10000);
+        // Déclencher immédiatement les sondes P2P directes mises en attente avant l'ouverture du WebSocket
+        if (this._pendingProbeUids.size > 0) {
+          const queued = Array.from(this._pendingProbeUids);
+          this._pendingProbeUids.clear();
+          setTimeout(() => this.probePeersPing(queued), 350);
+        }
       };
 
       this.ws.onmessage = (event) => {
@@ -937,21 +944,31 @@ class FirebaseFightcadeService {
   }
 
   probePeersPing(uids = []) {
-    if (!this.wsConnected || !Array.isArray(uids) || uids.length === 0) return;
-    const now = Date.now();
+    if (!Array.isArray(uids) || uids.length === 0) return;
     const myUid = this.identity?.uid;
+    if (!this.wsConnected) {
+      for (const uid of uids) {
+        if (uid && uid !== myUid) this._pendingProbeUids.add(uid);
+      }
+      return;
+    }
+    const now = Date.now();
     for (const uid of uids) {
       if (!uid || uid === myUid) continue;
       // 1. Toujours tenter la sonde P2P directe WebRTC UDP (zéro détour par le serveur Europe)
       this.p2pProbe?.probe(uid);
 
-      // 2. Secours léger via relais WS uniquement si le P2P direct n'est pas encore mesuré
+      // 2. Secours léger via relais WS uniquement après 4.5s si le P2P direct n'a pas encore répondu
       const existing = this.peerPings.get(uid);
       if (existing?.direct) continue;
       const last = this.peerPingSentAt.get(uid) || 0;
-      if (now - last < 8000) continue;
+      if (now - last < 9000) continue;
       this.peerPingSentAt.set(uid, now);
-      this.sendWs({ type: 'PEER_PING', targetUid: uid, ts: performance.now() });
+      setTimeout(() => {
+        if (this.wsConnected && !this.peerPings.get(uid)?.direct) {
+          this.sendWs({ type: 'PEER_PING', targetUid: uid, ts: performance.now() });
+        }
+      }, 4500);
     }
   }
 

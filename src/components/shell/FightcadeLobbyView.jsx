@@ -895,18 +895,12 @@ export function FightcadeLobbyView({
                             >
                               {u.name} {isMe && '(Vous)'}
                             </button>
-                            <FightcadePingIndicator
-                              pingMs={
-                                isMe
-                                  ? (peerPings.__self ?? u.ping ?? null)
-                                  : (peerPings[u.uid] ??
-                                      (peerPings.__self && u.ping
-                                        ? Math.round(peerPings.__self + u.ping)
-                                        : u.ping ?? null))
-                              }
-                              isDirect={Boolean(!isMe && peerPings.__meta?.[u.uid]?.direct)}
-                              isSelf={isMe}
-                            />
+                            {!isMe && (
+                              <FightcadePingIndicator
+                                pingMs={peerPings[u.uid] ?? null}
+                                isDirect={Boolean(peerPings.__meta?.[u.uid]?.direct)}
+                              />
+                            )}
                           </div>
 
                           {/* Statut précis du joueur */}

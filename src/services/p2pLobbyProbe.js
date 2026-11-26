@@ -12,8 +12,8 @@ const PROBE_STUN_SERVERS = [
 ];
 
 const CACHE_TTL_MS = 45000;
-const PROBE_TIMEOUT_MS = 4000;
-const MAX_CONCURRENT_PROBES = 3;
+const PROBE_TIMEOUT_MS = 12000;
+const MAX_CONCURRENT_PROBES = 4;
 
 export function trimmedLowRtt(samples) {
   if (!Array.isArray(samples) || samples.length === 0) return null;
@@ -182,19 +182,21 @@ export class P2pLobbyProbe {
   _attachDataChannel(peerUid, session, dc) {
     session.dc = dc;
     dc.onopen = () => {
-      // Les 2 pairs mesurent simultanément le vrai ping P2P direct (5 salves rapides sur 720ms)
+      // Prolonger proprement la fenêtre dès l'ouverture du DataChannel direct et envoyer le 1er ping à 0ms
+      if (session.timer) clearTimeout(session.timer);
+      session.timer = setTimeout(() => this._finishAndCleanup(peerUid), 2200);
       const sendBurst = (i) => {
         if (dc.readyState !== 'open') return;
         try {
           dc.send(`P:${performance.now()}`);
         } catch {}
         if (i === 4) {
-          const doneTimer = setTimeout(() => this._finishAndCleanup(peerUid), 650);
+          const doneTimer = setTimeout(() => this._finishAndCleanup(peerUid), 500);
           session.pingTimers.push(doneTimer);
         }
       };
       for (let i = 0; i < 5; i++) {
-        const t = setTimeout(() => sendBurst(i), i * 160);
+        const t = setTimeout(() => sendBurst(i), i * 140);
         session.pingTimers.push(t);
       }
     };

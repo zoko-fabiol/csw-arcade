@@ -274,12 +274,7 @@ export function FriendsDrawer({
                 <span className="text-[10px] font-mono text-neutral-300">#{friend.friendCode}</span>
                 {friend.isOnline && (
                   <FightcadePingIndicator
-                    pingMs={
-                      peerPings[friend.uid] ??
-                      (peerPings.__self && friend.ping
-                        ? Math.round(peerPings.__self + friend.ping)
-                        : friend.ping ?? null)
-                    }
+                    pingMs={peerPings[friend.uid] ?? null}
                     isDirect={Boolean(peerPings.__meta?.[friend.uid]?.direct)}
                   />
                 )}
