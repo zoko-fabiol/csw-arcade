@@ -39,6 +39,7 @@ export function UnifiedStageModal({
   voiceState = null,
   onToggleVoiceMute = null,
   onVoicePttChange = null,
+  onUnlockVoiceAudio = null,
   onAcceptVoiceInvite = null,
   onDismissVoiceInvite = null,
   onOpenSalon,
@@ -2489,6 +2490,7 @@ export function UnifiedStageModal({
         micMode={settings?.voice?.micMode || 'open'}
         onToggleMute={onToggleVoiceMute}
         onPttChange={onVoicePttChange}
+        onUnlockAudio={onUnlockVoiceAudio}
         onAcceptInvite={onAcceptVoiceInvite}
         onDismissInvite={onDismissVoiceInvite}
       />

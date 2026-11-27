@@ -4,7 +4,6 @@
 
 function buildIceServers() {
   const servers = [
-    { urls: 'stun:csw-arcade.tech:3478' },
     { urls: 'stun:stun.cloudflare.com:3478' },
     { urls: 'stun:stun.l.google.com:19302' },
     { urls: 'stun:stun1.l.google.com:19302' },
@@ -766,29 +765,36 @@ export class RollbackP2PEngine {
 
     const bytes = new Uint8Array(rawBuf);
     const magic = bytes[0];
-    let sentUdp = false;
+    let sentP2P = false;
 
-    if (this.udpChannel?.readyState === 'open') {
+    if ((magic === 0x5b || magic === 0x5c || magic === 0xcc) && this.reliableChannel?.readyState === 'open') {
       try {
-        this.udpChannel.send(rawBuf);
-        sentUdp = true;
+        this.reliableChannel.send(rawBuf);
+        sentP2P = true;
       } catch {
         /* noop */
       }
     }
 
-    // Pour les paquets de contrôle critiques (0x5B = FRAME0_ACK, 0x5C = FRAME0_GO, 0xCC = DESYNC_REQ) ou si l'UDP WebRTC n'est pas encore ouvert
-    if (!sentUdp || magic === 0x5b || magic === 0x5c || magic === 0xcc) {
-      if (this.onRelayButtonFallback) {
-        let binStr = '';
-        for (let i = 0; i < bytes.length; i++) {
-          binStr += String.fromCharCode(bytes[i]);
-        }
-        try {
-          this.onRelayButtonFallback({ packetB64: btoa(binStr) });
-        } catch {
-          /* noop */
-        }
+    if (this.udpChannel?.readyState === 'open') {
+      try {
+        this.udpChannel.send(rawBuf);
+        sentP2P = true;
+      } catch {
+        /* noop */
+      }
+    }
+
+    // Repli WebSocket VPS uniquement si aucun DataChannel P2P/TURN n'est ouvert
+    if (!sentP2P && this.onRelayButtonFallback) {
+      let binStr = '';
+      for (let i = 0; i < bytes.length; i++) {
+        binStr += String.fromCharCode(bytes[i]);
+      }
+      try {
+        this.onRelayButtonFallback({ packetB64: btoa(binStr) });
+      } catch {
+        /* noop */
       }
     }
   }

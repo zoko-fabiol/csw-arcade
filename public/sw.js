@@ -1,4 +1,4 @@
-const SHELL_CACHE_NAME = 'csw-arcade-shell-v33-ggpo-deterministic';
+const SHELL_CACHE_NAME = 'csw-arcade-shell-v34-voice-p2p';
 const ENGINE_CACHE_NAME = 'csw-arcade-engine-v7';
 const ROMS_CACHE_NAME = 'csw-arcade-roms-v1';
 

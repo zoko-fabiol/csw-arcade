@@ -13,6 +13,7 @@ export function VoicePartyPill({
   onChangeChannel,
   onTogglePeerMute,
   onPttChange,
+  onUnlockAudio,
   onAcceptInvite,
   onDismissInvite,
   inGame = false,
@@ -46,6 +47,18 @@ export function VoicePartyPill({
               </div>
             ))}
           </div>
+        )}
+
+        {hasRoom && voiceState?.audioBlocked && onUnlockAudio && (
+          <button
+            type="button"
+            onClick={onUnlockAudio}
+            title="Cliquer pour activer l'audio WebRTC"
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-amber-500 hover:bg-amber-400 text-black text-xs font-extrabold shadow-lg shadow-amber-900/30 animate-pulse transition cursor-pointer"
+          >
+            <Volume2 className="w-3.5 h-3.5" aria-hidden="true" />
+            <span>Activer son</span>
+          </button>
         )}
 
         {/* Bouton Push-to-Talk discret en jeu sur mobile/desktop si mode PTT actif */}
@@ -167,6 +180,16 @@ export function VoicePartyPill({
             </button>
 
             <div className="flex items-center gap-1 shrink-0">
+              {voiceState?.audioBlocked && (
+                <button
+                  type="button"
+                  onClick={() => onUnlockAudio?.()}
+                  title="Débloquer le son vocal"
+                  className="px-2 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-black text-[10px] font-black cursor-pointer"
+                >
+                  Activer son
+                </button>
+              )}
               <button
                 type="button"
                 onClick={onToggleMute}

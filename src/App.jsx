@@ -1785,6 +1785,7 @@ export default function App() {
           onChangeChannel={(ch) => voiceChatService.setChannel(ch)}
           onTogglePeerMute={(uid) => voiceChatService.togglePeerMute(uid)}
           onPttChange={(pressed) => voiceChatService.setPushToTalkPressed(pressed)}
+          onUnlockAudio={() => voiceChatService.unlockRemoteAudio()}
           onAcceptInvite={handleAcceptVoiceInvite}
           onDismissInvite={() => voiceChatService.dismissInvite()}
         />
@@ -1800,6 +1801,7 @@ export default function App() {
         voiceState={voiceState}
         onToggleVoiceMute={() => voiceChatService.toggleMute()}
         onVoicePttChange={(pressed) => voiceChatService.setPushToTalkPressed(pressed)}
+        onUnlockVoiceAudio={() => voiceChatService.unlockRemoteAudio()}
         onAcceptVoiceInvite={handleAcceptVoiceInvite}
         onDismissVoiceInvite={() => voiceChatService.dismissInvite()}
         incomingChallenge={

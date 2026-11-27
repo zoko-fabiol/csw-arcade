@@ -1,21 +1,17 @@
 /**
- * Service Groupe & Chat Vocal Non-Intrusif CSW Arcade passant par le VPS (/ws/voice)
+ * Service Groupe & Chat Vocal CSW Arcade — WebRTC P2P Pur + Cloudflare TURN (modèle VoiceBridge)
  * - Jusqu'à 6 joueurs par groupe salon, continu du salon jusqu'en jeu sans coupure
- * - Fonctionne en LAN ET à distance (4G / NAT strict / VPN / Samsung Internet / iOS / Desktop) :
- *   1) WebRTC Audio Opus 24 kbps avec STUN + TURN/TURNS (port 443 TCP/TLS)
- *   2) Relais Audio VPS natif Web Audio G.711 µ-law 12 kHz (trames auto-portantes 100 ms sur wss://.../ws/voice)
- *      actif automatiquement dès qu'un pair distant n'a pas de lien WebRTC P2P direct !
- * - Paramètres CSW Arcade : Confidentialité (everyone | friends | party | off),
- *   Mode Micro (open | ptt), Canal (party | game), Mute individuel, Détection de parole
- * - Transporte aussi les événements DM temps réel sur la même connexion WS VPS
+ * - Audio 100 % natif C++ WebRTC Opus (getUserMedia -> addTrack -> <audio autoplay>),
+ *   zéro ScriptProcessorNode ni ré-encodage JS sur le thread de l'émulateur
+ * - Signalisation temps réel WebSocket (/ws/voice) + STUN + Cloudflare Anycast TURN en secours NAT strict
+ * - Reprise automatique ICE (restartIce) sur micro-coupure Wi-Fi/4G + gestion autoplay bloqué
  */
 
 import { fetchDynamicTurnServers } from './rollbackP2P';
 
-function buildVoiceIceServers() {
+function buildBaseVoiceIceServers() {
   const servers = [
     { urls: 'stun:stun.cloudflare.com:3478' },
-    { urls: 'stun:csw-arcade.tech:3478' },
     { urls: 'stun:stun.l.google.com:19302' },
     { urls: 'stun:stun1.l.google.com:19302' },
   ];
@@ -40,14 +36,14 @@ function buildVoiceIceServers() {
   return servers;
 }
 
-const BASE_VOICE_ICE_SERVERS = buildVoiceIceServers();
+const BASE_VOICE_ICE_SERVERS = buildBaseVoiceIceServers();
 let cachedVoiceIceServers = BASE_VOICE_ICE_SERVERS;
 
 async function getVoiceIceServers() {
   try {
     const dynTurn = await Promise.race([
       fetchDynamicTurnServers(),
-      new Promise((r) => setTimeout(() => r([]), 3000)),
+      new Promise((r) => setTimeout(() => r([]), 2500)),
     ]);
     if (Array.isArray(dynTurn) && dynTurn.length > 0) {
       cachedVoiceIceServers = [...BASE_VOICE_ICE_SERVERS, ...dynTurn];
@@ -59,50 +55,7 @@ async function getVoiceIceServers() {
 if (typeof window !== 'undefined') {
   setTimeout(() => {
     getVoiceIceServers().catch(() => {});
-  }, 1200);
-}
-const RELAY_SAMPLE_RATE = 12000;
-const RELAY_FRAME_SAMPLES = 1200; // 100 ms à 12 kHz = 1,2 Ko en µ-law
-
-// Codec G.711 µ-law (standard télécom, 100 % auto-portant sans en-tête, zéro latence de décodage)
-function linearToUlaw(sample) {
-  const MULAW_MAX = 0x1fff;
-  const MULAW_BIAS = 33;
-  let pcm = Math.max(-1, Math.min(1, sample)) * 32767;
-  let sign = 0;
-  if (pcm < 0) {
-    sign = 0x80;
-    pcm = -pcm;
-  }
-  pcm = Math.min(MULAW_MAX * 4, Math.floor(pcm)) >> 2;
-  pcm += MULAW_BIAS;
-  let exponent = 7;
-  for (let mask = 0x4000; (pcm & mask) === 0 && exponent > 0; exponent--, mask >>= 1) {}
-  const mantissa = (pcm >> (exponent + 3)) & 0x0f;
-  return (~(sign | (exponent << 4) | mantissa)) & 0xff;
-}
-
-function ulawToLinear(uVal) {
-  const u = (~uVal) & 0xff;
-  const sign = u & 0x80;
-  const exponent = (u >> 4) & 0x07;
-  const mantissa = u & 0x0f;
-  let sample = ((mantissa << 3) + 0x84) << exponent;
-  sample -= 0x84;
-  return (sign ? -sample : sample) / 32768;
-}
-
-function bytesToBase64(bytes) {
-  let bin = '';
-  for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
-  return btoa(bin);
-}
-
-function base64ToBytes(b64) {
-  const bin = atob(b64);
-  const bytes = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-  return bytes;
+  }, 800);
 }
 
 function getVoiceWsUrl() {
@@ -111,16 +64,48 @@ function getVoiceWsUrl() {
   return `${proto}//${window.location.host}/ws/voice`;
 }
 
-function capOpusBitrate(sdp = '', maxKbps = 24) {
+/**
+ * Règle dynamiquement le bitrate Opus quel que soit le numéro de payload négocié dans le SDP.
+ */
+function configureOpusSdp(sdp = '', maxKbps = 32) {
   try {
-    const bps = Math.max(12000, Math.min(48000, Number(maxKbps || 24) * 1000));
-    return sdp.replace(/(a=fmtp:111 [^\r\n]+)/g, (line) => {
-      if (line.includes('maxaveragebitrate=')) return line;
-      return `${line};maxaveragebitrate=${bps};stereo=0;useinbandfec=1`;
-    });
+    const bps = Math.max(16000, Math.min(64000, Number(maxKbps || 32) * 1000));
+    const ptMatch = sdp.match(/a=rtpmap:(\d+)\s+opus\/48000/i);
+    const pt = ptMatch?.[1];
+    if (!pt) return sdp;
+
+    const fmtpRe = new RegExp(`(a=fmtp:${pt}\\s+[^\\r\\n]+)`, 'g');
+    if (fmtpRe.test(sdp)) {
+      return sdp.replace(fmtpRe, (line) => {
+        let next = line;
+        if (!next.includes('maxaveragebitrate=')) next += `;maxaveragebitrate=${bps}`;
+        if (!next.includes('useinbandfec=')) next += ';useinbandfec=1';
+        if (!next.includes('usedtx=')) next += ';usedtx=1';
+        return next;
+      });
+    }
+    return sdp.replace(
+      new RegExp(`(a=rtpmap:${pt}\\s+opus\\/48000[^\\r\\n]*)`, 'i'),
+      `$1\r\na=fmtp:${pt} minptime=10;useinbandfec=1;usedtx=1;maxaveragebitrate=${bps}`
+    );
   } catch {
     return sdp;
   }
+}
+
+function applySenderBitrate(pc, maxKbps = 32) {
+  try {
+    const maxBitrate = Math.max(16000, Math.min(64000, Number(maxKbps || 32) * 1000));
+    for (const sender of pc.getSenders()) {
+      if (sender.track?.kind !== 'audio' || typeof sender.getParameters !== 'function') continue;
+      const params = sender.getParameters();
+      if (!params.encodings || params.encodings.length === 0) {
+        params.encodings = [{}];
+      }
+      params.encodings[0].maxBitrate = maxBitrate;
+      sender.setParameters(params).catch(() => {});
+    }
+  } catch {}
 }
 
 class VoiceChatService {
@@ -129,11 +114,11 @@ class VoiceChatService {
     this.reconnectTimer = null;
     this.userProfile = null;
     this.settings = {
-      privacy: 'friends', // 'everyone' | 'friends' | 'party' | 'off'
-      micMode: 'open', // 'open' | 'ptt'
+      privacy: 'friends',
+      micMode: 'open',
       pttKey: 'KeyV',
       volume: 85,
-      sensitivity: 20, // 0..100
+      sensitivity: 20,
       defaultMuted: false,
       audioDucking: true,
     };
@@ -144,15 +129,16 @@ class VoiceChatService {
       roomTitle: '',
       hostUid: null,
       maxMembers: 6,
-      channel: 'party', // 'party' | 'game'
+      channel: 'party',
       members: [],
       ready: false,
       muted: false,
       speaking: false,
       pttActive: false,
+      audioBlocked: false,
       incomingInvite: null,
       error: '',
-      mutedPeers: {}, // uid -> true
+      mutedPeers: {},
       unreadByPeer: {},
       totalUnreadDm: 0,
     };
@@ -160,21 +146,17 @@ class VoiceChatService {
     this.listeners = new Set();
     this.dmListeners = new Set();
 
-    // Audio local, détection de parole & capture relais VPS µ-law
+    // Capture micro & indicateur visuel léger (AnalyserNode uniquement, zéro ScriptProcessorNode)
     this.localStream = null;
+    this.localAudioPromise = null;
     this.audioCtx = null;
-    this.playbackCtx = null;
     this.analyser = null;
-    this.relayProcessor = null;
-    this.relayGain = null;
-    this.relayPending = [];
     this.vadTimer = null;
     this.lastSpeakingSent = false;
     this.speakingHoldUntil = 0;
 
-    // WebRTC peers & jitter buffer de lecture VPS par interlocuteur
-    this.peers = new Map(); // peerUid -> { pc, audioEl, connected }
-    this.speakerQueues = new Map(); // peerUid -> { nextTime, gainNode }
+    // Connexions WebRTC natives directes (Opus P2P + Cloudflare TURN en secours)
+    this.peers = new Map(); // peerUid -> { pc, audioEl, connected, pendingCandidates, iceRestartTimer, makingOffer, ignoreOffer }
     this.audioContainer = null;
     this.boundKeyDown = null;
     this.boundKeyUp = null;
@@ -209,7 +191,7 @@ class VoiceChatService {
           this.state.error = '';
           this.emit();
         }
-      }, 4000);
+      }, 4500);
     }
   }
 
@@ -226,19 +208,22 @@ class VoiceChatService {
     return el;
   }
 
-  unlockPlaybackContext() {
-    try {
-      const Ctx = window.AudioContext || window.webkitAudioContext;
-      if (!Ctx) return null;
-      if (!this.playbackCtx || this.playbackCtx.state === 'closed') {
-        this.playbackCtx = new Ctx();
+  async unlockRemoteAudio() {
+    let anyBlocked = false;
+    for (const peer of this.peers.values()) {
+      if (!peer.audioEl?.srcObject) continue;
+      try {
+        await peer.audioEl.play();
+      } catch {
+        anyBlocked = true;
       }
-      if (this.playbackCtx.state === 'suspended') {
-        this.playbackCtx.resume().catch(() => {});
-      }
-      return this.playbackCtx;
-    } catch {
-      return null;
+    }
+    if (this.audioCtx?.state === 'suspended') {
+      this.audioCtx.resume().catch(() => {});
+    }
+    if (this.state.audioBlocked !== anyBlocked) {
+      this.state.audioBlocked = anyBlocked;
+      this.emit();
     }
   }
 
@@ -274,7 +259,7 @@ class VoiceChatService {
         this.emit();
         if (this.userProfile?.uid) {
           clearTimeout(this.reconnectTimer);
-          this.reconnectTimer = setTimeout(() => this.connect(this.userProfile), 2500);
+          this.reconnectTimer = setTimeout(() => this.connect(this.userProfile), 2000);
         }
       };
       ws.onerror = () => {};
@@ -319,21 +304,21 @@ class VoiceChatService {
       }
     }
 
-    const vol = Math.max(0, Math.min(1, Number(this.settings.volume ?? 85) / 100));
-    for (const [peerUid, peer] of this.peers.entries()) {
-      if (peer.audioEl) {
-        peer.audioEl.volume = this.state.mutedPeers[peerUid] ? 0 : vol;
-      }
-    }
-    for (const [peerUid, sq] of this.speakerQueues.entries()) {
-      if (sq.gainNode) {
-        sq.gainNode.gain.value = this.state.mutedPeers[peerUid] ? 0 : vol;
-      }
-    }
-
+    this.refreshPeerVolumes();
     this.applyMicTrackState();
     this.setupPushToTalkListeners();
     this.emit();
+  }
+
+  refreshPeerVolumes() {
+    const vol = Math.max(0, Math.min(1, Number(this.settings.volume ?? 85) / 100));
+    const myChannel = this.state.channel || 'party';
+    for (const [peerUid, peer] of this.peers.entries()) {
+      if (!peer.audioEl) continue;
+      const member = this.state.members.find((m) => m.uid === peerUid);
+      const sameChan = !member || (member.channel || 'party') === myChannel;
+      peer.audioEl.volume = sameChan && !this.state.mutedPeers[peerUid] ? vol : 0;
+    }
   }
 
   handleWsMessage(msg) {
@@ -380,6 +365,7 @@ class VoiceChatService {
       this.state.roomTitle = '';
       this.state.members = [];
       this.state.speaking = false;
+      this.state.audioBlocked = false;
       this.emit();
       return;
     }
@@ -392,6 +378,7 @@ class VoiceChatService {
       this.state.members = Array.isArray(msg.members) ? msg.members : [];
       const meRow = this.state.members.find((m) => m.uid === this.userProfile?.uid);
       if (meRow) this.state.ready = Boolean(meRow.ready);
+      this.refreshPeerVolumes();
       this.syncPeersWithRoom(this.state.members);
       this.emit();
       return;
@@ -399,11 +386,6 @@ class VoiceChatService {
 
     if (msg.type === 'webrtc_signal') {
       this.handleWebRtcSignal(msg.fromUid, msg.signal);
-      return;
-    }
-
-    if (msg.type === 'voice_audio') {
-      this.playRelayedAudioChunk(msg.fromUid, msg.codec, msg.sampleRate, msg.chunk);
     }
   }
 
@@ -413,26 +395,46 @@ class VoiceChatService {
   }
 
   async ensureLocalAudio() {
-    this.unlockPlaybackContext();
     if (this.localStream) return this.localStream;
+    if (this.localAudioPromise) return this.localAudioPromise;
+
+    if (typeof window !== 'undefined' && !window.isSecureContext) {
+      throw new Error('Le microphone nécessite HTTPS ou localhost.');
+    }
     if (typeof navigator === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
       throw new Error('Microphone non supporté sur ce navigateur.');
     }
-    const stream = await navigator.mediaDevices.getUserMedia({
-      audio: {
-        echoCancellation: true,
-        noiseSuppression: true,
-        autoGainControl: true,
-        channelCount: 1,
-      },
-      video: false,
-    });
-    this.localStream = stream;
-    this.startCapturePipeline(stream);
-    return stream;
+
+    this.localAudioPromise = navigator.mediaDevices
+      .getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+          channelCount: 1,
+        },
+        video: false,
+      })
+      .then((stream) => {
+        this.localStream = stream;
+        this.applyMicTrackState();
+        this.startLightweightVad(stream);
+        if (this.state.roomId && this.state.members.length > 0) {
+          this.syncPeersWithRoom(this.state.members);
+        }
+        return stream;
+      })
+      .finally(() => {
+        this.localAudioPromise = null;
+      });
+
+    return this.localAudioPromise;
   }
 
-  startCapturePipeline(stream) {
+  /**
+   * Détection visuelle de parole passive (AnalyserNode uniquement, zéro ScriptProcessorNode).
+   */
+  startLightweightVad(stream) {
     try {
       const Ctx = window.AudioContext || window.webkitAudioContext;
       if (!Ctx) return;
@@ -442,79 +444,9 @@ class VoiceChatService {
       }
       const src = this.audioCtx.createMediaStreamSource(stream);
       this.analyser = this.audioCtx.createAnalyser();
-      this.analyser.fftSize = 256;
+      this.analyser.fftSize = 128;
       src.connect(this.analyser);
 
-      // Pipeline Relais Audio VPS (G.711 µ-law 12 kHz) : 100 % fiable sur 4G / NAT / VPN / Mobile
-      const inputRate = this.audioCtx.sampleRate || 48000;
-      const ratio = inputRate / RELAY_SAMPLE_RATE;
-      const proc = this.audioCtx.createScriptProcessor(2048, 1, 1);
-      const silentGain = this.audioCtx.createGain();
-      silentGain.gain.value = 0;
-      src.connect(proc);
-      proc.connect(silentGain);
-      silentGain.connect(this.audioCtx.destination);
-      this.relayProcessor = proc;
-      this.relayGain = silentGain;
-      this.relayPending = [];
-
-      let fracPos = 0;
-      proc.onaudioprocess = (ev) => {
-        if (!this.state.roomId || this.isEffectivelyMuted()) {
-          this.relayPending.length = 0;
-          return;
-        }
-        const myUid = this.userProfile?.uid;
-        // N'envoyer via le relais VPS que si au moins 1 membre du même canal n'a pas de P2P WebRTC direct actif
-        const needsRelay = this.state.members.some((m) => {
-          if (m.uid === myUid) return false;
-          if ((m.channel || 'party') !== (this.state.channel || 'party')) return false;
-          const peer = this.peers.get(m.uid);
-          return !peer || !peer.connected;
-        });
-        if (!needsRelay) {
-          this.relayPending.length = 0;
-          return;
-        }
-
-        const input = ev.inputBuffer.getChannelData(0);
-        // Détection rapide d'énergie pour ne rien envoyer pendant le silence total
-        let peak = 0;
-        for (let i = 0; i < input.length; i += 4) {
-          const a = Math.abs(input[i]);
-          if (a > peak) peak = a;
-        }
-        const now = Date.now();
-        if (peak > 0.008) {
-          this.speakingHoldUntil = Math.max(this.speakingHoldUntil, now + 650);
-        }
-        if (now > this.speakingHoldUntil && !this.state.pttActive) {
-          this.relayPending.length = 0;
-          return;
-        }
-
-        // Sous-échantillonnage linéaire vers 12 kHz + encodage µ-law
-        while (fracPos < input.length) {
-          const idx = Math.floor(fracPos);
-          const s = input[idx] || 0;
-          this.relayPending.push(linearToUlaw(s));
-          fracPos += ratio;
-        }
-        fracPos -= input.length;
-
-        while (this.relayPending.length >= RELAY_FRAME_SAMPLES) {
-          const frame = new Uint8Array(this.relayPending.splice(0, RELAY_FRAME_SAMPLES));
-          this.sendWs({
-            type: 'voice_audio',
-            roomId: this.state.roomId,
-            codec: 'ulaw12k',
-            sampleRate: RELAY_SAMPLE_RATE,
-            chunk: bytesToBase64(frame),
-          });
-        }
-      };
-
-      // Détection de parole visuelle (anneau vert)
       const data = new Uint8Array(this.analyser.frequencyBinCount);
       clearInterval(this.vadTimer);
       this.vadTimer = setInterval(() => {
@@ -536,7 +468,7 @@ class VoiceChatService {
         const threshold = Math.max(4, Math.min(45, 50 - Number(this.settings.sensitivity ?? 20) * 0.45));
         const now = Date.now();
         if (avg > threshold) {
-          this.speakingHoldUntil = Math.max(this.speakingHoldUntil, now + 900);
+          this.speakingHoldUntil = Math.max(this.speakingHoldUntil, now + 850);
         }
         const isSpeakingNow = now < this.speakingHoldUntil;
         if (isSpeakingNow !== this.lastSpeakingSent) {
@@ -545,50 +477,7 @@ class VoiceChatService {
           this.sendWs({ type: 'voice_state', muted: false, speaking: isSpeakingNow, channel: this.state.channel });
           this.emit();
         }
-      }, 140);
-    } catch {}
-  }
-
-  playRelayedAudioChunk(fromUid, codec, sampleRate, b64) {
-    if (!fromUid || !b64 || this.state.mutedPeers[fromUid]) return;
-    // Si le P2P WebRTC direct est connecté avec ce pair, pas besoin de doubler via le relais VPS
-    const peer = this.peers.get(fromUid);
-    if (peer?.connected) return;
-    if (codec && codec !== 'ulaw12k') return;
-
-    const ctx = this.unlockPlaybackContext();
-    if (!ctx) return;
-    try {
-      const bytes = base64ToBytes(b64);
-      if (bytes.length === 0) return;
-      const sr = Number(sampleRate || RELAY_SAMPLE_RATE);
-      const audioBuf = ctx.createBuffer(1, bytes.length, sr);
-      const ch = audioBuf.getChannelData(0);
-      for (let i = 0; i < bytes.length; i++) {
-        ch[i] = ulawToLinear(bytes[i]);
-      }
-
-      let sq = this.speakerQueues.get(fromUid);
-      if (!sq) {
-        const gainNode = ctx.createGain();
-        const vol = Math.max(0, Math.min(1, Number(this.settings.volume ?? 85) / 100));
-        gainNode.gain.value = this.state.mutedPeers[fromUid] ? 0 : vol;
-        gainNode.connect(ctx.destination);
-        sq = { nextTime: 0, gainNode };
-        this.speakerQueues.set(fromUid, sq);
-      }
-
-      const source = ctx.createBufferSource();
-      source.buffer = audioBuf;
-      source.connect(sq.gainNode);
-
-      const now = ctx.currentTime;
-      // Jitter buffer souple (40 ms min, reset si dérive > 350 ms)
-      if (sq.nextTime < now + 0.015 || sq.nextTime > now + 0.35) {
-        sq.nextTime = now + 0.04;
-      }
-      source.start(sq.nextTime);
-      sq.nextTime += audioBuf.duration;
+      }, 180);
     } catch {}
   }
 
@@ -631,7 +520,7 @@ class VoiceChatService {
   }
 
   setPushToTalkPressed(pressed) {
-    this.unlockPlaybackContext();
+    this.unlockRemoteAudio();
     const next = Boolean(pressed);
     if (this.state.pttActive === next) return;
     this.state.pttActive = next;
@@ -646,7 +535,7 @@ class VoiceChatService {
   }
 
   async joinRoom({ roomId, title = 'Groupe CSW Arcade', channel = 'party' } = {}) {
-    this.unlockPlaybackContext();
+    this.unlockRemoteAudio();
     if (!this.userProfile?.uid) {
       this.setError('Connectez-vous pour utiliser le chat vocal.');
       return false;
@@ -657,7 +546,7 @@ class VoiceChatService {
     }
     this.connect(this.userProfile);
     try {
-      await this.ensureLocalAudio();
+      await Promise.all([this.ensureLocalAudio(), getVoiceIceServers()]);
     } catch (err) {
       this.setError(err?.message || 'Accès au microphone refusé.');
       return false;
@@ -683,7 +572,6 @@ class VoiceChatService {
   }
 
   async inviteUser({ toUid, roomTitle, channel = 'party' }) {
-    this.unlockPlaybackContext();
     if (!toUid || !this.userProfile?.uid) return false;
     if (!this.state.roomId) {
       const ok = await this.joinRoom({
@@ -704,7 +592,7 @@ class VoiceChatService {
   }
 
   async joinUserParty(targetUser) {
-    this.unlockPlaybackContext();
+    this.unlockRemoteAudio();
     if (!targetUser?.uid || !this.userProfile?.uid) return false;
     if (this.settings.privacy === 'off') {
       this.setError('Activez le chat vocal dans Paramètres → Audio.');
@@ -712,7 +600,7 @@ class VoiceChatService {
     }
     this.connect(this.userProfile);
     try {
-      await this.ensureLocalAudio();
+      await Promise.all([this.ensureLocalAudio(), getVoiceIceServers()]);
     } catch (err) {
       this.setError(err?.message || 'Accès au microphone refusé.');
       return false;
@@ -756,11 +644,12 @@ class VoiceChatService {
     this.state.members = [];
     this.state.speaking = false;
     this.state.pttActive = false;
+    this.state.audioBlocked = false;
     this.emit();
   }
 
   toggleMute() {
-    this.unlockPlaybackContext();
+    this.unlockRemoteAudio();
     this.state.muted = !this.state.muted;
     this.applyMicTrackState();
     this.sendWs({
@@ -782,15 +671,7 @@ class VoiceChatService {
       speaking: this.state.speaking,
       channel: clean,
     });
-    const vol = Math.max(0, Math.min(1, Number(this.settings.volume ?? 85) / 100));
-    for (const member of this.state.members) {
-      const peer = this.peers.get(member.uid);
-      const sameChan = (member.channel || 'party') === clean;
-      const targetVol = sameChan && !this.state.mutedPeers[member.uid] ? vol : 0;
-      if (peer?.audioEl) peer.audioEl.volume = targetVol;
-      const sq = this.speakerQueues.get(member.uid);
-      if (sq?.gainNode) sq.gainNode.gain.value = targetVol;
-    }
+    this.refreshPeerVolumes();
     this.emit();
   }
 
@@ -799,12 +680,22 @@ class VoiceChatService {
     const next = !this.state.mutedPeers[peerUid];
     if (next) this.state.mutedPeers[peerUid] = true;
     else delete this.state.mutedPeers[peerUid];
-    const vol = Math.max(0, Math.min(1, Number(this.settings.volume ?? 85) / 100));
-    const peer = this.peers.get(peerUid);
-    if (peer?.audioEl) peer.audioEl.volume = next ? 0 : vol;
-    const sq = this.speakerQueues.get(peerUid);
-    if (sq?.gainNode) sq.gainNode.gain.value = next ? 0 : vol;
+    this.refreshPeerVolumes();
     this.emit();
+  }
+
+  closePeerEntry(peerUid, entry) {
+    if (!entry) return;
+    clearTimeout(entry.iceRestartTimer);
+    try {
+      entry.pc.onconnectionstatechange = null;
+      entry.pc.oniceconnectionstatechange = null;
+      entry.pc.onicecandidate = null;
+      entry.pc.ontrack = null;
+      entry.pc.close();
+      entry.audioEl?.remove();
+    } catch {}
+    this.peers.delete(peerUid);
   }
 
   syncPeersWithRoom(members = []) {
@@ -812,26 +703,15 @@ class VoiceChatService {
     if (!myUid || !this.localStream) return;
     const activeIds = new Set(members.map((m) => m.uid));
 
-    for (const [peerUid, peer] of this.peers.entries()) {
+    for (const [peerUid, entry] of this.peers.entries()) {
       if (!activeIds.has(peerUid)) {
-        try {
-          peer.pc?.close();
-          peer.audioEl?.remove();
-        } catch {}
-        this.peers.delete(peerUid);
-      }
-    }
-    for (const [peerUid, sq] of this.speakerQueues.entries()) {
-      if (!activeIds.has(peerUid)) {
-        try {
-          sq.gainNode?.disconnect();
-        } catch {}
-        this.speakerQueues.delete(peerUid);
+        this.closePeerEntry(peerUid, entry);
       }
     }
 
     getVoiceIceServers().then(() => {
-      for (const m of members) {
+      if (!this.state.roomId || !this.localStream) return;
+      for (const m of this.state.members) {
         if (!m.uid || m.uid === myUid) continue;
         if (!this.peers.has(m.uid)) {
           const shouldInitiate = String(myUid) > String(m.uid);
@@ -839,6 +719,26 @@ class VoiceChatService {
         }
       }
     });
+  }
+
+  async sendOffer(peerUid, entry, { iceRestart = false } = {}) {
+    const pc = entry?.pc;
+    if (!pc || entry.makingOffer) return;
+    entry.makingOffer = true;
+    try {
+      const offer = await pc.createOffer(iceRestart ? { iceRestart: true } : undefined);
+      if (pc.signalingState !== 'stable') return;
+      offer.sdp = configureOpusSdp(offer.sdp, 32);
+      await pc.setLocalDescription(offer);
+      applySenderBitrate(pc, 32);
+      this.sendWs({
+        type: 'webrtc_signal',
+        toUid: peerUid,
+        signal: { type: 'offer', sdp: pc.localDescription },
+      });
+    } catch {} finally {
+      entry.makingOffer = false;
+    }
   }
 
   createPeerConnection(peerUid, initiate = false) {
@@ -852,28 +752,43 @@ class VoiceChatService {
     const audioEl = document.createElement('audio');
     audioEl.autoplay = true;
     audioEl.playsInline = true;
-    const vol = Math.max(0, Math.min(1, Number(this.settings.volume ?? 85) / 100));
-    audioEl.volume = this.state.mutedPeers[peerUid] ? 0 : vol;
     this.ensureAudioContainer()?.appendChild(audioEl);
 
-    const entry = { pc, audioEl, connected: false, pendingCandidates: [] };
+    const entry = {
+      pc,
+      audioEl,
+      connected: false,
+      pendingCandidates: [],
+      iceRestartTimer: null,
+      makingOffer: false,
+      polite: String(this.userProfile?.uid || '') < String(peerUid),
+      ignoreOffer: false,
+    };
     this.peers.set(peerUid, entry);
+    this.refreshPeerVolumes();
 
     if (this.localStream) {
       for (const track of this.localStream.getAudioTracks()) {
         pc.addTrack(track, this.localStream);
       }
+      applySenderBitrate(pc, 32);
     }
 
     pc.ontrack = (ev) => {
-      if (ev.streams?.[0]) {
-        audioEl.srcObject = ev.streams[0];
-        audioEl.play().catch(() => {});
-      }
+      if (this.peers.get(peerUid) !== entry) return;
+      const remoteStream = ev.streams?.[0] || new MediaStream([ev.track]);
+      audioEl.srcObject = remoteStream;
+      this.refreshPeerVolumes();
+      audioEl.play().catch(() => {
+        if (this.peers.get(peerUid) === entry && !this.state.audioBlocked) {
+          this.state.audioBlocked = true;
+          this.emit();
+        }
+      });
     };
 
     pc.onicecandidate = (ev) => {
-      if (ev.candidate) {
+      if (ev.candidate && this.peers.get(peerUid) === entry) {
         this.sendWs({
           type: 'webrtc_signal',
           toUid: peerUid,
@@ -882,29 +797,46 @@ class VoiceChatService {
       }
     };
 
+    const scheduleIceRecovery = (delayMs) => {
+      if (entry.iceRestartTimer || this.peers.get(peerUid) !== entry) return;
+      entry.iceRestartTimer = setTimeout(() => {
+        entry.iceRestartTimer = null;
+        if (this.peers.get(peerUid) !== entry || !this.state.roomId) return;
+        const st = pc.connectionState;
+        const iceSt = pc.iceConnectionState;
+        if (st === 'connected' || iceSt === 'connected' || iceSt === 'completed') return;
+        if (!entry.polite) {
+          try { pc.restartIce?.(); } catch {}
+          this.sendOffer(peerUid, entry, { iceRestart: true });
+        } else {
+          this.sendWs({
+            type: 'webrtc_signal',
+            toUid: peerUid,
+            signal: { type: 'renegotiate_request' },
+          });
+        }
+      }, delayMs);
+    };
+
     const updateConn = () => {
-      entry.connected =
-        pc.connectionState === 'connected' ||
-        pc.iceConnectionState === 'connected' ||
-        pc.iceConnectionState === 'completed';
+      if (this.peers.get(peerUid) !== entry) return;
+      const st = pc.connectionState;
+      const iceSt = pc.iceConnectionState;
+      entry.connected = st === 'connected' || iceSt === 'connected' || iceSt === 'completed';
+      if (entry.connected) {
+        clearTimeout(entry.iceRestartTimer);
+        entry.iceRestartTimer = null;
+      } else if (st === 'failed' || iceSt === 'failed') {
+        scheduleIceRecovery(250);
+      } else if (st === 'disconnected' || iceSt === 'disconnected') {
+        scheduleIceRecovery(2000);
+      }
     };
     pc.onconnectionstatechange = updateConn;
     pc.oniceconnectionstatechange = updateConn;
 
     if (initiate) {
-      pc.createOffer()
-        .then((offer) => {
-          offer.sdp = capOpusBitrate(offer.sdp, 32);
-          return pc.setLocalDescription(offer);
-        })
-        .then(() => {
-          this.sendWs({
-            type: 'webrtc_signal',
-            toUid: peerUid,
-            signal: { type: 'offer', sdp: pc.localDescription },
-          });
-        })
-        .catch(() => {});
+      this.sendOffer(peerUid, entry);
     }
 
     return entry;
@@ -912,27 +844,53 @@ class VoiceChatService {
 
   async handleWebRtcSignal(fromUid, signal) {
     if (!fromUid || !signal || !this.state.roomId) return;
-    await getVoiceIceServers();
+    await Promise.all([this.ensureLocalAudio().catch(() => null), getVoiceIceServers()]);
+    if (!this.state.roomId) return;
+
     let entry = this.peers.get(fromUid);
     if (!entry) {
       entry = this.createPeerConnection(fromUid, false);
     }
     if (!entry?.pc) return;
     const pc = entry.pc;
+
+    if (signal.type === 'renegotiate_request') {
+      if (!entry.polite) {
+        try { pc.restartIce?.(); } catch {}
+        await this.sendOffer(fromUid, entry, { iceRestart: true });
+      }
+      return;
+    }
+
     const flushPending = async () => {
       const list = entry.pendingCandidates || [];
       entry.pendingCandidates = [];
       for (const c of list) {
-        try { await pc.addIceCandidate(new RTCIceCandidate(c)); } catch {}
+        try {
+          await pc.addIceCandidate(new RTCIceCandidate(c));
+        } catch {}
       }
     };
+
     try {
       if (signal.type === 'offer' && signal.sdp) {
-        await pc.setRemoteDescription(new RTCSessionDescription(signal.sdp));
+        const offerCollision = entry.makingOffer || pc.signalingState !== 'stable';
+        entry.ignoreOffer = !entry.polite && offerCollision;
+        if (entry.ignoreOffer) return;
+
+        if (offerCollision && entry.polite) {
+          await Promise.all([
+            pc.setLocalDescription({ type: 'rollback' }),
+            pc.setRemoteDescription(new RTCSessionDescription(signal.sdp)),
+          ]);
+        } else {
+          await pc.setRemoteDescription(new RTCSessionDescription(signal.sdp));
+        }
         await flushPending();
         const answer = await pc.createAnswer();
-        answer.sdp = capOpusBitrate(answer.sdp, 32);
+        answer.sdp = configureOpusSdp(answer.sdp, 32);
         await pc.setLocalDescription(answer);
+        applySenderBitrate(pc, 32);
         this.sendWs({
           type: 'webrtc_signal',
           toUid: fromUid,
@@ -945,7 +903,11 @@ class VoiceChatService {
         if (!pc.remoteDescription) {
           entry.pendingCandidates.push(signal.candidate);
         } else {
-          await pc.addIceCandidate(new RTCIceCandidate(signal.candidate));
+          try {
+            await pc.addIceCandidate(new RTCIceCandidate(signal.candidate));
+          } catch (err) {
+            if (!entry.ignoreOffer) throw err;
+          }
         }
       }
     } catch {}
@@ -955,18 +917,10 @@ class VoiceChatService {
     clearInterval(this.vadTimer);
     this.vadTimer = null;
     this.lastSpeakingSent = false;
-    this.relayPending = [];
     if (this.boundKeyDown) window.removeEventListener('keydown', this.boundKeyDown);
     if (this.boundKeyUp) window.removeEventListener('keyup', this.boundKeyUp);
     this.boundKeyDown = null;
     this.boundKeyUp = null;
-
-    try {
-      this.relayProcessor?.disconnect();
-      this.relayGain?.disconnect();
-    } catch {}
-    this.relayProcessor = null;
-    this.relayGain = null;
 
     try {
       this.audioCtx?.close();
@@ -975,7 +929,7 @@ class VoiceChatService {
     this.analyser = null;
 
     if (this.localStream) {
-      for (const track of this.localStream.getTracks()) {
+      for (const track of this.localStream.getAudioTracks()) {
         try {
           track.stop();
         } catch {}
@@ -983,20 +937,10 @@ class VoiceChatService {
       this.localStream = null;
     }
 
-    for (const peer of this.peers.values()) {
-      try {
-        peer.pc?.close();
-        peer.audioEl?.remove();
-      } catch {}
+    for (const [peerUid, entry] of Array.from(this.peers.entries())) {
+      this.closePeerEntry(peerUid, entry);
     }
     this.peers.clear();
-
-    for (const sq of this.speakerQueues.values()) {
-      try {
-        sq.gainNode?.disconnect();
-      } catch {}
-    }
-    this.speakerQueues.clear();
   }
 }
 
