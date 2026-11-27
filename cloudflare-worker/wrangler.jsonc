@@ -7,7 +7,8 @@
     "enabled": true
   },
   "vars": {
-    "CLOUDFLARE_TURN_KEY_ID": "8359ae79314f32ee98e0ed87b257d524"
+    "CLOUDFLARE_TURN_KEY_ID": "980e6e6b9d5f5f730522dd1b0d6707dd",
+    "ALLOW_CROSS_ORIGIN": "1"
   },
   "durable_objects": {
     "bindings": [

@@ -58,10 +58,19 @@ if (typeof window !== 'undefined') {
   }, 800);
 }
 
+const DEFAULT_CF_VOICE_WS_URL = 'wss://csw-arcade-signaling.clausephwandji044.workers.dev/ws/voice';
+
 function getVoiceWsUrl() {
   if (typeof window === 'undefined') return '';
-  const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-  return `${proto}//${window.location.host}/ws/voice`;
+  try {
+    const override = import.meta?.env?.VITE_VOICE_WS_URL;
+    if (override) return override;
+  } catch {}
+  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+    const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    return `${proto}//${window.location.host}/ws/voice`;
+  }
+  return DEFAULT_CF_VOICE_WS_URL;
 }
 
 /**

@@ -49,12 +49,24 @@ try {
   }
 } catch {}
 
+const DEFAULT_CF_TURN_URL = 'https://csw-arcade-signaling.clausephwandji044.workers.dev/api/turn-credentials';
+
 export async function fetchDynamicTurnServers() {
   if (cachedDynamicTurnServers) return cachedDynamicTurnServers;
   if (typeof fetch !== 'function') return [];
   if (!dynamicTurnFetchPromise) {
-    dynamicTurnFetchPromise = fetch('/api/turn-credentials')
-      .then((r) => (r.ok ? r.json() : null))
+    let primaryUrl = DEFAULT_CF_TURN_URL;
+    try {
+      const override = import.meta?.env?.VITE_TURN_API_URL;
+      if (override) primaryUrl = override;
+    } catch {}
+    const fetchTurnJson = async (url) => {
+      const r = await fetch(url);
+      return r.ok ? r.json() : null;
+    };
+    dynamicTurnFetchPromise = fetchTurnJson(primaryUrl)
+      .catch(() => null)
+      .then((data) => (data?.ok && Array.isArray(data.iceServers) ? data : fetchTurnJson('/api/turn-credentials')))
       .then((data) => {
         if (data?.ok && Array.isArray(data.iceServers) && data.iceServers.length > 0) {
           cachedDynamicTurnServers = data.iceServers;

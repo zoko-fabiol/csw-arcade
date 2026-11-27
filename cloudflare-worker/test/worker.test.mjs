@@ -250,8 +250,10 @@ test('SignalingHubDO : relaye webrtc_signal (/ws/voice) & RTC_SIGNAL (/ws/netpla
   await hub.webSocketMessage(v1, JSON.stringify({ type: 'join_room', roomId: 'party_1' }));
   await hub.webSocketMessage(v2, JSON.stringify({ type: 'join_room', roomId: 'party_1' }));
   await hub.webSocketMessage(v1, JSON.stringify({ type: 'webrtc_signal', toUid: 'u2', signal: { type: 'offer', sdp: 'v=0' } }));
+  await hub.webSocketMessage(v1, JSON.stringify({ type: 'voice_invite', toUid: 'u2', roomTitle: 'Test Groupe' }));
 
   assert.ok(v2.sent.some((m) => m.type === 'webrtc_signal' && m.fromUid === 'u1' && m.signal?.type === 'offer'));
+  assert.ok(v2.sent.some((m) => m.type === 'voice_invite_received' && m.fromUid === 'u1' && m.roomId === 'party_1'));
 
   const n1 = makeMockWs('netplay');
   const n2 = makeMockWs('netplay');

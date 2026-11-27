@@ -302,6 +302,70 @@ export class SignalingHubDO extends DurableObject {
       return;
     }
 
+    if (msg.type === 'kick_member') {
+      const targetUid = String(msg.targetUid || '').trim();
+      if (!att.roomId || !targetUid || targetUid === uid) return;
+      const room = this.voiceRooms.get(att.roomId);
+      if (!room || room.hostUid !== uid || !room.members.has(targetUid)) return;
+      this._removeFromVoiceRoom(targetUid);
+      this._pushVoiceUser(targetUid, { type: 'left_room', reason: 'kicked' });
+      return;
+    }
+
+    if (msg.type === 'transfer_host') {
+      const targetUid = String(msg.targetUid || '').trim();
+      if (!att.roomId || !targetUid || targetUid === uid) return;
+      const room = this.voiceRooms.get(att.roomId);
+      if (!room || room.hostUid !== uid || !room.members.has(targetUid)) return;
+      room.hostUid = targetUid;
+      this._persistVoiceRooms();
+      this._broadcastVoiceRoom(att.roomId);
+      return;
+    }
+
+    if (msg.type === 'voice_invite') {
+      const toUid = String(msg.toUid || '').trim();
+      if (!toUid || toUid === uid) return;
+      const targetSockets = this._getVoiceSocketsByUid(toUid);
+      const targetPrivacy = targetSockets[0]?.deserializeAttachment()?.privacy || 'friends';
+      if (targetPrivacy === 'off') {
+        this._sendJson(ws, { type: 'voice_error', error: 'Ce joueur a désactivé le chat vocal.' });
+        return;
+      }
+      let roomId = att.roomId || String(msg.roomId || `party_${uid}`).slice(0, 80);
+      if (!att.roomId) {
+        let room = this.voiceRooms.get(roomId);
+        if (!room) {
+          room = {
+            roomId,
+            title: String(msg.roomTitle || `Groupe de ${att.name}`).slice(0, 60),
+            hostUid: uid,
+            members: new Set(),
+          };
+          this.voiceRooms.set(roomId, room);
+        }
+        room.members.add(uid);
+        ws.serializeAttachment({ ...att, roomId });
+        this._persistVoiceRooms();
+        this._broadcastVoiceRoom(roomId);
+      }
+      const room = this.voiceRooms.get(roomId);
+      const inviteTitle = String(msg.roomTitle || room?.title || `Groupe de ${att.name}`);
+      const delivered = this._pushVoiceUser(toUid, {
+        type: 'voice_invite_received',
+        inviteId: `vinv_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+        fromUid: uid,
+        fromName: att.name,
+        fromPhotoURL: att.photoURL || null,
+        roomId,
+        roomTitle: inviteTitle,
+        channel: msg.channel === 'game' ? 'game' : 'party',
+        createdAtMs: Date.now(),
+      });
+      this._sendJson(ws, { type: 'voice_invite_sent', toUid, delivered, roomId });
+      return;
+    }
+
     if (msg.type === 'webrtc_signal') {
       const toUid = String(msg.toUid || '').trim();
       if (!toUid || !att.roomId) return;
@@ -327,6 +391,11 @@ export class SignalingHubDO extends DurableObject {
           region: String(data.region || 'FR').slice(0, 6),
         });
         this._sendJson(ws, { type: 'IDENTIFIED', uid, ok: true });
+        break;
+      }
+
+      case 'PING': {
+        this._sendJson(ws, { type: 'PONG', clientTime: data.clientTime, serverTime: Date.now() });
         break;
       }
 
@@ -410,6 +479,21 @@ export class SignalingHubDO extends DurableObject {
           {
             type: 'RTC_SIGNAL',
             challengeId: data.challengeId,
+            fromUid: att.uid || null,
+            signalType: data.signalType,
+            payload: data.payload,
+          },
+          ws
+        );
+        break;
+      }
+
+      case 'PROBE_SIGNAL': {
+        if (!data.targetUid || !data.signalType) break;
+        this._pushNetplayUser(
+          data.targetUid,
+          {
+            type: 'PROBE_SIGNAL',
             fromUid: att.uid || null,
             signalType: data.signalType,
             payload: data.payload,
