@@ -87,6 +87,7 @@ function configureOpusSdp(sdp = '', maxKbps = 32) {
     if (fmtpRe.test(sdp)) {
       return sdp.replace(fmtpRe, (line) => {
         let next = line;
+        if (!next.includes('ptime=')) next += ';ptime=10';
         if (!next.includes('maxaveragebitrate=')) next += `;maxaveragebitrate=${bps}`;
         if (!next.includes('useinbandfec=')) next += ';useinbandfec=1';
         if (!next.includes('usedtx=')) next += ';usedtx=1';
@@ -95,7 +96,7 @@ function configureOpusSdp(sdp = '', maxKbps = 32) {
     }
     return sdp.replace(
       new RegExp(`(a=rtpmap:${pt}\\s+opus\\/48000[^\\r\\n]*)`, 'i'),
-      `$1\r\na=fmtp:${pt} minptime=10;useinbandfec=1;usedtx=1;maxaveragebitrate=${bps}`
+      `$1\r\na=fmtp:${pt} minptime=10;ptime=10;useinbandfec=1;usedtx=1;maxaveragebitrate=${bps}`
     );
   } catch {
     return sdp;
@@ -112,6 +113,7 @@ function applySenderBitrate(pc, maxKbps = 32) {
         params.encodings = [{}];
       }
       params.encodings[0].maxBitrate = maxBitrate;
+      params.encodings[0].networkPriority = 'high';
       sender.setParameters(params).catch(() => {});
     }
   } catch {}

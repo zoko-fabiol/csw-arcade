@@ -20,12 +20,12 @@ export function normalizeTurnEntries(cfList) {
       : entry?.urls
         ? [entry.urls]
         : [];
-    const udpFirst = [
-      ...rawUrls.filter((u) => String(u).includes('transport=udp')),
-      ...rawUrls.filter((u) => !String(u).includes('transport=udp')),
-    ];
-    if (udpFirst.length > 0) {
-      built.push({ ...entry, urls: udpFirst });
+    // Garder uniquement les URLs TURN UDP rapides + 1 seul repli TLS 443 (évite les paires ICE TCP redondantes)
+    const udpUrls = rawUrls.filter((u) => String(u).startsWith('turn') && String(u).includes('transport=udp'));
+    const tls443 = rawUrls.find((u) => String(u).startsWith('turns:') && String(u).includes(':443'));
+    const chosen = [...udpUrls, ...(tls443 ? [tls443] : [])];
+    if (chosen.length > 0) {
+      built.push({ ...entry, urls: chosen });
     }
   }
   return built;

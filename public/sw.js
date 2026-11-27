@@ -1,4 +1,4 @@
-const SHELL_CACHE_NAME = 'csw-arcade-shell-v35-cf-worker-voice';
+const SHELL_CACHE_NAME = 'csw-arcade-shell-v36-low-latency-p2p';
 const ENGINE_CACHE_NAME = 'csw-arcade-engine-v7';
 const ROMS_CACHE_NAME = 'csw-arcade-roms-v1';
 

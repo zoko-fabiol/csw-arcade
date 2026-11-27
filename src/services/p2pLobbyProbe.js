@@ -10,7 +10,6 @@ import { fetchDynamicTurnServers } from './rollbackP2P';
 const PROBE_STUN_SERVERS = [
   { urls: 'stun:stun.cloudflare.com:3478' },
   { urls: 'stun:stun.l.google.com:19302' },
-  { urls: 'stun:csw-arcade.tech:3478' },
 ];
 
 const CACHE_TTL_MS = 45000;
@@ -129,6 +128,7 @@ export class P2pLobbyProbe {
       const dc = session.pc.createDataChannel('csw-ping', {
         ordered: false,
         maxRetransmits: 0,
+        priority: 'high',
       });
       this._attachDataChannel(peerUid, session, dc);
       const offer = await session.pc.createOffer();

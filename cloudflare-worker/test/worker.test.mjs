@@ -71,7 +71,7 @@ registerHooks({
 const { default: worker } = await import('../src/index.js');
 const { handleVoiceBridgeRequest, VoiceBridgeRoomDO } = await import('../src/voicebridge.js');
 const { SignalingHubDO } = await import('../src/signalingHub.js');
-const { handleTurnCredentialsRequest, resetTurnCacheForTest } = await import('../src/turn.js');
+const { handleTurnCredentialsRequest, normalizeTurnEntries, resetTurnCacheForTest } = await import('../src/turn.js');
 
 function wrapStub(doInstance) {
   return {
@@ -224,6 +224,28 @@ test('/api/turn-credentials priorise UDP et retombe sur STUN sans token', async 
   const data = await res.json();
   assert.equal(data.ok, true);
   assert.ok(data.iceServers.some((s) => String(s.urls).includes('stun.cloudflare.com:3478')));
+
+  const normalized = normalizeTurnEntries([
+    { urls: ['stun:stun.cloudflare.com:3478', 'stun:stun.cloudflare.com:443'] },
+    {
+      urls: [
+        'turn:turn.cloudflare.com:3478?transport=udp',
+        'turn:turn.cloudflare.com:443?transport=udp',
+        'turn:turn.cloudflare.com:3478?transport=tcp',
+        'turns:turn.cloudflare.com:5349?transport=tcp',
+        'turn:turn.cloudflare.com:80?transport=tcp',
+        'turns:turn.cloudflare.com:443?transport=tcp',
+      ],
+      username: 'u',
+      credential: 'p',
+    },
+  ]);
+  assert.equal(normalized.length, 1);
+  assert.deepEqual(normalized[0].urls, [
+    'turn:turn.cloudflare.com:3478?transport=udp',
+    'turn:turn.cloudflare.com:443?transport=udp',
+    'turns:turn.cloudflare.com:443?transport=tcp',
+  ]);
 });
 
 test('SignalingHubDO : relaye webrtc_signal (/ws/voice) & RTC_SIGNAL (/ws/netplay) sans audio WS', async () => {

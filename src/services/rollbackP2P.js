@@ -49,6 +49,32 @@ try {
   }
 } catch {}
 
+function compactIceServers(servers = []) {
+  const seenStun = new Set();
+  const out = [];
+  for (const entry of servers) {
+    const raw = Array.isArray(entry?.urls) ? entry.urls : entry?.urls ? [entry.urls] : [];
+    const hasTurnCred = Boolean(entry?.username && entry?.credential);
+    if (!hasTurnCred) {
+      const freshStun = raw.filter((u) => {
+        const s = String(u);
+        if (!s.startsWith('stun:') || seenStun.has(s)) return false;
+        seenStun.add(s);
+        return true;
+      });
+      if (freshStun.length > 0) out.push({ ...entry, urls: freshStun.length === 1 ? freshStun[0] : freshStun });
+      continue;
+    }
+    const udpTurn = raw.filter((u) => String(u).startsWith('turn') && String(u).includes('transport=udp'));
+    const tls443 = raw.find((u) => String(u).startsWith('turns:') && String(u).includes(':443'));
+    const chosen = [...udpTurn, ...(tls443 ? [tls443] : [])];
+    if (chosen.length > 0) {
+      out.push({ ...entry, urls: chosen });
+    }
+  }
+  return out;
+}
+
 const DEFAULT_CF_TURN_URL = 'https://csw-arcade-signaling.clausephwandji044.workers.dev/api/turn-credentials';
 
 export async function fetchDynamicTurnServers() {
@@ -69,7 +95,7 @@ export async function fetchDynamicTurnServers() {
       .then((data) => (data?.ok && Array.isArray(data.iceServers) ? data : fetchTurnJson('/api/turn-credentials')))
       .then((data) => {
         if (data?.ok && Array.isArray(data.iceServers) && data.iceServers.length > 0) {
-          cachedDynamicTurnServers = data.iceServers;
+          cachedDynamicTurnServers = compactIceServers(data.iceServers);
           try {
             if (typeof localStorage !== 'undefined') {
               localStorage.setItem(
@@ -448,6 +474,7 @@ export class RollbackP2PEngine {
       const udp = this.pc.createDataChannel('fc-udp-inputs', {
         ordered: false,
         maxRetransmits: 0,
+        priority: 'high',
       });
       this.attachUdpChannel(udp);
 
