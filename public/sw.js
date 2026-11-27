@@ -1,5 +1,5 @@
-const SHELL_CACHE_NAME = 'csw-arcade-shell-v36-low-latency-p2p';
-const ENGINE_CACHE_NAME = 'csw-arcade-engine-v7';
+const SHELL_CACHE_NAME = 'csw-arcade-shell-v37-offline-tauri';
+const ENGINE_CACHE_NAME = 'csw-arcade-engine-v8';
 const ROMS_CACHE_NAME = 'csw-arcade-roms-v1';
 
 // Assets essentiels du moteur WebAssembly (FBNeo + EmulatorJS)
@@ -14,7 +14,10 @@ const ENGINE_ASSETS = [
   '/emulatorjs/cores/reports/fbneo.json',
   '/emulatorjs/cores/fbneo-wasm.data',
   '/emulatorjs/cores/fbneo-legacy-wasm.data',
-  '/emulatorjs/compression/extract7z.js'
+  '/emulatorjs/compression/extract7z.js',
+  '/emulatorjs/compression/extractzip.js',
+  '/emulatorjs/compression/libunrar.js',
+  '/emulatorjs/compression/libunrar.wasm'
 ];
 
 // Assets de l'interface et du shell CSW-Arcade
@@ -118,20 +121,20 @@ self.addEventListener('fetch', (event) => {
   // Permet un démarrage instantané 100% hors-ligne sans dépendance réseau une fois hébergé
   if (url.pathname.startsWith('/emulatorjs/') || url.hostname.includes('cdn.emulatorjs.org')) {
     event.respondWith(
-      caches.match(event.request).then((cachedResponse) => {
+      caches.match(event.request, { ignoreSearch: true }).then((cachedResponse) => {
         if (cachedResponse) {
           return cachedResponse;
         }
-        return fetch(event.request).then((networkResponse) => {
-          const ct = (networkResponse?.headers?.get('content-type') || '').toLowerCase();
-          if (networkResponse && ((networkResponse.status === 200 && !ct.includes('text/html')) || networkResponse.type === 'opaque')) {
-            const clone = networkResponse.clone();
-            caches.open(ENGINE_CACHE_NAME).then((cache) => cache.put(event.request, clone));
-          }
-          return networkResponse;
-        }).catch(() => {
-          // Secours : recherche sans paramètres d'URL (ex: hash ou query)
-          return caches.match(url.pathname);
+        return caches.match(url.pathname).then((pathCached) => {
+          if (pathCached) return pathCached;
+          return fetch(event.request).then((networkResponse) => {
+            const ct = (networkResponse?.headers?.get('content-type') || '').toLowerCase();
+            if (networkResponse && ((networkResponse.status === 200 && !ct.includes('text/html')) || networkResponse.type === 'opaque')) {
+              const clone = networkResponse.clone();
+              caches.open(ENGINE_CACHE_NAME).then((cache) => cache.put(event.request, clone));
+            }
+            return networkResponse;
+          }).catch(() => caches.match(url.pathname));
         });
       })
     );
@@ -150,8 +153,13 @@ self.addEventListener('fetch', (event) => {
             }
             return networkResponse;
           })
-          .catch(() => {
-            return caches.match('/index.html') || caches.match('/');
+          .catch(async () => {
+            return (
+              (await caches.match(url.pathname)) ||
+              (await caches.match(event.request, { ignoreSearch: true })) ||
+              (await caches.match('/index.html')) ||
+              (await caches.match('/'))
+            );
           })
       );
       return;
