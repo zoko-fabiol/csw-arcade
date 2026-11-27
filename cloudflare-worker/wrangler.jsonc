@@ -1,0 +1,30 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "csw-arcade-signaling",
+  "main": "src/index.js",
+  "compatibility_date": "2025-11-01",
+  "observability": {
+    "enabled": true
+  },
+  "vars": {
+    "CLOUDFLARE_TURN_KEY_ID": "8359ae79314f32ee98e0ed87b257d524"
+  },
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "VOICEBRIDGE_ROOMS",
+        "class_name": "VoiceBridgeRoomDO"
+      },
+      {
+        "name": "SIGNALING_HUB",
+        "class_name": "SignalingHubDO"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["VoiceBridgeRoomDO", "SignalingHubDO"]
+    }
+  ]
+}

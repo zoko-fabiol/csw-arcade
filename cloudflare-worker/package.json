@@ -1,0 +1,15 @@
+{
+  "name": "csw-arcade-signaling",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Traduction JavaScript / Cloudflare Workers + Durable Objects de VoiceBridge (api.php) et signalisation WebRTC CSW-Arcade",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "test": "node --test test/worker.test.mjs"
+  },
+  "devDependencies": {
+    "wrangler": "^4.0.0"
+  }
+}
